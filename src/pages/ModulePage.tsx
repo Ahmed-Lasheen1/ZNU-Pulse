@@ -12,6 +12,10 @@ import { fetchModuleStages } from '../lib/moduleStages'
 import { fetchSubjectsForModule } from '../lib/subjects'
 import { ModuleIcon, ExamIcon, NotesIcon } from '../lib/medicalIcons'
 import { FILE_CARDS } from '../lib/fileCards'
+// AUDIT FIX: isSafeExternalUrl guards the admin-entered Drive link before
+// it's ever shown as a clickable card / passed to window.open() — see
+// src/lib/embedUrl.js for details.
+import { isSafeExternalUrl } from '../lib/embedUrl'
 import { ExamStageIcon, StudyByLessonIcon, StudyMaterialsIcon, SmartSummariesIcon, PracticeIcon, BookIcon } from '@/components/ui/tool-icons'
 
 interface PageModule {
@@ -81,6 +85,12 @@ export default function ModulePage({ dark }: { dark: boolean }) {
       <div style={{ ...pulseType.cardTitle, fontSize: 'clamp(13px, 1.1vw, 16px)', color: pt.textPrimary }}>{card.title}</div>
     </LiquidGlassCard>
   )
+
+  // AUDIT FIX: only render/open the Drive link when it's a real http(s)
+  // URL — closes the same "unvalidated admin-entered URL used as a
+  // window.open target" gap that embedUrl.js's isSafeUrl() closes for
+  // iframe/audio src elsewhere in the app.
+  const driveUrlIsSafe = !!driveUrl && isSafeExternalUrl(driveUrl)
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
@@ -152,7 +162,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
         )}
 
         {/* Study Materials */}
-        {(filteredFileCards.length > 0 || driveUrl) && (
+        {(filteredFileCards.length > 0 || driveUrlIsSafe) && (
           <div style={{ marginBottom: 32 }}>
             <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
               <StudyMaterialsIcon color={ON_GRADIENT_TOP.muted} size={14} /> Study Materials
@@ -167,7 +177,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
               )
             )}
 
-            {driveUrl && (
+            {driveUrlIsSafe && (
               <div className="auto-grid-single" style={{ marginTop: filteredFileCards.length > 0 ? 16 : 0 }}>
                 <LiquidGlassCard dark={dark} delay={0}
                   onClick={() => window.open(driveUrl, '_blank', 'noopener,noreferrer')}

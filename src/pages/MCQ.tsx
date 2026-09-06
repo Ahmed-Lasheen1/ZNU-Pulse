@@ -398,6 +398,14 @@ export default function MCQ({ dark }: { dark: boolean }) {
   // splits "tutor" from "timed" mode). Mock Exam stays strictly
   // deferred until submission, since it's meant to simulate real test
   // conditions.
+  //
+  // Note: this per-question, in-the-moment grading still goes through
+  // grade_mcq (unchanged) — that RPC is only ever used for immediate
+  // feedback while a quiz is in progress, never for the recorded score.
+  // The recorded score/points/history for signed-in users now come
+  // exclusively from submit_quiz_attempt (see submitQuiz below), which
+  // re-grades everything itself server-side rather than trusting
+  // whatever the client already showed on screen.
   const isTutorMode = quizMode === 'practice' || quizMode === 'retry'
 
   async function tutorGradeAnswer(qi: number, opt: string) {
@@ -454,58 +462,39 @@ export default function MCQ({ dark }: { dark: boolean }) {
     startRetryQuiz(incorrectQs)
   }
 
+  // AUDIT FIX (score-integrity, pre-launch security audit):
+  //
+  // This function used to (1) call grade_mcq for every question,
+  // (2) compute total/correct/score/points itself in the browser from
+  // that response, and then (3) write answered_questions, exam_history,
+  // and a points amount directly to the database via plain table
+  // calls + `award_points({ p_amount: newPoints })`. Since every one of
+  // those writes only ever checked `auth.uid() = user_id` at the
+  // database layer (not whether the score/points being written were
+  // ever actually earned), a signed-in user could skip taking a quiz
+  // entirely and insert an arbitrary score/points combination directly
+  // from the browser console, using nothing but their own already-
+  // authenticated session and the public anon key.
+  //
+  // For signed-in users, all of that now happens in ONE atomic,
+  // server-side call: submit_quiz_attempt(). The RPC re-grades every
+  // submitted answer itself against the real answer key, and is the
+  // only thing that writes answered_questions/exam_history/points —
+  // the client never sends a score, a correctness flag, or a points
+  // amount for a signed-in user again. See the accompanying SQL
+  // migration for the RPC definition.
+  //
+  // Guests (no account) are unaffected: nothing is persisted server-
+  // side for them regardless, so grade_mcq + local (per-device)
+  // bookkeeping — exactly as before — is still the right, lowest-risk
+  // path for that case.
   async function submitQuiz() {
     clearInterval(timerRef.current)
     setGrading(true)
 
     const payload = quizQuestions.map((q, i) => ({ id: q.id, answer: answers[i] || null }))
-    const { data: graded, error } = await supabase.rpc('grade_mcq', { p_answers: payload })
-
-    if (error) {
-      setGrading(false)
-      showToast('⚠️ Could not submit — check your connection and try again', 'error')
-      return
-    }
-
-    const resultMap: Record<string, any> = {}
-    if (graded) {
-      graded.forEach((r: any) => {
-        resultMap[r.question_id] = {
-          is_correct: r.is_correct,
-          correct_answer: r.correct_answer,
-          explanation: r.explanation
-        }
-      })
-    }
-    setResults(resultMap)
-    setGrading(false)
-    setSubmitted(true)
-    window.scrollTo({ top: 0 })
-
-    clearActiveExam(user)
-
     const total = quizQuestions.length
-    const correctCount = quizQuestions.filter(q => resultMap[q.id]?.is_correct).length
-    const scorePercent = total > 0 ? Math.round((correctCount / total) * 100) : 0
     const timeSec = quizMode === 'mock' ? Math.max(0, MOCK_MINUTES * 60 - timeLeft) : null
-    setFinishTimeSec(quizMode === 'mock' ? (timeSec as number) : elapsedSeconds)
-
-    // Snapshot of every question this attempt got wrong — saved
-    // alongside the exam_history row so Review's History tab can show
-    // exactly what was missed in THIS attempt, later, even if the
-    // question bank itself changes or a question gets deleted.
-    const incorrectSnapshots = quizQuestions
-      .filter(q => resultMap[q.id] && !resultMap[q.id].is_correct)
-      .map(q => ({
-        question_id: q.id,
-        question: q.question,
-        option_a: q.option_a, option_b: q.option_b, option_c: q.option_c, option_d: q.option_d,
-        correct_answer: resultMap[q.id].correct_answer,
-        explanation: resultMap[q.id].explanation,
-        module_id: q.module_id || null,
-        subject_id: q.subject_id || null,
-        source: q.source || null,
-      }))
 
     const retryModuleIsUniform = quizMode === 'retry' && quizQuestions.every(q => q.module_id === quizQuestions[0]?.module_id)
     const retrySubjectIsUniform = quizMode === 'retry' && quizQuestions.every(q => q.subject_id === quizQuestions[0]?.subject_id)
@@ -518,45 +507,79 @@ export default function MCQ({ dark }: { dark: boolean }) {
         ? (retrySubjectIsUniform ? (quizQuestions[0]?.subject_id || null) : null)
         : null
 
-    if (!error && user) {
-      const toRecord = quizQuestions
-        .map(q => ({
-          question_id: q.id,
-          correct: resultMap[q.id]?.is_correct || false,
-          isNew: !answeredIds.has(q.id)
-        }))
-        .filter(r => r.isNew)
+    const resultMap: Record<string, any> = {}
 
-      if (toRecord.length > 0) {
-        await supabase.from('answered_questions').upsert(
-          toRecord.map(r => ({
-            user_id: user.id,
-            question_id: r.question_id,
-            correct: r.correct
-          }))
-        )
+    if (user) {
+      // Signed-in path — server is authoritative for grading, scoring,
+      // points, and the exam_history record. See comment above.
+      const { data: graded, error } = await supabase.rpc('submit_quiz_attempt', {
+        p_answers: payload,
+        p_module_id: historyModuleId,
+        p_quiz_type: quizMode,
+        p_subject_id: historySubjectId,
+        p_time_sec: timeSec
+      })
 
-        const newPoints = toRecord.filter(r => r.correct).length
-        if (newPoints > 0) {
-          const { error: pointsError } = await supabase.rpc('award_points', { p_amount: newPoints })
-          if (!pointsError) {
-            fetchProfile(user.id)
-          }
-        }
-        fetchAnsweredIds()
+      if (error) {
+        setGrading(false)
+        showToast('⚠️ Could not submit — check your connection and try again', 'error')
+        return
       }
 
-      supabase.from('exam_history').insert({
-        user_id: user.id,
-        module_id: historyModuleId,
-        quiz_type: quizMode,
-        subject_id: historySubjectId,
-        total, correct: correctCount, score: scorePercent, time_sec: timeSec,
-        incorrect_questions: incorrectSnapshots
-      }).then(({ error: historyError }: any) => {
-        if (historyError) console.warn('[MCQ] exam_history insert failed:', historyError)
-      })
-    } else if (!user) {
+      if (graded) {
+        graded.forEach((r: any) => {
+          resultMap[r.question_id] = {
+            is_correct: r.is_correct,
+            correct_answer: r.correct_answer,
+            explanation: r.explanation
+          }
+        })
+      }
+
+      // The RPC already recorded everything server-side — refresh the
+      // locally-cached profile/answered-ids state to reflect it rather
+      // than re-deriving anything from the client's own computation.
+      fetchProfile(user.id)
+      fetchAnsweredIds()
+    } else {
+      // Guest path — unchanged. Nothing is persisted server-side for a
+      // guest regardless of what the client sends, so there's no
+      // integrity gap here to close; grade_mcq + local bookkeeping is
+      // still the correct, lowest-risk approach.
+      const { data: graded, error } = await supabase.rpc('grade_mcq', { p_answers: payload })
+
+      if (error) {
+        setGrading(false)
+        showToast('⚠️ Could not submit — check your connection and try again', 'error')
+        return
+      }
+
+      if (graded) {
+        graded.forEach((r: any) => {
+          resultMap[r.question_id] = {
+            is_correct: r.is_correct,
+            correct_answer: r.correct_answer,
+            explanation: r.explanation
+          }
+        })
+      }
+
+      const incorrectSnapshots = quizQuestions
+        .filter(q => resultMap[q.id] && !resultMap[q.id].is_correct)
+        .map(q => ({
+          question_id: q.id,
+          question: q.question,
+          option_a: q.option_a, option_b: q.option_b, option_c: q.option_c, option_d: q.option_d,
+          correct_answer: resultMap[q.id].correct_answer,
+          explanation: resultMap[q.id].explanation,
+          module_id: q.module_id || null,
+          subject_id: q.subject_id || null,
+          source: q.source || null,
+        }))
+
+      const guestCorrectCount = quizQuestions.filter(q => resultMap[q.id]?.is_correct).length
+      const guestScorePercent = total > 0 ? Math.round((guestCorrectCount / total) * 100) : 0
+
       quizQuestions.forEach(q => {
         const r = resultMap[q.id]
         if (r && !r.is_correct) {
@@ -570,10 +593,19 @@ export default function MCQ({ dark }: { dark: boolean }) {
       enrichGuestFlagsWithResults(resultMap)
       addGuestHistory({
         module_id: historyModuleId, quiz_type: quizMode,
-        total, correct: correctCount, score: scorePercent, time_sec: timeSec,
+        total, correct: guestCorrectCount, score: guestScorePercent, time_sec: timeSec,
         incorrect_questions: incorrectSnapshots
       })
     }
+
+    setResults(resultMap)
+    setGrading(false)
+    setSubmitted(true)
+    window.scrollTo({ top: 0 })
+
+    clearActiveExam(user)
+
+    setFinishTimeSec(quizMode === 'mock' ? (timeSec as number) : elapsedSeconds)
   }
 
   // ── Exam mode (taking + results) ────────────────────────────────────

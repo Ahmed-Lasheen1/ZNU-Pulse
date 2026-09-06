@@ -13,6 +13,10 @@ import { fetchModuleStages, stageMetaFrom } from '../lib/moduleStages'
 import { fetchSubjectsForModule } from '../lib/subjects'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
 import { FILE_CARDS } from '../lib/fileCards'
+// AUDIT FIX: isSafeExternalUrl guards the admin-entered Drive link before
+// it's ever shown as a clickable card / passed to window.open() — see
+// src/lib/embedUrl.js for details.
+import { isSafeExternalUrl } from '../lib/embedUrl'
 import { ModuleIcon, ExamIcon, NotesIcon } from '../lib/medicalIcons'
 import { StudyMaterialsIcon, StudyByLessonIcon, SmartSummariesIcon, PracticeIcon, BookIcon } from '@/components/ui/tool-icons'
 
@@ -121,6 +125,12 @@ export default function StagePage({ dark }: { dark: boolean }) {
     else navigate(`/summaries?module=${moduleId}&stage=${stage}`)
   }
 
+  // AUDIT FIX: only render/open the Drive link when it's a real http(s)
+  // URL — closes the same "unvalidated admin-entered URL used as a
+  // window.open target" gap that embedUrl.js's isSafeUrl() closes for
+  // iframe/audio src elsewhere in the app.
+  const driveUrlIsSafe = !!driveUrl && isSafeExternalUrl(driveUrl)
+
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
       <PulseBackground />
@@ -142,7 +152,7 @@ export default function StagePage({ dark }: { dark: boolean }) {
           </div>
         </div>
 
-        {(filteredFileCards.length > 0 || driveUrl) && (
+        {(filteredFileCards.length > 0 || driveUrlIsSafe) && (
           <div style={{ marginBottom: 32 }}>
             <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
               <StudyMaterialsIcon color={ON_GRADIENT_TOP.muted} size={14} /> Study Materials
@@ -157,7 +167,7 @@ export default function StagePage({ dark }: { dark: boolean }) {
               )
             )}
 
-            {driveUrl && (
+            {driveUrlIsSafe && (
               <div className="auto-grid-single" style={{ marginTop: filteredFileCards.length > 0 ? 16 : 0 }}>
                 <LiquidGlassCard dark={dark} delay={0}
                   onClick={() => window.open(driveUrl, '_blank', 'noopener,noreferrer')}
