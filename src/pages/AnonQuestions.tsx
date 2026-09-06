@@ -1,5 +1,5 @@
 // src/pages/AnonQuestions.tsx
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabase'
 import { useAuth } from '../contexts'
 import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
@@ -29,6 +29,22 @@ const QNA_ACCENT = '#a78bfa'
 // badly behind, not a bug in this fetch.)
 const RECENT_QUESTIONS_LIMIT = 300
 
+// AUDIT FIX (pre-launch security audit — spam/abuse finding): there was
+// previously no friction at all between submissions — a script (or a
+// bored visitor) could call submitQuestion() in a tight loop and flood
+// the table, since submissions require no account. This is a client-side
+// courtesy cooldown only, not a real access-control boundary (anyone
+// bypassing the UI entirely, e.g. by calling the Supabase client directly
+// from devtools, isn't slowed down by it) — a proportionate fix for a
+// student study app is to make accidental/casual spamming inconvenient
+// through the normal UI, not to build server-side rate limiting for a
+// problem that hasn't actually been observed yet. If real abuse shows up
+// post-launch, move this enforcement server-side (e.g. a Postgres
+// trigger keyed on a submitted device/session token) rather than relying
+// on this alone.
+const SUBMIT_COOLDOWN_MS = 30_000
+const COOLDOWN_STORAGE_KEY = 'anon_q_last_submit_at'
+
 interface AnonQuestion {
   id: string
   question: string
@@ -50,8 +66,25 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
   const [loading, setLoading] = useState(true)
   const [msg, setMsg] = useState('')
   const [replyText, setReplyText] = useState<Record<string, string>>({})
+  const [cooldownRemaining, setCooldownRemaining] = useState(0)
+  const cooldownTimerRef = useRef<ReturnType<typeof setInterval>>()
 
   useEffect(() => { fetchQuestions(); fetchMyQuestions() }, [])
+
+  // Restores an in-progress cooldown across a page reload — without this,
+  // reloading the page would silently reset the timer and defeat the
+  // whole point of the cooldown.
+  useEffect(() => {
+    updateCooldownRemaining()
+    cooldownTimerRef.current = setInterval(updateCooldownRemaining, 1000)
+    return () => clearInterval(cooldownTimerRef.current)
+  }, [])
+
+  function updateCooldownRemaining() {
+    const lastSubmitAt = Number(localStorage.getItem(COOLDOWN_STORAGE_KEY) || 0)
+    const remaining = Math.max(0, SUBMIT_COOLDOWN_MS - (Date.now() - lastSubmitAt))
+    setCooldownRemaining(remaining)
+  }
 
   useEffect(() => {
     if (!('Notification' in window) || Notification.permission !== 'granted') return
@@ -91,9 +124,17 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
 
   async function submitQuestion() {
     if (!newQ.trim()) return
+    if (cooldownRemaining > 0) {
+      const seconds = Math.ceil(cooldownRemaining / 1000)
+      setMsg(`❌ Please wait ${seconds}s before submitting another question`)
+      setTimeout(() => setMsg(''), 3000)
+      return
+    }
     const token = crypto.randomUUID()
     const { error } = await supabase.from('anonymous_questions').insert([{ question: newQ.trim(), tracking_token: token }])
     if (!error) {
+      localStorage.setItem(COOLDOWN_STORAGE_KEY, String(Date.now()))
+      updateCooldownRemaining()
       addMyAnonToken(token)
       setMsg('✅ Question submitted anonymously!')
       setNewQ('')
@@ -123,6 +164,8 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
 
   const isSuccess = msg.includes('✅')
   const inStyle = { ...glassInput(pt, dark), padding: '13px 20px' }
+  const submitDisabled = cooldownRemaining > 0
+  const cooldownSeconds = Math.ceil(cooldownRemaining / 1000)
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
@@ -187,12 +230,15 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
             {msg && (
               <div style={{ color: isSuccess ? '#4ade80' : pt.danger, fontSize: 13, marginBottom: 8 }}>{msg}</div>
             )}
-            <button onClick={submitQuestion} style={{
+            <button onClick={submitQuestion} disabled={submitDisabled} style={{
               width: '100%', padding: '13px', background: QNA_ACCENT,
-              border: 'none', borderRadius: 999, cursor: 'pointer',
+              border: 'none', borderRadius: 999, cursor: submitDisabled ? 'not-allowed' : 'pointer',
+              opacity: submitDisabled ? 0.6 : 1,
               fontWeight: 700, color: '#0f172a', fontFamily: pulseFonts.body, fontSize: 14,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
-            }}>Submit Anonymously <Lock size={14} /></button>
+            }}>
+              {submitDisabled ? `Please wait ${cooldownSeconds}s...` : (<>Submit Anonymously <Lock size={14} /></>)}
+            </button>
           </LiquidGlassCard>
         </div>
 
