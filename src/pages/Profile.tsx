@@ -159,7 +159,7 @@ export default function Profile({ dark }: { dark: boolean }) {
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
       <PulseBackground />
-      <div className="pulse-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body, maxWidth: 700, margin: '0 auto' }}>
+      <div className="pulse-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body, maxWidth: 560, margin: '0 auto' }}>
 
         <div style={{ marginBottom: 8 }}>
           <BackButton dark={dark} fallback="/" />
@@ -167,7 +167,7 @@ export default function Profile({ dark }: { dark: boolean }) {
 
         {/* Tabs — history now lives on the Review page (/review), so
             it's no longer one of the tabs here. */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginBottom: 24 }}>
           {(['profile', 'leaderboard'] as const).map(t => {
             const active = tab === t
             const color = active ? pt.cobalt : pt.sub
@@ -177,10 +177,10 @@ export default function Profile({ dark }: { dark: boolean }) {
                 activeTint={`${pt.cobalt}26`} hoverTint={hoverTint}
                 onClick={() => setTab(t)} role="button" tabIndex={0}
                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTab(t) } }}
-                style={{ flex: 1, textAlign: 'center' }}
+                style={{ textAlign: 'center' }}
               >
-                <div style={{ padding: '10px', ...pulseType.button, color, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                  {t === 'profile' ? <User size={14} color={color} /> : <LeaderboardIcon color={color} size={14} />}
+                <div style={{ padding: '11px 26px', ...pulseType.button, fontSize: 14, color, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+                  {t === 'profile' ? <User size={15} color={color} /> : <LeaderboardIcon color={color} size={15} />}
                   {t === 'profile' ? 'Profile' : 'Leaderboard'}
                 </div>
               </PulseGlassRow>
