@@ -81,8 +81,22 @@ export function getPulseTheme(dark) {
         terracottaSoft: 'rgba(255,107,0,0.16)',
         amber: '#FF6B00',
         warning: '#FF6B00',
-        danger: '#EF6B57',
-        error: '#EF6B57',
+        // AUDIT FIX (readability): dark-mode danger/error was
+        // '#EF6B57', a coral-salmon red tuned for contrast against a
+        // solid near-black surface. Several places that read this
+        // token — most visibly the Home page's Weekly Report card —
+        // sit on translucent glass layered over the *light/pale-blue
+        // top* zone of the fixed PULSE_BG gradient, not a true dark
+        // background, so that red ended up too close in brightness to
+        // read comfortably. Replaced with '#F87171' (the red commonly
+        // used for dark-theme error/danger text in modern UI kits,
+        // e.g. Tailwind's red-400) — it stays clearly "red" (unlike
+        // Material's more muted/pink dark-error '#CF6679') while
+        // testing well against both this app's genuinely dark
+        // surfaces (canvas/surfaceFlat) and its lighter glass-over-
+        // gradient surfaces like the Weekly Report card.
+        danger: '#F87171',
+        error: '#F87171',
         success: '#4ADE80',
 
         // ECG mark
