@@ -11,7 +11,7 @@ import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PulseBackground from '../../components/pulse/PulseBackground'
 import { FlagIcon, SearchIcon2, LightbulbIcon } from '../../components/ui/tool-icons'
 import {
-  MOCK_MINUTES, MCQ_ACCENT,
+  MOCK_MINUTES,
   EXAM_TOP_TEXT, EXAM_TOP_TEXT_MUTED, EXAM_TOP_AMBER, EXAM_TOP_RED,
   EXAM_LOW_TEXT, EXAM_LOW_SECONDARY, EXAM_LOW_TEXT_MUTED, EXAM_LOW_SHADOW, EXAM_DIVIDER,
   optionLabels, optionTexts, formatTime, StatChip, InfoTag,
@@ -61,6 +61,10 @@ export default function MCQExamFlow({
 }: MCQExamFlowProps) {
   const pt = getPulseTheme(dark)
   const isTutorMode = quizMode === 'practice' || quizMode === 'retry'
+  // Feature accent for the exam UI — see premiumTheme.js's `teal`
+  // token comment for why this replaced the old standalone terracotta
+  // MCQ_ACCENT constant.
+  const mcqAccent = pt.teal
 
   function getScore() {
     return quizQuestions.filter(q => results[q.id]?.is_correct).length
@@ -209,7 +213,7 @@ export default function MCQExamFlow({
 
         {total === 0 && !submitted && (
           <div style={{ textAlign: 'center', padding: 24 }}>
-            <h2 style={{ color: MCQ_ACCENT, fontSize: 16 }}>No questions available yet!</h2>
+            <h2 style={{ color: mcqAccent, fontSize: 16 }}>No questions available yet!</h2>
           </div>
         )}
 
@@ -229,7 +233,7 @@ export default function MCQExamFlow({
               flaggedIndexes={flaggedIndexes}
               onGoTo={setCurrentIndex}
               dark={dark}
-              accent={MCQ_ACCENT}
+              accent={mcqAccent}
             />
 
             <LiquidGlassCard dark={dark} delay={0} style={{
@@ -248,8 +252,8 @@ export default function MCQExamFlow({
                     <span style={{
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                       minWidth: 30, height: 24, padding: '0 9px', borderRadius: 8,
-                      background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`,
-                      color: MCQ_ACCENT, fontWeight: 800, fontSize: 12, whiteSpace: 'nowrap'
+                      background: `${mcqAccent}22`, border: `1px solid ${mcqAccent}55`,
+                      color: mcqAccent, fontWeight: 800, fontSize: 12, whiteSpace: 'nowrap'
                     }}>Q{safeIndex + 1}</span>
                     {showSubjectTag && <InfoTag label={subj.name} color={subj.color || '#34d399'} />}
                     {showLessonTag && <InfoTag label={lesson.title} color="#818cf8" />}
@@ -495,14 +499,14 @@ export default function MCQExamFlow({
               <div style={{ marginTop: 20 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: EXAM_LOW_SECONDARY, textShadow: EXAM_LOW_SHADOW, marginBottom: 8 }}>FOCUS NEXT</div>
                 <LiquidGlassCard dark={dark} delay={0} style={{ padding: '16px 20px' }}>
-                  <div style={{ color: MCQ_ACCENT, fontWeight: 800, fontSize: 15, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  <div style={{ color: mcqAccent, fontWeight: 800, fontSize: 15, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                     {weakestSubject.name}
                   </div>
                   <div style={{ color: pt.sub, fontSize: 12, marginBottom: 12 }}>
                     You missed {weakestSubject.incorrect} question{weakestSubject.incorrect === 1 ? '' : 's'} from this topic.
                   </div>
                   <button onClick={() => startTargetedPractice(weakestSubject.id)} className="exam-btn" style={{
-                    width: '100%', background: MCQ_ACCENT, color: '#0f172a', border: 'none', borderRadius: 999,
+                    width: '100%', background: mcqAccent, color: '#0f172a', border: 'none', borderRadius: 999,
                     padding: '11px', fontWeight: 800, fontSize: 12, letterSpacing: 0.5, cursor: 'pointer', fontFamily: pulseFonts.body
                   }}>START TARGETED PRACTICE</button>
                 </LiquidGlassCard>
@@ -564,8 +568,8 @@ export default function MCQExamFlow({
                       <span style={{
                         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                         minWidth: 28, height: 22, padding: '0 8px', borderRadius: 7,
-                        background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`,
-                        color: MCQ_ACCENT, fontWeight: 800, fontSize: 11
+                        background: `${mcqAccent}22`, border: `1px solid ${mcqAccent}55`,
+                        color: mcqAccent, fontWeight: 800, fontSize: 11
                       }}>Q{qi + 1}</span>
                       <span style={{
                         fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: '2px 9px', borderRadius: 20,
