@@ -129,7 +129,7 @@ export default function MCQBrowse({
           active={activeStage}
           onSelect={onSelectStage}
           dark={dark}
-          accentColor={MCQ_ACCENT}
+          accentColor={pt.cobalt}
           style={{ marginBottom: 16 }}
         />
 
@@ -138,7 +138,7 @@ export default function MCQBrowse({
           active={activeSubject}
           onSelect={onSelectSubject}
           dark={dark}
-          accentColor={MCQ_ACCENT}
+          accentColor={pt.cobalt}
           style={{ marginBottom: 28 }}
         />
 

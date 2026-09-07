@@ -234,7 +234,7 @@ export default function Review({ dark }: { dark: boolean }) {
             return (
               <PulseGlassRow
                 key={t.id} dark={dark} radius={999} active={active}
-                activeTint={`${REVIEW_ACCENT}26`} hoverTint={hoverTint}
+                activeTint={`${pt.cobalt}26`} hoverTint={hoverTint}
                 onClick={() => setTab(t.id)} role="button" tabIndex={0}
                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTab(t.id) } }}
                 style={{ textAlign: 'center', width: 150 }}

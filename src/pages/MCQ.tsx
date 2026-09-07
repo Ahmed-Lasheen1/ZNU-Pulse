@@ -308,6 +308,9 @@ export default function MCQ({ dark }: { dark: boolean }) {
     timerRef.current = setInterval(tick, 1000)
   }
 
+  // AUDIT FIX (per user request): if the current selection has zero
+  // eligible questions, don't let the student enter an empty exam
+  // screen at all — show a toast and stay on the browsing view.
   function startQuiz(type: string, subjectId: string | null = null) {
     let qs = type === 'mock'
       ? shuffle(getFilteredQuestions('mock')).slice(0, 36)
@@ -316,6 +319,11 @@ export default function MCQ({ dark }: { dark: boolean }) {
           (q.exam_type === 'practice' || q.exam_type === 'both') &&
           (activeStage === 'all' || (q.exam_stage || 'general') === activeStage)
         )).slice(0, 50)
+
+    if (qs.length === 0) {
+      showToast('❌ No questions available for this selection yet', 'error')
+      return
+    }
 
     setQuizQuestions(qs)
     setAnswers({})
@@ -336,7 +344,16 @@ export default function MCQ({ dark }: { dark: boolean }) {
     window.scrollTo({ top: 0 })
   }
 
+  // Same guard as startQuiz above — a retry list can legitimately be
+  // empty (e.g. every flagged/incorrect question for a filter has
+  // since been deleted), so this is checked here too rather than only
+  // at the two call sites that already guard it themselves.
   function startRetryQuiz(list: any[]) {
+    if (!list || list.length === 0) {
+      showToast('❌ No questions to retry', 'error')
+      return
+    }
+
     setQuizQuestions(list)
     setAnswers({})
     setResults({})
@@ -619,54 +636,4 @@ export default function MCQ({ dark }: { dark: boolean }) {
         quizQuestions={quizQuestions}
         answers={answers}
         results={results}
-        flaggedIds={flaggedIds}
-        struckOut={struckOut}
-        currentIndex={currentIndex}
-        setCurrentIndex={setCurrentIndex}
-        timeLeft={timeLeft}
-        elapsedSeconds={elapsedSeconds}
-        finishTimeSec={finishTimeSec}
-        fontScale={fontScale}
-        cycleFontScale={cycleFontScale}
-        showReview={showReview}
-        setShowReview={setShowReview}
-        subjects={subjects}
-        lessons={lessons}
-        lessonFilter={lessonFilter}
-        stopQuiz={stopQuiz}
-        submitQuiz={submitQuiz}
-        tryAgain={tryAgain}
-        startTargetedPractice={startTargetedPractice}
-        selectAnswer={selectAnswer}
-        toggleStrike={toggleStrike}
-        toggleFlagFor={toggleFlagFor}
-        goPrev={goPrev}
-        goNext={goNext}
-      />
-    )
-  }
-
-  // ── Module / subject browsing view ─────────────────────────────────
-  return (
-    <MCQBrowse
-      dark={dark}
-      modulesError={modulesError}
-      loadError={loadError}
-      usingCache={usingCache}
-      resumeData={resumeData}
-      onResume={resumeExam}
-      onDiscardResume={discardResume}
-      activeModuleObj={activeModuleObj}
-      stages={stages}
-      activeStage={activeStage}
-      onSelectStage={setActiveStage}
-      moduleSubjects={moduleSubjects}
-      activeSubject={activeSubject}
-      onSelectSubject={setActiveSubject}
-      loading={loading}
-      questions={questions}
-      getFilteredQuestions={getFilteredQuestions}
-      onStartQuiz={startQuiz}
-    />
-  )
-}
+        
