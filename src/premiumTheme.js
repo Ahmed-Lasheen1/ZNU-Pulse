@@ -77,20 +77,6 @@ export function getPulseTheme(dark) {
         textAccent: '#38BDF8',
         indigo: '#8E7CF6',
         indigoSoft: 'rgba(142,124,246,0.16)',
-        // Teal — cool-family accent for the MCQ/quiz and Review
-        // features (see mcqShared.tsx / Review.tsx). Previously those
-        // used a standalone terracotta-coral (#e2725b) that sat in
-        // the same warm hue family as `danger` (incorrect-answer red)
-        // and `amber` (warnings/streaks) — on the exam results screen
-        // itself that meant the feature's own brand accent was
-        // visually competing with its own "wrong answer" color. Teal
-        // sits color-wheel-adjacent to cobalt/cyan (reads as the same
-        // cool family) while staying clear of the red/orange zone
-        // entirely, and distinct from indigo (already claimed by
-        // Schedule's SCHEDULE_ACCENT).
-        teal: '#2DD4BF',
-        tealSoft: 'rgba(45,212,191,0.16)',
-        tealBorder: 'rgba(45,212,191,0.4)',
         terracotta: '#FF6B00',
         terracottaSoft: 'rgba(255,107,0,0.16)',
         amber: '#FF6B00',
@@ -135,11 +121,6 @@ export function getPulseTheme(dark) {
         textAccent: '#0284C7',
         indigo: '#6C5CE3',
         indigoSoft: 'rgba(108,92,227,0.10)',
-        // Teal — see the dark-theme comment above for why this
-        // replaces the old MCQ/Review terracotta accent.
-        teal: '#0D9488',
-        tealSoft: 'rgba(13,148,136,0.10)',
-        tealBorder: 'rgba(13,148,136,0.35)',
         terracotta: '#EA580C',
         terracottaSoft: 'rgba(234,88,12,0.12)',
         amber: '#EA580C',

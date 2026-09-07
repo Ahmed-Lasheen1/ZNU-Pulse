@@ -17,6 +17,8 @@ import QuestionSourceBadge from '../components/QuestionSourceBadge'
 import { ModuleIcon } from '../lib/medicalIcons'
 import { BookIcon, ClockIcon, FlagIcon, LightbulbIcon, TargetIcon, EmptyBoxIcon, CelebrationIcon, RefreshIcon, SearchIcon2 } from '../components/ui/tool-icons'
 
+const REVIEW_ACCENT = '#e2725b'
+
 const SECTION_GAP = 22
 const ITEM_GAP = 16
 
@@ -82,13 +84,6 @@ export default function Review({ dark }: { dark: boolean }) {
   const navigate = useNavigate()
   const showToast = useToast() as (message: string, type?: 'success' | 'error') => void
   const pt = getPulseTheme(dark)
-  // Feature accent — was a standalone hardcoded terracotta-coral
-  // (#e2725b) that clashed with this page's own red/green
-  // correct/incorrect coloring. Now reads the theme's `teal` token
-  // (same fix as MCQ_ACCENT, see premiumTheme.js's comment on it),
-  // computed here so it can respond to the light/dark toggle like
-  // every other themed color on this page.
-  const REVIEW_ACCENT = pt.teal
 
   const [tab, setTab] = useState<ReviewTab>('history')
 

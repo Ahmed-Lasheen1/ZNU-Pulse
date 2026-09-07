@@ -7,18 +7,9 @@
 import { pulseFonts, ON_GRADIENT_TOP, ON_GRADIENT_BOTTOM } from '../../premiumTheme'
 
 export const MOCK_MINUTES = 36
-
-// NOTE: the MCQ/exam feature's brand accent used to live here as a
-// standalone hardcoded hex (MCQ_ACCENT = '#e2725b', a terracotta-
-// coral). That color sat in the same warm hue family as this app's
-// semantic `danger` (incorrect-answer red) and `amber` (warnings/
-// streaks) tokens — on the exam results screen itself, that meant the
-// feature's own accent was visually competing with the very "wrong
-// answer" red it renders right next to. It's now `pt.teal` (see
-// premiumTheme.js), read directly from the theme wherever it's needed
-// (MCQBrowse.tsx, MCQExamFlow.tsx, and Review.tsx's REVIEW_ACCENT)
-// instead of a flat constant — this file has no access to `dark`, so
-// there's nothing to export from here anymore.
+// Existing functional accent for the MCQ/exam feature (same terracotta
+// used on Review.tsx) — reused, not invented.
+export const MCQ_ACCENT = '#e2725b'
 
 // ── Shared accuracy tiers ────────────────────────────────────────────
 // Single source of truth for the score bands used everywhere accuracy

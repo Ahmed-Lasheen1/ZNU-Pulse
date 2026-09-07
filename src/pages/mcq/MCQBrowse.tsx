@@ -13,6 +13,7 @@ import PulseGlassRow from '../../components/pulse/PulseGlassRow'
 import BackButton from '../../components/pulse/BackButton'
 import { ModuleIcon, ExamIcon } from '../../lib/medicalIcons'
 import { OfflineIcon, BookIcon, PauseIcon, PlayIcon, EmptyBoxIcon } from '../../components/ui/tool-icons'
+import { MCQ_ACCENT } from './mcqShared'
 
 interface MCQBrowseProps {
   dark: boolean
@@ -68,7 +69,7 @@ export default function MCQBrowse({
 
         <div style={{ textAlign: 'center', padding: '10px 0 16px' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-            <ExamIcon color={pt.teal} size={40} />
+            <ExamIcon color={MCQ_ACCENT} size={40} />
           </div>
           <h1 style={{ fontFamily: pulseFonts.display, fontWeight: 800, fontSize: 24, color: ON_GRADIENT_TOP.primary, marginBottom: 4 }}>MCQ Bank</h1>
         </div>
@@ -89,17 +90,17 @@ export default function MCQBrowse({
               padding: '14px 18px', display: 'flex', alignItems: 'center',
               justifyContent: 'space-between', gap: 10, flexWrap: 'wrap'
             }}>
-              <div style={{ color: pt.teal, fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <PauseIcon color={pt.teal} size={13} /> Paused {resumeData.quizMode === 'mock' ? 'mock exam' : 'practice quiz'} — {Object.keys(resumeData.answers || {}).length}/{(resumeData.quizQuestions || []).length} answered
+              <div style={{ color: MCQ_ACCENT, fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <PauseIcon color={MCQ_ACCENT} size={13} /> Paused {resumeData.quizMode === 'mock' ? 'mock exam' : 'practice quiz'} — {Object.keys(resumeData.answers || {}).length}/{(resumeData.quizQuestions || []).length} answered
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={onResume} style={{
-                  background: pt.teal, color: '#0f172a', border: 'none', padding: '6px 14px',
+                  background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '6px 14px',
                   borderRadius: 999, cursor: 'pointer', fontWeight: 700, fontSize: 12, fontFamily: pulseFonts.body,
                   display: 'inline-flex', alignItems: 'center', gap: 5
                 }}><PlayIcon color="#0f172a" size={11} /> Continue</button>
                 <button onClick={onDiscardResume} style={{
-                  background: 'transparent', border: `1px solid ${pt.teal}40`, color: pt.teal,
+                  background: 'transparent', border: `1px solid ${MCQ_ACCENT}40`, color: MCQ_ACCENT,
                   padding: '6px 14px', borderRadius: 999, cursor: 'pointer', fontWeight: 700, fontSize: 12, fontFamily: pulseFonts.body
                 }}>Discard</button>
               </div>
@@ -128,7 +129,7 @@ export default function MCQBrowse({
           active={activeStage}
           onSelect={onSelectStage}
           dark={dark}
-          accentColor={pt.teal}
+          accentColor={MCQ_ACCENT}
           style={{ marginBottom: 16 }}
         />
 
@@ -137,7 +138,7 @@ export default function MCQBrowse({
           active={activeSubject}
           onSelect={onSelectSubject}
           dark={dark}
-          accentColor={pt.teal}
+          accentColor={MCQ_ACCENT}
           style={{ marginBottom: 28 }}
         />
 
@@ -149,19 +150,19 @@ export default function MCQBrowse({
             <div style={{ display: 'flex', alignItems: 'center', gap: 18, padding: '22px 24px', flexWrap: 'wrap' }}>
               <div style={{
                 width: 60, height: 60, borderRadius: 18, flexShrink: 0,
-                background: `${pt.teal}22`, border: `1px solid ${pt.teal}55`,
+                background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>
-                <ExamIcon color={pt.teal} size={28} />
+                <ExamIcon color={MCQ_ACCENT} size={28} />
               </div>
               <div style={{ flex: 1, minWidth: 160 }}>
-                <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: pt.teal, marginBottom: 4 }}>Mock Exam</h3>
+                <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: MCQ_ACCENT, marginBottom: 4 }}>Mock Exam</h3>
                 <p style={{ color: pt.sub, fontSize: 13 }}>
                   {Math.min(36, getFilteredQuestions('mock').length)} questions · 36 minutes
                 </p>
               </div>
               <button onClick={() => onStartQuiz('mock')} style={{
-                background: pt.teal, color: '#0f172a', border: 'none', padding: '12px 24px',
+                background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '12px 24px',
                 borderRadius: 999, fontWeight: 800, cursor: 'pointer', fontFamily: pulseFonts.body, flexShrink: 0
               }}>Start →</button>
             </div>
@@ -189,7 +190,7 @@ export default function MCQBrowse({
                   <div style={{ color: pt.textPrimary, fontWeight: 700, marginBottom: 8, fontSize: 15 }}>{sub.name}</div>
                   <div style={{ color: pt.textMuted, fontSize: 12, marginBottom: 16 }}>{subQs.length} questions</div>
                   <div style={{
-                    background: pt.teal, color: '#0f172a', border: 'none', padding: '7px 0',
+                    background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '7px 0',
                     borderRadius: 999, fontWeight: 700, textAlign: 'center', fontSize: 12, fontFamily: pulseFonts.body
                   }}>Practice</div>
                 </LiquidGlassCard>
