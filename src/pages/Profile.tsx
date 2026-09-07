@@ -208,18 +208,10 @@ export default function Profile({ dark }: { dark: boolean }) {
                 {/* Profile Card */}
                 <div style={{ marginBottom: 16 }}>
                   <LiquidGlassCard dark={dark} delay={0} style={{ padding: '28px 24px', textAlign: 'center' }}>
-                    <div style={{
-                      width: 80, height: 80, borderRadius: '50%',
-                      background: `linear-gradient(135deg, ${pt.cobalt}, ${pt.indigo})`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 32, fontWeight: 900, color: '#fff', margin: '0 auto 16px'
-                    }}>
-                      {initialOf(profile.name)}
-                    </div>
-                    <h2 style={{ ...pulseType.sectionTitle, color: pt.cobalt, fontSize: 22, marginBottom: 4 }}>
+                    <h2 style={{ ...pulseType.sectionTitle, color: pt.cobalt, fontSize: 30, marginBottom: 8 }}>
                       Dr. {profile.name}
                     </h2>
-                    <p style={{ color: pt.textMuted, fontSize: 13, marginBottom: 16 }}>ZNU Medical Student</p>
+                    <p style={{ color: pt.textMuted, fontSize: 17, marginBottom: 16 }}>ZNU Medical Student</p>
                     <div style={{
                       display: 'inline-flex', alignItems: 'center', gap: 8,
                       background: `${pt.amber}20`, border: `1px solid ${pt.amber}40`,
