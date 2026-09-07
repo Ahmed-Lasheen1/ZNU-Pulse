@@ -1,3 +1,4 @@
+// src/components/pulse/BackButton.tsx
 import type { CSSProperties } from 'react'
 import { useGoBack } from '../../lib/useGoBack'
 import { getPulseTheme, pulseType } from '../../premiumTheme'
@@ -36,6 +37,26 @@ interface BackButtonProps {
 // i.e. the header's true rendered height — plus a small fixed gap so
 // the pill doesn't touch the header bar.
 const HEADER_GAP = 0
+
+// AUDIT FIX: BackButton is `position: fixed`, so pages that render it
+// inline at their own top (every normal page, via the `<div style={{
+// marginBottom: 8 }}><BackButton .../></div>` pattern) get a real
+// spacer for free from that wrapping div's own document flow. But
+// MediaOverlay/SummaryOverlay render arbitrary iframe content that
+// starts flush at the top of the viewport — since the button never
+// participates in layout, it simply floated on top of whatever the
+// iframe rendered underneath it, covering text/controls near the top
+// of PDFs, videos, and summary pages.
+//
+// Exported so those two overlays (and any future one) can reserve
+// this exact vertical strip above their content instead of just
+// hoping nothing important renders under the fixed button. Mirrors
+// the button's own top offset (see the `top` value below) plus the
+// pill's own rendered height (~36px from PulseGlassRow's '8px 18px'
+// padding around pulseType.small text) plus a small breathing gap so
+// content doesn't start flush against the pill.
+export const BACK_BUTTON_CLEARANCE =
+  `calc(max(16px, env(safe-area-inset-top)) + 60px + ${HEADER_GAP}px + 36px + 16px)`
 
 export default function BackButton({ dark, fallback = '/', onClick, style }: BackButtonProps) {
   const pt = getPulseTheme(dark)
