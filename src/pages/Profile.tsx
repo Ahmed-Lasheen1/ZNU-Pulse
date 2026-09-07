@@ -170,7 +170,7 @@ export default function Profile({ dark }: { dark: boolean }) {
         <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginBottom: 24 }}>
           {(['profile', 'leaderboard'] as const).map(t => {
             const active = tab === t
-            const color = active ? pt.cobalt : pt.sub
+            const color = active ? (dark ? '#ffffff' : '#062B50') : pt.sub
             return (
               <PulseGlassRow
                 key={t} dark={dark} radius={999} active={active}
