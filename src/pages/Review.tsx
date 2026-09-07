@@ -202,7 +202,7 @@ export default function Review({ dark }: { dark: boolean }) {
       <style>{`
         .review-wide {
           width: 100%;
-          max-width: 1200px;
+          max-width: 820px;
           margin: 0 auto;
           padding: 0 20px;
           box-sizing: border-box;
@@ -239,8 +239,8 @@ export default function Review({ dark }: { dark: boolean }) {
                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTab(t.id) } }}
                 style={{ textAlign: 'center' }}
               >
-                <div style={{ padding: '7px 16px', ...pulseType.button, fontSize: 9, color, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                  <t.Icon color={color} size={9} /> {t.label}
+                <div style={{ padding: '11px 26px', ...pulseType.button, fontSize: 14, color, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+                  <t.Icon color={color} size={15} /> {t.label}
                 </div>
               </PulseGlassRow>
             )
