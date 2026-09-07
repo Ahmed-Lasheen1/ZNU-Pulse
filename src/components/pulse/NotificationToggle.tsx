@@ -4,30 +4,8 @@ import { useToast } from '../ToastProvider'
 import { useNotificationStatus } from '../../lib/useNotificationStatus'
 import { subscribeToPush, unsubscribeFromPush } from '../../lib/pushNotifications'
 import LiquidGlassCard from '../ui/liquid-glass-card'
+import PulseSwitch from '../ui/pulse-switch'
 import { BellIcon } from '../ui/tool-icons'
-
-function Switch({ on, onClick, disabled, dark }: { on: boolean; onClick: () => void; disabled?: boolean; dark: boolean }) {
-  const pt = getPulseTheme(dark)
-  return (
-    <button
-      type="button" onClick={onClick} disabled={disabled}
-      role="switch" aria-checked={on}
-      aria-label={on ? 'Turn off notifications' : 'Turn on notifications'}
-      style={{
-        width: 46, height: 26, borderRadius: 999, border: 'none', padding: 3,
-        background: on ? pt.cobalt : (dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'),
-        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.55 : 1,
-        display: 'flex', alignItems: 'center', justifyContent: on ? 'flex-end' : 'flex-start',
-        transition: 'background 0.2s ease', flexShrink: 0
-      }}
-    >
-      <span aria-hidden style={{
-        width: 20, height: 20, borderRadius: '50%', background: '#fff',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.3)', display: 'block'
-      }} />
-    </button>
-  )
-}
 
 // Persistent on/off control for push notifications, shown on the
 // Profile page — the counterpart to NotifyPermissionButton's one-shot
@@ -115,7 +93,13 @@ export default function NotificationToggle({ dark }: { dark: boolean }) {
                   : 'Get exam and deadline reminders'}
           </div>
         </div>
-        <Switch on={enabled} onClick={handleToggle} disabled={busy || !supported} dark={dark} />
+        <PulseSwitch
+          on={enabled}
+          onClick={handleToggle}
+          disabled={busy || !supported}
+          dark={dark}
+          ariaLabel={enabled ? 'Turn off notifications' : 'Turn on notifications'}
+        />
       </div>
     </LiquidGlassCard>
   )
