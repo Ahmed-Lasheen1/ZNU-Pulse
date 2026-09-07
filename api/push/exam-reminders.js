@@ -26,17 +26,24 @@ export default async function handler(req, res) {
 
   const supabase = createClient(SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
 
+  // AUDIT FIX (multi-date support): an exam schedule item can now
+  // carry more than one date (see the schedules_add_dates_array
+  // migration and admin/SchedulesTab.tsx) — a schedule matches the
+  // reminder window if ANY of its dates falls within it, not just a
+  // single `date` column.
   const { data: schedules } = await supabase
     .from('schedules')
-    .select('title, date, module_id, modules(name)')
+    .select('title, dates, module_id, modules(name)')
     .eq('type', 'exam')
-    .not('date', 'is', null)
+    .not('dates', 'is', null)
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const upcoming = (schedules || []).filter((s) => {
-    const diffDays = Math.round((new Date(s.date) - today) / (24 * 60 * 60 * 1000))
-    return diffDays >= 0 && diffDays <= 2
+    return (s.dates || []).some((d) => {
+      const diffDays = Math.round((new Date(d) - today) / (24 * 60 * 60 * 1000))
+      return diffDays >= 0 && diffDays <= 2
+    })
   })
 
   if (upcoming.length === 0) return res.status(200).json({ sent: 0, reason: 'no upcoming exams' })

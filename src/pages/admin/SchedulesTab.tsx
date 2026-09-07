@@ -17,7 +17,13 @@ interface ScheduleRow {
   url: string
   type: 'study' | 'exam'
   module_id: string
-  date?: string | null
+  // AUDIT FIX (multi-date support): a single exam schedule item can now
+  // carry more than one date (e.g. a full staged exam schedule for a
+  // module, not just one exam day). Replaces the old singular `date`
+  // column — see the `schedules_add_dates_array` migration, which
+  // backfilled every existing single-date row into a one-element array
+  // so nothing already saved was lost.
+  dates?: string[] | null
 }
 
 interface SchedulesTabProps {
@@ -40,7 +46,10 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
   const [schUrl, setSchUrl] = useState('')
   const [schType, setSchType] = useState<'study' | 'exam'>('study')
   const [schModuleId, setSchModuleId] = useState('')
-  const [schDate, setSchDate] = useState('')
+  // Multiple exam dates for this one schedule item — always at least
+  // one input row, even when empty, so there's always somewhere to
+  // type the first date.
+  const [schDates, setSchDates] = useState<string[]>([''])
   const [moduleFilter, setModuleFilter] = useState('all')
   // AUDIT FIX (performance audit — double-submit risk).
   const [saving, setSaving] = useState(false)
@@ -56,16 +65,29 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
 
   function editSchedule(s: ScheduleRow) {
     setEditingScheduleId(s.id)
-    setSchTitle(s.title); setSchUrl(s.url); setSchType(s.type); setSchModuleId(s.module_id); setSchDate(s.date || '')
+    setSchTitle(s.title); setSchUrl(s.url); setSchType(s.type); setSchModuleId(s.module_id)
+    setSchDates(s.dates && s.dates.length > 0 ? s.dates : [''])
   }
   function resetScheduleForm() {
-    setEditingScheduleId(null); setSchTitle(''); setSchUrl(''); setSchDate('')
+    setEditingScheduleId(null); setSchTitle(''); setSchUrl(''); setSchDates([''])
   }
+
+  function updateDateAt(index: number, value: string) {
+    setSchDates(prev => prev.map((d, i) => i === index ? value : d))
+  }
+  function addDateRow() {
+    setSchDates(prev => [...prev, ''])
+  }
+  function removeDateRow(index: number) {
+    setSchDates(prev => (prev.length === 1 ? [''] : prev.filter((_, i) => i !== index)))
+  }
+
   async function saveSchedule() {
     if (!schTitle || !schUrl || !schModuleId || saving) return
+    const cleanedDates = schDates.map(d => d.trim()).filter(Boolean)
     const payload = {
       title: schTitle, url: schUrl, type: schType, module_id: schModuleId,
-      date: schType === 'exam' && schDate ? schDate : null
+      dates: schType === 'exam' && cleanedDates.length > 0 ? cleanedDates : null
     }
     setSaving(true)
     if (editingScheduleId) {
@@ -104,8 +126,28 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
       </select>
       {schType === 'exam' && (
         <>
-          <label style={fieldLabel(pt)}>Exam Date (for reminder notifications)</label>
-          <input type="date" value={schDate} onChange={e => setSchDate(e.target.value)} style={inStyle} />
+          <label style={fieldLabel(pt)}>Exam Date(s) (for reminder notifications)</label>
+          {schDates.map((d, i) => (
+            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <input
+                type="date"
+                value={d}
+                onChange={e => updateDateAt(i, e.target.value)}
+                style={{ ...inStyle, marginBottom: 0, flex: 1 }}
+              />
+              <button
+                onClick={() => removeDateRow(i)}
+                aria-label="Remove this date"
+                style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+              ><TrashIcon color={pt.danger} size={12} /></button>
+            </div>
+          ))}
+          <button onClick={addDateRow} style={{
+            background: 'transparent', border: `1px dashed ${pt.border}`, borderRadius: 10,
+            padding: '8px', width: '100%', cursor: 'pointer', color: pt.sub,
+            fontFamily: 'inherit', fontSize: 12, fontWeight: 700, marginBottom: 12,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5
+          }}><PlusIcon color={pt.sub} size={11} /> Add Another Exam Date</button>
         </>
       )}
       <label style={fieldLabel(pt)}>Module</label>
@@ -155,7 +197,9 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {s.type === 'exam' ? <ExamIcon color={pt.text} size={14} /> : <CalendarDotIcon color={pt.text} size={14} />}
                     <span style={{ color: pt.text, fontWeight: 600 }}>{s.title}</span>
-                    <span style={{ color: pt.textMuted, fontSize: 12, marginLeft: 4 }}>· {s.type}{s.date ? ` · ${s.date}` : ''}</span>
+                    <span style={{ color: pt.textMuted, fontSize: 12, marginLeft: 4 }}>
+                      · {s.type}{s.dates && s.dates.length > 0 ? ` · ${s.dates.slice().sort().join(', ')}` : ''}
+                    </span>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={() => editSchedule(s)} aria-label={`Edit schedule: ${s.title}`} style={{ ...miniBtn(pt, pt.cobalt), display: 'inline-flex', alignItems: 'center' }}><EditIcon color={pt.cobalt} size={12} /></button>

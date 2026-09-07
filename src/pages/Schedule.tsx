@@ -33,7 +33,11 @@ interface ScheduleRow {
   id: string
   title: string
   week?: string | null
-  date?: string | null
+  // AUDIT FIX (multi-date support): an exam schedule item can now
+  // carry more than one date (e.g. a full staged exam schedule for a
+  // module) instead of just one — see the `schedules_add_dates_array`
+  // migration and admin/SchedulesTab.tsx.
+  dates?: string[] | null
   url: string
   type: 'study' | 'exam'
   module_id: string
@@ -119,7 +123,11 @@ export default function Schedule({ dark }: { dark: boolean }) {
         <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: SECTION_GAP }}>
           {(['study', 'exam'] as ScheduleType[]).map(type => {
             const active = activeType === type
-            const color = active ? pt.cobalt : pt.sub
+            // AUDIT FIX: matches the active-tab text color used by
+            // Profile's Profile/Leaderboard tabs (see Profile.tsx)
+            // instead of the Liquid Glass pt.cobalt token, so these
+            // two pill rows read consistently across the app.
+            const color = active ? (dark ? '#ffffff' : '#062B50') : pt.sub
             return (
               <PulseGlassRow
                 key={type}
@@ -158,6 +166,7 @@ export default function Schedule({ dark }: { dark: boolean }) {
           <div>
             {filtered.map((sch, i) => {
               const isLast = i === filtered.length - 1
+              const sortedDates = sch.dates && sch.dates.length > 0 ? [...sch.dates].sort() : []
               return (
                 <div key={sch.id} style={{ marginBottom: isLast ? 0 : TASK_GAP }}>
                   <LiquidGlassCard
@@ -179,9 +188,10 @@ export default function Schedule({ dark }: { dark: boolean }) {
                       </div>
                       <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2 }}>
                         {sch.week ? sch.week : null}
-                        {sch.date && (
+                        {sortedDates.length > 0 && (
                           <span style={{ color: SCHEDULE_ACCENT, fontWeight: 700 }}>
-                            {sch.week ? ' · ' : ''}{new Date(sch.date).toLocaleDateString()}
+                            {sch.week ? ' · ' : ''}
+                            {sortedDates.map(d => new Date(d).toLocaleDateString()).join(', ')}
                           </span>
                         )}
                       </div>
