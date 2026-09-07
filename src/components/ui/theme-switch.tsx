@@ -27,6 +27,17 @@ export default function ThemeSwitch({ dark, onToggle, scale = 1, stretchX = 1 }:
 
   const BASE_W = 104
   const BASE_H = 64
+  const TRACK_PADDING = 6
+  const THUMB_SIZE = 44
+
+  // stretchX widens the track itself (a real width) instead of a
+  // non-uniform transform — that's what was squashing the round
+  // thumb into an oval. The thumb keeps a literal 44x44 size, so
+  // border-radius:999 always renders it as a true circle, and the
+  // track's own border-radius:999 auto-rounds correctly at any
+  // width (a pill shape, not a distorted ellipse).
+  const trackW = BASE_W * stretchX
+  const thumbTravel = trackW - THUMB_SIZE - TRACK_PADDING * 2
 
   function generateParticles() {
     const newParticles: Particle[] = []
@@ -46,10 +57,13 @@ export default function ThemeSwitch({ dark, onToggle, scale = 1, stretchX = 1 }:
 
   return (
     <div style={{
-      width: BASE_W * scale * stretchX, height: BASE_H * scale,
+      width: trackW * scale, height: BASE_H * scale,
       position: 'relative', display: 'inline-block'
     }}>
-      <div style={{ transform: `scale(${scale * stretchX}, ${scale})`, transformOrigin: 'top left' }}>
+      {/* Only uniform `scale` goes through transform now — scaling
+          both axes by the same factor never distorts a circle,
+          unlike the old scale(scaleX, scaleY). */}
+      <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>
         <svg style={{ position: 'absolute', width: 0, height: 0 }}>
           <defs>
             <filter id="grain-light">
@@ -75,8 +89,8 @@ export default function ThemeSwitch({ dark, onToggle, scale = 1, stretchX = 1 }:
           onClick={handleToggle}
           style={{
             position: 'relative',
-            display: 'flex', height: 64, width: 104, alignItems: 'center',
-            borderRadius: 999, padding: 6,
+            display: 'flex', height: BASE_H, width: trackW, alignItems: 'center',
+            borderRadius: 999, padding: TRACK_PADDING,
             background: isDark
               ? `radial-gradient(ellipse at top left, ${pt.surfaceRaised} 0%, ${pt.surfaceFlat} 50%, ${pt.canvas} 100%)`
               : `radial-gradient(ellipse at top left, #ffffff 0%, #ffffff 45%, ${pt.surfaceFlat} 100%)`,
@@ -122,7 +136,7 @@ export default function ThemeSwitch({ dark, onToggle, scale = 1, stretchX = 1 }:
           <motion.div
             style={{
               position: 'relative', zIndex: 1,
-              display: 'flex', height: 44, width: 44, alignItems: 'center', justifyContent: 'center',
+              display: 'flex', height: THUMB_SIZE, width: THUMB_SIZE, alignItems: 'center', justifyContent: 'center',
               borderRadius: 999, overflow: 'hidden',
               background: isDark
                 ? `linear-gradient(145deg, #7fb0ff 0%, ${pt.cobalt} 55%, #2a5cd8 100%)`
@@ -132,7 +146,7 @@ export default function ThemeSwitch({ dark, onToggle, scale = 1, stretchX = 1 }:
                 : `inset 2px 2px 4px rgba(199,211,227,0.3), inset -2px -2px 4px rgba(255,255,255,1), inset 0 1px 2px rgba(255,255,255,1), 0 1px 2px rgba(255,255,255,1), 0 8px 32px rgba(0,0,0,0.18), 0 4px 12px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.08)`,
               border: isDark ? '2px solid rgba(255,255,255,0.4)' : '2px solid rgba(255,255,255,0.9)',
             }}
-            animate={{ x: isDark ? 46 : 0 }}
+            animate={{ x: isDark ? thumbTravel : 0 }}
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
           >
             <div style={{
