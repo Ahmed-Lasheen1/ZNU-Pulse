@@ -51,6 +51,13 @@ interface MCQExamFlowProps {
   goNext: () => void
 }
 
+// Shared wrap rules for the question/answer/explanation blocks below —
+// same pattern already used on Review.tsx — so long unbroken tokens
+// (drug names, dosages, abbreviations with no spaces) can always break
+// onto a new line instead of forcing the box wider than its card and
+// getting clipped by the card's own overflow boundary.
+const wrapText: React.CSSProperties = { wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }
+
 export default function MCQExamFlow({
   dark, quizMode, submitted, grading, quizQuestions, answers, results,
   flaggedIds, struckOut, currentIndex, setCurrentIndex,
@@ -376,10 +383,10 @@ export default function MCQExamFlow({
                       <div style={{
                         background: dark ? 'rgba(56,189,248,0.10)' : 'rgba(2,132,199,0.06)',
                         borderRadius: 10, padding: '10px 14px', color: pt.sub, fontSize: 12,
-                        flexShrink: 0, wordBreak: 'break-word', overflowWrap: 'anywhere',
-                        display: 'flex', alignItems: 'flex-start', gap: 8
+                        flexShrink: 0, display: 'flex', alignItems: 'flex-start', gap: 8
                       }}>
-                        <LightbulbIcon color={pt.sub} size={14} /> <span>{result.explanation}</span>
+                        <LightbulbIcon color={pt.sub} size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+                        <span style={{ flex: 1, minWidth: 0, ...wrapText }}>{result.explanation}</span>
                       </div>
                     )}
                   </>
@@ -556,8 +563,16 @@ export default function MCQExamFlow({
               const showLessonTag = !lessonFilter && !!lesson
               return (
                 <div key={qi} style={{ marginBottom: isLast ? 0 : 14 }}>
+                  {/* AUDIT FIX: this card, like every LiquidGlassCard,
+                      now sizes itself to whatever content is actually
+                      inside it (see liquid-glass-card.tsx) instead of
+                      being locked to a fixed height and clipping the
+                      rest. `width: '100%'` and `boxSizing: 'border-box'`
+                      are added defensively so a very wide unbroken
+                      token in an option/explanation can't force this
+                      card wider than its column either. */}
                   <LiquidGlassCard dark={dark} delay={0} style={{
-                    padding: '18px 20px',
+                    padding: '18px 20px', width: '100%', boxSizing: 'border-box',
                     boxShadow: `inset 0 0 0 2px ${isCorrect ? '#4ade80' : userAnswer ? '#f87171' : 'transparent'}`
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
@@ -579,7 +594,7 @@ export default function MCQExamFlow({
 
                     <p style={{
                       ...pulseType.cardTitle, color: pt.textPrimary, margin: '0 0 12px',
-                      wordBreak: 'break-word', overflowWrap: 'anywhere'
+                      ...wrapText
                     }}>{q.question}</p>
 
                     {optionTexts(q).map((opt: string, ai: number) => {
@@ -594,7 +609,7 @@ export default function MCQExamFlow({
                           background: bg, border: `1px solid ${border}`,
                           borderRadius: 10, padding: '10px 14px', marginBottom: 8,
                           color, fontSize: 13, fontWeight: 600,
-                          wordBreak: 'break-word', overflowWrap: 'anywhere'
+                          ...wrapText
                         }}>
                           {label.toUpperCase()}. {opt}
                         </div>
@@ -607,7 +622,8 @@ export default function MCQExamFlow({
                         borderRadius: 10, padding: '10px 14px', marginTop: 8, color: pt.sub, fontSize: 12,
                         display: 'flex', alignItems: 'flex-start', gap: 8
                       }}>
-                        <LightbulbIcon color={pt.sub} size={14} /> <span>{result.explanation}</span>
+                        <LightbulbIcon color={pt.sub} size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+                        <span style={{ flex: 1, minWidth: 0, ...wrapText }}>{result.explanation}</span>
                       </div>
                     )}
                   </LiquidGlassCard>
