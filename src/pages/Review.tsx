@@ -237,9 +237,9 @@ export default function Review({ dark }: { dark: boolean }) {
                 activeTint={`${REVIEW_ACCENT}26`} hoverTint={hoverTint}
                 onClick={() => setTab(t.id)} role="button" tabIndex={0}
                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTab(t.id) } }}
-                style={{ textAlign: 'center' }}
+                style={{ textAlign: 'center', width: 150 }}
               >
-                <div style={{ padding: '11px 26px', ...pulseType.button, fontSize: 14, color, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+                <div style={{ padding: '11px 0', ...pulseType.button, fontSize: 14, color, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
                   <t.Icon color={color} size={15} /> {t.label}
                 </div>
               </PulseGlassRow>

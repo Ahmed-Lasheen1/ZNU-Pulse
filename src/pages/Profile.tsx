@@ -177,9 +177,9 @@ export default function Profile({ dark }: { dark: boolean }) {
                 activeTint={`${pt.cobalt}26`} hoverTint={hoverTint}
                 onClick={() => setTab(t)} role="button" tabIndex={0}
                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTab(t) } }}
-                style={{ textAlign: 'center' }}
+                style={{ textAlign: 'center', width: 150 }}
               >
-                <div style={{ padding: '11px 26px', ...pulseType.button, fontSize: 14, color, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+                <div style={{ padding: '11px 0', ...pulseType.button, fontSize: 14, color, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
                   {t === 'profile' ? <User size={15} color={color} /> : <LeaderboardIcon color={color} size={15} />}
                   {t === 'profile' ? 'Profile' : 'Leaderboard'}
                 </div>
