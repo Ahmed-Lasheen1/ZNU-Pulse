@@ -28,14 +28,20 @@ export default function ThemeSwitch({ dark, onToggle, scale = 1, stretchX = 1 }:
   const BASE_W = 104
   const BASE_H = 64
   const TRACK_PADDING = 6
-  const THUMB_SIZE = 44
+  // Sized off the track's own height (minus padding) instead of a flat
+  // 44 — a hardcoded thumb size stayed fixed no matter how tall/short
+  // the track rendered, which is what made it look like a small dot
+  // stuck near the edge of a wider/shorter pill. Now it always fills
+  // the track top-to-bottom, at any scale.
+  const THUMB_SIZE = BASE_H - TRACK_PADDING * 2
 
   // stretchX widens the track itself (a real width) instead of a
-  // non-uniform transform — that's what was squashing the round
-  // thumb into an oval. The thumb keeps a literal 44x44 size, so
-  // border-radius:999 always renders it as a true circle, and the
-  // track's own border-radius:999 auto-rounds correctly at any
-  // width (a pill shape, not a distorted ellipse).
+  // non-uniform transform — a non-uniform scale(scaleX, scaleY) is
+  // what previously squashed the round thumb into an oval. The thumb
+  // keeps a size derived from BASE_H, so border-radius:999 always
+  // renders it as a true circle, and the track's own border-radius:999
+  // auto-rounds correctly at any width (a pill shape, not a distorted
+  // ellipse).
   const trackW = BASE_W * stretchX
   const thumbTravel = trackW - THUMB_SIZE - TRACK_PADDING * 2
 
