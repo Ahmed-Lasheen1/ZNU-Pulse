@@ -1,4 +1,4 @@
-import BackButton, { BACK_BUTTON_CLEARANCE } from './pulse/BackButton'
+import BackButton from './pulse/BackButton'
 
 // Full-screen dark overlay used for schedule images/PDFs, question-bank
 // PDFs, and lecture videos (Schedule, FilesPage).
@@ -12,15 +12,6 @@ import BackButton, { BACK_BUTTON_CLEARANCE } from './pulse/BackButton'
 // the exact same <BackButton> component every other page uses instead
 // of a one-off close button — same position, same style, same
 // behavior everywhere.
-//
-// AUDIT FIX: BackButton is `position: fixed`, so it doesn't occupy any
-// space in this flex column on its own — the iframe used to start
-// flush at the top of the overlay and the button just floated on top
-// of it, covering whatever the PDF/video rendered underneath. A
-// spacer reserving BackButton's own on-screen footprint
-// (BACK_BUTTON_CLEARANCE) now sits between the button and the iframe,
-// so the iframe's content always starts below the button instead of
-// being overlaid by it.
 export default function MediaOverlay({ dark, onClose, src, iframeTitle, allow, allowFullScreen }) {
   return (
     <div style={{
@@ -29,7 +20,6 @@ export default function MediaOverlay({ dark, onClose, src, iframeTitle, allow, a
       display: 'flex', flexDirection: 'column'
     }}>
       <BackButton dark={dark} onClick={onClose} />
-      <div style={{ height: BACK_BUTTON_CLEARANCE, flexShrink: 0 }} />
       <iframe src={src} style={{ flex: 1, border: 'none', width: '100%' }} title={iframeTitle} allow={allow} allowFullScreen={allowFullScreen} />
     </div>
   )
