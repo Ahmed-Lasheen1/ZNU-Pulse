@@ -636,4 +636,54 @@ export default function MCQ({ dark }: { dark: boolean }) {
         quizQuestions={quizQuestions}
         answers={answers}
         results={results}
-        
+        flaggedIds={flaggedIds}
+        struckOut={struckOut}
+        currentIndex={currentIndex}
+        setCurrentIndex={setCurrentIndex}
+        timeLeft={timeLeft}
+        elapsedSeconds={elapsedSeconds}
+        finishTimeSec={finishTimeSec}
+        fontScale={fontScale}
+        cycleFontScale={cycleFontScale}
+        showReview={showReview}
+        setShowReview={setShowReview}
+        subjects={subjects}
+        lessons={lessons}
+        lessonFilter={lessonFilter}
+        stopQuiz={stopQuiz}
+        submitQuiz={submitQuiz}
+        tryAgain={tryAgain}
+        startTargetedPractice={startTargetedPractice}
+        selectAnswer={selectAnswer}
+        toggleStrike={toggleStrike}
+        toggleFlagFor={toggleFlagFor}
+        goPrev={goPrev}
+        goNext={goNext}
+      />
+    )
+  }
+
+  // ── Module / subject browsing view ─────────────────────────────────
+  return (
+    <MCQBrowse
+      dark={dark}
+      modulesError={modulesError}
+      loadError={loadError}
+      usingCache={usingCache}
+      resumeData={resumeData}
+      onResume={resumeExam}
+      onDiscardResume={discardResume}
+      activeModuleObj={activeModuleObj}
+      stages={stages}
+      activeStage={activeStage}
+      onSelectStage={setActiveStage}
+      moduleSubjects={moduleSubjects}
+      activeSubject={activeSubject}
+      onSelectSubject={setActiveSubject}
+      loading={loading}
+      questions={questions}
+      getFilteredQuestions={getFilteredQuestions}
+      onStartQuiz={startQuiz}
+    />
+  )
+}
