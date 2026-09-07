@@ -177,6 +177,14 @@ export default function Review({ dark }: { dark: boolean }) {
   const hoverTint = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'
   const inStyle = { ...glassInput(pt, dark), padding: '13px 20px', marginBottom: 0 }
 
+  // Shared style for the question/option/explanation blocks below so
+  // long text always wraps onto as many lines as it needs instead of
+  // being squeezed onto one line — previously this only "looked" fine
+  // because the very wide desktop column gave short questions enough
+  // room to stay on one line by coincidence, not because anything
+  // enforced wrapping.
+  const wrapText: React.CSSProperties = { wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }
+
   const reviewTabs = [
     { id: 'history' as const, label: 'History', Icon: ClockIcon },
     { id: 'flagged' as const, label: 'Flagged', Icon: FlagIcon },
@@ -185,7 +193,28 @@ export default function Review({ dark }: { dark: boolean }) {
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
       <PulseBackground />
-      <div className="pulse-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body }}>
+      {/* Narrower, centered content column — the default .pulse-wide
+          class scales up to 1800px on large desktops, which made every
+          card in this page stretch edge-to-edge for no real reason.
+          review-wide caps out at 2/3 of that (1200px) and stays
+          centered via margin:auto; below that width it behaves the
+          same as any other full-width mobile page. */}
+      <style>{`
+        .review-wide {
+          width: 100%;
+          max-width: 1200px;
+          margin: 0 auto;
+          padding: 0 20px;
+          box-sizing: border-box;
+        }
+        @media (min-width: 900px) {
+          .review-wide { padding: 0 40px; }
+        }
+        @media (min-width: 1400px) {
+          .review-wide { padding: 0 64px; }
+        }
+      `}</style>
+      <div className="review-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body }}>
 
         <div style={{ marginBottom: 8 }}>
           <BackButton dark={dark} fallback="/mcq" />
@@ -193,7 +222,12 @@ export default function Review({ dark }: { dark: boolean }) {
 
         <PageIntro dark={dark} emoji={<BookIcon color={ON_GRADIENT_TOP.primary} size={40} />} title="Review" subtitle="Your exam history, mistakes, and flagged questions" paddingBottom={16} />
 
-        <div style={{ display: 'flex', gap: 8, marginBottom: SECTION_GAP }}>
+        {/* History / Flagged pills — shrunk to ~2/3 of their previous
+            size (padding + font + icon all scaled down) and no longer
+            flex:1 (they used to stretch to fill the whole row width).
+            justify-content:center + a modest gap keeps them together
+            in the middle instead of pinned to opposite edges. */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginBottom: SECTION_GAP }}>
           {reviewTabs.map(t => {
             const active = tab === t.id
             const color = active ? REVIEW_ACCENT : pt.sub
@@ -203,10 +237,10 @@ export default function Review({ dark }: { dark: boolean }) {
                 activeTint={`${REVIEW_ACCENT}26`} hoverTint={hoverTint}
                 onClick={() => setTab(t.id)} role="button" tabIndex={0}
                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTab(t.id) } }}
-                style={{ flex: 1, textAlign: 'center' }}
+                style={{ textAlign: 'center' }}
               >
-                <div style={{ padding: '10px', ...pulseType.button, color, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                  <t.Icon color={color} size={14} /> {t.label}
+                <div style={{ padding: '7px 16px', ...pulseType.button, fontSize: 9, color, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                  <t.Icon color={color} size={9} /> {t.label}
                 </div>
               </PulseGlassRow>
             )
@@ -346,7 +380,7 @@ export default function Review({ dark }: { dark: boolean }) {
                           <QuestionSourceBadge source={item.source} />
                         </div>
                       )}
-                      <p style={{ ...pulseType.cardTitle, color: pt.textPrimary, marginBottom: 12 }}>{item.question}</p>
+                      <p style={{ ...pulseType.cardTitle, color: pt.textPrimary, marginBottom: 12, ...wrapText }}>{item.question}</p>
 
                       {optionsOf(item).map((opt, ai) => {
                         const label = optionLabels[ai]
@@ -356,9 +390,11 @@ export default function Review({ dark }: { dark: boolean }) {
                             background: isCorrect ? '#064e3b' : (dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
                             border: `1px solid ${isCorrect ? '#4ade80' : pt.border}`,
                             borderRadius: 10, padding: '9px 14px', marginBottom: 6,
-                            color: isCorrect ? '#4ade80' : pt.sub, fontSize: 13, fontWeight: 600
+                            color: isCorrect ? '#4ade80' : pt.sub, fontSize: 13, fontWeight: 600,
+                            display: 'flex', alignItems: 'flex-start', gap: 6, ...wrapText
                           }}>
-                            {label.toUpperCase()}. {opt}
+                            <span style={{ flexShrink: 0 }}>{label.toUpperCase()}.</span>
+                            <span style={wrapText}>{opt}</span>
                           </div>
                         )
                       })}
@@ -369,7 +405,8 @@ export default function Review({ dark }: { dark: boolean }) {
                           borderRadius: 10, padding: '10px 14px', marginTop: 8, color: pt.sub, fontSize: 12,
                           display: 'flex', alignItems: 'flex-start', gap: 8
                         }}>
-                          <LightbulbIcon color={pt.sub} size={14} /> <span>{item.explanation}</span>
+                          <LightbulbIcon color={pt.sub} size={14} style={{ flexShrink: 0, marginTop: 2 }} />
+                          <span style={wrapText}>{item.explanation}</span>
                         </div>
                       )}
 
@@ -461,7 +498,7 @@ export default function Review({ dark }: { dark: boolean }) {
                         {item.source && <QuestionSourceBadge source={item.source} />}
                       </div>
                     )}
-                    <p style={{ ...pulseType.cardTitle, color: pt.textPrimary, marginBottom: 12 }}>{item.question}</p>
+                    <p style={{ ...pulseType.cardTitle, color: pt.textPrimary, marginBottom: 12, ...wrapText }}>{item.question}</p>
 
                     {optionsOf(item).map((opt, ai) => {
                       const label = optionLabels[ai]
@@ -471,9 +508,11 @@ export default function Review({ dark }: { dark: boolean }) {
                           background: isCorrect ? '#064e3b' : (dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
                           border: `1px solid ${isCorrect ? '#4ade80' : pt.border}`,
                           borderRadius: 10, padding: '9px 14px', marginBottom: 6,
-                          color: isCorrect ? '#4ade80' : pt.sub, fontSize: 13, fontWeight: 600
+                          color: isCorrect ? '#4ade80' : pt.sub, fontSize: 13, fontWeight: 600,
+                          display: 'flex', alignItems: 'flex-start', gap: 6, ...wrapText
                         }}>
-                          {label.toUpperCase()}. {opt}
+                          <span style={{ flexShrink: 0 }}>{label.toUpperCase()}.</span>
+                          <span style={wrapText}>{opt}</span>
                         </div>
                       )
                     })}
@@ -484,7 +523,8 @@ export default function Review({ dark }: { dark: boolean }) {
                         borderRadius: 10, padding: '10px 14px', marginTop: 8, color: pt.sub, fontSize: 12,
                         display: 'flex', alignItems: 'flex-start', gap: 8
                       }}>
-                        <LightbulbIcon color={pt.sub} size={14} /> <span>{item.explanation}</span>
+                        <LightbulbIcon color={pt.sub} size={14} style={{ flexShrink: 0, marginTop: 2 }} />
+                        <span style={wrapText}>{item.explanation}</span>
                       </div>
                     )}
                     {!item.attempted && (
