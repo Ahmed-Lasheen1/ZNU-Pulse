@@ -46,6 +46,14 @@ export default function MCQBrowse({
   const navigate = useNavigate()
   const hoverTint = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'
 
+  // AUDIT FIX: these two TabRows used to hardcode accentColor={pt.cobalt},
+  // so their active-tab text was always the same blue no matter which
+  // module was selected. Summaries.tsx's equivalent stage TabRow passes
+  // accentColor={mod.color} (the current module's own color) — this now
+  // matches that same convention so the MCQ page's tab rows read
+  // consistently with Summaries instead of always defaulting to cobalt.
+  const tabAccentColor = activeModuleObj?.color || pt.cobalt
+
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
       <PulseBackground />
@@ -129,7 +137,7 @@ export default function MCQBrowse({
           active={activeStage}
           onSelect={onSelectStage}
           dark={dark}
-          accentColor={pt.cobalt}
+          accentColor={tabAccentColor}
           style={{ marginBottom: 16 }}
         />
 
@@ -138,7 +146,7 @@ export default function MCQBrowse({
           active={activeSubject}
           onSelect={onSelectSubject}
           dark={dark}
-          accentColor={pt.cobalt}
+          accentColor={tabAccentColor}
           style={{ marginBottom: 28 }}
         />
 
