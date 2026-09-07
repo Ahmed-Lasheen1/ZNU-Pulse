@@ -230,7 +230,7 @@ export default function Review({ dark }: { dark: boolean }) {
         <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginBottom: SECTION_GAP }}>
           {reviewTabs.map(t => {
             const active = tab === t.id
-            const color = active ? REVIEW_ACCENT : pt.sub
+            const color = active ? (dark ? '#ffffff' : '#062B50') : pt.sub
             return (
               <PulseGlassRow
                 key={t.id} dark={dark} radius={999} active={active}
