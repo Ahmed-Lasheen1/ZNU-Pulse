@@ -28,22 +28,18 @@ export default function ThemeSwitch({ dark, onToggle, scale = 1, stretchX = 1 }:
   const BASE_W = 104
   const BASE_H = 64
   const TRACK_PADDING = 6
-  // Sized off the track's own height (minus padding) instead of a flat
-  // 44 — a hardcoded thumb size stayed fixed no matter how tall/short
-  // the track rendered, which is what made it look like a small dot
-  // stuck near the edge of a wider/shorter pill. Now it always fills
-  // the track top-to-bottom, at any scale.
+  const BORDER_WIDTH = 2
   const THUMB_SIZE = BASE_H - TRACK_PADDING * 2
 
-  // stretchX widens the track itself (a real width) instead of a
-  // non-uniform transform — a non-uniform scale(scaleX, scaleY) is
-  // what previously squashed the round thumb into an oval. The thumb
-  // keeps a size derived from BASE_H, so border-radius:999 always
-  // renders it as a true circle, and the track's own border-radius:999
-  // auto-rounds correctly at any width (a pill shape, not a distorted
-  // ellipse).
   const trackW = BASE_W * stretchX
-  const thumbTravel = trackW - THUMB_SIZE - TRACK_PADDING * 2
+  // AUDIT FIX: box-sizing:border-box (global, see index.css) means
+  // the track's specified width already includes its border — so the
+  // content box the thumb actually travels within is narrower than
+  // `trackW` by the border on both sides, not just the padding. This
+  // was previously only subtracting padding, which let the thumb
+  // overshoot toward the right edge when "on" (the left side looked
+  // fine since it only depends on padding, not this travel distance).
+  const thumbTravel = trackW - THUMB_SIZE - TRACK_PADDING * 2 - BORDER_WIDTH * 2
 
   function generateParticles() {
     const newParticles: Particle[] = []
@@ -66,9 +62,6 @@ export default function ThemeSwitch({ dark, onToggle, scale = 1, stretchX = 1 }:
       width: trackW * scale, height: BASE_H * scale,
       position: 'relative', display: 'inline-block'
     }}>
-      {/* Only uniform `scale` goes through transform now — scaling
-          both axes by the same factor never distorts a circle,
-          unlike the old scale(scaleX, scaleY). */}
       <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>
         <svg style={{ position: 'absolute', width: 0, height: 0 }}>
           <defs>
@@ -103,7 +96,7 @@ export default function ThemeSwitch({ dark, onToggle, scale = 1, stretchX = 1 }:
             boxShadow: isDark
               ? `inset 3px 3px 8px rgba(0,0,0,0.5), inset -3px -3px 8px rgba(90,120,165,0.35), inset 0 2px 4px rgba(0,0,0,0.5), inset 0 -2px 4px rgba(90,120,165,0.3), 0 2px 4px rgba(0,0,0,0.3), 0 8px 16px rgba(0,0,0,0.25), 0 16px 32px rgba(0,0,0,0.18)`
               : `inset 3px 3px 8px rgba(175,192,214,0.35), inset -3px -3px 8px rgba(255,255,255,1), inset 0 2px 4px rgba(175,192,214,0.3), inset 0 -2px 4px rgba(255,255,255,1), 0 2px 4px rgba(0,0,0,0.06), 0 8px 16px rgba(0,0,0,0.05), 0 16px 32px rgba(0,0,0,0.04)`,
-            border: `2px solid ${pt.border}`,
+            border: `${BORDER_WIDTH}px solid ${pt.border}`,
             outline: 'none', cursor: 'pointer',
           }}
           aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}

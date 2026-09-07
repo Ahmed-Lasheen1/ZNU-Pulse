@@ -8,36 +8,31 @@ interface PulseSwitchProps {
   disabled?: boolean
   dark: boolean
   ariaLabel?: string
-  // Scales the whole control uniformly — same reasoning as
-  // ThemeSwitch's own `scale` prop: only ever scale x/y together, or
-  // the circular thumb distorts into an oval.
   size?: number
 }
 
 const BASE_W = 46
 const BASE_H = 26
 const TRACK_PADDING = 3
-// Fills the track height (minus padding) rather than a flat guess —
-// same fix applied to ThemeSwitch, so the thumb never reads as a
-// small dot stuck in a too-big track.
+const BORDER_WIDTH = 1.5
 const THUMB_SIZE = BASE_H - TRACK_PADDING * 2
 
-// Shared "pill track + circular thumb" toggle for ordinary settings
-// rows (NotificationToggle today; any future on/off setting can reuse
-// this). Deliberately NOT ThemeSwitch itself — that component is a
-// standalone hero control (sun/moon icons, grain texture, particle
-// burst) sized and paced for a rare, deliberate action. This is the
-// quieter, compact sibling: same neumorphic shadow recipe and the
-// same "real width, fixed circular thumb" geometry, tuned for a
-// control that sits inline next to a label inside a card.
 export default function PulseSwitch({ on, onClick, disabled, dark, ariaLabel, size = 1 }: PulseSwitchProps) {
   const pt = getPulseTheme(dark)
 
   const trackW = BASE_W * size
   const trackH = BASE_H * size
   const padding = TRACK_PADDING * size
+  const borderWidth = BORDER_WIDTH * size
   const thumbSize = THUMB_SIZE * size
-  const thumbTravel = trackW - thumbSize - padding * 2
+  // AUDIT FIX: box-sizing:border-box (global, see index.css) means
+  // `trackW` already includes the border — the content box the thumb
+  // travels within is narrower than that by the border on both sides,
+  // not just the padding. Previously only padding was subtracted,
+  // which pushed the thumb past center toward the right edge when
+  // "on". Border width is now also scaled by `size`, matching every
+  // other dimension here, so this stays correct at any size.
+  const thumbTravel = trackW - thumbSize - padding * 2 - borderWidth * 2
 
   return (
     <button
@@ -52,7 +47,7 @@ export default function PulseSwitch({ on, onClick, disabled, dark, ariaLabel, si
         display: 'flex', alignItems: 'center',
         width: trackW, height: trackH, flexShrink: 0,
         borderRadius: 999, padding,
-        border: `1.5px solid ${pt.border}`,
+        border: `${borderWidth}px solid ${pt.border}`,
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.55 : 1,
         outline: 'none',
