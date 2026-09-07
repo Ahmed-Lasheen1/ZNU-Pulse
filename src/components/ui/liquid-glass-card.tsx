@@ -75,27 +75,10 @@ export default function LiquidGlassCard({
           isolation: 'isolate',
           overflow: 'hidden',
           borderRadius,
+          height: '100%',
           transform: hovered && interactive ? 'scale(1.05)' : 'scale(1)',
           transition: 'transform 0.3s ease',
           ...liquidGlassBackdrop(),
-          // AUDIT FIX (content clipping): this box is the actual
-          // visible glass card — it now receives the caller's FULL
-          // style (padding, minHeight, display, boxShadow, etc.)
-          // directly, instead of that style landing one level deeper
-          // on a plain content div while THIS box (the one that
-          // actually has `overflow: hidden`) stayed hard-locked to
-          // `height: 100%` with no awareness of how much content was
-          // actually inside it. `minHeight: '100%'` (not `height`)
-          // keeps every existing equal-height-row-in-a-grid layout
-          // (ModulePage/StagePage/Summaries card grids, etc.) working
-          // exactly as before when content is short, but now lets the
-          // box grow taller than that whenever a question, an answer
-          // option, or an explanation actually needs more room —
-          // nothing gets clipped at this box's own overflow boundary
-          // just because it "was" a fixed height.
-          height: 'auto',
-          minHeight: '100%',
-          ...contentStyle,
         }}
       >
         <div
@@ -115,7 +98,7 @@ export default function LiquidGlassCard({
           }}
         />
 
-        <div style={{ position: 'relative', zIndex: 10 }}>
+        <div style={{ position: 'relative', zIndex: 10, ...contentStyle }}>
           {children}
         </div>
       </div>
