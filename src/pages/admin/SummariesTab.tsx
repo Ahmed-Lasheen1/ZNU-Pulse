@@ -38,6 +38,9 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
   function showMsg(m: string) { setMsg(m); setTimeout(() => setMsg(''), 3000) }
 
   const [summaries, setSummaries] = useState<SummaryRow[]>([])
+  // AUDIT FIX (performance audit): own loading flag, same reasoning
+  // as QuestionsTab/SchedulesTab.
+  const [summariesLoading, setSummariesLoading] = useState(true)
   const [editingSummaryId, setEditingSummaryId] = useState<string | null>(null)
   const [sumTitle, setSumTitle] = useState('')
   const [sumUrl, setSumUrl] = useState('')
@@ -47,6 +50,8 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
   const [sumExamStage, setSumExamStage] = useState('')
   const [sumStageOptions, setSumStageOptions] = useState(EXAM_STAGES)
   const [moduleFilter, setModuleFilter] = useState('all')
+  // AUDIT FIX (performance audit — double-submit risk).
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => { fetchSummaries() }, [])
   useEffect(() => {
@@ -54,8 +59,10 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
   }, [sumModuleId])
 
   async function fetchSummaries() {
+    setSummariesLoading(true)
     const { data } = await supabase.from('summaries').select('*').order('created_at', { ascending: false }).limit(LIST_LIMIT)
     if (data) setSummaries(data as SummaryRow[])
+    setSummariesLoading(false)
   }
 
   function editSummary(s: SummaryRow) {
@@ -69,19 +76,22 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
     setSumSubjectId(''); setSumLessonId(''); setSumExamStage('')
   }
   async function saveSummary() {
-    if (!sumTitle || !sumUrl || !sumModuleId) return
+    if (!sumTitle || !sumUrl || !sumModuleId || saving) return
     const payload = {
       title: sumTitle, url: sumUrl, module_id: sumModuleId,
       subject_id: sumSubjectId || null,
       lesson_id: sumLessonId || null,
       exam_stage: sumExamStage || null
     }
+    setSaving(true)
     if (editingSummaryId) {
       const { error } = await supabase.from('summaries').update(payload).eq('id', editingSummaryId)
+      setSaving(false)
       if (!error) { showMsg('✅ Summary updated!'); resetSummaryForm(); fetchSummaries() }
       else showMsg('❌ ' + error.message)
     } else {
       const { error } = await supabase.from('summaries').insert([payload])
+      setSaving(false)
       if (!error) { showMsg('✅ Summary added!'); resetSummaryForm(); fetchSummaries() }
       else showMsg('❌ ' + error.message)
     }
@@ -131,8 +141,10 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
       <input placeholder="Title (e.g. End Module Exam)" value={sumTitle} onChange={e => setSumTitle(e.target.value)} style={inStyle} />
       <input placeholder="Summary URL" value={sumUrl} onChange={e => setSumUrl(e.target.value)} style={inStyle} />
       <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={saveSummary} style={{ ...btnStyle(pt, dark), flex: 1 }}>{editingSummaryId ? 'Save Changes' : 'Add Summary'}</button>
-        {editingSummaryId && <button onClick={resetSummaryForm} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
+        <button onClick={saveSummary} disabled={saving} style={{ ...btnStyle(pt, dark), flex: 1, opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}>
+          {saving ? 'Saving...' : editingSummaryId ? 'Save Changes' : 'Add Summary'}
+        </button>
+        {editingSummaryId && <button onClick={resetSummaryForm} disabled={saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
       </div>
     </LiquidGlassCard>
   )
@@ -146,13 +158,19 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
         </select>
       </div>
 
-      {summaries.length === 0 && (
+      {summariesLoading && (
+        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
+          <p style={{ color: pt.sub }}>Loading...</p>
+        </LiquidGlassCard>
+      )}
+
+      {!summariesLoading && summaries.length === 0 && (
         <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
           <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><ConstructionIcon color={pt.sub} size={14} /> No summaries yet — add one on the left</p>
         </LiquidGlassCard>
       )}
 
-      {visibleModules.map(mod => {
+      {!summariesLoading && visibleModules.map(mod => {
         const modSummaries = summaries.filter(s => s.module_id === mod.id)
         if (modSummaries.length === 0) return null
         return (

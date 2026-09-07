@@ -40,6 +40,11 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
   function showMsg(m: string) { setMsg(m); setTimeout(() => setMsg(''), 3000) }
 
   const [questions, setQuestions] = useState<QuestionRow[]>([])
+  // AUDIT FIX (performance audit): QuestionsTab fetches its own
+  // primary list independently of Admin's reference-data load, so it
+  // needs its own loading flag — without one, "No questions yet" was
+  // able to flash before fetchQuestions() had actually resolved.
+  const [questionsLoading, setQuestionsLoading] = useState(true)
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null)
   const [qText, setQText] = useState('')
   const [qA, setQA] = useState('')
@@ -58,6 +63,11 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
   const [bulkMode, setBulkMode] = useState(false)
   const [bulkText, setBulkText] = useState('')
   const [bulkSaving, setBulkSaving] = useState(false)
+  // AUDIT FIX (performance audit — double-submit risk): the single-
+  // question save path had no in-flight flag at all (bulk add already
+  // had bulkSaving) — this brings it in line so "Add Question"/"Save
+  // Changes" can't double-fire.
+  const [saving, setSaving] = useState(false)
   const [moduleFilter, setModuleFilter] = useState('all')
   const [search, setSearch] = useState('')
 
@@ -67,12 +77,14 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
   }, [qModuleId])
 
   async function fetchQuestions() {
+    setQuestionsLoading(true)
     const { data } = await supabase
       .from('questions')
       .select('id, question, module_id, subject_id, lesson_id, exam_type, exam_stage, source, created_at')
       .order('created_at', { ascending: false })
       .limit(LIST_LIMIT)
     if (data) setQuestions(data as QuestionRow[])
+    setQuestionsLoading(false)
   }
 
   async function editQuestion(q: QuestionRow) {
@@ -93,7 +105,8 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
     setQSubjectId(''); setQLessonId(''); setQExamStage('')
   }
   async function saveQuestion() {
-    if (!qText || !qA || !qB || !qC || !qD || !qModuleId) return
+    if (!qText || !qA || !qB || !qC || !qD || !qModuleId || saving) return
+    setSaving(true)
     if (editingQuestionId) {
       const { error } = await supabase.rpc('admin_update_question', {
         p_id: editingQuestionId,
@@ -101,6 +114,7 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
         p_correct: qCorrect, p_explanation: qExplanation, p_exam_type: qExamType, p_exam_stage: qExamStage || null,
         p_module_id: qModuleId, p_subject_id: qSubjectId || null, p_lesson_id: qLessonId || null, p_source: qSource || null
       })
+      setSaving(false)
       if (!error) { showMsg('✅ Question updated!'); resetQuestionForm(); fetchQuestions() }
       else showMsg('❌ ' + error.message)
     } else {
@@ -110,6 +124,7 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
         exam_stage: qExamStage || null, module_id: qModuleId, subject_id: qSubjectId || null,
         lesson_id: qLessonId || null, source: qSource || null
       }])
+      setSaving(false)
       if (!error) { showMsg('✅ Question added!'); resetQuestionForm(); fetchQuestions() }
       else showMsg('❌ ' + error.message)
     }
@@ -295,7 +310,7 @@ Correct: A`}</pre>
             value={bulkText}
             onChange={e => setBulkText(e.target.value)}
             style={{ ...inStyle, minHeight: 240, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }} />
-          <button onClick={bulkAddQuestions} disabled={bulkSaving} style={{ ...btnStyle(pt, dark), width: '100%' }}>
+          <button onClick={bulkAddQuestions} disabled={bulkSaving} style={{ ...btnStyle(pt, dark), width: '100%', opacity: bulkSaving ? 0.7 : 1, cursor: bulkSaving ? 'not-allowed' : 'pointer' }}>
             {bulkSaving ? 'Adding...' : 'Parse & Add All'}
           </button>
         </>
@@ -317,8 +332,10 @@ Correct: A`}</pre>
           </select>
           <textarea placeholder="Explanation (optional)" value={qExplanation} onChange={e => setQExplanation(e.target.value)} style={{ ...inStyle, minHeight: 60, resize: 'vertical' }} />
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={saveQuestion} style={{ ...btnStyle(pt, dark), flex: 1 }}>{editingQuestionId ? 'Save Changes' : 'Add Question'}</button>
-            {editingQuestionId && <button onClick={resetQuestionForm} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
+            <button onClick={saveQuestion} disabled={saving} style={{ ...btnStyle(pt, dark), flex: 1, opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}>
+              {saving ? 'Saving...' : editingQuestionId ? 'Save Changes' : 'Add Question'}
+            </button>
+            {editingQuestionId && <button onClick={resetQuestionForm} disabled={saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
           </div>
         </>
       )}
@@ -345,13 +362,19 @@ Correct: A`}</pre>
         </select>
       </div>
 
-      {questions.length === 0 && (
+      {questionsLoading && (
+        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
+          <p style={{ color: pt.sub }}>Loading...</p>
+        </LiquidGlassCard>
+      )}
+
+      {!questionsLoading && questions.length === 0 && (
         <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
           <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><ConstructionIcon color={pt.sub} size={14} /> No questions yet — add one on the left</p>
         </LiquidGlassCard>
       )}
 
-      {visibleModules.map(mod => {
+      {!questionsLoading && visibleModules.map(mod => {
         const modQuestions = questions.filter(q =>
           q.module_id === mod.id &&
           (!searchLower || q.question.toLowerCase().includes(searchLower))

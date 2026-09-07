@@ -17,9 +17,11 @@ interface LessonsTabProps {
   subjects: AdminSubject[]
   lessons: AdminLesson[]
   fetchLessons: () => void
+  // AUDIT FIX (performance audit): see ModulesTab.tsx.
+  refDataLoading: boolean
 }
 
-export default function LessonsTab({ dark, modules, subjects, lessons, fetchLessons }: LessonsTabProps) {
+export default function LessonsTab({ dark, modules, subjects, lessons, fetchLessons, refDataLoading }: LessonsTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
   const [msg, setMsg] = useState('')
@@ -31,6 +33,9 @@ export default function LessonsTab({ dark, modules, subjects, lessons, fetchLess
   const [lessonTitle, setLessonTitle] = useState('')
   const [lessonIcon, setLessonIcon] = useState('')
   const [moduleFilter, setModuleFilter] = useState('all')
+  // AUDIT FIX (performance audit — double-submit risk): see
+  // ModulesTab.tsx's saving state for the same reasoning.
+  const [saving, setSaving] = useState(false)
 
   function editLesson(l: AdminLesson) {
     setEditingLessonId(l.id)
@@ -41,14 +46,17 @@ export default function LessonsTab({ dark, modules, subjects, lessons, fetchLess
     setEditingLessonId(null); setLessonTitle(''); setLessonIcon('')
   }
   async function saveLesson() {
-    if (!lessonTitle || !lessonSubjectId || !lessonModuleId) return showMsg('❌ Pick a module, subject, and title first')
+    if (!lessonTitle || !lessonSubjectId || !lessonModuleId || saving) return showMsg('❌ Pick a module, subject, and title first')
     const payload = { title: lessonTitle, subject_id: lessonSubjectId, module_id: lessonModuleId, icon: lessonIcon || null }
+    setSaving(true)
     if (editingLessonId) {
       const { error } = await supabase.from('lessons').update(payload).eq('id', editingLessonId)
+      setSaving(false)
       if (!error) { showMsg('✅ Lesson updated!'); resetLessonForm(); fetchLessons() }
       else showMsg('❌ ' + error.message)
     } else {
       const { error } = await supabase.from('lessons').insert([payload])
+      setSaving(false)
       if (!error) { showMsg('✅ Lesson added!'); resetLessonForm(); fetchLessons() }
       else showMsg('❌ ' + error.message)
     }
@@ -84,8 +92,10 @@ export default function LessonsTab({ dark, modules, subjects, lessons, fetchLess
       <input placeholder="Lesson title" value={lessonTitle} onChange={e => setLessonTitle(e.target.value)} style={inStyle} />
       <IconPicker value={lessonIcon} onChange={setLessonIcon} inStyle={inStyle} pt={pt} />
       <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={saveLesson} style={{ ...btnStyle(pt, dark), flex: 1 }}>{editingLessonId ? 'Save Changes' : 'Add Lesson'}</button>
-        {editingLessonId && <button onClick={resetLessonForm} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
+        <button onClick={saveLesson} disabled={saving} style={{ ...btnStyle(pt, dark), flex: 1, opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}>
+          {saving ? 'Saving...' : editingLessonId ? 'Save Changes' : 'Add Lesson'}
+        </button>
+        {editingLessonId && <button onClick={resetLessonForm} disabled={saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
       </div>
     </LiquidGlassCard>
   )
@@ -99,13 +109,19 @@ export default function LessonsTab({ dark, modules, subjects, lessons, fetchLess
         </select>
       </div>
 
-      {lessons.length === 0 && (
+      {refDataLoading && (
+        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
+          <p style={{ color: pt.sub }}>Loading...</p>
+        </LiquidGlassCard>
+      )}
+
+      {!refDataLoading && lessons.length === 0 && (
         <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
           <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><ConstructionIcon color={pt.sub} size={14} /> No lessons yet — add one on the left</p>
         </LiquidGlassCard>
       )}
 
-      {visibleModules.map(mod => {
+      {!refDataLoading && visibleModules.map(mod => {
         const modSubjects = filteredSubjects(mod.id)
         const modLessons = lessons.filter(l => l.module_id === mod.id)
         if (modLessons.length === 0) return null

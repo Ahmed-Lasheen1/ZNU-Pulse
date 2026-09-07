@@ -14,9 +14,14 @@ interface ModulesTabProps {
   dark: boolean
   modules: AdminModule[]
   fetchModules: () => void
+  // AUDIT FIX (performance audit): true only during Admin's initial
+  // reference-data load — lets this tab show a neutral loading state
+  // instead of briefly flashing "No modules yet" before the real
+  // data has arrived. See Admin.tsx for where this is set.
+  refDataLoading: boolean
 }
 
-export default function ModulesTab({ dark, modules, fetchModules }: ModulesTabProps) {
+export default function ModulesTab({ dark, modules, fetchModules, refDataLoading }: ModulesTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
   const [msg, setMsg] = useState('')
@@ -27,6 +32,14 @@ export default function ModulesTab({ dark, modules, fetchModules }: ModulesTabPr
   const [modColor, setModColor] = useState('#38bdf8')
   const [modIcon, setModIcon] = useState('📚')
   const [modStatus, setModStatus] = useState<'active' | 'completed'>('active')
+  // AUDIT FIX (performance audit — double-submit risk): saveModule()
+  // previously had no in-flight state at all, so the "Add Module" /
+  // "Save Changes" button stayed fully clickable while the insert/
+  // update was still in the air — a fast double-click could fire two
+  // writes before the first one's showMsg/refetch ever landed. Same
+  // pattern already existed correctly in StagesTab/SettingsTab; this
+  // just brings ModulesTab in line with it.
+  const [saving, setSaving] = useState(false)
 
   function editModule(mod: AdminModule) {
     setEditingModuleId(mod.id)
@@ -36,16 +49,19 @@ export default function ModulesTab({ dark, modules, fetchModules }: ModulesTabPr
     setEditingModuleId(null); setModName(''); setModColor('#38bdf8'); setModIcon('📚'); setModStatus('active')
   }
   async function saveModule() {
-    if (!modName) return
+    if (!modName || saving) return
     const dup = modules.some(m => m.name.trim().toLowerCase() === modName.trim().toLowerCase() && m.id !== editingModuleId)
     if (dup) return showMsg('❌ A module with this name already exists')
 
+    setSaving(true)
     if (editingModuleId) {
       const { error } = await supabase.from('modules').update({ name: modName, color: modColor, icon: modIcon, status: modStatus }).eq('id', editingModuleId)
+      setSaving(false)
       if (!error) { showMsg('✅ Module updated!'); resetModuleForm(); fetchModules() }
       else showMsg('❌ ' + error.message)
     } else {
       const { error } = await supabase.from('modules').insert([{ name: modName, color: modColor, icon: modIcon, status: modStatus }])
+      setSaving(false)
       if (!error) { showMsg('✅ Module added!'); resetModuleForm(); fetchModules() }
       else showMsg('❌ ' + error.message)
     }
@@ -109,15 +125,23 @@ export default function ModulesTab({ dark, modules, fetchModules }: ModulesTabPr
         </div>
       </div>
       <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-        <button onClick={saveModule} style={{ ...btnStyle(pt, dark), flex: 1 }}>{editingModuleId ? 'Save Changes' : 'Add Module'}</button>
-        {editingModuleId && <button onClick={resetModuleForm} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
+        <button onClick={saveModule} disabled={saving} style={{ ...btnStyle(pt, dark), flex: 1, opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}>
+          {saving ? 'Saving...' : editingModuleId ? 'Save Changes' : 'Add Module'}
+        </button>
+        {editingModuleId && <button onClick={resetModuleForm} disabled={saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
       </div>
     </LiquidGlassCard>
   )
 
   const list = (
     <div>
-      {activeModules.length > 0 && (
+      {refDataLoading && (
+        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
+          <p style={{ color: pt.sub }}>Loading...</p>
+        </LiquidGlassCard>
+      )}
+
+      {!refDataLoading && activeModules.length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <h4 style={{ color: '#22c55e', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><DotIcon color="#22c55e" size={9} /> Active</h4>
           <div className="admin-list-grid">
@@ -126,7 +150,7 @@ export default function ModulesTab({ dark, modules, fetchModules }: ModulesTabPr
         </div>
       )}
 
-      {completedModules.length > 0 && (
+      {!refDataLoading && completedModules.length > 0 && (
         <div>
           <h4 style={{ color: pt.textMuted, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><CheckCircleIcon color={pt.textMuted} size={13} /> Completed</h4>
           <div className="admin-list-grid">
@@ -135,7 +159,7 @@ export default function ModulesTab({ dark, modules, fetchModules }: ModulesTabPr
         </div>
       )}
 
-      {modules.length === 0 && (
+      {!refDataLoading && modules.length === 0 && (
         <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
           <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><ConstructionIcon color={pt.sub} size={14} /> No modules yet — add one on the left</p>
         </LiquidGlassCard>

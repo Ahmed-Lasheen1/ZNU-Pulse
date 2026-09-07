@@ -32,6 +32,9 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
   function showMsg(m: string) { setMsg(m); setTimeout(() => setMsg(''), 3000) }
 
   const [schedules, setSchedules] = useState<ScheduleRow[]>([])
+  // AUDIT FIX (performance audit): own loading flag for this tab's
+  // own fetch, same reasoning as QuestionsTab.
+  const [schedulesLoading, setSchedulesLoading] = useState(true)
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null)
   const [schTitle, setSchTitle] = useState('')
   const [schUrl, setSchUrl] = useState('')
@@ -39,12 +42,16 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
   const [schModuleId, setSchModuleId] = useState('')
   const [schDate, setSchDate] = useState('')
   const [moduleFilter, setModuleFilter] = useState('all')
+  // AUDIT FIX (performance audit — double-submit risk).
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => { fetchSchedules() }, [])
 
   async function fetchSchedules() {
+    setSchedulesLoading(true)
     const { data } = await supabase.from('schedules').select('*').order('created_at', { ascending: false }).limit(LIST_LIMIT)
     if (data) setSchedules(data as ScheduleRow[])
+    setSchedulesLoading(false)
   }
 
   function editSchedule(s: ScheduleRow) {
@@ -55,17 +62,20 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
     setEditingScheduleId(null); setSchTitle(''); setSchUrl(''); setSchDate('')
   }
   async function saveSchedule() {
-    if (!schTitle || !schUrl || !schModuleId) return
+    if (!schTitle || !schUrl || !schModuleId || saving) return
     const payload = {
       title: schTitle, url: schUrl, type: schType, module_id: schModuleId,
       date: schType === 'exam' && schDate ? schDate : null
     }
+    setSaving(true)
     if (editingScheduleId) {
       const { error } = await supabase.from('schedules').update(payload).eq('id', editingScheduleId)
+      setSaving(false)
       if (!error) { showMsg('✅ Schedule updated!'); resetScheduleForm(); fetchSchedules() }
       else showMsg('❌ ' + error.message)
     } else {
       const { error } = await supabase.from('schedules').insert([payload])
+      setSaving(false)
       if (!error) { showMsg('✅ Schedule added!'); resetScheduleForm(); fetchSchedules() }
       else showMsg('❌ ' + error.message)
     }
@@ -101,8 +111,10 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
       <label style={fieldLabel(pt)}>Module</label>
       <ModuleSelect modules={modules} value={schModuleId} onChange={setSchModuleId} dark={dark} />
       <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={saveSchedule} style={{ ...btnStyle(pt, dark), flex: 1 }}>{editingScheduleId ? 'Save Changes' : 'Add Schedule'}</button>
-        {editingScheduleId && <button onClick={resetScheduleForm} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
+        <button onClick={saveSchedule} disabled={saving} style={{ ...btnStyle(pt, dark), flex: 1, opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}>
+          {saving ? 'Saving...' : editingScheduleId ? 'Save Changes' : 'Add Schedule'}
+        </button>
+        {editingScheduleId && <button onClick={resetScheduleForm} disabled={saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
       </div>
     </LiquidGlassCard>
   )
@@ -116,13 +128,19 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
         </select>
       </div>
 
-      {schedules.length === 0 && (
+      {schedulesLoading && (
+        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
+          <p style={{ color: pt.sub }}>Loading...</p>
+        </LiquidGlassCard>
+      )}
+
+      {!schedulesLoading && schedules.length === 0 && (
         <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
           <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><ConstructionIcon color={pt.sub} size={14} /> No schedules yet — add one on the left</p>
         </LiquidGlassCard>
       )}
 
-      {visibleModules.map(mod => {
+      {!schedulesLoading && visibleModules.map(mod => {
         const modSchedules = schedules.filter(s => s.module_id === mod.id)
         if (modSchedules.length === 0) return null
         return (

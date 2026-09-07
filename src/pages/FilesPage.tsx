@@ -12,6 +12,7 @@ import PulseBackground from '../components/pulse/PulseBackground'
 import BackButton from '../components/pulse/BackButton'
 import PageIntro from '../components/pulse/PageIntro'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
+import { fetchSubjectsForModule } from '../lib/subjects'
 import { getDriveOrRawUrl, getVideoEmbedUrl } from '../lib/embedUrl'
 import { BookIcon, QuestionMarkIcon, VideoIcon, GraduationCapIcon, DocumentIcon, AudioIcon, FolderIcon, PlayIcon } from '../components/ui/tool-icons'
 
@@ -95,7 +96,21 @@ export default function FilesPage({ dark }: { dark: boolean }) {
   const { modules, modulesLoaded, modulesError } = useModules() as {
     modules: FilesModule[]; modulesLoaded: boolean; modulesError: boolean
   }
-  const [subjects, setSubjects] = useState<FilesSubject[]>([])
+  // AUDIT FIX (performance audit — genuinely redundant request): this
+  // used to be `const [subjects, setSubjects] = useState<FilesSubject[]>([])`
+  // populated by a raw, uncached `supabase.from('subjects').select('*')`
+  // inside the SAME effect as the files fetch, keyed on `[fileType]` —
+  // so switching between Explanation/Question/Lecture/Course files
+  // (which only ever changes `fileType`, never which subjects exist)
+  // re-fetched the ENTIRE subjects table every single time. Every
+  // other page that needs subjects (ModulePage, StagePage, MCQ) goes
+  // through the shared in-memory cache in src/lib/subjects.js
+  // instead. This now does the same: `moduleSubjects` is fetched via
+  // `fetchSubjectsForModule`, which loads the whole subjects table
+  // ONCE per browser tab (cached, in-flight-deduped) no matter how
+  // many times this effect re-runs, and is keyed on `[activeModule]`
+  // (the thing it actually depends on) rather than `[fileType]`.
+  const [moduleSubjects, setModuleSubjects] = useState<FilesSubject[]>([])
   const [activeModule, setActiveModule] = useState<string | null>(null)
   const [activeSubject, setActiveSubject] = useState('all')
   const [loading, setLoading] = useState(true)
@@ -120,25 +135,34 @@ export default function FilesPage({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules, moduleParam])
 
+  // Files — the only thing that actually depends on `fileType`.
   useEffect(() => {
     let ignore = false
-    async function fetchData() {
+    async function fetchFiles() {
       setLoading(true)
-      const [subRes, fileRes] = await Promise.all([
-        supabase.from('subjects').select('*').order('name'),
-        supabase.from('files').select('*').eq('type', fileType).order('created_at', { ascending: false })
-      ])
+      const { data, error } = await supabase.from('files').select('*').eq('type', fileType).order('created_at', { ascending: false })
       if (ignore) return
-      if (subRes.data) setSubjects(subRes.data)
-      if (fileRes.data) setFiles(fileRes.data)
-      if (subRes.error || fileRes.error) setLoadError(true)
+      if (data) setFiles(data)
+      if (error) setLoadError(true)
       setLoading(false)
     }
-    fetchData()
+    fetchFiles()
     return () => { ignore = true }
   }, [fileType])
 
-  const moduleSubjects = subjects.filter(s => s.module_id === activeModule)
+  // Subjects for the current module — keyed on `activeModule`, not
+  // `fileType`, and served from the shared cache instead of a fresh
+  // network call every time.
+  useEffect(() => {
+    let ignore = false
+    fetchSubjectsForModule(activeModule || '').then(({ subjects, error }) => {
+      if (ignore) return
+      setModuleSubjects(subjects)
+      if (error) setLoadError(true)
+    })
+    return () => { ignore = true }
+  }, [activeModule])
+
   const filtered = files.filter(f => {
     const moduleMatch = f.module_id === activeModule
     const subjectMatch = activeSubject === 'all' || f.subject_id === activeSubject

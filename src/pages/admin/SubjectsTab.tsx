@@ -16,9 +16,13 @@ interface SubjectsTabProps {
   modules: AdminModule[]
   subjects: AdminSubject[]
   fetchSubjects: () => void
+  // AUDIT FIX (performance audit): see ModulesTab.tsx for why this
+  // exists — avoids flashing the empty state before the initial
+  // reference-data fetch resolves.
+  refDataLoading: boolean
 }
 
-export default function SubjectsTab({ dark, modules, subjects, fetchSubjects }: SubjectsTabProps) {
+export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, refDataLoading }: SubjectsTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
   const [msg, setMsg] = useState('')
@@ -31,6 +35,9 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects }: 
   const [subIcon, setSubIcon] = useState('📖')
   const [subColor, setSubColor] = useState('#34d399')
   const [moduleFilter, setModuleFilter] = useState('all')
+  // AUDIT FIX (performance audit — double-submit risk): see
+  // ModulesTab.tsx's saving state for the same reasoning.
+  const [saving, setSaving] = useState(false)
 
   function editSubject(sub: AdminSubject) {
     setEditingSubjectId(sub.id)
@@ -42,7 +49,7 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects }: 
     setSubIcon('📖'); setSubColor('#34d399')
   }
   async function saveSubject() {
-    if (!subName || !subModuleId) return
+    if (!subName || !subModuleId || saving) return
     const existing = subjects.filter(s => s.module_id === subModuleId && s.id !== editingSubjectId)
     if (existing.some(s => s.name.trim().toLowerCase() === subName.trim().toLowerCase())) {
       return showMsg('❌ This subject already exists in that module')
@@ -51,12 +58,15 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects }: 
       name: subName, module_id: subModuleId, type: subType,
       icon: subIcon || '📖', color: subColor || '#34d399'
     }
+    setSaving(true)
     if (editingSubjectId) {
       const { error } = await supabase.from('subjects').update(payload).eq('id', editingSubjectId)
+      setSaving(false)
       if (!error) { showMsg('✅ Subject updated!'); resetSubjectForm(); fetchSubjects() }
       else showMsg('❌ ' + error.message)
     } else {
       const { error } = await supabase.from('subjects').insert([payload])
+      setSaving(false)
       if (!error) { showMsg('✅ Subject added!'); resetSubjectForm(); fetchSubjects() }
       else showMsg('❌ ' + error.message)
     }
@@ -93,8 +103,10 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects }: 
         <option value="practical">Practical Only</option>
       </select>
       <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={saveSubject} style={{ ...btnStyle(pt, dark), flex: 1 }}>{editingSubjectId ? 'Save Changes' : 'Add Subject'}</button>
-        {editingSubjectId && <button onClick={resetSubjectForm} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
+        <button onClick={saveSubject} disabled={saving} style={{ ...btnStyle(pt, dark), flex: 1, opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}>
+          {saving ? 'Saving...' : editingSubjectId ? 'Save Changes' : 'Add Subject'}
+        </button>
+        {editingSubjectId && <button onClick={resetSubjectForm} disabled={saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
       </div>
     </LiquidGlassCard>
   )
@@ -108,13 +120,19 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects }: 
         </select>
       </div>
 
-      {subjects.length === 0 && (
+      {refDataLoading && (
+        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
+          <p style={{ color: pt.sub }}>Loading...</p>
+        </LiquidGlassCard>
+      )}
+
+      {!refDataLoading && subjects.length === 0 && (
         <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
           <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><ConstructionIcon color={pt.sub} size={14} /> No subjects yet — add one on the left</p>
         </LiquidGlassCard>
       )}
 
-      {visibleModules.map(mod => {
+      {!refDataLoading && visibleModules.map(mod => {
         const subs = filteredSubjects(mod.id)
         if (subs.length === 0) return null
         return (

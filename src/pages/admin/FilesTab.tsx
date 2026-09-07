@@ -40,6 +40,9 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
   function showMsg(m: string) { setMsg(m); setTimeout(() => setMsg(''), 3000) }
 
   const [files, setFiles] = useState<FileRow[]>([])
+  // AUDIT FIX (performance audit): own loading flag, same reasoning
+  // as the other tabs with an independent fetch.
+  const [filesLoading, setFilesLoading] = useState(true)
   const [editingFileId, setEditingFileId] = useState<string | null>(null)
   const [fileName, setFileName] = useState('')
   const [fileUrl, setFileUrl] = useState('')
@@ -51,6 +54,8 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
   const [fileExamStage, setFileExamStage] = useState('')
   const [fileStageOptions, setFileStageOptions] = useState(EXAM_STAGES)
   const [moduleFilter, setModuleFilter] = useState('all')
+  // AUDIT FIX (performance audit — double-submit risk).
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => { fetchFiles() }, [])
   useEffect(() => {
@@ -58,8 +63,10 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
   }, [fileModuleId])
 
   async function fetchFiles() {
+    setFilesLoading(true)
     const { data } = await supabase.from('files').select('*').order('created_at', { ascending: false }).limit(LIST_LIMIT)
     if (data) setFiles(data as FileRow[])
+    setFilesLoading(false)
   }
 
   function editFile(f: FileRow) {
@@ -73,7 +80,7 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
     setFileSubjectId(''); setFileLessonId(''); setFileExamStage('')
   }
   async function saveFile() {
-    if (!fileName || !fileUrl || !fileModuleId) return
+    if (!fileName || !fileUrl || !fileModuleId || saving) return
     const payload = {
       name: fileName, url: fileUrl, type: fileType,
       file_type: fileFileType, module_id: fileModuleId,
@@ -81,12 +88,15 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
       lesson_id: fileLessonId || null,
       exam_stage: fileExamStage || null
     }
+    setSaving(true)
     if (editingFileId) {
       const { error } = await supabase.from('files').update(payload).eq('id', editingFileId)
+      setSaving(false)
       if (!error) { showMsg('✅ File updated!'); resetFileForm(); fetchFiles() }
       else showMsg('❌ ' + error.message)
     } else {
       const { error } = await supabase.from('files').insert([payload])
+      setSaving(false)
       if (!error) { showMsg('✅ File added!'); resetFileForm(); fetchFiles() }
       else showMsg('❌ ' + error.message)
     }
@@ -159,8 +169,10 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
       </select>
 
       <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={saveFile} style={{ ...btnStyle(pt, dark), flex: 1 }}>{editingFileId ? 'Save Changes' : 'Add File'}</button>
-        {editingFileId && <button onClick={resetFileForm} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
+        <button onClick={saveFile} disabled={saving} style={{ ...btnStyle(pt, dark), flex: 1, opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}>
+          {saving ? 'Saving...' : editingFileId ? 'Save Changes' : 'Add File'}
+        </button>
+        {editingFileId && <button onClick={resetFileForm} disabled={saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
       </div>
     </LiquidGlassCard>
   )
@@ -174,13 +186,19 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
         </select>
       </div>
 
-      {files.length === 0 && (
+      {filesLoading && (
+        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
+          <p style={{ color: pt.sub }}>Loading...</p>
+        </LiquidGlassCard>
+      )}
+
+      {!filesLoading && files.length === 0 && (
         <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
           <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><ConstructionIcon color={pt.sub} size={14} /> No files yet — add one on the left</p>
         </LiquidGlassCard>
       )}
 
-      {visibleModules.map(mod => {
+      {!filesLoading && visibleModules.map(mod => {
         const modFiles = files.filter(f => f.module_id === mod.id)
         if (modFiles.length === 0) return null
         return (

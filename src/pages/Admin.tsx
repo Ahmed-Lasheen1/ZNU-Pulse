@@ -63,9 +63,24 @@ export default function Admin({ dark }: AdminProps) {
   const [subjects, setSubjects] = useState<AdminSubject[]>([])
   const [lessons, setLessons] = useState<AdminLesson[]>([])
 
+  // AUDIT FIX (performance audit — loading states): previously there
+  // was no flag distinguishing "haven't fetched yet" from "fetched,
+  // genuinely empty". Every reference-data tab (Modules/Subjects/
+  // Lessons) rendered its own list straight off `modules`/`subjects`/
+  // `lessons`, which all start as `[]` — so on every single Admin
+  // visit, for the brief window between mount and the fetch actually
+  // resolving, each tab would flash its real "No modules yet — add
+  // one on the left" empty state before the true data arrived. This
+  // tracks the INITIAL load only (not every subsequent refetch a tab
+  // triggers after a save, which should feel instant / not re-show a
+  // loading state), so it's set once per Admin mount via Promise.all
+  // over the three initial fetches.
+  const [refDataLoading, setRefDataLoading] = useState(true)
+
   useEffect(() => {
     if (isAuth) {
-      fetchModules(); fetchSubjects(); fetchLessons()
+      setRefDataLoading(true)
+      Promise.all([fetchModules(), fetchSubjects(), fetchLessons()]).finally(() => setRefDataLoading(false))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuth])
@@ -105,7 +120,7 @@ export default function Admin({ dark }: AdminProps) {
 
   if (!isAuth) return <NotFound dark={dark} />
 
-  const tabProps = { dark, modules, subjects, lessons, fetchModules, fetchSubjects, fetchLessons }
+  const tabProps = { dark, modules, subjects, lessons, fetchModules, fetchSubjects, fetchLessons, refDataLoading }
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
