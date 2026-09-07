@@ -51,7 +51,20 @@ export default async function handler(req, res) {
     const totalAttempted = history.reduce((a, h) => a + h.total, 0)
     const totalCorrect = history.reduce((a, h) => a + h.correct, 0)
     const accuracy = totalAttempted > 0 ? Math.round((100 * totalCorrect) / totalAttempted) : 0
-    const body = `You answered ${totalAttempted} questions this week at ${accuracy}% accuracy. Keep it up! 💪`
+
+    // Message tone scales with how the student actually did this
+    // week. Tiers (90/75/65/50) match the same breakpoints used by
+    // the in-app Weekly Report card on Home and the MCQ results
+    // screen — see accuracyTier() in src/pages/mcq/mcqShared.tsx —
+    // so the push notification and the app never disagree.
+    const encouragement =
+      accuracy >= 90 ? 'Outstanding work! 🌟' :
+      accuracy >= 75 ? 'Great work! 👏' :
+      accuracy >= 65 ? 'Keep it up! 💪' :
+      accuracy >= 50 ? "Keep practicing — you'll get there! 📚" :
+                        "Don't give up — every question helps you learn! 🔄"
+
+    const body = `You answered ${totalAttempted} questions this week at ${accuracy}% accuracy. ${encouragement}`
 
     await Promise.all(userSubs.map(async (sub) => {
       try {

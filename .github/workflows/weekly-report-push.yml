@@ -2,7 +2,7 @@ name: Weekly Report Push
 
 on:
   schedule:
-    - cron: '0 18 * * 0'   # every Sunday at 18:00 UTC
+    - cron: '0 18 * * 4'   # every Thursday at 18:00 UTC
   workflow_dispatch:
 
 jobs:

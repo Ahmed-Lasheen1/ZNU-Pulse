@@ -20,6 +20,7 @@ import PulseBackground from '../components/pulse/PulseBackground'
 import PulseBrand from '../components/pulse/PulseBrand'
 import { ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, PauseIcon, LightningIcon } from '@/components/ui/tool-icons'
 import { ModuleIcon } from '../lib/medicalIcons'
+import { accuracyTier, accuracyColor, type AccuracyTier } from './mcq/mcqShared'
 
 interface HomeModule {
   id: string; name: string; icon?: string | null; color: string; status: 'active' | 'completed'
@@ -47,6 +48,15 @@ const toolCards = [
 // the toggle.
 const ACTIVE_MODULES_ACCENT = getPulseTheme(false).cobalt
 
+// The "Keep the pulse. Shape the future." footer sits in the
+// gradient's dark/bottom zone in both themes (see ON_GRADIENT_BOTTOM
+// above it), so its two flanking divider lines must stay fixed too —
+// previously they read `pt.border`, a Liquid Glass token that changes
+// between the light and dark app themes even though this text/its
+// dividers never move off the same dark gradient zone. Frozen to the
+// DARK-mode border value per the request to "use the dark one."
+const FOOTER_LINE_COLOR = getPulseTheme(true).border
+
 const MODULE_BLURBS: Record<string, string> = {
   neuro: 'Explore the wonders of the nervous system',
   cardio: 'Understand the heart and blood vessels',
@@ -57,6 +67,29 @@ const MODULE_BLURBS: Record<string, string> = {
 function moduleBlurb(name: string) {
   const key = Object.keys(MODULE_BLURBS).find(k => name.toLowerCase().includes(k))
   return key ? MODULE_BLURBS[key] : 'Master the essentials of this module.'
+}
+
+// ── Weekly Report accuracy feedback ─────────────────────────────────
+// A short, warm one-liner reflecting this week's accuracy — the same
+// tiered-feedback idea already used on the MCQ results screen
+// (EXCELLENT / GREAT WORK / GOOD WORK / KEEP PRACTICING, see
+// MCQExamFlow.tsx), adapted for this card's tone: sentence case rather
+// than all-caps, phrased as encouragement rather than a verdict, since
+// this is a standing weekly dashboard a student sees every time they
+// open the app — not a one-off exam result. Tiers and colors come from
+// accuracyTier/accuracyColor in mcqShared.tsx — the same single source
+// of truth used by the MCQ results screen and mirrored server-side by
+// the weekly push notification (api/push/weekly-report.js) — so all
+// three surfaces always agree.
+function weeklyAccuracyFeedback(accuracy: number, pt: ReturnType<typeof getPulseTheme>) {
+  const labels: Record<AccuracyTier, string> = {
+    excellent: 'Outstanding week!',
+    great: 'Great progress!',
+    good: 'Nice and steady.',
+    keep_practicing: "Keep pushing — you've got this.",
+    needs_work: "Let's turn it around this week.",
+  }
+  return { label: labels[accuracyTier(accuracy)], color: accuracyColor(accuracy, pt) }
 }
 
 // ── Custom line-art icons for the Weekly Report card ────────────────
@@ -264,6 +297,8 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
     </motion.h2>
   )
 
+  const weeklyFeedback = weeklySummary ? weeklyAccuracyFeedback(weeklySummary.accuracy, pt) : null
+
   return (
     <div style={{ position: 'relative', minHeight: '100vh', overflowX: 'hidden' }}>
       <PulseBackground />
@@ -380,13 +415,21 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                     <div>
                       <div style={{
                         ...statNumStyle,
-                        color: weeklySummary ? (weeklySummary.accuracy >= 60 ? pt.cobalt : pt.danger) : pt.textPrimary
+                        color: weeklyFeedback ? weeklyFeedback.color : pt.textPrimary
                       }}>
                         {weeklySummary ? `${weeklySummary.accuracy}%` : '—'}
                       </div>
                       <div style={{ ...pulseType.small, color: pt.textSecondary, marginTop: 4 }}>
                         {weeklySummary ? 'Accuracy this week' : 'No questions logged this week'}
                       </div>
+                      {weeklyFeedback && (
+                        <div style={{
+                          display: 'inline-block', marginTop: 6,
+                          background: `${weeklyFeedback.color}18`, border: `1px solid ${weeklyFeedback.color}40`,
+                          color: weeklyFeedback.color, borderRadius: 999, padding: '2px 10px',
+                          fontSize: 11, fontWeight: 700
+                        }}>{weeklyFeedback.label}</div>
+                      )}
                     </div>
                     <div>
                       <div style={{ ...statNumStyle, color: pt.textPrimary }}>{weeklySummary ? weeklySummary.totalAttempted : 0}</div>
@@ -512,12 +555,12 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
             transition={{ duration: 0.7, delay: FOOTER_DELAY }}
             style={{ display: 'flex', alignItems: 'center', gap: 14, justifyContent: 'center' }}
           >
-            <div style={{ height: 1, background: pt.border, flex: 1, maxWidth: 120 }} />
+            <div style={{ height: 1, background: FOOTER_LINE_COLOR, flex: 1, maxWidth: 120 }} />
             <div style={{ ...pulseType.small, display: 'flex', alignItems: 'center', gap: 8, color: ON_GRADIENT_BOTTOM.muted }}>
               <img src="/icon-192.png" alt="" style={{ width: 18, height: 18, borderRadius: 4, objectFit: 'cover' }} />
               Keep the pulse. Shape the future.
             </div>
-            <div style={{ height: 1, background: pt.border, flex: 1, maxWidth: 120 }} />
+            <div style={{ height: 1, background: FOOTER_LINE_COLOR, flex: 1, maxWidth: 120 }} />
           </motion.div>
         </div>
 

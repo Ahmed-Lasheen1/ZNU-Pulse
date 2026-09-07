@@ -11,6 +11,32 @@ export const MOCK_MINUTES = 36
 // used on Review.tsx) — reused, not invented.
 export const MCQ_ACCENT = '#e2725b'
 
+// ── Shared accuracy tiers ────────────────────────────────────────────
+// Single source of truth for the score bands used everywhere accuracy
+// gets a color or a verdict: the MCQ results screen (EXCELLENT./GREAT
+// WORK./etc in MCQExamFlow.tsx), the per-subject accuracy bars, and
+// the Home page's Weekly Report card (see weeklyAccuracyFeedback in
+// Home.tsx) and the weekly push notification (api/push/weekly-report.js
+// mirrors these same breakpoints server-side). Keeping the breakpoints
+// in one place means changing them only ever needs to happen here.
+export type AccuracyTier = 'excellent' | 'great' | 'good' | 'keep_practicing' | 'needs_work'
+
+export function accuracyTier(accuracy: number): AccuracyTier {
+  if (accuracy >= 90) return 'excellent'
+  if (accuracy >= 75) return 'great'
+  if (accuracy >= 65) return 'good'
+  if (accuracy >= 50) return 'keep_practicing'
+  return 'needs_work'
+}
+
+export function accuracyColor(accuracy: number, pt: { success: string; cobalt: string; amber: string; danger: string }) {
+  const tier = accuracyTier(accuracy)
+  if (tier === 'excellent' || tier === 'great') return pt.success
+  if (tier === 'good') return pt.cobalt
+  if (tier === 'keep_practicing') return pt.amber
+  return pt.danger
+}
+
 // ── Gradient-aware text colors ──────────────────────────────────────
 // PulseBackground's gradient is fixed to the *viewport* (not the
 // scrolled page) and always runs pale blue (top) → dark navy (bottom),

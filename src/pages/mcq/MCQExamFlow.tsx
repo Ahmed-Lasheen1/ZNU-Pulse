@@ -14,7 +14,8 @@ import {
   MOCK_MINUTES, MCQ_ACCENT,
   EXAM_TOP_TEXT, EXAM_TOP_TEXT_MUTED, EXAM_TOP_AMBER, EXAM_TOP_RED,
   EXAM_LOW_TEXT, EXAM_LOW_SECONDARY, EXAM_LOW_TEXT_MUTED, EXAM_LOW_SHADOW, EXAM_DIVIDER,
-  optionLabels, optionTexts, formatTime, StatChip, InfoTag
+  optionLabels, optionTexts, formatTime, StatChip, InfoTag,
+  accuracyTier, accuracyColor
 } from './mcqShared'
 
 interface MCQExamFlowProps {
@@ -80,6 +81,20 @@ export default function MCQExamFlow({
   const score = submitted ? getScore() : 0
   const total = quizQuestions.length
   const percent = total > 0 ? Math.round((score / total) * 100) : 0
+
+  // Color and verdict for the big results number — shared tiers with
+  // the Home page's Weekly Report card and the weekly push
+  // notification (see accuracyTier/accuracyColor in mcqShared.tsx), so
+  // a change to the breakpoints in one place updates everywhere.
+  const resultColor = accuracyColor(percent, pt)
+  const resultVerdict = {
+    excellent: 'EXCELLENT.',
+    great: 'GREAT WORK.',
+    good: 'GOOD WORK.',
+    keep_practicing: 'KEEP PRACTICING.',
+    needs_work: "DON'T GIVE UP.",
+  }[accuracyTier(percent)]
+
   const answeredIndexes = new Set(Object.keys(answers).map(Number))
   const flaggedIndexes = new Set(quizQuestions.map((q, i) => flaggedIds.has(q.id) ? i : null).filter((i): i is number => i !== null))
   const safeIndex = total > 0 ? Math.min(currentIndex, total - 1) : 0
@@ -439,10 +454,10 @@ export default function MCQExamFlow({
               </div>
               <div style={{
                 fontFamily: pulseFonts.display, fontWeight: 800, fontSize: 'clamp(52px, 11vw, 104px)',
-                lineHeight: 1, color: EXAM_LOW_TEXT, textShadow: '0 2px 14px rgba(1,12,74,0.55)'
+                lineHeight: 1, color: resultColor, textShadow: '0 2px 14px rgba(1,12,74,0.55)'
               }}>{percent}</div>
-              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, color: EXAM_LOW_TEXT, textShadow: EXAM_LOW_SHADOW, marginTop: 4 }}>
-                {percent >= 90 ? 'EXCELLENT.' : percent >= 75 ? 'GREAT WORK.' : percent >= 60 ? 'GOOD WORK.' : 'KEEP PRACTICING.'}
+              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, color: resultColor, textShadow: EXAM_LOW_SHADOW, marginTop: 4 }}>
+                {resultVerdict}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginTop: 16, flexWrap: 'wrap' }}>
@@ -467,7 +482,7 @@ export default function MCQExamFlow({
                     }}>
                       <div style={{
                         height: '100%', width: `${s.accuracy}%`, borderRadius: 999,
-                        background: s.accuracy >= 60 ? pt.cobalt : pt.danger,
+                        background: accuracyColor(s.accuracy, pt),
                         transition: 'width 0.6s ease'
                       }} />
                     </div>
