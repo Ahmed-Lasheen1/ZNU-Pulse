@@ -10,6 +10,7 @@ import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle, fieldLabel,
 import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
 import { fetchModuleStages } from '../../lib/moduleStages'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon, ListIcon, SearchIcon2, RobotIcon, BookIcon, GraduationCapIcon } from '../../components/ui/tool-icons'
+import QuestionSourceBadge from '../../components/QuestionSourceBadge'
 import type { AdminModule, AdminSubject, AdminLesson } from './adminTypes'
 
 const EXAM_STAGES = STAGE_META.map(s => ({ value: s.value, label: s.title }))
@@ -346,11 +347,10 @@ Correct: A`}</pre>
     <div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-          <SearchIcon2 color={pt.faint} size={14} />
           <input
             placeholder="Search questions..."
             value={search} onChange={e => setSearch(e.target.value)}
-            style={{ ...inStyle, marginBottom: 0, paddingLeft: 34, position: 'relative' }}
+            style={{ ...inStyle, marginBottom: 0, paddingLeft: 34 }}
           />
           <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
             <SearchIcon2 color={pt.faint} size={14} />
@@ -387,15 +387,47 @@ Correct: A`}</pre>
               <span style={{ color: pt.textMuted, fontSize: 12, fontWeight: 400 }}>({modQuestions.length})</span>
             </h4>
             <div className="admin-list-grid">
-              {modQuestions.map(q => (
-                <LiquidGlassCard key={q.id} dark={dark} delay={0} style={{ padding: '12px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <span style={{ color: pt.text, fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 100 }}>{q.question}</span>
-                  <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                    <button onClick={() => editQuestion(q)} aria-label="Edit question" style={{ ...miniBtn(pt, pt.cobalt), display: 'inline-flex', alignItems: 'center' }}><EditIcon color={pt.cobalt} size={12} /></button>
-                    <button onClick={() => deleteQuestion(q.id)} aria-label="Delete question" style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
-                  </div>
-                </LiquidGlassCard>
-              ))}
+              {modQuestions.map(q => {
+                const isEditing = editingQuestionId === q.id
+                const stageText = q.exam_stage
+                  ? (EXAM_STAGES.find(s => s.value === q.exam_stage)?.label || q.exam_stage)
+                  : null
+                return (
+                  <LiquidGlassCard
+                    key={q.id} dark={dark} delay={0}
+                    style={{
+                      padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10,
+                      boxShadow: isEditing ? `inset 0 0 0 2px ${pt.cobalt}` : undefined
+                    }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                      <p style={{
+                        color: pt.text, fontWeight: 600, fontSize: 13, lineHeight: 1.45, margin: 0,
+                        flex: 1, minWidth: 0, wordBreak: 'break-word', overflowWrap: 'anywhere',
+                        display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+                      }}>{q.question}</p>
+                      <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                        <button onClick={() => editQuestion(q)} aria-label={`Edit question: ${q.question}`} style={{ ...miniBtn(pt, pt.cobalt), display: 'inline-flex', alignItems: 'center' }}><EditIcon color={pt.cobalt} size={12} /></button>
+                        <button onClick={() => deleteQuestion(q.id)} aria-label={`Delete question: ${q.question}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                      <span style={{
+                        fontSize: 10.5, fontWeight: 700, padding: '2px 9px', borderRadius: 20,
+                        background: `${pt.cobalt}18`, border: `1px solid ${pt.cobalt}40`, color: pt.cobalt
+                      }}>
+                        {q.exam_type === 'practice' ? 'Practice Only' : q.exam_type === 'mock' ? 'Mock Only' : 'Practice + Mock'}
+                      </span>
+                      {stageText && (
+                        <span style={{
+                          fontSize: 10.5, fontWeight: 700, padding: '2px 9px', borderRadius: 20,
+                          background: `${pt.indigo}18`, border: `1px solid ${pt.indigo}40`, color: pt.indigo
+                        }}>{stageText}</span>
+                      )}
+                      {q.source && <QuestionSourceBadge source={q.source} />}
+                    </div>
+                  </LiquidGlassCard>
+                )
+              })}
             </div>
           </div>
         )
