@@ -120,6 +120,11 @@ export default function FilesPage({ dark }: { dark: boolean }) {
   const params = new URLSearchParams(location.search)
   const fileType = params.get('type')
   const moduleParam = params.get('module')
+  // AUDIT FIX (search accuracy): a specific file id from Search.tsx
+  // (`?file=<id>`) — once this module's files finish loading, the
+  // matching file's viewer opens directly (see the effect below)
+  // instead of leaving the person to find it again in the list.
+  const fileParam = params.get('file')
   const typeMeta = fileType ? TYPE_META[fileType] : null
 
   useHistoryOverlay(!!viewer, () => setViewer(null))
@@ -162,6 +167,17 @@ export default function FilesPage({ dark }: { dark: boolean }) {
     })
     return () => { ignore = true }
   }, [activeModule])
+
+  // AUDIT FIX (search accuracy): opens the exact file a Search result
+  // pointed at, the moment it shows up in the fetched list. Guarded on
+  // `viewer` being empty so it never fights with the person manually
+  // closing it and opening a different file afterward.
+  useEffect(() => {
+    if (!fileParam || viewer) return
+    const match = files.find(f => f.id === fileParam)
+    if (match) setViewer(match)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileParam, files])
 
   const filtered = files.filter(f => {
     const moduleMatch = f.module_id === activeModule

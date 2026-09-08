@@ -86,8 +86,8 @@ function SummariesHome({ modules, onSelect, dark }: {
   )
 }
 
-function ModuleSummaries({ mod, onBack, dark, initialStage }: {
-  mod: SummaryModule; onBack: () => void; dark: boolean; initialStage?: string
+function ModuleSummaries({ mod, onBack, dark, initialStage, initialSummaryId }: {
+  mod: SummaryModule; onBack: () => void; dark: boolean; initialStage?: string; initialSummaryId?: string
 }) {
   const pt = getPulseTheme(dark)
   const [summaries, setSummaries] = useState<Summary[]>([])
@@ -111,6 +111,22 @@ function ModuleSummaries({ mod, onBack, dark, initialStage }: {
         setLoading(false)
       })
   }, [mod.id])
+
+  // AUDIT FIX (search accuracy): when arriving here from a Search
+  // result for a specific summary (see Search.tsx's `summary` query
+  // param), open that exact summary directly instead of leaving the
+  // person to find it again in the list. Also switches the stage tab
+  // to whichever stage that summary actually belongs to, so it's
+  // visible in the filtered list underneath if the overlay is closed.
+  useEffect(() => {
+    if (!initialSummaryId || summaries.length === 0) return
+    const match = summaries.find(s => s.id === initialSummaryId)
+    if (match) {
+      setSelected(match)
+      if (match.exam_stage) setActiveStage(match.exam_stage)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSummaryId, summaries])
 
   const filtered = summaries.filter(s => activeStage === 'all' || (s.exam_stage || 'general') === activeStage)
 
@@ -219,12 +235,16 @@ export default function Summaries({ dark }: { dark: boolean }) {
   }, [modules, location.search])
 
   const initialStage = new URLSearchParams(location.search).get('stage') || 'all'
+  // AUDIT FIX (search accuracy): a specific summary id from Search.tsx
+  // (`?summary=<id>`), forwarded down so ModuleSummaries can open that
+  // exact summary the moment its list finishes loading.
+  const initialSummaryId = new URLSearchParams(location.search).get('summary') || undefined
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
       <PulseBackground />
       {selected
-        ? <ModuleSummaries mod={selected} onBack={() => setSelected(null)} dark={dark} initialStage={initialStage} />
+        ? <ModuleSummaries mod={selected} onBack={() => setSelected(null)} dark={dark} initialStage={initialStage} initialSummaryId={initialSummaryId} />
         : <SummariesHome modules={modules} onSelect={setSelected} dark={dark} />}
     </div>
   )

@@ -72,7 +72,12 @@ export default function Search({ dark }: { dark: boolean }) {
     const like = `%${q}%`
     const [fileRes, questionRes, summaryRes, scheduleRes] = await Promise.all([
       supabase.from('files').select('*').ilike('name', like).limit(20),
-      supabase.from('questions').select('id, question, module_id, exam_type, exam_stage, created_at').ilike('question', like).limit(20),
+      // AUDIT FIX (search accuracy): pulled in option_a-d and
+      // subject_id, which weren't selected before. Without them,
+      // clicking a question result had nothing to open except the
+      // parent module — now the full question row is available so a
+      // click can open that exact question directly (see openResult).
+      supabase.from('questions').select('id, question, option_a, option_b, option_c, option_d, module_id, subject_id, exam_type, exam_stage, created_at').ilike('question', like).limit(20),
       supabase.from('summaries').select('*').ilike('title', like).limit(20),
       supabase.from('schedules').select('*').ilike('title', like).limit(20),
     ])
@@ -96,12 +101,41 @@ export default function Search({ dark }: { dark: boolean }) {
     setLoading(false)
   }
 
+  // AUDIT FIX (search accuracy): every non-module result used to just
+  // drop the person on the parent module page (or, for schedules, the
+  // Schedule page with nothing selected), leaving them to re-find the
+  // exact thing they searched for by hand. Each type below now opens
+  // the exact item:
+  // - file: Files page pre-filtered to the right module/type, with
+  //   this exact file's viewer opened via the `file` query param
+  //   (see FilesPage.tsx).
+  // - question: jumps straight into a one-question quiz for this
+  //   exact question, using the same retryQuestions mechanism Review's
+  //   "Retry this one" already uses (see MCQ.tsx's handling of
+  //   location.state.retryQuestions).
+  // - summary: Summaries page pre-filtered to the right module, with
+  //   this exact summary opened via the `summary` query param (see
+  //   Summaries.tsx).
+  // - schedule: Schedule page pre-filtered to the right module/type,
+  //   with this exact item opened via the `item` query param (see
+  //   Schedule.tsx).
   function openResult(r: SearchResult) {
     if (r.type === 'module') return navigate(`/module/${r.id}`)
-    if (r.type === 'file') return navigate(`/files?type=${r.raw.type}&module=${r.raw.module_id}`)
-    if (r.type === 'question') return navigate(`/mcq?module=${r.raw.module_id}`)
-    if (r.type === 'summary') return navigate(`/module/${r.raw.module_id}`)
-    if (r.type === 'schedule') return navigate('/schedule')
+    if (r.type === 'file') return navigate(`/files?type=${r.raw.type}&module=${r.raw.module_id}&file=${r.raw.id}`)
+    if (r.type === 'question') {
+      const q = r.raw
+      return navigate('/mcq', {
+        state: {
+          retryQuestions: [{
+            id: q.id, question: q.question,
+            option_a: q.option_a, option_b: q.option_b, option_c: q.option_c, option_d: q.option_d,
+            module_id: q.module_id, subject_id: q.subject_id
+          }]
+        }
+      })
+    }
+    if (r.type === 'summary') return navigate(`/summaries?module=${r.raw.module_id}&summary=${r.raw.id}`)
+    if (r.type === 'schedule') return navigate(`/schedule?module=${r.raw.module_id}&type=${r.raw.type}&item=${r.raw.id}`)
   }
 
   const inStyle = { ...glassInput(pt, dark), padding: '15px 20px', marginBottom: 0, borderRadius: 999, fontSize: 15 }

@@ -1,5 +1,6 @@
 // src/pages/Schedule.tsx
 import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
 import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
 import ErrorBanner from '../components/ErrorBanner'
@@ -47,6 +48,7 @@ type ScheduleType = 'study' | 'exam'
 
 export default function Schedule({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
+  const location = useLocation()
   const { modules, modulesLoaded, modulesError } = useModules() as {
     modules: ScheduleModule[]
     modulesLoaded: boolean
@@ -54,7 +56,17 @@ export default function Schedule({ dark }: { dark: boolean }) {
   }
   const [schedules, setSchedules] = useState<ScheduleRow[]>([])
   const [activeModule, setActiveModule] = useState<string | null>(null)
-  const [activeType, setActiveType] = useState<ScheduleType>('study')
+
+  // AUDIT FIX (search accuracy): Search.tsx now links here with
+  // `?module=<id>&type=<study|exam>&item=<id>` so a schedule search
+  // result opens the exact matching item instead of dropping the
+  // person on the default (first active module, Study tab) view.
+  const params = new URLSearchParams(location.search)
+  const moduleParam = params.get('module')
+  const typeParam = params.get('type')
+  const itemParam = params.get('item')
+
+  const [activeType, setActiveType] = useState<ScheduleType>(() => (typeParam === 'exam' ? 'exam' : 'study'))
   const [loading, setLoading] = useState(true)
   const [viewer, setViewer] = useState<ScheduleRow | null>(null)
   const [loadError, setLoadError] = useState(false)
@@ -64,11 +76,16 @@ export default function Schedule({ dark }: { dark: boolean }) {
   const activeModules = modules.filter(m => m.status === 'active')
 
   useEffect(() => {
-    if (modulesLoaded && activeModules.length > 0 && !activeModule) {
+    if (activeModule) return
+    if (moduleParam && modules.some(m => m.id === moduleParam)) {
+      setActiveModule(moduleParam)
+      return
+    }
+    if (modulesLoaded && activeModules.length > 0) {
       setActiveModule(activeModules[0].id)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modulesLoaded, modules])
+  }, [modulesLoaded, modules, moduleParam])
 
   useEffect(() => {
     let ignore = false
@@ -83,6 +100,16 @@ export default function Schedule({ dark }: { dark: boolean }) {
     fetchData()
     return () => { ignore = true }
   }, [])
+
+  // Opens the exact schedule item a Search result pointed at, once
+  // the full list has loaded. Guarded on `viewer` being empty so it
+  // never fights with the person manually closing it afterward.
+  useEffect(() => {
+    if (!itemParam || viewer || schedules.length === 0) return
+    const match = schedules.find(s => s.id === itemParam)
+    if (match) setViewer(match)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemParam, schedules])
 
   const filtered = schedules.filter(s => s.module_id === activeModule && s.type === activeType)
   const hoverTint = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'
