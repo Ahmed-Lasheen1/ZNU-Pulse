@@ -24,7 +24,7 @@ export default function ResetPassword({ dark = true }: { dark?: boolean }) {
   }, [])
 
   async function handleSubmit() {
-    if (!password || password.length < 6) return setMessage('❌ Password must be at least 6 characters')
+    if (!password || password.length < 8) return setMessage('❌ Password must be at least 8 characters')
     if (password !== confirm) return setMessage('❌ Passwords do not match')
     setLoading(true); setMessage('')
     const { error } = await supabase.auth.updateUser({ password })
