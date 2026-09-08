@@ -686,3 +686,13 @@ export function LightningIcon({ color, size = 16 }: IconProps) {
     </svg>
   )
 }
+
+export function ArchiveBoxIcon({ color, size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="4" width="18" height="5" rx="1.5" stroke={color} strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M4.5 9v9a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5V9" stroke={color} strokeWidth="1.6" strokeLinejoin="round" opacity="0.85" />
+      <path d="M10 13.5h4" stroke={color} strokeWidth="1.6" strokeLinecap="round" opacity="0.7" />
+    </svg>
+  )
+}
