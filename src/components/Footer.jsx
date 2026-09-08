@@ -7,7 +7,6 @@ import PulseGlassRow from './pulse/PulseGlassRow'
 // itself never changes with that toggle) — so the divider is frozen
 // to the dark-mode value rather than reading a Liquid Glass token
 // that would otherwise flip with the theme.
-const HOVER_TINT = 'rgba(255,255,255,0.08)'
 
 // AUDIT FIX (per user request): every quick-nav link removed — Home,
 // Schedule, Checklist, MCQ, etc. are all one tap away from the
