@@ -2,23 +2,10 @@ import { getPulseTheme, pulseFonts, ON_GRADIENT_BOTTOM } from '../premiumTheme'
 import PulseGlassRow from './pulse/PulseGlassRow'
 import { WhatsAppIcon } from './ui/tool-icons'
 
-// Same reasoning as Home.tsx's FOOTER_LINE_COLOR: the footer always
-// sits on the dark/lower portion of the fixed PULSE_BG gradient,
-// regardless of the app's light/dark theme toggle (the gradient
-// itself never changes with that toggle) — so the divider is frozen
-// to the dark-mode value rather than reading a Liquid Glass token
-// that would otherwise flip with the theme.
 const DIVIDER_COLOR = getPulseTheme(true).border
 const HOVER_TINT = 'rgba(255,255,255,0.08)'
 const WHATSAPP_URL = 'https://wa.me/qr/AFP6XCVC2BJHO1'
 
-// AUDIT FIX (per user request): every quick-nav link removed — Home,
-// Schedule, Checklist, MCQ, etc. are all one tap away from the
-// persistent NavMenu and already surfaced on Home itself, so
-// repeating them here was pure redundancy, not navigation. This now
-// follows the "Large Type" / narrow-footer pattern (big brand
-// wordmark as the visual anchor + a copyright line, nothing else) —
-// the right fit for a small app that doesn't need a second sitemap.
 export default function Footer({ dark }) {
   const pt = getPulseTheme(dark)
   const year = new Date().getFullYear()
@@ -45,9 +32,6 @@ export default function Footer({ dark }) {
         }
       `}</style>
 
-      {/* Brand statement — the footer's one visual moment. Decorative
-          only (aria-hidden), since the real, accessible brand name
-          already lives in the site header on every page. */}
       <div aria-hidden style={{ textAlign: 'center', padding: '44px 20px 8px' }}>
         <div className="site-footer-wordmark" style={{
           fontFamily: pulseFonts.display, fontWeight: 800, letterSpacing: 2,
@@ -66,22 +50,20 @@ export default function Footer({ dark }) {
             Made with ❤️ by Ahmed Lasheen
           </span>
 
-          {/* Contact — WhatsApp icon pill, same glass treatment as
-              "Back to top" below. A real <a> (not onClick) so
-              right-click / open-in-new-tab / share work naturally. */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
+          <div style={{ marginTop: 2 }}>
             <PulseGlassRow dark={true} radius={999} hoverTint={HOVER_TINT}>
               <a
                 href={WHATSAPP_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="Contact us on WhatsApp"
                 style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: 38, height: 38, color: ON_GRADIENT_BOTTOM.secondary,
+                  display: 'flex', alignItems: 'center', gap: 7,
+                  padding: '6px 14px', fontSize: 12, fontWeight: 700,
+                  color: ON_GRADIENT_BOTTOM.secondary, textDecoration: 'none',
                 }}
               >
-                <WhatsAppIcon color={ON_GRADIENT_BOTTOM.secondary} size={17} />
+                <WhatsAppIcon color={ON_GRADIENT_BOTTOM.secondary} size={14} />
+                Contact us
               </a>
             </PulseGlassRow>
           </div>
