@@ -95,7 +95,12 @@ export async function unsubscribeFromPush() {
     const endpoint = sub.endpoint
     await sub.unsubscribe()
 
-    const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint)
+   // Goes through a security-definer RPC (mirrors upsert_push_subscription's
+   // own ownership rule) instead of a direct table delete — a plain
+   // delete().eq('endpoint', endpoint) silently matched zero rows for guest
+   // devices, since their row has user_id IS NULL and the RLS delete policy
+   // (auth.uid() = user_id) never matches NULL = NULL.
+   const { error } = await supabase.rpc('delete_push_subscription', { p_endpoint: endpoint })
     if (error) {
       console.warn('[push] Could not remove subscription from Supabase:', error)
       return { success: false, reason: 'db_delete_failed', error }
