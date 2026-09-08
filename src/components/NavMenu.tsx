@@ -5,7 +5,7 @@ import { Search as SearchIcon } from 'lucide-react'
 import { useAuth } from '../contexts'
 import { MenuToggleIcon } from './ui/menu-toggle-icon'
 import ThemeSwitch from './ui/theme-switch'
-import { HomeIcon, ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, SignOutIcon } from './ui/tool-icons'
+import { HomeIcon, ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, BookIcon, SignOutIcon } from './ui/tool-icons'
 import { getPulseTheme, pulseFonts } from '../premiumTheme'
 import { glassInput } from './pulse/PulseUI'
 import { liquidGlassShadow, liquidGlassBackdrop, liquidGlassTint } from '../lib/liquidGlass'
@@ -39,17 +39,18 @@ interface NavItem {
 // didn't have a matching glyph anywhere yet. `accent` mirrors Home's
 // own accent assignment per card (indigo/amber alternating) so the
 // menu's colors read as the same system, not a new one.
+//
+// Review uses the same BookIcon Review.tsx's own page header already
+// uses (via PageIntro), so the nav entry visually matches the page it
+// links to.
 const navItems: NavItem[] = [
   { label: 'Home', href: '/', Icon: HomeIcon, accent: 'cobalt' },
   { label: 'Schedules', href: '/schedule', Icon: ScheduleIcon, accent: 'indigo' },
   { label: 'Checklist', href: '/checklist', Icon: ChecklistIcon, accent: 'amber' },
   { label: 'Anonymous Q&A', href: '/anon-questions', Icon: AnonQAIcon, accent: 'indigo' },
   { label: 'Leaderboard', href: '/profile?tab=leaderboard', Icon: LeaderboardIcon, accent: 'amber' },
+  { label: 'Review', href: '/review', Icon: BookIcon, accent: 'indigo' },
 ]
-
-function initialOf(name?: string | null): string {
-  return name && name.trim() ? name.trim().charAt(0).toUpperCase() : '?'
-}
 
 const BUTTON_SIZE = 44
 const PANEL_WIDTH = 280
@@ -76,7 +77,7 @@ const CLOSE_DURATION = 0.55
 
 // AUDIT FIX (responsive/layout audit): on short viewports — landscape
 // phones, small foldables, anything shorter than roughly 500-550px
-// tall — this panel's content (profile row + search + 5 nav items +
+// tall — this panel's content (profile row + search + 6 nav items +
 // theme switch + sign-out) can be taller than the available viewport
 // height. The OUTER panel below intentionally keeps `overflow:
 // 'hidden'` (required for its own backdrop-filter blur to sample
@@ -404,19 +405,16 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
             maxHeight: PANEL_MAX_HEIGHT, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
           } as CSSProperties}
         >
-          {/* Profile / Sign In */}
+          {/* Profile / Sign In — AUDIT FIX (per user request): the
+              circular avatar badge (background gradient + name's
+              first initial) has been removed. Name and points now sit
+              flush left in the row instead of next to a badge. */}
           {user ? (
             <GlassRow dark={dark} radius={18} onClick={() => goTo('/profile')}
               role="button" tabIndex={open ? 0 : -1}
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goTo('/profile') } }}
               style={{ cursor: 'pointer' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px' }}>
-                <div style={{
-                  width: 42, height: 42, borderRadius: '50%', flexShrink: 0,
-                  background: `linear-gradient(135deg, ${pt.cobalt}, ${pt.indigo})`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 16, fontWeight: 900, color: '#fff'
-                }}>{initialOf(profile?.name)}</div>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{
                     color: pt.text, fontWeight: 800, fontSize: 14,
