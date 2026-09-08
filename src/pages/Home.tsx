@@ -1,6 +1,6 @@
 // src/pages/Home.tsx
 import { useEffect, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown } from 'lucide-react'
 import { useAuth, useModules } from '../contexts'
@@ -350,18 +350,29 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
           pointerEvents: 'auto'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <Link to="/" aria-label="ZNU Pulse — Home" style={{ textDecoration: 'none', display: 'inline-flex' }}>
-              <PulseBrand
-                dark={dark}
-                instant={!playEntrance}
-                animation={{
-                  logoDelay: LOGO_DELAY,
-                  wordsStart: BRAND_WORDS_START,
-                  wordStagger: BRAND_WORD_STAGGER,
-                  taglineDelay: BRAND_TAGLINE_DELAY,
-                }}
-              />
-            </Link>
+            {/* AUDIT FIX: this used to be wrapped in a react-router
+                <Link to="/">, which does a client-side (non-reloading)
+                navigation on click — layered on top of PulseBrand's
+                own goHome() handler, which sets window.location.href
+                and forces a full reload. The two competed for the
+                same click; PulseBrand's full-reload navigation still
+                won, but only by chance of ordering, not by design.
+                PulseBrand already handles its own click-to-home
+                navigation (and is now the same component every other
+                page's header renders via PulseOverlayHeader), so the
+                <Link> wrapper is removed here to match — one
+                navigation path, not two fighting over the same
+                click. */}
+            <PulseBrand
+              dark={dark}
+              instant={!playEntrance}
+              animation={{
+                logoDelay: LOGO_DELAY,
+                wordsStart: BRAND_WORDS_START,
+                wordStagger: BRAND_WORD_STAGGER,
+                taglineDelay: BRAND_TAGLINE_DELAY,
+              }}
+            />
 
             <motion.div
               initial={playEntrance ? { opacity: 0, x: 20 } : false}
