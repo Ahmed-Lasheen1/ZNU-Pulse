@@ -151,14 +151,14 @@ export default function Checklist({ dark }: { dark: boolean }) {
     if (!('Notification' in window) || Notification.permission !== 'granted') return
     if (tasks.length === 0) return
     const todayStr = new Date().toDateString()
-    if (localStorage.getItem('checklist_last_notify') === todayStr) return
+    if (localStorage.getItem('znu_checklist_last_notify') === todayStr) return
 
     const urgent = tasks.filter(t => !t.done && (isOverdue(t.deadline) || isDueSoon(t.deadline)))
     if (urgent.length > 0) {
       new Notification('ZNU Future Doctors', {
         body: `You have ${urgent.length} checklist item(s) due soon or overdue.`
       })
-      localStorage.setItem('checklist_last_notify', todayStr)
+      localStorage.setItem('znu_checklist_last_notify', todayStr)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks])
