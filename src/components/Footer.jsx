@@ -38,11 +38,8 @@ export default function Footer({ dark }) {
           font-size: clamp(36px, 10vw, 96px);
         }
         .site-footer-legal {
-          display: flex; align-items: center; justify-content: space-between;
-          gap: 12px; flex-wrap: wrap; padding: 14px 0;
-        }
-        @media (max-width: 560px) {
-          .site-footer-legal { flex-direction: column; text-align: center; }
+          display: flex; flex-direction: column; align-items: center;
+          gap: 6px; padding: 18px 0 22px; text-align: center;
         }
       `}</style>
 
@@ -67,16 +64,21 @@ export default function Footer({ dark }) {
       <div className="pulse-wide" style={{ padding: '0 20px' }}>
         <div style={{ height: 1, background: DIVIDER_COLOR }} />
         <div className="site-footer-legal">
-          <span style={{ color: ON_GRADIENT_BOTTOM.muted, fontSize: 12, fontWeight: 600 }}>
-            © {year} ZNU Pulse · Made with ❤️ by Ahmed Lasheen
+          <span style={{ color: ON_GRADIENT_BOTTOM.secondary, fontSize: 13, fontWeight: 600 }}>
+            Made with ❤️ by Ahmed Lasheen
           </span>
-          <PulseGlassRow dark={true} radius={999} hoverTint={HOVER_TINT} onClick={backToTop}
-            role="button" tabIndex={0}
-            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); backToTop() } }}>
-            <div style={{ padding: '6px 14px', fontSize: 12, fontWeight: 700, color: ON_GRADIENT_BOTTOM.secondary }}>
-              ↑ Back to top
-            </div>
-          </PulseGlassRow>
+          <span style={{ color: ON_GRADIENT_BOTTOM.muted, fontSize: 12, fontWeight: 600 }}>
+            © {year} ZNU Pulse. All rights reserved.
+          </span>
+          <div style={{ marginTop: 4 }}>
+            <PulseGlassRow dark={true} radius={999} hoverTint={HOVER_TINT} onClick={backToTop}
+              role="button" tabIndex={0}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); backToTop() } }}>
+              <div style={{ padding: '6px 14px', fontSize: 12, fontWeight: 700, color: ON_GRADIENT_BOTTOM.secondary }}>
+                ↑ Back to top
+              </div>
+            </PulseGlassRow>
+          </div>
         </div>
       </div>
     </footer>
