@@ -33,9 +33,9 @@ const CENTER_PATH =  "M0,383.0 L24,383.0 L28,383.1 L32,383.0 L36,383.0 L40,383.0
 // everywhere along the path — the mask above is what then crops this
 // down to the exact real silhouette, so the final visible width is
 // governed entirely by the real pixels, not by this number.
-const STROKE_WIDTH = 25
+const STROKE_WIDTH = 30
 
-const BEAM_DURATION = '6s'
+const BEAM_DURATION = '7s'
 
 function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(false)
