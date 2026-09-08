@@ -1,10 +1,16 @@
+// src/components/NotifyPermissionButton.jsx
 import { useState, useEffect } from 'react'
 import { getPulseTheme, ON_GRADIENT_TOP } from '../premiumTheme'
 import { useToast } from './ToastProvider'
 import { useNotificationStatus } from '../lib/useNotificationStatus'
 import { subscribeToPush } from '../lib/pushNotifications'
 import { useOncePerSession } from '../lib/useOncePerSession'
+import { useLimitedAppearance } from '../lib/useLimitedAppearance'
 import { BellIcon } from './ui/tool-icons'
+
+// How many page loads this prompt gets to appear on before it retires
+// for good — see the AUDIT FIX note below.
+const MAX_PROMPT_SHOWS = 3
 
 // Strips a leading emoji/symbol (and any trailing whitespace) off a
 // label string — lets existing callers that still pass an
@@ -23,12 +29,21 @@ function stripLeadingEmoji(text) {
 // can never disagree about whether notifications are actually on for
 // this device.
 //
-// AUDIT FIX: the "not supported" and "blocked" cases used to render a
-// permanent paragraph of explanatory text inline, on every page this
-// button happens to be mounted on (Home, Checklist, AnonQuestions).
-// Both are now a single toast, shown once per browser tab session
-// (see useOncePerSession) — the student can check or fix their
-// notification setting any time from the toggle on the Profile page.
+// AUDIT FIX (per user request): this used to render on every single
+// reload for as long as notifications stayed off, which trained
+// people to tune it out rather than act on it — annoying, especially
+// since Profile's NotificationToggle is always available as a manual
+// way in. The prompt now only shows on the first MAX_PROMPT_SHOWS page
+// loads (see useLimitedAppearance) and then disappears permanently,
+// regardless of whether the person ever tapped it. Enabling
+// notifications (or a browser permission change) is unaffected — this
+// only governs whether the *ask* itself keeps resurfacing.
+//
+// AUDIT FIX (still true): the "not supported" and "blocked" cases
+// don't render inline explanatory text — both are a single toast,
+// shown once per browser tab session (see useOncePerSession). The
+// student can check or fix their notification setting any time from
+// the toggle on the Profile page.
 export default function NotifyPermissionButton({ dark, label = 'Enable notifications' }) {
   const pt = getPulseTheme(dark)
   const showToast = useToast()
@@ -37,6 +52,13 @@ export default function NotifyPermissionButton({ dark, label = 'Enable notificat
 
   const canToastUnsupported = useOncePerSession('znu_notif_unsupported_toast')
   const canToastDenied = useOncePerSession('znu_notif_denied_toast')
+
+  // Everything that would make this button worth showing at all,
+  // independent of the reload budget below — kept separate so the
+  // budget is only ever spent on loads where the button actually had
+  // something to say.
+  const wouldShow = checked && supported && permission !== 'denied' && !enabled
+  const allowedByBudget = useLimitedAppearance('znu_notif_prompt', wouldShow, MAX_PROMPT_SHOWS)
 
   useEffect(() => {
     if (!checked || !canToastUnsupported) return
@@ -88,10 +110,7 @@ export default function NotifyPermissionButton({ dark, label = 'Enable notificat
     showToast(messages[result.reason] || '❌ Could not enable notifications', 'error')
   }
 
-  if (!checked) return null
-  if (!supported) return null
-  if (permission === 'denied') return null
-  if (enabled) return null
+  if (!wouldShow || !allowedByBudget) return null
 
   return (
     <button onClick={handleClick} disabled={busy} style={{

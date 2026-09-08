@@ -1,6 +1,6 @@
 // src/pages/Home.tsx
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown } from 'lucide-react'
 import { useAuth, useModules } from '../contexts'
@@ -14,11 +14,12 @@ import { loadSavedActiveExam } from '../lib/activeExam'
 import { ENTRANCE_PAUSE } from '../lib/pulseMotion'
 import { useOncePerSession } from '../lib/useOncePerSession'
 import NotifyPermissionButton from '../components/NotifyPermissionButton'
+import GuestSignInButton from '../components/GuestSignInButton'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import EcgHero from '../components/pulse/EcgHero'
 import PulseBackground from '../components/pulse/PulseBackground'
 import PulseBrand from '../components/pulse/PulseBrand'
-import { ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, PauseIcon, LightningIcon } from '@/components/ui/tool-icons'
+import { ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, PauseIcon, LightningIcon, CheckCircleIcon } from '@/components/ui/tool-icons'
 import { ModuleIcon } from '../lib/medicalIcons'
 import { accuracyTier, accuracyColor, type AccuracyTier } from './mcq/mcqShared'
 
@@ -349,16 +350,18 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
           pointerEvents: 'auto'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <PulseBrand
-              dark={dark}
-              instant={!playEntrance}
-              animation={{
-                logoDelay: LOGO_DELAY,
-                wordsStart: BRAND_WORDS_START,
-                wordStagger: BRAND_WORD_STAGGER,
-                taglineDelay: BRAND_TAGLINE_DELAY,
-              }}
-            />
+            <Link to="/" aria-label="ZNU Pulse — Home" style={{ textDecoration: 'none', display: 'inline-flex' }}>
+              <PulseBrand
+                dark={dark}
+                instant={!playEntrance}
+                animation={{
+                  logoDelay: LOGO_DELAY,
+                  wordsStart: BRAND_WORDS_START,
+                  wordStagger: BRAND_WORD_STAGGER,
+                  taglineDelay: BRAND_TAGLINE_DELAY,
+                }}
+              />
+            </Link>
 
             <motion.div
               initial={playEntrance ? { opacity: 0, x: 20 } : false}
@@ -459,6 +462,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
             transition={{ duration: 0.7, delay: NOTIFY_DELAY }}
           >
             <NotifyPermissionButton dark={dark} label="Enable exam & deadline reminders" />
+            <GuestSignInButton dark={dark} />
           </motion.div>
 
           <div className="pulse-wide">
@@ -637,14 +641,23 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
         {/* ── Completed Modules — collapsible, muted card treatment ───
             Same pill-shaped LiquidGlassCard used by Active Modules
             (so it still visually reads as "a card" in this app), just
-            desaturated: grayscale icon circle, muted text, a
-            "✓ Completed" tag instead of the colored active-dot. The
+            desaturated: grayscale icon circle, muted text, a small
+            checkmark badge instead of the colored active-dot. The
             whole list is collapsed by default (finished modules are
             lower priority than active ones) with a chevron + count
             badge as the expand affordance, and the expand/collapse is
             animated via AnimatePresence rather than an instant
             show/hide. The section is capped to 640px and centered so
             it doesn't stretch edge-to-edge on wide desktop screens.
+
+            AUDIT FIX (per user request): the per-card "✓ Completed"
+            text pill was redundant — the card is already grayscale,
+            muted, and sitting inside a section literally titled
+            "✓ Completed Modules", so repeating the word again on every
+            row added nothing. Replaced with a small icon-only
+            checkmark badge: still a visual anchor confirming the
+            card's state at a glance, without repeating text that's
+            already said twice elsewhere on the same screen.
 
             The toggle itself is now a centered LiquidGlassCard pill
             (same glass treatment as the announcement card above) so
@@ -744,12 +757,14 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                               }}>{mod.name}</div>
                             </div>
-                            <span style={{
-                              fontSize: 10, fontWeight: 700, color: pt.textMuted,
+                            <span aria-label="Completed" style={{
+                              width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
                               background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
-                              border: `1px solid ${pt.border}`, borderRadius: 999,
-                              padding: '2px 10px', flexShrink: 0, whiteSpace: 'nowrap',
-                            }}>✓ Completed</span>
+                              border: `1px solid ${pt.border}`,
+                            }}>
+                              <CheckCircleIcon color={pt.textMuted} size={12} />
+                            </span>
                           </LiquidGlassCard>
                         </motion.div>
                       ))}
