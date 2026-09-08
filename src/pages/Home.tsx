@@ -421,8 +421,14 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
           }
 
           @media (max-width: 640px) {
-            .pulse-fold { gap: 14px; }
+            .pulse-fold { gap: 14px; padding-top: 4px; }
             .pulse-report-grid { gap: 8px; }
+            /* Pull the ECG hero up toward the header now that it's
+               first in mobile stacking order — the clamp()-based
+               top padding above was tuned for the old order (report
+               card first), which left a big gap above the hero once
+               it moved to the top. */
+            .pulse-hero-panel { margin-top: -18px; min-height: clamp(100px, 42vw, 200px); }
           }
         `}</style>
 
