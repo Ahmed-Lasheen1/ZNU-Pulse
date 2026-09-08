@@ -421,18 +421,34 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
           }
 
           @media (max-width: 640px) {
-            .pulse-fold { gap: 14px; padding-top: 4px; }
+            .pulse-fold { gap: 12px; padding-top: 0; }
             .pulse-report-grid { gap: 8px; }
             /* Pull the ECG hero up toward the header now that it's
-               first in mobile stacking order — the clamp()-based
-               top padding above was tuned for the old order (report
-               card first), which left a big gap above the hero once
-               it moved to the top. */
-            .pulse-hero-panel { margin-top: -18px; min-height: clamp(100px, 42vw, 200px); }
+               first in mobile stacking order — the clamp()-based top
+               padding above was tuned for the old order (report card
+               first), which left a big gap above the hero once it
+               moved to the top. Combined with the corrected header
+               spacer above, this puts the hero right under the
+               header instead of floating with empty space above it. */
+            .pulse-hero-panel { margin-top: -30px; min-height: clamp(90px, 38vw, 190px); }
           }
         `}</style>
 
-        <div style={{ height: 'calc(76px + env(safe-area-inset-top))' }} />
+        {/* AUDIT FIX: this used to be `calc(76px + env(safe-area-inset-top))`
+            — a flat 76px PLUS the full safe-area inset, added
+            together. But the header block above sets its own top
+            padding as `max(16px, env(safe-area-inset-top))` — it uses
+            WHICHEVER is bigger, never both (same root-cause bug
+            already fixed in BackButton.tsx's HEADER_GAP). On a phone
+            with a notch/Dynamic Island the safe-area inset is
+            typically 47-59px, so the old formula was double-counting
+            that extra 16px and leaving a bigger empty gap above the
+            page content than the header actually needs. Corrected to
+            mirror the header's real math: `max(16px,
+            env(safe-area-inset-top))` for the top padding, + 44px for
+            the logo row, + 16px for the header's own bottom padding —
+            i.e. the header's true rendered height, nothing extra. */}
+        <div style={{ height: 'calc(max(16px, env(safe-area-inset-top)) + 60px)' }} />
 
         <div className="pulse-fold">
           {modulesError && <div className="pulse-wide"><ErrorBanner /></div>}
