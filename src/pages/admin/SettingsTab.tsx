@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../supabase'
-import { getPulseTheme } from '../../premiumTheme'
+import { getPulseTheme, pulseType } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { btnStyle, inStyle as adminInStyle, fieldLabel } from './adminStyles'
@@ -141,21 +141,35 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
             <MegaphoneIcon color={pt.cobalt} size={17} /> Home Page Announcement
           </h3>
           <p style={{ color: pt.textMuted, fontSize: 13, marginBottom: 16 }}>
-            Shows in a banner at the top of the Home page for everyone. Leave it empty to hide the banner
-            completely. The box below is styled exactly like it'll appear on the site.
+            Shows in a card at the top of the Home page for everyone. Leave it empty to hide the card
+            completely. The preview below is styled exactly like it'll appear on the site — same glass
+            card, same text style, and it wraps onto more than one line the same way too.
           </p>
-          <textarea
-            placeholder="e.g. Pharma exam next week, study well!"
-            value={announcement}
-            onChange={e => setAnnouncement(e.target.value)}
-            style={{
-              width: '100%', minHeight: 96, padding: '14px 20px',
-              borderRadius: 16, border: `1px solid ${pt.cobaltBorder}`,
-              background: `linear-gradient(135deg, ${pt.cobaltSoft}, ${pt.indigoSoft})`,
-              color: pt.text, fontSize: 14, fontWeight: 600, lineHeight: 1.6,
-              textAlign: 'center', fontFamily: 'inherit', outline: 'none',
-              resize: 'vertical', marginBottom: 12, boxSizing: 'border-box'
-            }} />
+          {/* AUDIT FIX: this preview used to be a plain textarea with
+              its own one-off styling (a flat cobalt/indigo gradient
+              background, centered text, fontWeight 600 @ 14px) that
+              had drifted out of sync with how the announcement
+              actually renders on Home — a LiquidGlassCard (real
+              blur + tint + shadow, not a flat gradient) with
+              left-aligned text at pulseType.bodyEmphasis / 13px (see
+              the announcement block in Home.tsx). Wrapping the
+              textarea in the same LiquidGlassCard component with
+              matching padding/typography makes what admins see here
+              an accurate preview instead of a stylized guess. */}
+          <LiquidGlassCard dark={dark} instant style={{ padding: '16px 20px', marginBottom: 12 }}>
+            <textarea
+              placeholder="e.g. Pharma exam next week, study well!"
+              value={announcement}
+              onChange={e => setAnnouncement(e.target.value)}
+              style={{
+                display: 'block', width: '100%', minHeight: 80, padding: 0,
+                border: 'none', background: 'transparent', outline: 'none',
+                ...pulseType.bodyEmphasis, fontSize: 13, color: pt.textPrimary,
+                lineHeight: 1.5, textAlign: 'left', fontFamily: 'inherit',
+                whiteSpace: 'normal', wordBreak: 'break-word',
+                resize: 'vertical', boxSizing: 'border-box'
+              }} />
+          </LiquidGlassCard>
           <button onClick={saveAnnouncement} disabled={announcementSaving} style={{ ...btnStyle(pt, dark), width: '100%' }}>
             {announcementSaving ? 'Saving...' : 'Save Announcement'}
           </button>
