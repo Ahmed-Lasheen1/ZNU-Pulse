@@ -550,10 +550,9 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
             </div>
           </div>
 
-          <div className="pulse-wide">
+          <div className="pulse-wide" style={{ marginTop: 'clamp(8px, 2vh, 24px)' }}>
             {sectionTitle('Tools', TOOLS_START, 'top', LightningIcon, true)}
             <div className="pulse-tools-grid">
-              {toolCards.map((card, i) => {
                 const accentColor = card.accent === 'amber' ? pt.amber : pt.indigo
                 const Icon = card.Icon
                 return (
