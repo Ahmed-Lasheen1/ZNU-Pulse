@@ -1,40 +1,184 @@
-import { ON_GRADIENT_BOTTOM } from '../premiumTheme'
+import { useNavigate } from 'react-router-dom'
+import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_BOTTOM } from '../premiumTheme'
+import PulseGlassRow from './pulse/PulseGlassRow'
+import {
+  HomeIcon, ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, SearchIcon2,
+} from './ui/tool-icons'
+import { ExamIcon, NotesIcon } from '../lib/medicalIcons'
 
-// The Footer renders in normal document flow, but the app's
-// PulseBackground is `position: fixed; height: 100dvh` — it always
-// covers whatever the current viewport shows, from the light top of
-// its gradient to the dark bottom, regardless of scroll or theme. By
-// the time a visitor scrolls this far, the Footer sits over the
-// dark/lower portion of that gradient in both light and dark app
-// themes (the gradient itself doesn't change with the theme toggle),
-// so its text uses ON_GRADIENT_BOTTOM rather than the old invented
-// slate grays.
-//
-// AUDIT FIX (footer invisible): PulseBackground is `position: fixed`
-// with no z-index set. Per CSS stacking rules, a positioned element
-// (even at the default z-index:auto) paints AFTER — i.e. on top of —
-// plain in-flow, non-positioned content, regardless of DOM order.
-// Every page already works around this by wrapping its own content in
-// a `position: relative, zIndex: 1` div (see e.g. Home.tsx,
-// ModulePage.tsx). Footer is rendered by App.jsx outside of any page's
-// own wrapper, so without the same treatment it stayed a plain static
-// block and was silently painted underneath the fixed background,
-// making it completely invisible no matter how far you scrolled.
-// Adding the identical `position: relative, zIndex: 1` here lifts it
-// into the same stacking tier as the rest of the page content.
-export default function Footer({ dark }) {
+const LOGO_SRC = '/icon-192.png'
+
+// Same reasoning as Home.tsx's FOOTER_LINE_COLOR: the footer always
+// sits on the dark/lower portion of the fixed PULSE_BG gradient,
+// regardless of the app's light/dark theme toggle (the gradient
+// itself never changes with that toggle) — so every border/divider
+// here is frozen to the dark-mode value rather than reading a
+// Liquid Glass token that would otherwise flip with the theme.
+const DIVIDER_COLOR = getPulseTheme(true).border
+const HOVER_TINT = 'rgba(255,255,255,0.08)'
+
+// Column link groups — grouped by what a visitor is actually looking
+// for (explore the app / connect with the community / manage your
+// account), the same "answers one of a few questions" grouping
+// footer-design guides converge on, rather than one long flat list.
+const EXPLORE_LINKS = [
+  { label: 'Home', to: '/', Icon: HomeIcon },
+  { label: 'Schedules', to: '/schedule', Icon: ScheduleIcon },
+  { label: 'Checklist', to: '/checklist', Icon: ChecklistIcon },
+  { label: 'MCQ Bank', to: '/mcq', Icon: ExamIcon },
+  { label: 'Smart Summaries', to: '/summaries', Icon: NotesIcon },
+]
+
+const COMMUNITY_LINKS = [
+  { label: 'Anonymous Q&A', to: '/anon-questions', Icon: AnonQAIcon },
+  { label: 'Leaderboard', to: '/profile?tab=leaderboard', Icon: LeaderboardIcon },
+  { label: 'Search', to: '/search', Icon: SearchIcon2 },
+]
+
+const ACCOUNT_LINKS = [
+  { label: 'My Profile', to: '/profile' },
+  { label: 'Sign In', to: '/auth' },
+  { label: 'Exam History & Mistakes', to: '/review' },
+]
+
+function FooterHeading({ children }) {
   return (
-    <div style={{
+    <h3 style={{
+      ...pulseType.sectionLabel,
+      color: ON_GRADIENT_BOTTOM.muted,
+      marginBottom: 16,
+    }}>{children}</h3>
+  )
+}
+
+function FooterLink({ label, to, Icon, onNavigate }) {
+  return (
+    <PulseGlassRow dark={true} radius={10} hoverTint={HOVER_TINT} onClick={() => onNavigate(to)}
+      role="button" tabIndex={0}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onNavigate(to) } }}
+      style={{ marginBottom: 4 }}>
+      <div style={{
+        padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 8,
+        color: ON_GRADIENT_BOTTOM.secondary, fontSize: 13, fontWeight: 600,
+        fontFamily: pulseFonts.body,
+      }}>
+        {Icon && <Icon color={ON_GRADIENT_BOTTOM.muted} size={14} />}
+        {label}
+      </div>
+    </PulseGlassRow>
+  )
+}
+
+export default function Footer({ dark }) {
+  const navigate = useNavigate()
+  const pt = getPulseTheme(dark)
+  const year = new Date().getFullYear()
+
+  function goTo(path) {
+    navigate(path)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function backToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  return (
+    <footer style={{
       position: 'relative',
       zIndex: 1,
-      textAlign: 'center',
-      padding: '20px',
-      borderTop: `1px solid ${dark ? '#1e3a5f' : '#e2e8f0'}`,
-      color: ON_GRADIENT_BOTTOM.secondary,
-      fontSize: 13,
-      fontWeight: 600
+      borderTop: `1px solid ${DIVIDER_COLOR}`,
+      fontFamily: pulseFonts.body,
     }}>
-      Made with ❤️ by Ahmed Lasheen · ZNU Future Doctors
-    </div>
+      <style>{`
+        .site-footer-grid {
+          display: grid;
+          grid-template-columns: 1.4fr 1fr 1fr 1fr;
+          gap: 32px;
+        }
+        @media (max-width: 900px) {
+          .site-footer-grid { grid-template-columns: 1fr 1fr; gap: 28px 20px; }
+        }
+        @media (max-width: 560px) {
+          .site-footer-grid { grid-template-columns: 1fr; gap: 28px; }
+        }
+        .site-footer-bottom {
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 16px; flex-wrap: wrap;
+        }
+        @media (max-width: 560px) {
+          .site-footer-bottom { flex-direction: column; text-align: center; }
+        }
+      `}</style>
+
+      <div className="pulse-wide" style={{ padding: '56px 20px 28px' }}>
+        <div className="site-footer-grid" style={{ marginBottom: 40 }}>
+          {/* Brand column */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+              <div style={{
+                width: 40, height: 40, flexShrink: 0, borderRadius: 10, overflow: 'hidden',
+                background: pt.surfaceFlat, border: `1px solid ${pt.cobaltBorder}`,
+              }}>
+                <img src={LOGO_SRC} alt="ZNU Pulse" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              </div>
+              <div style={{
+                ...pulseType.sectionTitle,
+                fontFamily: pulseFonts.display, fontWeight: 800, fontSize: 18, letterSpacing: 1,
+                color: ON_GRADIENT_BOTTOM.primary, lineHeight: 1,
+              }}>
+                ZNU <span style={{ color: pt.cobalt }}>PULSE</span>
+              </div>
+            </div>
+            <p style={{
+              color: ON_GRADIENT_BOTTOM.secondary, fontSize: 13, lineHeight: 1.6, maxWidth: 320, marginBottom: 6,
+            }}>
+              Your integrated medical study platform — schedules, checklists, an MCQ bank, and smart summaries, all in one place.
+            </p>
+            <p style={{ color: ON_GRADIENT_BOTTOM.muted, fontSize: 12, lineHeight: 1.6 }}>
+              Faculty of Medicine — Zagazig National University
+            </p>
+          </div>
+
+          {/* Explore column */}
+          <div>
+            <FooterHeading>Explore</FooterHeading>
+            {EXPLORE_LINKS.map(l => <FooterLink key={l.to} {...l} onNavigate={goTo} />)}
+          </div>
+
+          {/* Community column */}
+          <div>
+            <FooterHeading>Community</FooterHeading>
+            {COMMUNITY_LINKS.map(l => <FooterLink key={l.to} {...l} onNavigate={goTo} />)}
+          </div>
+
+          {/* Account column */}
+          <div>
+            <FooterHeading>Account</FooterHeading>
+            {ACCOUNT_LINKS.map(l => <FooterLink key={l.to} {...l} onNavigate={goTo} />)}
+          </div>
+        </div>
+
+        <div style={{ height: 1, background: DIVIDER_COLOR, marginBottom: 20 }} />
+
+        {/* Legal / credit strip */}
+        <div className="site-footer-bottom">
+          <div style={{ color: ON_GRADIENT_BOTTOM.muted, fontSize: 12, fontWeight: 600 }}>
+            © {year} ZNU Pulse. All rights reserved.
+          </div>
+          <div style={{ color: ON_GRADIENT_BOTTOM.muted, fontSize: 12, fontWeight: 600 }}>
+            Made with ❤️ by Ahmed Lasheen · ZNU Future Doctors
+          </div>
+          <PulseGlassRow dark={true} radius={999} hoverTint={HOVER_TINT} onClick={backToTop}
+            role="button" tabIndex={0}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); backToTop() } }}>
+            <div style={{
+              padding: '7px 16px', fontSize: 12, fontWeight: 700,
+              color: ON_GRADIENT_BOTTOM.secondary,
+            }}>↑ Back to top</div>
+          </PulseGlassRow>
+        </div>
+      </div>
+    </footer>
   )
 }
