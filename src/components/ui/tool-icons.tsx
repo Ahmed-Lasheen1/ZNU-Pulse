@@ -696,3 +696,20 @@ export function ArchiveBoxIcon({ color, size = 16 }: IconProps) {
     </svg>
   )
 }
+
+export function WhatsAppIcon({ color, size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path
+        d="M12 3.5a8.5 8.5 0 0 0-7.3 12.8L3.5 20.5l4.3-1.2A8.5 8.5 0 1 0 12 3.5Z"
+        stroke={color}
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9 8.7c.15-.4.5-.7.9-.7h.5c.3 0 .55.2.65.5l.5 1.3c.1.25.05.55-.15.75l-.5.55c.4.95 1.2 1.75 2.15 2.15l.55-.5c.2-.2.5-.25.75-.15l1.3.5c.3.1.5.35.5.65v.5c0 .4-.3.75-.7.9-2.6.9-5.6-.5-7-3-.75-1.35-1-2.75-.45-4.03Z"
+        fill={color}
+      />
+    </svg>
+  )
+}
