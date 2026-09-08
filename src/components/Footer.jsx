@@ -56,13 +56,9 @@ export default function Footer({ dark }) {
         }}>
           ZNU PULSE
         </div>
-        <div style={{ color: ON_GRADIENT_BOTTOM.muted, fontSize: 12, fontWeight: 600, marginTop: 6 }}>
-          Keep the pulse. Shape the future.
-        </div>
       </div>
 
       <div className="pulse-wide" style={{ padding: '0 20px' }}>
-        <div style={{ height: 1, background: DIVIDER_COLOR }} />
         <div className="site-footer-legal">
           <span style={{ color: ON_GRADIENT_BOTTOM.secondary, fontSize: 13, fontWeight: 600 }}>
             Made with ❤️ by Ahmed Lasheen
