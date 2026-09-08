@@ -23,7 +23,7 @@ export const EXAM_STAGES = [
 // Kept only as a safe fallback for any old/unrecognized stage value
 // (e.g. content tagged 'general' before this list existed) — not shown
 // as a selectable option anywhere.
-const FALLBACK_STAGE = { value: 'general', title: 'General', Icon: PinIcon, color: '#64748b' }
+export const FALLBACK_STAGE = { value: 'general', title: 'General', Icon: PinIcon, color: '#64748b' }
 
 export function stageMeta(value) {
   return EXAM_STAGES.find(s => s.value === value) || FALLBACK_STAGE
