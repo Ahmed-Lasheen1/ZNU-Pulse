@@ -69,6 +69,31 @@ function FooterLink({ label, to, Icon, onNavigate }) {
   )
 }
 
+// Two soft, low-opacity glows scoped to the footer only (NOT the
+// full-viewport GradientBlobs used on Auth/ResetPassword, which is
+// `position: fixed` and meant to cover an entire page). These are
+// `position: absolute` against the footer's own `position: relative`
+// container, sized and placed to bleed off its edges — the same
+// "carry the brand's visual identity into the footer" idea the
+// footer-design research calls out, applied at a scale that suits a
+// site-wide footer rather than a hero section.
+function FooterGlow({ pt }) {
+  return (
+    <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', zIndex: 0, pointerEvents: 'none' }}>
+      <div style={{
+        position: 'absolute', width: 420, height: 420, borderRadius: '50%',
+        background: `radial-gradient(circle, ${pt.cobalt}22, transparent 70%)`,
+        top: -220, left: '-8%', filter: 'blur(60px)',
+      }} />
+      <div style={{
+        position: 'absolute', width: 360, height: 360, borderRadius: '50%',
+        background: `radial-gradient(circle, ${pt.indigo}1c, transparent 70%)`,
+        bottom: -200, right: '-6%', filter: 'blur(70px)',
+      }} />
+    </div>
+  )
+}
+
 export default function Footer({ dark }) {
   const navigate = useNavigate()
   const pt = getPulseTheme(dark)
@@ -87,6 +112,7 @@ export default function Footer({ dark }) {
     <footer style={{
       position: 'relative',
       zIndex: 1,
+      overflow: 'hidden',
       borderTop: `1px solid ${DIVIDER_COLOR}`,
       fontFamily: pulseFonts.body,
     }}>
@@ -109,9 +135,14 @@ export default function Footer({ dark }) {
         @media (max-width: 560px) {
           .site-footer-bottom { flex-direction: column; text-align: center; }
         }
+        .site-footer-wordmark {
+          font-size: clamp(40px, 11vw, 128px);
+        }
       `}</style>
 
-      <div className="pulse-wide" style={{ padding: '56px 20px 28px' }}>
+      <FooterGlow pt={pt} />
+
+      <div className="pulse-wide" style={{ position: 'relative', zIndex: 1, padding: '56px 20px 0' }}>
         <div className="site-footer-grid" style={{ marginBottom: 40 }}>
           {/* Brand column */}
           <div>
@@ -162,7 +193,7 @@ export default function Footer({ dark }) {
         <div style={{ height: 1, background: DIVIDER_COLOR, marginBottom: 20 }} />
 
         {/* Legal / credit strip */}
-        <div className="site-footer-bottom">
+        <div className="site-footer-bottom" style={{ paddingBottom: 24 }}>
           <div style={{ color: ON_GRADIENT_BOTTOM.muted, fontSize: 12, fontWeight: 600 }}>
             © {year} ZNU Pulse. All rights reserved.
           </div>
@@ -177,6 +208,28 @@ export default function Footer({ dark }) {
               color: ON_GRADIENT_BOTTOM.secondary,
             }}>↑ Back to top</div>
           </PulseGlassRow>
+        </div>
+      </div>
+
+      {/* Closing brand statement — a large, faded wordmark as the very
+          last thing on the page, the "final brand moment" pattern
+          seen across polished SaaS/product footers. Decorative only
+          (the real, accessible brand name is already in the column
+          above), so it's hidden from assistive tech and doesn't
+          repeat the page's landmark structure. Reuses Home.tsx's own
+          tagline verbatim rather than inventing new marketing copy. */}
+      <div aria-hidden style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '0 20px 28px', overflow: 'hidden' }}>
+        <div className="site-footer-wordmark" style={{
+          fontFamily: pulseFonts.display, fontWeight: 800, letterSpacing: 2,
+          lineHeight: 1, whiteSpace: 'nowrap',
+          background: `linear-gradient(135deg, ${ON_GRADIENT_BOTTOM.muted}, ${pt.cobalt}55)`,
+          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          opacity: 0.5,
+        }}>
+          ZNU PULSE
+        </div>
+        <div style={{ color: ON_GRADIENT_BOTTOM.muted, fontSize: 12, fontWeight: 600, marginTop: 4 }}>
+          Keep the pulse. Shape the future.
         </div>
       </div>
     </footer>
