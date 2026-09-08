@@ -178,6 +178,20 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
   // Modules (just muted) rather than a flat row-list, per feedback.
   const [archiveOpen, setArchiveOpen] = useState(false)
 
+  // Tracks whether the expand/collapse height animation has finished.
+  // The wrapping motion.div needs `overflow: hidden` WHILE it's
+  // animating height (0 -> auto), but hidden overflow also clips each
+  // card's own hover scale-up effect once the list is fully open —
+  // that's what made completed-module cards look "cut off" on hover.
+  // Switching to `overflow: visible` only after the height animation
+  // completes keeps the collapse/expand working while letting hover
+  // effects breathe once the list is settled.
+  const [archiveOverflowVisible, setArchiveOverflowVisible] = useState(false)
+
+  useEffect(() => {
+    if (!archiveOpen) setArchiveOverflowVisible(false)
+  }, [archiveOpen])
+
   // True only the first time Home mounts in this browser tab session
   // (survives reloads, resets when the tab closes). The full
   // staggered entrance plays once; navigating back to Home afterward
@@ -282,26 +296,38 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
   // same reasoning Footer.jsx already documents for its own text
   // color. `zone` lets each call site pick the correct one instead of
   // both sharing one Glass-token color regardless of position.
+  //
+  // AUDIT FIX (contrast): both headings previously always used the
+  // `muted` (62%-opacity) tone regardless of context, which read too
+  // faint sitting directly on the gradient. `strong` lets a call site
+  // opt into the near-full-opacity `secondary` tone instead, without
+  // touching any other caller of this helper.
   const sectionTitle = (
     text: string,
     delaySeconds: number,
     zone: 'top' | 'bottom' = 'top',
-    Icon?: (p: { color: string; size?: number }) => JSX.Element
-  ) => (
-    <motion.h2
-      initial={playEntrance ? { opacity: 0, y: 20 } : false}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.7, delay: delaySeconds }}
-      style={{
-        ...pulseType.sectionLabel,
-        color: zone === 'bottom' ? ON_GRADIENT_BOTTOM.muted : ON_GRADIENT_TOP.muted,
-        marginBottom: 16,
-        display: 'flex', alignItems: 'center', gap: 6,
-      }}>
-      {Icon && <Icon color={zone === 'bottom' ? ON_GRADIENT_BOTTOM.muted : ON_GRADIENT_TOP.muted} size={13} />}
-      {text}
-    </motion.h2>
-  )
+    Icon?: (p: { color: string; size?: number }) => JSX.Element,
+    strong: boolean = false
+  ) => {
+    const color = zone === 'bottom'
+      ? (strong ? ON_GRADIENT_BOTTOM.secondary : ON_GRADIENT_BOTTOM.muted)
+      : (strong ? ON_GRADIENT_TOP.secondary : ON_GRADIENT_TOP.muted)
+    return (
+      <motion.h2
+        initial={playEntrance ? { opacity: 0, y: 20 } : false}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, delay: delaySeconds }}
+        style={{
+          ...pulseType.sectionLabel,
+          color,
+          marginBottom: 16,
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+        {Icon && <Icon color={color} size={13} />}
+        {text}
+      </motion.h2>
+    )
+  }
 
   const weeklyFeedback = weeklySummary ? weeklyAccuracyFeedback(weeklySummary.accuracy, pt) : null
 
@@ -351,11 +377,8 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
       }}>
         <style>{`
           .pulse-fold {
-            min-height: 100vh;
-            min-height: 100svh;
             display: flex;
             flex-direction: column;
-            justify-content: center;
             gap: clamp(16px, 3vh, 40px);
             padding: clamp(14px, 2.5vh, 28px) 0 clamp(24px, 4vh, 56px);
             padding-bottom: max(clamp(24px, 4vh, 56px), env(safe-area-inset-bottom));
@@ -526,7 +549,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
           </div>
 
           <div className="pulse-wide">
-            {sectionTitle('Tools', TOOLS_START, 'top', LightningIcon)}
+            {sectionTitle('Tools', TOOLS_START, 'top', LightningIcon, true)}
             <div className="pulse-tools-grid">
               {toolCards.map((card, i) => {
                 const accentColor = card.accent === 'amber' ? pt.amber : pt.indigo
@@ -582,7 +605,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
             show/hide. The section is capped to 640px and centered so
             it doesn't stretch edge-to-edge on wide desktop screens. */}
         {completedModules.length > 0 && (
-          <div className="pulse-wide" style={{ paddingBottom: 'max(100px, env(safe-area-inset-bottom))' }}>
+          <div className="pulse-wide" style={{ paddingBottom: 'max(40px, env(safe-area-inset-bottom))' }}>
             <div style={{ maxWidth: 640, margin: '0 auto' }}>
               <motion.button
                 onClick={() => setArchiveOpen(o => !o)}
@@ -594,7 +617,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8, width: '100%',
                   background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
-                  marginBottom: 16, ...pulseType.sectionLabel, color: ON_GRADIENT_BOTTOM.muted,
+                  marginBottom: 16, ...pulseType.sectionLabel, color: ON_GRADIENT_BOTTOM.secondary,
                 }}
               >
                 ✓ Completed Modules
@@ -609,7 +632,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                   transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
                   style={{ marginLeft: 'auto', display: 'inline-flex' }}
                 >
-                  <ChevronDown size={14} color={ON_GRADIENT_BOTTOM.muted} />
+                  <ChevronDown size={14} color={ON_GRADIENT_BOTTOM.secondary} />
                 </motion.span>
               </motion.button>
 
@@ -621,39 +644,53 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
                     transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                    style={{ overflow: 'hidden' }}
+                    onAnimationComplete={() => setArchiveOverflowVisible(true)}
+                    style={{ overflow: archiveOverflowVisible ? 'visible' : 'hidden' }}
                   >
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 4 }}>
+                    <motion.div
+                      initial="hidden"
+                      animate="visible"
+                      variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06, delayChildren: 0.05 } } }}
+                      style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 4 }}
+                    >
                       {completedModules.map((mod) => (
-                        <LiquidGlassCard key={mod.id} dark={dark} delay={0} instant
-                          onClick={() => navigate(`/module/${mod.id}`)}
-                          style={{
-                            borderRadius: 999, padding: '10px 18px 10px 10px',
-                            display: 'flex', alignItems: 'center', gap: 14, opacity: 0.85,
-                          }}>
-                          <div style={{
-                            width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
-                            background: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            filter: 'grayscale(0.6)',
-                          }}>
-                            <ModuleIcon value={mod.icon} size={20} color={pt.textMuted} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
+                        <motion.div
+                          key={mod.id}
+                          variants={{
+                            hidden: { opacity: 0, y: 14 },
+                            visible: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } }
+                          }}
+                        >
+                          <LiquidGlassCard dark={dark} delay={0} instant
+                            onClick={() => navigate(`/module/${mod.id}`)}
+                            style={{
+                              borderRadius: 999, padding: '10px 18px 10px 10px',
+                              display: 'flex', alignItems: 'center', gap: 14, opacity: 0.85,
+                            }}>
                             <div style={{
-                              ...pulseType.cardTitle, color: pt.textSecondary,
-                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                            }}>{mod.name}</div>
-                          </div>
-                          <span style={{
-                            fontSize: 10, fontWeight: 700, color: pt.textMuted,
-                            background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
-                            border: `1px solid ${pt.border}`, borderRadius: 999,
-                            padding: '2px 10px', flexShrink: 0, whiteSpace: 'nowrap',
-                          }}>✓ Completed</span>
-                        </LiquidGlassCard>
+                              width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
+                              background: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              filter: 'grayscale(0.6)',
+                            }}>
+                              <ModuleIcon value={mod.icon} size={20} color={pt.textMuted} />
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{
+                                ...pulseType.cardTitle, color: pt.textSecondary,
+                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                              }}>{mod.name}</div>
+                            </div>
+                            <span style={{
+                              fontSize: 10, fontWeight: 700, color: pt.textMuted,
+                              background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                              border: `1px solid ${pt.border}`, borderRadius: 999,
+                              padding: '2px 10px', flexShrink: 0, whiteSpace: 'nowrap',
+                            }}>✓ Completed</span>
+                          </LiquidGlassCard>
+                        </motion.div>
                       ))}
-                    </div>
+                    </motion.div>
                   </motion.div>
                 )}
               </AnimatePresence>
