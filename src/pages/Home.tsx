@@ -405,10 +405,10 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
           }
 
           .pulse-hero-panel {
-            min-height: clamp(130px, 34vw, 320px);
+            min-height: clamp(150px, 36vw, 340px);
           }
           @media (max-width: 640px) {
-            .pulse-hero-panel { min-height: clamp(110px, 46vw, 220px); }
+            .pulse-hero-panel { min-height: clamp(120px, 48vw, 230px); }
           }
 
           @media (max-width: 640px) {
