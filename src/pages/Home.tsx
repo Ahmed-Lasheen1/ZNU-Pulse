@@ -1,7 +1,7 @@
 // src/pages/Home.tsx
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown } from 'lucide-react'
 import { useAuth, useModules } from '../contexts'
 import NavMenu from '../components/NavMenu'
@@ -18,7 +18,7 @@ import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import EcgHero from '../components/pulse/EcgHero'
 import PulseBackground from '../components/pulse/PulseBackground'
 import PulseBrand from '../components/pulse/PulseBrand'
-import { ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, PauseIcon, LightningIcon, ArchiveBoxIcon } from '@/components/ui/tool-icons'
+import { ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, PauseIcon, LightningIcon } from '@/components/ui/tool-icons'
 import { ModuleIcon } from '../lib/medicalIcons'
 import { accuracyTier, accuracyColor, type AccuracyTier } from './mcq/mcqShared'
 
@@ -172,12 +172,10 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
   const [pausedExam, setPausedExam] = useState<any>(null)
   const [weeklySummary, setWeeklySummary] = useState<WeeklySummary | null>(null)
 
-  // Archive-style disclosure for Completed Modules — collapsed by
-  // default. Archived/completed content is low-priority by
-  // definition, so it shouldn't carry the same visual weight as
-  // active content until the student actually asks to see it (see
-  // IxDF/UXPin archive-list guidance: collapse, list rather than
-  // grid, muted treatment, clear expand affordance).
+  // Collapsible disclosure for Completed Modules — collapsed by
+  // default so finished modules don't compete visually with active
+  // ones, but presented as the same pill-card treatment as Active
+  // Modules (just muted) rather than a flat row-list, per feedback.
   const [archiveOpen, setArchiveOpen] = useState(false)
 
   // True only the first time Home mounts in this browser tab session
@@ -572,76 +570,94 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
           </motion.div>
         </div>
 
-        {/* ── Completed Modules — Archive treatment ──────────────────
-            Collapsed by default (archived content is low-priority by
-            definition; it shouldn't compete with active content until
-            the student explicitly asks for it). Rendered as a single
-            bordered list with row dividers rather than a card grid —
-            the standard "archive list" pattern — with a muted,
-            desaturated icon/text treatment so it visually reads as
-            "done" rather than "actionable." A count badge + chevron on
-            the header gives a clear, discoverable affordance to expand
-            it, so it doesn't feel like content is missing. */}
+        {/* ── Completed Modules — collapsible, muted card treatment ───
+            Same pill-shaped LiquidGlassCard used by Active Modules
+            (so it still visually reads as "a card" in this app), just
+            desaturated: grayscale icon circle, muted text, a
+            "✓ Completed" tag instead of the colored active-dot. The
+            whole list is collapsed by default (finished modules are
+            lower priority than active ones) with a chevron + count
+            badge as the expand affordance, and the expand/collapse is
+            animated via AnimatePresence rather than an instant
+            show/hide. The section is capped to 640px and centered so
+            it doesn't stretch edge-to-edge on wide desktop screens. */}
         {completedModules.length > 0 && (
           <div className="pulse-wide" style={{ paddingBottom: 'max(100px, env(safe-area-inset-bottom))' }}>
-            <motion.button
-              onClick={() => setArchiveOpen(o => !o)}
-              initial={playEntrance ? { opacity: 0, y: 20 } : false}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: COMPLETED_MODULES_START }}
-              aria-expanded={archiveOpen}
-              aria-label={archiveOpen ? 'Collapse archive' : 'Expand archive'}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-                background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
-                marginBottom: 16, ...pulseType.sectionLabel, color: ON_GRADIENT_BOTTOM.muted,
-              }}
-            >
-              <ArchiveBoxIcon color={ON_GRADIENT_BOTTOM.muted} size={13} />
-              Archive
-              <span style={{
-                background: 'rgba(255,255,255,0.12)',
-                border: `1px solid ${ON_GRADIENT_BOTTOM.muted}55`,
-                borderRadius: 999, padding: '1px 8px', fontSize: 10, fontWeight: 700,
-                color: ON_GRADIENT_BOTTOM.muted,
-              }}>{completedModules.length}</span>
-              <ChevronDown
-                size={14} color={ON_GRADIENT_BOTTOM.muted}
-                style={{ marginLeft: 'auto', transition: 'transform 0.25s ease', transform: archiveOpen ? 'rotate(180deg)' : 'none' }}
-              />
-            </motion.button>
+            <div style={{ maxWidth: 640, margin: '0 auto' }}>
+              <motion.button
+                onClick={() => setArchiveOpen(o => !o)}
+                initial={playEntrance ? { opacity: 0, y: 20 } : false}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, delay: COMPLETED_MODULES_START }}
+                aria-expanded={archiveOpen}
+                aria-label={archiveOpen ? 'Collapse completed modules' : 'Expand completed modules'}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                  background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
+                  marginBottom: 16, ...pulseType.sectionLabel, color: ON_GRADIENT_BOTTOM.muted,
+                }}
+              >
+                ✓ Completed Modules
+                <span style={{
+                  background: 'rgba(255,255,255,0.12)',
+                  border: `1px solid ${ON_GRADIENT_BOTTOM.muted}55`,
+                  borderRadius: 999, padding: '1px 8px', fontSize: 10, fontWeight: 700,
+                  color: ON_GRADIENT_BOTTOM.muted,
+                }}>{completedModules.length}</span>
+                <motion.span
+                  animate={{ rotate: archiveOpen ? 180 : 0 }}
+                  transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                  style={{ marginLeft: 'auto', display: 'inline-flex' }}
+                >
+                  <ChevronDown size={14} color={ON_GRADIENT_BOTTOM.muted} />
+                </motion.span>
+              </motion.button>
 
-            {archiveOpen && (
-              <LiquidGlassCard dark={dark} delay={0} instant style={{ padding: '4px 4px' }}>
-                {completedModules.map((mod, i) => (
-                  <div
-                    key={mod.id}
-                    role="button" tabIndex={0}
-                    onClick={() => navigate(`/module/${mod.id}`)}
-                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/module/${mod.id}`) } }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
-                      cursor: 'pointer',
-                      borderBottom: i < completedModules.length - 1 ? `1px solid ${pt.border}` : 'none',
-                    }}
+              <AnimatePresence initial={false}>
+                {archiveOpen && (
+                  <motion.div
+                    key="completed-modules-list"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                    style={{ overflow: 'hidden' }}
                   >
-                    <div style={{
-                      width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
-                      background: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      filter: 'grayscale(1)', opacity: 0.75,
-                    }}>
-                      <ModuleIcon value={mod.icon} size={16} color={pt.textMuted} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 4 }}>
+                      {completedModules.map((mod) => (
+                        <LiquidGlassCard key={mod.id} dark={dark} delay={0} instant
+                          onClick={() => navigate(`/module/${mod.id}`)}
+                          style={{
+                            borderRadius: 999, padding: '10px 18px 10px 10px',
+                            display: 'flex', alignItems: 'center', gap: 14, opacity: 0.85,
+                          }}>
+                          <div style={{
+                            width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
+                            background: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            filter: 'grayscale(0.6)',
+                          }}>
+                            <ModuleIcon value={mod.icon} size={20} color={pt.textMuted} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              ...pulseType.cardTitle, color: pt.textSecondary,
+                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            }}>{mod.name}</div>
+                          </div>
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, color: pt.textMuted,
+                            background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                            border: `1px solid ${pt.border}`, borderRadius: 999,
+                            padding: '2px 10px', flexShrink: 0, whiteSpace: 'nowrap',
+                          }}>✓ Completed</span>
+                        </LiquidGlassCard>
+                      ))}
                     </div>
-                    <div style={{
-                      ...pulseType.cardTitle, fontSize: 13, color: pt.textSecondary, flex: 1, minWidth: 0,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>{mod.name}</div>
-                    <span style={{ ...pulseType.small, fontSize: 10, color: pt.faint, flexShrink: 0 }}>Archived</span>
-                  </div>
-                ))}
-              </LiquidGlassCard>
-            )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         )}
       </div>
