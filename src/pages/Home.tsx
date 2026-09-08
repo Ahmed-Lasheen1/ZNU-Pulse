@@ -396,8 +396,8 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
             /* Mobile stacking order: ECG hero first, then the weekly
                report / paused-exam / announcement column, then Active
                Modules. Desktop keeps its normal grid column order
-               (no `order` applied there), so this only affects the
-               single-column mobile layout. */
+               (no order property applied there), so this only affects
+               the single-column mobile layout. */
             .pulse-hero-panel { order: 1; }
             .pulse-dash-report { order: 2; }
             .pulse-dash-modules { order: 3; }
