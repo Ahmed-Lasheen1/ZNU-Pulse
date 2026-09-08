@@ -297,7 +297,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
       <PulseBackground />
-      <div className="pulse-wide checklist-page" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body, maxWidth: 720, margin: '0 auto' }}>
+      <div className="pulse-wide checklist-page" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body, maxWidth: 900, margin: '0 auto' }}>
         <style>{`
           /* Add-task row: input + button share a row on wider screens,
              stack cleanly on narrow ones instead of squeezing. */
