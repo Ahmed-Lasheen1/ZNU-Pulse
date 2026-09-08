@@ -713,3 +713,4 @@ export function WhatsAppIcon({ color, size = 16 }: IconProps) {
     </svg>
   )
 }
+
