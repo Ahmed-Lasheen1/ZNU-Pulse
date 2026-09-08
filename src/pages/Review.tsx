@@ -214,7 +214,7 @@ export default function Review({ dark }: { dark: boolean }) {
           .review-wide { padding: 0 64px; }
         }
       `}</style>
-      <div className="review-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body }}>
+      <div className="review-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body, maxWidth: 900, margin: '0 auto' }}>
 
         <div style={{ marginBottom: 8 }}>
           <BackButton dark={dark} fallback="/mcq" />
