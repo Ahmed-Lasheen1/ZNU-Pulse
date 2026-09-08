@@ -15,19 +15,7 @@ interface PulseBrandProps {
   dark: boolean
   logoSize?: number
   fontSize?: number
-  // Omit entirely for a static render (used by PulseHeader on every
-  // non-Home page). Pass Home's own timeline to get its entrance
-  // animation (logo slides in, "ZNU"/"PULSE" stagger in word by word,
-  // tagline fades in last) — this is Home's actual animation, not a
-  // new one; it's just parameterized so both call sites share the
-  // same markup instead of duplicating it.
   animation?: BrandAnimationTiming
-  // When true (and `animation` is passed), skips the "from" state of
-  // every motion element and renders straight into its final
-  // position/opacity — used to replay the Home entrance only once per
-  // browser tab session instead of every time the user navigates back
-  // to Home. Has no effect on the static (no-animation) branch, which
-  // was never animated in the first place.
   instant?: boolean
 }
 
@@ -36,18 +24,35 @@ const brandWordItem = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } },
 }
 
-// This brand block always sits directly on the light/top portion of
-// the fixed PULSE_BG gradient — regardless of the app's light/dark
-// theme toggle, since that gradient never changes with the theme.
-// `pt` below is still used for the decorative logo box (a small glass
-// chip), but the plain "ZNU"/tagline text uses ON_GRADIENT_TOP, not
-// the Liquid Glass text tokens, since it isn't sitting on any glass.
+// Logo/name/tagline click goes through a real browser navigation
+// (window.location.href), not React Router's navigate() — a full
+// page reload, same as clicking a logo on any traditional website.
+// Deliberate choice over SPA routing here: this is the one spot
+// people expect "start over" behavior from, even though it costs the
+// SPA's instant-navigation speed.
+function goHome() {
+  window.location.href = '/'
+}
+function handleBrandKeyDown(e: React.KeyboardEvent) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault()
+    goHome()
+  }
+}
+
 export default function PulseBrand({ dark, logoSize = 44, fontSize = 20, animation, instant = false }: PulseBrandProps) {
   const pt = getPulseTheme(false)
 
   if (!animation) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div
+        onClick={goHome}
+        onKeyDown={handleBrandKeyDown}
+        role="link"
+        tabIndex={0}
+        aria-label="ZNU Pulse — go to home"
+        style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
+      >
         <div style={{
           width: logoSize, height: logoSize, flexShrink: 0,
           borderRadius: 10, overflow: 'hidden',
@@ -73,7 +78,14 @@ export default function PulseBrand({ dark, logoSize = 44, fontSize = 20, animati
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+    <div
+      onClick={goHome}
+      onKeyDown={handleBrandKeyDown}
+      role="link"
+      tabIndex={0}
+      aria-label="ZNU Pulse — go to home"
+      style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
+    >
       <motion.div
         initial={instant ? false : { opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}

@@ -1,5 +1,3 @@
-// src/components/pulse/PulseOverlayHeader.jsx
-import { Link } from 'react-router-dom'
 import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../../premiumTheme'
 import NavMenu from '../NavMenu'
 
@@ -16,11 +14,6 @@ const LOGO_SRC = '/icon-192.png'
 // gradient, so its plain text uses ON_GRADIENT_TOP rather than the
 // Liquid Glass tokens — same reasoning as PulseBrand.tsx, which this
 // mirrors. `pt` is still used only for the decorative logo chip.
-//
-// AUDIT FIX (per user request): the logo/name/tag block is now a real
-// link to "/" instead of inert decoration — clicking it from anywhere
-// in the app takes the person back to Home, matching the универсal
-// "click the logo to go home" convention used almost everywhere else.
 export default function PulseOverlayHeader({ dark, toggleTheme }) {
   const pt = getPulseTheme(false)
 
@@ -35,7 +28,7 @@ export default function PulseOverlayHeader({ dark, toggleTheme }) {
         pointerEvents: 'auto'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <Link to="/" aria-label="ZNU Pulse — Home" style={{ display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{
               width: 44, height: 44, flexShrink: 0,
               borderRadius: 12, overflow: 'hidden',
@@ -57,7 +50,7 @@ export default function PulseOverlayHeader({ dark, toggleTheme }) {
                 color: ON_GRADIENT_TOP.muted, marginTop: 5,
               }}>For Future Doctors</div>
             </div>
-          </Link>
+          </div>
 
           <NavMenu dark={dark} toggleTheme={toggleTheme} align="right" />
         </div>
