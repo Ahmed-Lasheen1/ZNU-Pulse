@@ -503,7 +503,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                 transition={{ duration: 0.85, delay: HERO_DELAY }}
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
-                <EcgHero height={400} />
+                <EcgHero height={500} />
               </motion.div>
 
               <div>
