@@ -1,11 +1,21 @@
 import { getPulseTheme, pulseFonts, ON_GRADIENT_BOTTOM } from '../premiumTheme'
 import PulseGlassRow from './pulse/PulseGlassRow'
-import { WhatsAppIcon } from './ui/tool-icons'
 
+// Same reasoning as Home.tsx's FOOTER_LINE_COLOR: the footer always
+// sits on the dark/lower portion of the fixed PULSE_BG gradient,
+// regardless of the app's light/dark theme toggle (the gradient
+// itself never changes with that toggle) — so the divider is frozen
+// to the dark-mode value rather than reading a Liquid Glass token
+// that would otherwise flip with the theme.
 const DIVIDER_COLOR = getPulseTheme(true).border
 const HOVER_TINT = 'rgba(255,255,255,0.08)'
-const WHATSAPP_URL = 'https://wa.me/qr/AFP6XCVC2BJHO1'
-
+// AUDIT FIX (per user request): every quick-nav link removed — Home,
+// Schedule, Checklist, MCQ, etc. are all one tap away from the
+// persistent NavMenu and already surfaced on Home itself, so
+// repeating them here was pure redundancy, not navigation. This now
+// follows the "Large Type" / narrow-footer pattern (big brand
+// wordmark as the visual anchor + a copyright line, nothing else) —
+// the right fit for a small app that doesn't need a second sitemap.
 export default function Footer({ dark }) {
   const pt = getPulseTheme(dark)
   const year = new Date().getFullYear()
@@ -32,6 +42,9 @@ export default function Footer({ dark }) {
         }
       `}</style>
 
+      {/* Brand statement — the footer's one visual moment. Decorative
+          only (aria-hidden), since the real, accessible brand name
+          already lives in the site header on every page. */}
       <div aria-hidden style={{ textAlign: 'center', padding: '44px 20px 8px' }}>
         <div className="site-footer-wordmark" style={{
           fontFamily: pulseFonts.display, fontWeight: 800, letterSpacing: 2,
@@ -47,35 +60,17 @@ export default function Footer({ dark }) {
       <div className="pulse-wide" style={{ padding: '0 20px' }}>
         <div className="site-footer-legal">
           <span style={{ color: ON_GRADIENT_BOTTOM.secondary, fontSize: 13, fontWeight: 600 }}>
-            Made with heart by Ahmed Lasheen
+            Made with ❤️ by Ahmed Lasheen
           </span>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
-            <PulseGlassRow dark={true} radius={999} hoverTint={HOVER_TINT}>
-              
-                href={WHATSAPP_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Contact us on WhatsApp"
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: 38, height: 38, color: ON_GRADIENT_BOTTOM.secondary,
-                }}
-              >
-                <WhatsAppIcon color={ON_GRADIENT_BOTTOM.secondary} size={17} />
-              </a>
-            </PulseGlassRow>
-          </div>
-
           <span style={{ color: ON_GRADIENT_BOTTOM.muted, fontSize: 12, fontWeight: 600 }}>
-            {'\u00A9'} {year} ZNU Pulse. All rights reserved.
+            © {year} ZNU Pulse. All rights reserved.
           </span>
           <div style={{ marginTop: 4 }}>
             <PulseGlassRow dark={true} radius={999} hoverTint={HOVER_TINT} onClick={backToTop}
               role="button" tabIndex={0}
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); backToTop() } }}>
               <div style={{ padding: '6px 14px', fontSize: 12, fontWeight: 700, color: ON_GRADIENT_BOTTOM.secondary }}>
-                Back to top
+                ↑ Back to top
               </div>
             </PulseGlassRow>
           </div>
