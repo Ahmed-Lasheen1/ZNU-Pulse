@@ -393,7 +393,16 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
           }
           @media (max-width: 1000px) {
             .pulse-dash-grid { grid-template-columns: 1fr; }
+            /* Mobile stacking order: ECG hero first, then the weekly
+               report / paused-exam / announcement column, then Active
+               Modules. Desktop keeps its normal grid column order
+               (no `order` applied there), so this only affects the
+               single-column mobile layout. */
+            .pulse-hero-panel { order: 1; }
+            .pulse-dash-report { order: 2; }
+            .pulse-dash-modules { order: 3; }
           }
+
           .pulse-report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
           .pulse-tools-grid {
             display: grid;
@@ -432,7 +441,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
 
           <div className="pulse-wide">
             <div className="pulse-dash-grid">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="pulse-dash-report" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <LiquidGlassCard dark={dark} delay={msFor(WEEKLY_REPORT_START)} instant={!playEntrance} style={{ padding: '18px 20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
                     <WeeklyReportIcon color={pt.text} size={16} />
@@ -489,7 +498,15 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                         <PauseIcon color={pt.cobalt} size={13} /> Continue where you left off →
                       </div>
                     ) : (
-                      <div style={{ ...pulseType.bodyEmphasis, fontSize: 13, color: pt.textPrimary, lineHeight: 1.5 }}>
+                      // Multi-line announcement support: explicit
+                      // normal white-space + word-break so a longer
+                      // announcement wraps onto as many lines as it
+                      // needs inside the card instead of being
+                      // assumed to stay on one line.
+                      <div style={{
+                        ...pulseType.bodyEmphasis, fontSize: 13, color: pt.textPrimary,
+                        lineHeight: 1.5, whiteSpace: 'normal', wordBreak: 'break-word'
+                      }}>
                         {announcement}
                       </div>
                     )}
@@ -508,7 +525,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                 </div>
               </motion.div>
 
-              <div>
+              <div className="pulse-dash-modules">
                 <motion.div
                   initial={playEntrance ? { opacity: 0, y: 16 } : false}
                   animate={{ opacity: 1, y: 0 }}
@@ -605,38 +622,60 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
             badge as the expand affordance, and the expand/collapse is
             animated via AnimatePresence rather than an instant
             show/hide. The section is capped to 640px and centered so
-            it doesn't stretch edge-to-edge on wide desktop screens. */}
+            it doesn't stretch edge-to-edge on wide desktop screens.
+
+            The toggle itself is now a centered LiquidGlassCard pill
+            (same glass treatment as the announcement card above) so
+            the "✓ Completed Modules" label and its chevron sit close
+            together in the middle of the row instead of being spread
+            across the full width with the chevron pinned to the far
+            right. Its text/badge/chevron colors now read the
+            Liquid Glass tokens (pt.*) instead of the fixed
+            ON_GRADIENT_BOTTOM tokens, so — like the announcement card
+            — they respond to the light/dark theme toggle rather than
+            staying frozen to one shade. */}
         {completedModules.length > 0 && (
           <div className="pulse-wide" style={{ paddingBottom: 'max(40px, env(safe-area-inset-bottom))' }}>
             <div style={{ maxWidth: 640, margin: '0 auto' }}>
-              <motion.button
-                onClick={() => setArchiveOpen(o => !o)}
+              <motion.div
                 initial={playEntrance ? { opacity: 0, y: 20 } : false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, delay: COMPLETED_MODULES_START }}
-                aria-expanded={archiveOpen}
-                aria-label={archiveOpen ? 'Collapse completed modules' : 'Expand completed modules'}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-                  background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
-                  marginBottom: 16, ...pulseType.sectionLabel, color: ON_GRADIENT_BOTTOM.secondary,
-                }}
+                style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}
               >
-                ✓ Completed Modules
-                <span style={{
-                  background: 'rgba(255,255,255,0.12)',
-                  border: `1px solid ${ON_GRADIENT_BOTTOM.muted}55`,
-                  borderRadius: 999, padding: '1px 8px', fontSize: 10, fontWeight: 700,
-                  color: ON_GRADIENT_BOTTOM.muted,
-                }}>{completedModules.length}</span>
-                <motion.span
-                  animate={{ rotate: archiveOpen ? 180 : 0 }}
-                  transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                  style={{ marginLeft: 'auto', display: 'inline-flex' }}
+                <LiquidGlassCard
+                  dark={dark}
+                  delay={msFor(COMPLETED_MODULES_START)}
+                  instant={!playEntrance}
+                  style={{ padding: '10px 22px', borderRadius: 999 }}
                 >
-                  <ChevronDown size={14} color={ON_GRADIENT_BOTTOM.secondary} />
-                </motion.span>
-              </motion.button>
+                  <button
+                    onClick={() => setArchiveOpen(o => !o)}
+                    aria-expanded={archiveOpen}
+                    aria-label={archiveOpen ? 'Collapse completed modules' : 'Expand completed modules'}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
+                      ...pulseType.sectionLabel, color: pt.textSecondary,
+                    }}
+                  >
+                    ✓ Completed Modules
+                    <span style={{
+                      background: dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
+                      border: `1px solid ${pt.border}`,
+                      borderRadius: 999, padding: '1px 8px', fontSize: 10, fontWeight: 700,
+                      color: pt.textMuted,
+                    }}>{completedModules.length}</span>
+                    <motion.span
+                      animate={{ rotate: archiveOpen ? 180 : 0 }}
+                      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                      style={{ display: 'inline-flex' }}
+                    >
+                      <ChevronDown size={14} color={pt.textSecondary} />
+                    </motion.span>
+                  </button>
+                </LiquidGlassCard>
+              </motion.div>
 
               <AnimatePresence initial={false}>
                 {archiveOpen && (
