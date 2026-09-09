@@ -389,14 +389,10 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
   // in the same tick this effect runs can occasionally race the
   // browser's own paint/layout pass for newly-tabbable elements.
   useEffect(() => {
-    if (open) {
-      const raf = requestAnimationFrame(() => {
-        contentRef.current?.querySelector<HTMLElement>('button, input')?.focus()
-      })
-      return () => cancelAnimationFrame(raf)
-    }
+  if (!open) {
     triggerButtonRef.current?.focus()
-  }, [open])
+  }
+}, [open])
 
   // AUDIT FIX (accessibility — close on focus loss): previously the
   // only ways to close were Escape, an outside click, or picking an
