@@ -152,7 +152,6 @@ const ACTIVE_MODULES_START = WEEKLY_REPORT_START + 0.6
 const TOOLS_START = ACTIVE_MODULES_START + 0.6
 const FOOTER_DELAY = TOOLS_START + 0.5
 const COMPLETED_MODULES_START = TOOLS_START + 0.6
-const CARD_FADE_DURATION = -0.3
 
 function msFor(targetSeconds: number) {
   return Math.round(((targetSeconds - ENTRANCE_PAUSE) / 1.5) * 1000)
@@ -333,7 +332,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
   }
 
   const weeklyFeedback = weeklySummary ? weeklyAccuracyFeedback(weeklySummary.accuracy, pt) : null
-  const tickerBaseDelay = WEEKLY_REPORT_START + CARD_FADE_DURATION
+  const tickerBaseDelay = NOTIFY_DELAY
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh', overflowX: 'hidden' }}>
