@@ -213,6 +213,16 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
   const [open, setOpen] = useState(false)
   const [searchValue, setSearchValue] = useState('')
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
+  // PERF FIX: `willChange` on the panel used to be a static, always-on
+  // style — meaning every page that mounts NavMenu (i.e. every page)
+  // reserved an off-screen compositing layer for the panel's blur for
+  // the entire time the page was open, even if the menu was never
+  // touched. `willChange` is meant to be applied only while an
+  // animation is imminent/in-flight, not permanently — this tracks
+  // that window explicitly via the panel's own onAnimationStart/
+  // onAnimationComplete callbacks below, so the hint is only active
+  // during the ~0.55-0.6s the scale/opacity are actually moving.
+  const [animating, setAnimating] = useState(false)
   const navigate = useNavigate()
   const { user, profile, signOut } = useAuth() as {
     user: AuthUser | null
@@ -220,6 +230,8 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
     signOut: () => Promise<void>
   }
   const wrapperRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const triggerButtonRef = useRef<HTMLButtonElement>(null)
   const pt = getPulseTheme(dark)
   const transition = useSyncedTransition(open)
 
@@ -236,6 +248,40 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
       document.removeEventListener('keydown', onEscape as EventListener)
     }
   }, [open])
+
+  // AUDIT FIX (accessibility — focus management): a standard
+  // dropdown/disclosure should move focus INTO itself on open (so a
+  // keyboard user doesn't have to blind-Tab past the rest of the page
+  // header to reach it) and return focus to the trigger button on
+  // close, regardless of which of the three close paths fired
+  // (Escape, outside click, or picking an item via goTo/handleSignOut
+  // below). A short rAF delay lets the open state's DOM update land
+  // before we query for a focusable target — querying synchronously
+  // in the same tick this effect runs can occasionally race the
+  // browser's own paint/layout pass for newly-tabbable elements.
+  useEffect(() => {
+    if (open) {
+      const raf = requestAnimationFrame(() => {
+        contentRef.current?.querySelector<HTMLElement>('[role="button"], input, button')?.focus()
+      })
+      return () => cancelAnimationFrame(raf)
+    }
+    triggerButtonRef.current?.focus()
+  }, [open])
+
+  // AUDIT FIX (accessibility — close on focus loss): previously the
+  // only ways to close were Escape, an outside click, or picking an
+  // item. A keyboard user who simply Tabs past the last focusable row
+  // (Sign Out, or the theme switch if signed out) left the panel
+  // visually open — floating over page content — with focus already
+  // elsewhere on the page. Standard dropdown behavior closes
+  // automatically once focus genuinely leaves the panel.
+  // `relatedTarget` is the element about to receive focus; if it's
+  // still inside this wrapper (e.g. focus moving from the search
+  // input to a nav row), this is a no-op.
+  function handleContentBlur(e: React.FocusEvent<HTMLDivElement>) {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) setOpen(false)
+  }
 
   function goTo(path: string) { setOpen(false); navigate(path) }
 
@@ -304,7 +350,16 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
           // the browser to keep an extra isolated compositing layer
           // reserved for no benefit. willChange should only list
           // properties that actually change over time.
-          willChange: 'transform, opacity',
+          //
+          // PERF FIX (follow-up): `willChange` itself is now only set
+          // while `animating` is true (see the animating state above
+          // + onAnimationStart/onAnimationComplete below), instead of
+          // being a permanent style. Previously this reserved a GPU
+          // compositing layer for the entire time ANY page was open —
+          // NavMenu mounts on every route — regardless of whether the
+          // menu was ever clicked. 'auto' at rest lets the browser
+          // reclaim that layer when the panel isn't moving.
+          willChange: animating ? 'transform, opacity' : 'auto',
           // overflow-hidden + isolation:isolate + backdrop-filter all
           // live on THIS element — the same one that carries the
           // scale/opacity animation below. That co-location is what
@@ -346,6 +401,8 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
             ease: 'linear',
           },
         }}
+        onAnimationStart={() => setAnimating(true)}
+        onAnimationComplete={() => setAnimating(false)}
       >
         <div aria-hidden className="pointer-events-none" style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', boxShadow: liquidGlassShadow(dark) }} />
         <div aria-hidden className="pointer-events-none" style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', background: liquidGlassTint(dark) }} />
@@ -388,8 +445,13 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
             Capping height here and scrolling internally keeps every
             row reachable on any viewport, without touching the outer
             element's overflow (which must stay `hidden` for its own
-            backdrop-filter blur to render correctly). */}
+            backdrop-filter blur to render correctly).
+
+            AUDIT FIX (accessibility): `ref={contentRef}` + `onBlur`
+            here back the focus-management effect and close-on-blur
+            handler above — see their own comments for why. */}
         <motion.div
+          ref={contentRef}
           initial={false}
           animate={{ y: open ? 0 : -16, opacity: open ? [0, 0, 1, 1] : [1, 1, 0, 0] }}
           transition={{
@@ -400,6 +462,7 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
               ease: 'linear',
             },
           }}
+          onBlur={handleContentBlur}
           aria-hidden={!open}
           style={{
             position: 'relative', zIndex: 1, width: PANEL_WIDTH, padding: '0 14px 16px',
@@ -524,13 +587,21 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
       {/* Real toggle button — fixed 44x44, never scaled or distorted.
           Sits above the glass panel (higher zIndex) at the same
           corner, so it stays crisp throughout the whole open/close
-          motion regardless of what the panel underneath is doing. */}
+          motion regardless of what the panel underneath is doing.
+
+          AUDIT FIX: `ref={triggerButtonRef}` backs the focus-return
+          effect above — closing the menu via Escape, an outside
+          click, or picking an item now returns keyboard focus here,
+          instead of leaving it wherever it happened to land (or
+          nowhere, per-browser-default, if the closing click landed on
+          a non-focusable element). */}
       <div style={{
         position: 'absolute', top: 0, [cornerSide]: 0,
         width: BUTTON_SIZE, height: BUTTON_SIZE, zIndex: 2000,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <motion.button
+          ref={triggerButtonRef}
           onClick={() => setOpen(o => !o)}
           aria-label={open ? 'Close navigation menu' : 'Open navigation menu'}
           aria-haspopup="true"
