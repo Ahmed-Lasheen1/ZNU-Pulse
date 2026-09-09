@@ -144,9 +144,7 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
             Shows in a card at the top of the Home page for everyone. Leave it empty to hide the card
             completely. The preview below is styled exactly like it'll appear on the site — same glass
             card, same text style, and it wraps onto more than one line the same way too. Press Enter in
-            the box below to force a line break exactly where you want one — the live site will break at
-            that same spot. If you don't add any line breaks, a long announcement will still wrap on its
-            own to fit the card; nothing gets cut off.
+            the box below to force a line break exactly where you want one.
           </p>
           {/* AUDIT FIX: this preview used to be a plain textarea with
               its own one-off styling (a flat cobalt/indigo gradient
