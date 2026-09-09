@@ -152,6 +152,7 @@ const ACTIVE_MODULES_START = WEEKLY_REPORT_START + 0.6
 const TOOLS_START = ACTIVE_MODULES_START + 0.6
 const FOOTER_DELAY = TOOLS_START + 0.5
 const COMPLETED_MODULES_START = TOOLS_START + 0.6
+const CARD_FADE_DURATION = 0.75
 
 function msFor(targetSeconds: number) {
   return Math.round(((targetSeconds - ENTRANCE_PAUSE) / 1.5) * 1000)
@@ -332,6 +333,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
   }
 
   const weeklyFeedback = weeklySummary ? weeklyAccuracyFeedback(weeklySummary.accuracy, pt) : null
+  const tickerBaseDelay = playEntrance ? WEEKLY_REPORT_START + CARD_FADE_DURATION : 0
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh', overflowX: 'hidden' }}>
@@ -495,7 +497,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                       }}>
                         {weeklySummary ? (
                           <>
-                            <NumberTicker value={weeklySummary.accuracy} delay={0} />%
+                            <NumberTicker value={weeklySummary.accuracy} delay={tickerBaseDelay} />%
                           </>
                         ) : '—'}
                       </div>
@@ -513,7 +515,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                     </div>
                     <div>
                       <div style={{ ...statNumStyle, color: pt.textPrimary }}>
-                        <NumberTicker value={weeklySummary ? weeklySummary.totalAttempted : 0} delay={0.15} />
+                        <NumberTicker value={weeklySummary ? weeklySummary.totalAttempted : 0} delay={tickerBaseDelay + 0.15} />
                       </div>
                       <div style={{ ...pulseType.small, color: pt.textSecondary, marginTop: 4 }}>Questions attempted</div>
                     </div>
@@ -527,7 +529,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, color: pt.terracotta }}>
                         <StreakFlameIcon color={pt.terracotta} size={16} />
                         <span style={{ ...pulseType.display, fontSize: 22, lineHeight: 1 }}>
-                          <NumberTicker value={streak} delay={0.3} />
+                          <NumberTicker value={streak} delay={tickerBaseDelay + 0.3} />
                         </span>
                       </div>
                       <div style={{ ...pulseType.small, fontSize: 11, color: pt.textMuted, marginTop: 4 }}>Day streak</div>
