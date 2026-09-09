@@ -168,7 +168,7 @@ export default function Admin({ dark }: AdminProps) {
             genuinely centered on the same axis instead of relying on
             font-metric coincidence. */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '8px 0 16px' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', lineHeight: 0, position: 'relative', top: -2 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', lineHeight: 0, position: 'relative', top: -5 }}>
             <GearIcon color={pt.text} size={24} />
           </span>
           <h1 style={{ ...pulseType.miniPageTitle, fontSize: 20, color: pt.text, lineHeight: '24px' }}>Admin Panel</h1>
