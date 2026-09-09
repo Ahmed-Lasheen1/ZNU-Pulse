@@ -155,9 +155,23 @@ export default function Admin({ dark }: AdminProps) {
           <BackButton dark={dark} fallback="/" />
         </div>
 
+        {/* AUDIT FIX: GearIcon (an inline <svg>, a "replaced" element
+            like <img>) was drifting a couple pixels below the <h1>'s
+            visual center in this flex row — browsers baseline-align
+            inline replaced elements against surrounding text metrics
+            even inside `align-items: center` once the h1's line-height
+            multiplier doesn't cleanly match the icon's own box height.
+            Wrapping the icon in its own `inline-flex` span (with
+            `lineHeight: 0` to strip any residual inline box padding)
+            and pinning the h1's line-height to match the icon's pixel
+            size removes the ambiguity entirely, so the two are
+            genuinely centered on the same axis instead of relying on
+            font-metric coincidence. */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '8px 0 16px' }}>
-          <GearIcon color={pt.text} size={24} />
-          <h1 style={{ ...pulseType.miniPageTitle, fontSize: 20, color: pt.text }}>Admin Panel</h1>
+          <span style={{ display: 'inline-flex', alignItems: 'center', lineHeight: 0 }}>
+            <GearIcon color={pt.text} size={24} />
+          </span>
+          <h1 style={{ ...pulseType.miniPageTitle, fontSize: 20, color: pt.text, lineHeight: '24px' }}>Admin Panel</h1>
         </div>
 
         <div className="admin-tabs">

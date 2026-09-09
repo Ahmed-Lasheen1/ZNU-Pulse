@@ -11,6 +11,21 @@ interface SettingsTabProps {
   dark: boolean
 }
 
+// AUDIT FIX (announcement preview accuracy, per user request): the
+// real announcement card on Home renders at very different widths
+// depending on context — the narrow `pulse-dash-report` column on the
+// desktop dashboard grid (`1fr 1.3fr 1fr`, so roughly ~30% of the
+// page), or the full stacked width on mobile once that grid collapses
+// to one column. Both of those land in a similar ballpark once you
+// account for typical device/window sizes, so capping the preview
+// here to roughly that width means a line long enough to wrap on the
+// real Home card will now also wrap in this preview — instead of
+// admins writing something that looks like one line here (this card
+// used to be free to stretch across up to half the admin panel, which
+// is far wider than the real card ever gets) and then discovering it
+// wraps awkwardly once real students see it.
+const ANNOUNCEMENT_PREVIEW_MAX_WIDTH = 380
+
 export default function SettingsTab({ dark }: SettingsTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
@@ -142,9 +157,11 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
           </h3>
           <p style={{ color: pt.textMuted, fontSize: 13, marginBottom: 16 }}>
             Shows in a card at the top of the Home page for everyone. Leave it empty to hide the card
-            completely. The preview below is styled exactly like it'll appear on the site — same glass
-            card, same text style, and it wraps onto more than one line the same way too. Press Enter in
-            the box below to force a line break exactly where you want one.
+            completely. The preview below is capped to roughly the real card's width (~{ANNOUNCEMENT_PREVIEW_MAX_WIDTH}px),
+            so a line long enough to wrap on Home — on the narrow desktop dashboard column or on a stacked
+            mobile screen — will wrap here too, instead of looking like one line only to break oddly once
+            students actually see it. Press Enter in the box below to force a line break exactly where you
+            want one.
           </p>
           {/* AUDIT FIX: this preview used to be a plain textarea with
               its own one-off styling (a flat cobalt/indigo gradient
@@ -166,21 +183,31 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
               rendered HTML). Switched both to `white-space: 'pre-line'`
               so an admin-authored line break actually shows up as a
               line break wherever this text is displayed, while still
-              wrapping normally when a line runs long. */}
-          <LiquidGlassCard dark={dark} instant style={{ padding: '16px 20px', marginBottom: 12 }}>
-            <textarea
-              placeholder="e.g. Pharma exam next week, study well!"
-              value={announcement}
-              onChange={e => setAnnouncement(e.target.value)}
-              style={{
-                display: 'block', width: '100%', minHeight: 80, padding: 0,
-                border: 'none', background: 'transparent', outline: 'none',
-                ...pulseType.bodyEmphasis, fontSize: 13, color: pt.textPrimary,
-                lineHeight: 1.5, textAlign: 'left', fontFamily: 'inherit',
-                whiteSpace: 'pre-line', wordBreak: 'break-word',
-                resize: 'vertical', boxSizing: 'border-box'
-              }} />
-          </LiquidGlassCard>
+              wrapping normally when a line runs long.
+
+              AUDIT FIX (preview width, per user request): the card
+              itself used to be free to stretch to the full width of
+              this form column — up to half the admin panel on a wide
+              screen, far wider than the real Home card ever renders
+              at. Wrapped in a `maxWidth` div matching roughly the real
+              card's rendered width so long lines actually wrap here
+              the same way they will on the real site. */}
+          <div style={{ maxWidth: ANNOUNCEMENT_PREVIEW_MAX_WIDTH, marginBottom: 12 }}>
+            <LiquidGlassCard dark={dark} instant style={{ padding: '16px 20px' }}>
+              <textarea
+                placeholder="e.g. Pharma exam next week, study well!"
+                value={announcement}
+                onChange={e => setAnnouncement(e.target.value)}
+                style={{
+                  display: 'block', width: '100%', minHeight: 80, padding: 0,
+                  border: 'none', background: 'transparent', outline: 'none',
+                  ...pulseType.bodyEmphasis, fontSize: 13, color: pt.textPrimary,
+                  lineHeight: 1.5, textAlign: 'left', fontFamily: 'inherit',
+                  whiteSpace: 'pre-line', wordBreak: 'break-word',
+                  resize: 'vertical', boxSizing: 'border-box'
+                }} />
+            </LiquidGlassCard>
+          </div>
           <button onClick={saveAnnouncement} disabled={announcementSaving} style={{ ...btnStyle(pt, dark), width: '100%' }}>
             {announcementSaving ? 'Saving...' : 'Save Announcement'}
           </button>
