@@ -143,7 +143,10 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
           <p style={{ color: pt.textMuted, fontSize: 13, marginBottom: 16 }}>
             Shows in a card at the top of the Home page for everyone. Leave it empty to hide the card
             completely. The preview below is styled exactly like it'll appear on the site — same glass
-            card, same text style, and it wraps onto more than one line the same way too.
+            card, same text style, and it wraps onto more than one line the same way too. Press Enter in
+            the box below to force a line break exactly where you want one — the live site will break at
+            that same spot. If you don't add any line breaks, a long announcement will still wrap on its
+            own to fit the card; nothing gets cut off.
           </p>
           {/* AUDIT FIX: this preview used to be a plain textarea with
               its own one-off styling (a flat cobalt/indigo gradient
@@ -155,7 +158,17 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
               the announcement block in Home.tsx). Wrapping the
               textarea in the same LiquidGlassCard component with
               matching padding/typography makes what admins see here
-              an accurate preview instead of a stylized guess. */}
+              an accurate preview instead of a stylized guess.
+
+              AUDIT FIX (line breaks): this textarea's own value
+              already preserved line breaks as typed — the bug was
+              purely in how the announcement is *rendered* elsewhere
+              (this preview and the real Home card both used
+              `white-space: 'normal'`, which collapses newlines in
+              rendered HTML). Switched both to `white-space: 'pre-line'`
+              so an admin-authored line break actually shows up as a
+              line break wherever this text is displayed, while still
+              wrapping normally when a line runs long. */}
           <LiquidGlassCard dark={dark} instant style={{ padding: '16px 20px', marginBottom: 12 }}>
             <textarea
               placeholder="e.g. Pharma exam next week, study well!"
@@ -166,7 +179,7 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
                 border: 'none', background: 'transparent', outline: 'none',
                 ...pulseType.bodyEmphasis, fontSize: 13, color: pt.textPrimary,
                 lineHeight: 1.5, textAlign: 'left', fontFamily: 'inherit',
-                whiteSpace: 'normal', wordBreak: 'break-word',
+                whiteSpace: 'pre-line', wordBreak: 'break-word',
                 resize: 'vertical', boxSizing: 'border-box'
               }} />
           </LiquidGlassCard>

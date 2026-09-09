@@ -536,13 +536,17 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                       </div>
                     ) : (
                       // Multi-line announcement support: explicit
-                      // normal white-space + word-break so a longer
-                      // announcement wraps onto as many lines as it
-                      // needs inside the card instead of being
-                      // assumed to stay on one line.
+                      // `white-space: 'pre-line'` (not 'normal') so an
+                      // admin-authored line break (see
+                      // admin/SettingsTab.tsx) actually renders as a
+                      // line break here, while a long line with no
+                      // explicit break still wraps on its own to fit
+                      // the card instead of being cut off — the card
+                      // has no fixed height, so it just grows taller
+                      // to fit whatever text is here.
                       <div style={{
                         ...pulseType.bodyEmphasis, fontSize: 13, color: pt.textPrimary,
-                        lineHeight: 1.5, whiteSpace: 'normal', wordBreak: 'break-word'
+                        lineHeight: 1.5, whiteSpace: 'pre-line', wordBreak: 'break-word'
                       }}>
                         {announcement}
                       </div>
