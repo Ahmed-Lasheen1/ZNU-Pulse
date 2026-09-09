@@ -13,18 +13,18 @@ import { BellIcon } from '../ui/tool-icons'
 // same shared status (see useNotificationStatus) so they never
 // disagree about whether notifications are actually on.
 //
-// `size` scales the whole card (padding, text, icon, and the switch
-// itself via PulseSwitch's own `size` prop) — defaults to 1 (the
-// original size) so every other place this is used is unaffected;
-// Profile.tsx now passes a larger value to make this control easier
-// to see/tap.
+// `switchSize` scales ONLY the PulseSwitch control itself (via its
+// own `size` prop) — the card, text, and icon around it stay at their
+// normal size. Defaults to 1 (PulseSwitch's own default), so every
+// other place this is used is unaffected; Profile.tsx passes a larger
+// value to make just the switch easier to see/tap there.
 //
 // A browser can only be un-blocked by the person themselves, from
 // their own browser's site settings — no page can do that
 // programmatically. When permission is 'denied', the switch renders
 // off and disabled; tapping it explains that via a toast instead of
 // silently doing nothing.
-export default function NotificationToggle({ dark, size = 1 }: { dark: boolean; size?: number }) {
+export default function NotificationToggle({ dark, switchSize = 1 }: { dark: boolean; switchSize?: number }) {
   const pt = getPulseTheme(dark)
   const showToast = useToast() as (message: string, type?: 'success' | 'error') => void
   const { supported, permission, enabled, checked, refresh } = useNotificationStatus()
@@ -83,13 +83,13 @@ export default function NotificationToggle({ dark, size = 1 }: { dark: boolean; 
   }
 
   return (
-    <LiquidGlassCard dark={dark} delay={0} style={{ padding: `${16 * size}px ${20 * size}px` }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 * size }}>
+    <LiquidGlassCard dark={dark} delay={0} style={{ padding: '16px 20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ ...pulseType.cardTitle, fontSize: 15 * size, color: pt.textPrimary, display: 'flex', alignItems: 'center', gap: 6 * size }}>
-            <BellIcon color={pt.textPrimary} size={15 * size} /> Push Notifications
+          <div style={{ ...pulseType.cardTitle, color: pt.textPrimary, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <BellIcon color={pt.textPrimary} size={15} /> Push Notifications
           </div>
-          <div style={{ ...pulseType.small, fontSize: 12.5 * size, color: pt.textMuted, marginTop: 2 * size }}>
+          <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2 }}>
             {!supported
               ? 'Not supported in this browser'
               : permission === 'denied'
@@ -104,7 +104,7 @@ export default function NotificationToggle({ dark, size = 1 }: { dark: boolean; 
           onClick={handleToggle}
           disabled={busy || !supported}
           dark={dark}
-          size={size}
+          size={switchSize}
           ariaLabel={enabled ? 'Turn off notifications' : 'Turn on notifications'}
         />
       </div>

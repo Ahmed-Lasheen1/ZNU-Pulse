@@ -234,7 +234,7 @@ export default function Profile({ dark }: { dark: boolean }) {
                     default size used anywhere else this component
                     might be reused. */}
                 <div style={{ marginBottom: 16 }}>
-                  <NotificationToggle dark={dark} size={1.5} />
+                  <NotificationToggle dark={dark} switchSize={1.5} />
                 </div>
 
                 {/* Link out to exam history & mistakes — now its own
