@@ -20,6 +20,7 @@ import EcgHero from '../components/pulse/EcgHero'
 import PulseBackground from '../components/pulse/PulseBackground'
 import PulseBrand from '../components/pulse/PulseBrand'
 import { ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, PauseIcon, LightningIcon, CheckCircleIcon } from '@/components/ui/tool-icons'
+import { NumberTicker } from '@/components/ui/number-ticker'
 import { ModuleIcon } from '../lib/medicalIcons'
 import { accuracyTier, accuracyColor, type AccuracyTier } from './mcq/mcqShared'
 
@@ -492,7 +493,11 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                         ...statNumStyle,
                         color: weeklyFeedback ? weeklyFeedback.color : pt.textPrimary
                       }}>
-                        {weeklySummary ? `${weeklySummary.accuracy}%` : '—'}
+                        {weeklySummary ? (
+                          <>
+                            <NumberTicker value={weeklySummary.accuracy} delay={0} />%
+                          </>
+                        ) : '—'}
                       </div>
                       <div style={{ ...pulseType.small, color: pt.textSecondary, marginTop: 4 }}>
                         {weeklySummary ? 'Accuracy this week' : 'No questions logged this week'}
@@ -507,7 +512,9 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                       )}
                     </div>
                     <div>
-                      <div style={{ ...statNumStyle, color: pt.textPrimary }}>{weeklySummary ? weeklySummary.totalAttempted : 0}</div>
+                      <div style={{ ...statNumStyle, color: pt.textPrimary }}>
+                        <NumberTicker value={weeklySummary ? weeklySummary.totalAttempted : 0} delay={0.15} />
+                      </div>
                       <div style={{ ...pulseType.small, color: pt.textSecondary, marginTop: 4 }}>Questions attempted</div>
                     </div>
                     <div>
@@ -519,7 +526,9 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                     <div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, color: pt.terracotta }}>
                         <StreakFlameIcon color={pt.terracotta} size={16} />
-                        <span style={{ ...pulseType.display, fontSize: 22, lineHeight: 1 }}>{streak}</span>
+                        <span style={{ ...pulseType.display, fontSize: 22, lineHeight: 1 }}>
+                          <NumberTicker value={streak} delay={0.3} />
+                        </span>
                       </div>
                       <div style={{ ...pulseType.small, fontSize: 11, color: pt.textMuted, marginTop: 4 }}>Day streak</div>
                     </div>
