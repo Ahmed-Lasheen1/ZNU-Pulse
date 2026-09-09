@@ -100,12 +100,12 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
           gap: 16px;
         }
         @media (min-width: 900px) {
-          .settings-row { grid-template-columns: 1fr 1fr; align-items: start; }
+          .settings-row { grid-template-columns: 1fr 1fr; align-items: stretch; }
         }
       `}</style>
 
       <div className="settings-row" style={{ marginBottom: 16 }}>
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
+        <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px', height: '100%', display: 'flex', flexDirection: 'column' }}>
           <h3 style={{ color: pt.cobalt, marginBottom: 8, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
             <MegaphoneIcon color={pt.cobalt} size={17} /> Push Notification to Everyone
           </h3>
@@ -114,13 +114,13 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
             You'll be asked to confirm before it sends.
           </p>
           <input placeholder="Title (e.g. New questions added!)" value={broadcastTitle} onChange={e => setBroadcastTitle(e.target.value)} style={inStyle} />
-          <textarea placeholder="Message" value={broadcastBody} onChange={e => setBroadcastBody(e.target.value)} style={{ ...inStyle, minHeight: 70, resize: 'vertical' }} />
-          <button onClick={sendBroadcast} disabled={broadcastSending} style={{ ...btnStyle(pt, dark), width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+          <textarea placeholder="Message" value={broadcastBody} onChange={e => setBroadcastBody(e.target.value)} style={{ ...inStyle, minHeight: 70, resize: 'vertical', flex: 1 }} />
+          <button onClick={sendBroadcast} disabled={broadcastSending} style={{ ...btnStyle(pt, dark), width: '100%', marginTop: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
             {broadcastSending ? 'Sending...' : <><SendIcon color="#fff" size={13} /> Send to Everyone</>}
           </button>
         </LiquidGlassCard>
 
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
+        <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px', height: '100%', display: 'flex', flexDirection: 'column' }}>
           <h3 style={{ color: pt.cobalt, marginBottom: 8, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
             <MegaphoneIcon color={pt.cobalt} size={17} /> Home Page Announcement
           </h3>
@@ -128,14 +128,14 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
             Shows at the top of the Home page. Leave empty to hide it. Preview below matches the real
             card's width, and Enter adds a line break.
           </p>
-          <div style={{ maxWidth: ANNOUNCEMENT_PREVIEW_MAX_WIDTH, marginBottom: 12 }}>
-            <LiquidGlassCard dark={dark} instant style={{ padding: '16px 20px' }}>
+          <div style={{ maxWidth: ANNOUNCEMENT_PREVIEW_MAX_WIDTH, marginBottom: 12, flex: 1 }}>
+            <LiquidGlassCard dark={dark} instant style={{ padding: '16px 20px', height: '100%' }}>
               <textarea
                 placeholder="e.g. Pharma exam next week, study well!"
                 value={announcement}
                 onChange={e => setAnnouncement(e.target.value)}
                 style={{
-                  display: 'block', width: '100%', minHeight: 80, padding: 0,
+                  display: 'block', width: '100%', height: '100%', minHeight: 80, padding: 0,
                   border: 'none', background: 'transparent', outline: 'none',
                   ...pulseType.bodyEmphasis, fontSize: 13, color: pt.textPrimary,
                   lineHeight: 1.5, textAlign: 'left', fontFamily: 'inherit',
@@ -144,7 +144,7 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
                 }} />
             </LiquidGlassCard>
           </div>
-          <button onClick={saveAnnouncement} disabled={announcementSaving} style={{ ...btnStyle(pt, dark), width: '100%' }}>
+          <button onClick={saveAnnouncement} disabled={announcementSaving} style={{ ...btnStyle(pt, dark), width: '100%', marginTop: 'auto' }}>
             {announcementSaving ? 'Saving...' : 'Save Announcement'}
           </button>
         </LiquidGlassCard>
