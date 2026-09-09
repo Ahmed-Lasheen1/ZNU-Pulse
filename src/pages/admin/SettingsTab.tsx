@@ -135,7 +135,7 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
                 value={announcement}
                 onChange={e => setAnnouncement(e.target.value)}
                 style={{
-                  display: 'block', width: '100%', height: '100%', minHeight: 80, padding: 0,
+                  display: 'block', width: '100%', height: '100%', minHeight: 102, padding: 0,
                   border: 'none', background: 'transparent', outline: 'none',
                   ...pulseType.bodyEmphasis, fontSize: 13, color: pt.textPrimary,
                   lineHeight: 1.5, textAlign: 'left', fontFamily: 'inherit',
