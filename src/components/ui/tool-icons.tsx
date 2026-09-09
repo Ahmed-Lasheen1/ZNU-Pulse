@@ -713,3 +713,26 @@ export function WhatsAppIcon({ color, size = 16 }: IconProps) {
     </svg>
   )
 }
+
+export function UserIcon({ color, size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="8" r="3.6" stroke={color} strokeWidth="1.6" />
+      <path d="M5 20c0-3.6 3.1-6.2 7-6.2s7 2.6 7 6.2" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function StarIcon({ color, size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path
+        d="M12 3.2l2.47 5.24 5.73.68-4.25 3.98 1.15 5.72L12 15.9l-5.1 2.92 1.15-5.72L3.8 9.12l5.73-.68L12 3.2Z"
+        fill={color}
+        stroke={color}
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}

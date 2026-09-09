@@ -5,7 +5,7 @@ import { Search as SearchIcon } from 'lucide-react'
 import { useAuth } from '../contexts'
 import { MenuToggleIcon } from './ui/menu-toggle-icon'
 import ThemeSwitch from './ui/theme-switch'
-import { HomeIcon, ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, BookIcon, SignOutIcon } from './ui/tool-icons'
+import { HomeIcon, ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, BookIcon, SignOutIcon, UserIcon, StarIcon } from './ui/tool-icons'
 import { getPulseTheme, pulseFonts } from '../premiumTheme'
 import { glassInput } from './pulse/PulseUI'
 import { liquidGlassShadow, liquidGlassBackdrop, liquidGlassTint } from '../lib/liquidGlass'
@@ -276,11 +276,27 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
   // visually open — floating over page content — with focus already
   // elsewhere on the page. Standard dropdown behavior closes
   // automatically once focus genuinely leaves the panel.
-  // `relatedTarget` is the element about to receive focus; if it's
-  // still inside this wrapper (e.g. focus moving from the search
-  // input to a nav row), this is a no-op.
+  //
+  // AUDIT FIX (reopen-on-close bug): when the menu opens, the effect
+  // above auto-focuses the first row. Clicking the TRIGGER BUTTON to
+  // close then fired this blur handler first (since focus was moving
+  // away from that row) — which called setOpen(false) — immediately
+  // followed by the button's own onClick, whose `setOpen(o => !o)`
+  // read the just-queued `false` and flipped it straight back to
+  // `true` in the same batch. Net effect: clicking the toggle to
+  // close visibly reopened the menu instead. Skipping this handler
+  // whenever focus is headed to the trigger button specifically
+  // leaves that button's own click handler as the single source of
+  // truth for that one case, while every other "focus left the
+  // panel" scenario (Tabbing past the last row, clicking some other
+  // focusable element on the page) still closes correctly here.
+  // Also skips when relatedTarget is null (some browsers omit it for
+  // window-level focus loss) rather than risk a false-positive close.
   function handleContentBlur(e: React.FocusEvent<HTMLDivElement>) {
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) setOpen(false)
+    const next = e.relatedTarget as Node | null
+    if (!next) return
+    if (next === triggerButtonRef.current) return
+    if (!e.currentTarget.contains(next)) setOpen(false)
   }
 
   function goTo(path: string) { setOpen(false); navigate(path) }
@@ -447,6 +463,14 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
             element's overflow (which must stay `hidden` for its own
             backdrop-filter blur to render correctly).
 
+            AUDIT FIX (halo clipped at top): the profile row's own
+            outward glow (liquidGlassShadow's `0 0 12px` term) had
+            zero room above it — this container's top padding used to
+            be a flat 0, so the row sat flush against this scrollable
+            box's own top edge and the glow got clipped exactly at
+            that boundary. A small top padding gives the glow
+            somewhere to render into.
+
             AUDIT FIX (accessibility): `ref={contentRef}` + `onBlur`
             here back the focus-management effect and close-on-blur
             handler above — see their own comments for why. */}
@@ -465,7 +489,7 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
           onBlur={handleContentBlur}
           aria-hidden={!open}
           style={{
-            position: 'relative', zIndex: 1, width: PANEL_WIDTH, padding: '0 14px 16px',
+            position: 'relative', zIndex: 1, width: PANEL_WIDTH, padding: '8px 14px 16px',
             fontFamily: pulseFonts.body, display: 'flex', flexDirection: 'column', gap: 10,
             maxHeight: PANEL_MAX_HEIGHT, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
           } as CSSProperties}
@@ -473,7 +497,14 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
           {/* Profile / Sign In — AUDIT FIX (per user request): the
               circular avatar badge (background gradient + name's
               first initial) has been removed. Name and points now sit
-              flush left in the row instead of next to a badge. */}
+              flush left in the row instead of next to a badge.
+
+              AUDIT FIX (per user request): added a small custom
+              UserIcon before the name, and swapped the ⭐ emoji for a
+              custom thin-line StarIcon before the points count —
+              matching the app-wide convention (see tool-icons.tsx) of
+              replacing raw emoji with purpose-built glyphs that take
+              the theme's own color rather than a fixed emoji glyph. */}
           {user ? (
             <GlassRow dark={dark} radius={18} onClick={() => goTo('/profile')}
               role="button" tabIndex={open ? 0 : -1}
@@ -481,12 +512,15 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
               style={{ cursor: 'pointer' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px' }}>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{
-                    color: pt.text, fontWeight: 800, fontSize: 14,
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-                  }}>Dr. {profile?.name || '...'}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                    <UserIcon color={pt.text} size={13} />
+                    <span style={{
+                      color: pt.text, fontWeight: 800, fontSize: 14, flex: 1, minWidth: 0,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                    }}>Dr. {profile?.name || '...'}</span>
+                  </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: pt.amber, fontSize: 12, fontWeight: 700, marginTop: 3 }}>
-                    ⭐ {profile?.points || 0} points
+                    <StarIcon color={pt.amber} size={11} /> {profile?.points || 0} points
                   </div>
                 </div>
               </div>
@@ -591,10 +625,8 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
 
           AUDIT FIX: `ref={triggerButtonRef}` backs the focus-return
           effect above — closing the menu via Escape, an outside
-          click, or picking an item now returns keyboard focus here,
-          instead of leaving it wherever it happened to land (or
-          nowhere, per-browser-default, if the closing click landed on
-          a non-focusable element). */}
+          click, or picking an item now returns keyboard focus here.
+          It also backs the reopen-bug fix in handleContentBlur. */}
       <div style={{
         position: 'absolute', top: 0, [cornerSide]: 0,
         width: BUTTON_SIZE, height: BUTTON_SIZE, zIndex: 2000,
