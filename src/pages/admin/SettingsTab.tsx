@@ -4,7 +4,6 @@ import { getPulseTheme, pulseType } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { btnStyle, inStyle as adminInStyle, fieldLabel } from './adminStyles'
-import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
 import { MegaphoneIcon, SendIcon, LinkIcon } from '../../components/ui/tool-icons'
 
 interface SettingsTabProps {
@@ -35,7 +34,6 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
   const [announcement, setAnnouncement] = useState('')
   const [announcementSaving, setAnnouncementSaving] = useState(false)
   const [driveUrl, setDriveUrl] = useState('')
-  const [stageDriveUrls, setStageDriveUrls] = useState<Record<string, string>>({ tbl: '', end_module: '', practical: '', final: '' })
   const [driveUrlSaving, setDriveUrlSaving] = useState(false)
   const [broadcastTitle, setBroadcastTitle] = useState('')
   const [broadcastBody, setBroadcastBody] = useState('')
@@ -44,18 +42,11 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
   useEffect(() => { fetchAnnouncement() }, [])
 
   async function fetchAnnouncement() {
-    const keys = ['home_announcement', 'drive_url', ...STAGE_META.map(s => `drive_url_${s.value}`)]
-    const { data } = await supabase.from('site_settings').select('key, value').in('key', keys)
+    const { data } = await supabase.from('site_settings').select('key, value').in('key', ['home_announcement', 'drive_url'])
     if (data) {
       const byKey = Object.fromEntries(data.map((r: any) => [r.key, r.value || '']))
       setAnnouncement(byKey['home_announcement'] || '')
       setDriveUrl(byKey['drive_url'] || '')
-      setStageDriveUrls({
-        tbl: byKey['drive_url_tbl'] || '',
-        end_module: byKey['drive_url_end_module'] || '',
-        practical: byKey['drive_url_practical'] || '',
-        final: byKey['drive_url_final'] || '',
-      })
     }
   }
 
@@ -68,13 +59,9 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
 
   async function saveDriveLinks() {
     setDriveUrlSaving(true)
-    const upserts = [
-      { key: 'drive_url', value: driveUrl.trim() },
-      ...STAGE_META.map(s => ({ key: `drive_url_${s.value}`, value: (stageDriveUrls[s.value] || '').trim() }))
-    ]
-    const { error } = await supabase.from('site_settings').upsert(upserts)
+    const { error } = await supabase.from('site_settings').upsert({ key: 'drive_url', value: driveUrl.trim() })
     setDriveUrlSaving(false)
-    showMsg(error ? '❌ ' + error.message : '✅ Drive links updated!')
+    showMsg(error ? '❌ ' + error.message : '✅ Drive link updated!')
   }
 
   async function sendBroadcast() {
@@ -106,16 +93,6 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
     <div>
       <InlineMessage message={msg} />
 
-      {/* AUDIT FIX (messy layout): the three cards used to be one
-          uneven single-column stack — a short broadcast card, then a
-          tall drive-links card with every stage input stacked
-          vertically, then the announcement box. Regrouped into two
-          clear rows: two similarly-sized action cards up top
-          (Broadcast / Announcement — the "write something, send it"
-          pair), then Drive Links on its own full-width row below with
-          its per-stage inputs laid out as a compact grid instead of a
-          long vertical list, so the card's height stops dwarfing
-          everything else on the page. */}
       <style>{`
         .settings-row {
           display: grid;
@@ -124,14 +101,6 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
         }
         @media (min-width: 900px) {
           .settings-row { grid-template-columns: 1fr 1fr; align-items: start; }
-        }
-        .drive-links-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 12px 16px;
-        }
-        @media (min-width: 640px) {
-          .drive-links-grid { grid-template-columns: 1fr 1fr; }
         }
       `}</style>
 
@@ -163,35 +132,6 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
             students actually see it. Press Enter in the box below to force a line break exactly where you
             want one.
           </p>
-          {/* AUDIT FIX: this preview used to be a plain textarea with
-              its own one-off styling (a flat cobalt/indigo gradient
-              background, centered text, fontWeight 600 @ 14px) that
-              had drifted out of sync with how the announcement
-              actually renders on Home — a LiquidGlassCard (real
-              blur + tint + shadow, not a flat gradient) with
-              left-aligned text at pulseType.bodyEmphasis / 13px (see
-              the announcement block in Home.tsx). Wrapping the
-              textarea in the same LiquidGlassCard component with
-              matching padding/typography makes what admins see here
-              an accurate preview instead of a stylized guess.
-
-              AUDIT FIX (line breaks): this textarea's own value
-              already preserved line breaks as typed — the bug was
-              purely in how the announcement is *rendered* elsewhere
-              (this preview and the real Home card both used
-              `white-space: 'normal'`, which collapses newlines in
-              rendered HTML). Switched both to `white-space: 'pre-line'`
-              so an admin-authored line break actually shows up as a
-              line break wherever this text is displayed, while still
-              wrapping normally when a line runs long.
-
-              AUDIT FIX (preview width, per user request): the card
-              itself used to be free to stretch to the full width of
-              this form column — up to half the admin panel on a wide
-              screen, far wider than the real Home card ever renders
-              at. Wrapped in a `maxWidth` div matching roughly the real
-              card's rendered width so long lines actually wrap here
-              the same way they will on the real site. */}
           <div style={{ maxWidth: ANNOUNCEMENT_PREVIEW_MAX_WIDTH, marginBottom: 12 }}>
             <LiquidGlassCard dark={dark} instant style={{ padding: '16px 20px' }}>
               <textarea
@@ -216,36 +156,21 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
 
       <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
         <h3 style={{ color: pt.cobalt, marginBottom: 8, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <LinkIcon color={pt.cobalt} size={17} /> Google Drive Links
+          <LinkIcon color={pt.cobalt} size={17} /> Google Drive Link
         </h3>
         <p style={{ color: pt.textMuted, fontSize: 13, marginBottom: 16 }}>
-          Set a different Drive folder per exam stage so students land in the right folder immediately from
-          that stage's page. Leave a stage empty to fall back to the default — leave everything empty to hide
-          the button entirely.
+          Shown as the "University Google Drive" button wherever it's offered. Leave it empty to hide the button entirely.
         </p>
 
-        <label style={fieldLabel(pt)}>Default (fallback)</label>
+        <label style={fieldLabel(pt)}>Drive URL</label>
         <input
           placeholder="https://drive.google.com/..."
           value={driveUrl}
           onChange={e => setDriveUrl(e.target.value)}
           style={{ ...inStyle, marginBottom: 16 }} />
 
-        <div className="drive-links-grid" style={{ marginBottom: 16 }}>
-          {STAGE_META.map(s => (
-            <div key={s.value}>
-              <label style={fieldLabel(pt)}>{s.title}</label>
-              <input
-                placeholder="https://drive.google.com/... (optional)"
-                value={stageDriveUrls[s.value] || ''}
-                onChange={e => setStageDriveUrls(prev => ({ ...prev, [s.value]: e.target.value }))}
-                style={{ ...inStyle, marginBottom: 0 }} />
-            </div>
-          ))}
-        </div>
-
         <button onClick={saveDriveLinks} disabled={driveUrlSaving} style={{ ...btnStyle(pt, dark), width: '100%' }}>
-          {driveUrlSaving ? 'Saving...' : 'Save Drive Links'}
+          {driveUrlSaving ? 'Saving...' : 'Save Drive Link'}
         </button>
       </LiquidGlassCard>
     </div>
