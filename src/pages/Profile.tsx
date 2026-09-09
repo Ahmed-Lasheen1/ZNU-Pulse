@@ -12,6 +12,7 @@ import PulseBackground from '../components/pulse/PulseBackground'
 import BackButton from '../components/pulse/BackButton'
 import PulseGlassRow from '../components/pulse/PulseGlassRow'
 import NotificationToggle from '../components/pulse/NotificationToggle'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { LeaderboardIcon, ClockIcon } from '../components/ui/tool-icons'
 import { Lock, User, Star, ClipboardList, Pencil, Award } from 'lucide-react'
 
@@ -135,6 +136,7 @@ export default function Profile({ dark }: { dark: boolean }) {
   })
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
 
   useEffect(() => { fetchData() }, [user])
 
@@ -226,9 +228,13 @@ export default function Profile({ dark }: { dark: boolean }) {
 
                 {/* Notifications toggle — persistent on/off control,
                     the counterpart to the one-shot "Enable
-                    notifications" banner elsewhere in the app. */}
+                    notifications" banner elsewhere in the app.
+                    Sized up (size={1.5}) so it's easier to see and
+                    tap here on its dedicated Profile row than the
+                    default size used anywhere else this component
+                    might be reused. */}
                 <div style={{ marginBottom: 16 }}>
-                  <NotificationToggle dark={dark} />
+                  <NotificationToggle dark={dark} size={1.5} />
                 </div>
 
                 {/* Link out to exam history & mistakes — now its own
@@ -282,7 +288,7 @@ export default function Profile({ dark }: { dark: boolean }) {
                   />
                 )}
 
-                <button onClick={async () => { await signOut(); navigate('/') }} style={{
+                <button onClick={() => setShowSignOutConfirm(true)} style={{
                   width: '100%', padding: '14px',
                   background: 'rgba(239,107,87,0.14)', border: '1px solid rgba(239,107,87,0.35)',
                   borderRadius: 999, cursor: 'pointer',
@@ -338,6 +344,21 @@ export default function Profile({ dark }: { dark: boolean }) {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        dark={dark}
+        open={showSignOutConfirm}
+        title="Sign out?"
+        message="You'll need to sign in again to see your progress and points."
+        confirmLabel="Sign Out"
+        confirmColor={pt.danger}
+        onCancel={() => setShowSignOutConfirm(false)}
+        onConfirm={async () => {
+          setShowSignOutConfirm(false)
+          await signOut()
+          navigate('/')
+        }}
+      />
     </div>
   )
 }

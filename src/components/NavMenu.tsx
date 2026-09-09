@@ -10,6 +10,7 @@ import { getPulseTheme, pulseFonts } from '../premiumTheme'
 import { glassInput } from './pulse/PulseUI'
 import { liquidGlassShadow, liquidGlassBackdrop, liquidGlassTint } from '../lib/liquidGlass'
 import PulseGlassRow from './pulse/PulseGlassRow'
+import ConfirmDialog from './ConfirmDialog'
 
 type PulseTheme = ReturnType<typeof getPulseTheme>
 type Align = 'left' | 'right'
@@ -211,6 +212,7 @@ interface NavMenuProps {
 export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuProps) {
   const [open, setOpen] = useState(false)
   const [searchValue, setSearchValue] = useState('')
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
   const navigate = useNavigate()
   const { user, profile, signOut } = useAuth() as {
     user: AuthUser | null
@@ -487,11 +489,14 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
             <ThemeSwitch dark={dark} onToggle={toggleTheme} scale={0.62} stretchX={1.3} />
           </div>
 
-          {/* Sign out */}
+          {/* Sign out — now opens a confirmation dialog instead of
+              signing out immediately on click (see ConfirmDialog
+              below), matching the same confirmation the Sign Out
+              button on the Profile page uses. */}
           {user && (
-            <GlassRow dark={dark} radius={16} onClick={handleSignOut}
+            <GlassRow dark={dark} radius={16} onClick={() => setShowSignOutConfirm(true)}
               role="button" tabIndex={open ? 0 : -1}
-              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSignOut() } }}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowSignOutConfirm(true) } }}
               style={{ cursor: 'pointer' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px' }}>
                 <SignOutIcon color={pt.danger} size={17} />
@@ -501,6 +506,20 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
           )}
         </motion.div>
       </motion.div>
+
+      <ConfirmDialog
+        dark={dark}
+        open={showSignOutConfirm}
+        title="Sign out?"
+        message="You'll need to sign in again to see your progress and points."
+        confirmLabel="Sign Out"
+        confirmColor={pt.danger}
+        onCancel={() => setShowSignOutConfirm(false)}
+        onConfirm={async () => {
+          setShowSignOutConfirm(false)
+          await handleSignOut()
+        }}
+      />
 
       {/* Real toggle button — fixed 44x44, never scaled or distorted.
           Sits above the glass panel (higher zIndex) at the same
