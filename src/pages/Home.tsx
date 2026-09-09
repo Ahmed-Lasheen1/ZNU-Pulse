@@ -333,7 +333,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
   }
 
   const weeklyFeedback = weeklySummary ? weeklyAccuracyFeedback(weeklySummary.accuracy, pt) : null
-  const tickerBaseDelay = playEntrance ? WEEKLY_REPORT_START + CARD_FADE_DURATION : 0
+  const tickerBaseDelay = WEEKLY_REPORT_START + CARD_FADE_DURATION
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh', overflowX: 'hidden' }}>
@@ -497,7 +497,9 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                       }}>
                         {weeklySummary ? (
                           <>
-                            <NumberTicker value={weeklySummary.accuracy} delay={tickerBaseDelay} />%
+                            {playEntrance
+                              ? <NumberTicker value={weeklySummary.accuracy} delay={tickerBaseDelay} />
+                              : weeklySummary.accuracy}%
                           </>
                         ) : '—'}
                       </div>
@@ -515,7 +517,9 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                     </div>
                     <div>
                       <div style={{ ...statNumStyle, color: pt.textPrimary }}>
-                        <NumberTicker value={weeklySummary ? weeklySummary.totalAttempted : 0} delay={tickerBaseDelay + 0.15} />
+                        {playEntrance
+                          ? <NumberTicker value={weeklySummary ? weeklySummary.totalAttempted : 0} delay={tickerBaseDelay + 0.15} />
+                          : (weeklySummary ? weeklySummary.totalAttempted : 0)}
                       </div>
                       <div style={{ ...pulseType.small, color: pt.textSecondary, marginTop: 4 }}>Questions attempted</div>
                     </div>
@@ -529,7 +533,9 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, color: pt.terracotta }}>
                         <StreakFlameIcon color={pt.terracotta} size={16} />
                         <span style={{ ...pulseType.display, fontSize: 22, lineHeight: 1 }}>
-                          <NumberTicker value={streak} delay={tickerBaseDelay + 0.3} />
+                          {playEntrance
+                            ? <NumberTicker value={streak} delay={tickerBaseDelay + 0.3} />
+                            : streak}
                         </span>
                       </div>
                       <div style={{ ...pulseType.small, fontSize: 11, color: pt.textMuted, marginTop: 4 }}>Day streak</div>
