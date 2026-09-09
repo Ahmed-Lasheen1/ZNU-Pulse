@@ -125,12 +125,8 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
             <MegaphoneIcon color={pt.cobalt} size={17} /> Home Page Announcement
           </h3>
           <p style={{ color: pt.textMuted, fontSize: 13, marginBottom: 16 }}>
-            Shows in a card at the top of the Home page for everyone. Leave it empty to hide the card
-            completely. The preview below is capped to roughly the real card's width (~{ANNOUNCEMENT_PREVIEW_MAX_WIDTH}px),
-            so a line long enough to wrap on Home — on the narrow desktop dashboard column or on a stacked
-            mobile screen — will wrap here too, instead of looking like one line only to break oddly once
-            students actually see it. Press Enter in the box below to force a line break exactly where you
-            want one.
+            Shows at the top of the Home page. Leave empty to hide it. Preview below matches the real
+            card's width, and Enter adds a line break.
           </p>
           <div style={{ maxWidth: ANNOUNCEMENT_PREVIEW_MAX_WIDTH, marginBottom: 12 }}>
             <LiquidGlassCard dark={dark} instant style={{ padding: '16px 20px' }}>
