@@ -11,6 +11,7 @@ import SummaryOverlay from '../components/SummaryOverlay'
 import { useModules } from '../contexts'
 import { fetchLessonById } from '../lib/lessons'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
+import { getPreviewUrl } from '../lib/embedUrl'
 import { ModuleIcon, ExamIcon, NotesIcon } from '../lib/medicalIcons'
 import { SmartSummariesIcon, PracticeIcon, ConstructionIcon } from '@/components/ui/tool-icons'
 
@@ -64,7 +65,7 @@ export default function LessonPage({ dark }: { dark: boolean }) {
   )
 
   if (selectedSummary) return (
-    <SummaryOverlay dark={dark} onBack={() => setSelectedSummary(null)} title={selectedSummary.title} url={selectedSummary.url} />
+    <SummaryOverlay dark={dark} onBack={() => setSelectedSummary(null)} title={selectedSummary.title} url={getPreviewUrl(selectedSummary.url)} />
   )
 
   function openSummary() {

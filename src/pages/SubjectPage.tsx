@@ -13,6 +13,7 @@ import { useModules } from '../contexts'
 import { fetchSubjectById } from '../lib/subjects'
 import { fetchLessonsForSubject } from '../lib/lessons'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
+import { getPreviewUrl } from '../lib/embedUrl'
 import { ModuleIcon, ExamIcon, NotesIcon } from '../lib/medicalIcons'
 import { BookIcon, ConstructionIcon } from '../components/ui/tool-icons'
 
@@ -72,7 +73,7 @@ export default function SubjectPage({ dark }: { dark: boolean }) {
   )
 
   if (selectedSummary) return (
-    <SummaryOverlay dark={dark} onBack={() => setSelectedSummary(null)} title={selectedSummary.title} url={selectedSummary.url} />
+    <SummaryOverlay dark={dark} onBack={() => setSelectedSummary(null)} title={selectedSummary.title} url={getPreviewUrl(selectedSummary.url)} />
   )
 
   function openAllSummaries() {

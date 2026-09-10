@@ -12,6 +12,7 @@ import { useModules } from '../contexts'
 import { fetchModuleStages, stageMetaFrom } from '../lib/moduleStages'
 import { fetchSubjectsForModule } from '../lib/subjects'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
+import { getPreviewUrl } from '../lib/embedUrl'
 import { FILE_CARDS } from '../lib/fileCards'
 // AUDIT FIX: isSafeExternalUrl guards the admin-entered Drive link before
 // it's ever shown as a clickable card / passed to window.open() — see
@@ -103,7 +104,7 @@ export default function StagePage({ dark }: { dark: boolean }) {
       dark={dark}
       onBack={() => setSelectedSummary(null)}
       title={selectedSummary.title}
-      url={selectedSummary.url}
+      url={getPreviewUrl(selectedSummary.url)}
     />
   )
 

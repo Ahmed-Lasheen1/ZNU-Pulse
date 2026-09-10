@@ -12,6 +12,7 @@ import BackButton from '../components/pulse/BackButton'
 import { useModules } from '../contexts'
 import { fetchModuleStages } from '../lib/moduleStages'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
+import { getPreviewUrl } from '../lib/embedUrl'
 import { ModuleIcon, NotesIcon } from '../lib/medicalIcons'
 import { ConstructionIcon } from '../components/ui/tool-icons'
 
@@ -131,7 +132,7 @@ function ModuleSummaries({ mod, onBack, dark, initialStage, initialSummaryId }: 
   const filtered = summaries.filter(s => activeStage === 'all' || (s.exam_stage || 'general') === activeStage)
 
   if (selected) return (
-    <SummaryOverlay dark={dark} onBack={() => setSelected(null)} title={selected.title} url={selected.url} />
+    <SummaryOverlay dark={dark} onBack={() => setSelected(null)} title={selected.title} url={getPreviewUrl(selected.url)} />
   )
 
   return (

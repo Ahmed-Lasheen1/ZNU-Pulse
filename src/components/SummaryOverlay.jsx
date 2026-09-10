@@ -1,24 +1,45 @@
 import BackButton from './pulse/BackButton'
+import { previewKindFor } from '../lib/embedUrl'
 
-// Full-screen "back + iframe" viewer shared by every page that opens
-// a summary or lesson in an embedded viewer (StagePage, Summaries,
-// SubjectPage, LessonPage).
+// Full-screen "back + preview" viewer shared by every page that opens
+// a summary or lesson resource — StagePage, Summaries, SubjectPage,
+// LessonPage.
 //
-// AUDIT FIX: same fix as MediaOverlay.jsx — dropped the old solid
-// header bar (dark navy gradient, sourced from the now-retired
-// theme.js) and stopped covering the real site header by using
-// z-index 400 instead of 2000. Uses the shared <BackButton> component
-// instead of a hand-rolled pill, so it matches every other page
-// pixel-for-pixel.
-//
-// `100dvh` (not `100vh`) matches the same dynamic-viewport-height
-// convention used elsewhere in this app (PulseBackground.tsx) to
-// avoid the iOS Safari address-bar collapse/expand gap.
-export default function SummaryOverlay({ dark, onBack, url, title }) {
+// Now content-type aware: `fileType` is an optional hint ('pdf' |
+// 'html' | 'video' | 'image') a caller can pass when it already knows
+// what kind of resource this is (e.g. a stored file_type column).
+// Without a hint, the kind is inferred from the URL itself (YouTube
+// link -> video, image extension -> image, everything else -> plain
+// iframe) via previewKindFor() in lib/embedUrl.js — so existing
+// callers that only ever passed `url` keep working unchanged, they
+// just also now get automatic image support for free.
+export default function SummaryOverlay({ dark, onBack, url, title, fileType }) {
+  const kind = previewKindFor(url, fileType)
+
   return (
     <div style={{ position: 'fixed', inset: 0, height: '100dvh', background: '#000', zIndex: 400 }}>
       <BackButton dark={dark} onClick={onBack} />
-      <iframe src={url} style={{ height: '100%', width: '100%', border: 'none' }} title={title} />
+
+      {kind === 'image' ? (
+        <div style={{
+          height: '100%', width: '100%', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', overflow: 'auto'
+        }}>
+          <img
+            src={url}
+            alt={title}
+            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+          />
+        </div>
+      ) : (
+        <iframe
+          src={url}
+          style={{ height: '100%', width: '100%', border: 'none' }}
+          title={title}
+          allow={kind === 'video' ? 'autoplay; fullscreen' : undefined}
+          allowFullScreen={kind === 'video' || undefined}
+        />
+      )}
     </div>
   )
 }

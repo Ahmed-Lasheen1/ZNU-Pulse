@@ -80,3 +80,43 @@ export function getVideoEmbedUrl(url) {
 export function isSafeExternalUrl(url) {
   return isSafeUrl(url)
 }
+
+// ... existing isSafeUrl, driveEmbedUrl, getDriveOrRawUrl, getVideoEmbedUrl, isSafeExternalUrl stay unchanged ...
+
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|svg|bmp)(\?.*)?$/i
+const HTML_EXT_RE = /\.html?(\?.*)?$/i
+
+function isYouTubeUrl(url) {
+  return url.includes('youtube.com/watch') || url.includes('youtu.be/')
+}
+
+// Classifies a URL (optionally with an explicit hint, e.g. a stored
+// file_type column) into how SummaryOverlay should render it.
+// 'image' -> <img>, 'video' -> embedded video iframe, 'iframe' ->
+// everything else (PDF, HTML, Drive docs, etc) via a plain iframe.
+export function previewKindFor(url, fileTypeHint) {
+  if (fileTypeHint === 'video') return 'video'
+  if (fileTypeHint === 'image') return 'image'
+  if (fileTypeHint === 'pdf' || fileTypeHint === 'html') return 'iframe'
+  if (!url) return 'iframe'
+  if (isYouTubeUrl(url)) return 'video'
+  if (IMAGE_EXT_RE.test(url)) return 'image'
+  return 'iframe'
+}
+
+// Single entry point SummaryOverlay uses: resolves a raw admin-entered
+// URL (Drive share link, YouTube link, direct image link, direct HTML
+// link, whatever) into whatever `src` value actually works for the
+// kind previewKindFor() decided on. Falls back to '' (renders nothing)
+// for anything unsafe — same http(s)-only rule as every other embed
+// helper here.
+export function getPreviewUrl(url, fileTypeHint) {
+  if (!url || !isSafeUrl(url)) return ''
+  const kind = previewKindFor(url, fileTypeHint)
+  if (kind === 'video') return getVideoEmbedUrl(url)
+  if (kind === 'image') return url
+  // 'iframe' catch-all: Drive links still get rewritten to their
+  // /preview form; direct HTML/PDF/anything-else links pass through
+  // unchanged, same as getDriveOrRawUrl already does.
+  return getDriveOrRawUrl(url)
+}
