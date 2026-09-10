@@ -26,69 +26,8 @@ interface ExamStage { value: string; title: string; emoji?: string; Icon?: (p: {
 
 function gridCols(n: number) { return n === 1 ? 1 : 2 }
 
-function SummariesHome({ modules, onSelect, dark }: {
-  modules: SummaryModule[]; onSelect: (m: SummaryModule) => void; dark: boolean
-}) {
-  const pt = getPulseTheme(dark)
-  const sorted = [
-    ...modules.filter(m => m.status === 'active'),
-    ...modules.filter(m => m.status !== 'active')
-  ]
-
-  return (
-    <div className="pulse-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body }}>
-      <div style={{ marginBottom: 8 }}>
-        <BackButton dark={dark} fallback="/" />
-      </div>
-
-      <div style={{ textAlign: 'center', padding: '20px 0 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
-          <NotesIcon color={pt.success} size={48} />
-        </div>
-        <h1 style={{
-          ...pulseType.pageTitle, fontSize: 26,
-          background: `linear-gradient(135deg, ${pt.success}, ${pt.cobalt})`,
-          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          marginBottom: 8
-        }}>Smart Summaries</h1>
-        <p style={{ color: ON_GRADIENT_TOP.secondary, fontSize: 14 }}>Interactive study summaries for each module</p>
-      </div>
-
-      {sorted.length === 0 && (
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-          <p style={{ color: pt.sub }}>No summaries available yet 🚧</p>
-        </LiquidGlassCard>
-      )}
-
-      <div className="auto-grid" style={{ ['--auto-grid-cols' as any]: gridCols(sorted.length) }}>
-        {sorted.map((mod, i) => (
-          <LiquidGlassCard key={mod.id} dark={dark} delay={i * 80} onClick={() => onSelect(mod)}
-            style={{ padding: 24, textAlign: 'center', opacity: mod.status === 'active' ? 1 : 0.75 }}>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-              <ModuleIcon value={mod.icon} size={40} color={mod.color} />
-            </div>
-            <div style={{
-              ...pulseType.cardTitle, fontWeight: 900, color: mod.color, fontSize: 18, marginBottom: 6,
-              wordBreak: 'break-word', overflowWrap: 'anywhere'
-            }}>{mod.name}</div>
-            <div style={{
-              display: 'inline-block',
-              background: mod.status === 'active' ? 'rgba(74,222,128,0.14)' : (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
-              color: mod.status === 'active' ? '#4ade80' : pt.textMuted,
-              border: `1px solid ${mod.status === 'active' ? 'rgba(74,222,128,0.35)' : pt.border}`,
-              borderRadius: 999, padding: '2px 10px', fontSize: 11, fontWeight: 700
-            }}>
-              {mod.status === 'active' ? '● Active' : '✓ Completed'}
-            </div>
-          </LiquidGlassCard>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function ModuleSummaries({ mod, onBack, dark, initialStage, initialSummaryId }: {
-  mod: SummaryModule; onBack: () => void; dark: boolean; initialStage?: string; initialSummaryId?: string
+function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
+  mod: SummaryModule; dark: boolean; initialStage?: string; initialSummaryId?: string
 }) {
   const pt = getPulseTheme(dark)
   const [summaries, setSummaries] = useState<Summary[]>([])
@@ -98,13 +37,14 @@ function ModuleSummaries({ mod, onBack, dark, initialStage, initialSummaryId }: 
   const [activeStage, setActiveStage] = useState(initialStage || 'all')
   const [stages, setStages] = useState<ExamStage[]>([])
 
-  // Back button closes this open summary before it ever falls through
-  // to the outer "which module" back handled by Summaries below.
+  // Back button closes this open summary before falling through to a
+  // real page navigation.
   useHistoryOverlay(!!selected, () => setSelected(null))
 
   useEffect(() => { fetchModuleStages(mod.id).then(setStages) }, [mod.id])
 
   useEffect(() => {
+    setLoading(true)
     supabase.from('summaries').select('*').eq('module_id', mod.id).order('created_at')
       .then(({ data, error }) => {
         if (data) setSummaries(data)
@@ -137,12 +77,11 @@ function ModuleSummaries({ mod, onBack, dark, initialStage, initialSummaryId }: 
 
   return (
     <div className="pulse-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body }}>
-      {/* "Back" here means "return to the module grid", a local
-          view switch, not real page navigation — that's why this
-          passes onClick instead of relying on BackButton's default
-          history behavior. */}
+      {/* No more "back to module grid" — Summaries no longer has a
+          module-picker page, so Back now does a real navigation
+          (e.g. back to the module page that linked here, or Home). */}
       <div style={{ marginBottom: 8 }}>
-        <BackButton dark={dark} onClick={onBack} />
+        <BackButton dark={dark} fallback={`/module/${mod.id}`} />
       </div>
 
       <div style={{ textAlign: 'center', padding: '10px 0 24px' }}>
@@ -216,37 +155,47 @@ function ModuleSummaries({ mod, onBack, dark, initialStage, initialSummaryId }: 
 }
 
 export default function Summaries({ dark }: { dark: boolean }) {
-  const { modules } = useModules() as { modules: SummaryModule[] }
+  const { modules, modulesLoaded, modulesError } = useModules() as { modules: SummaryModule[]; modulesLoaded: boolean; modulesError: boolean }
   const location = useLocation()
-  const [selected, setSelected] = useState<SummaryModule | null>(null)
+  const pt = getPulseTheme(dark)
 
-  // Pressing back while viewing one module's summaries returns to the
-  // module grid instead of leaving the Summaries page entirely.
-  useHistoryOverlay(!!selected, () => setSelected(null))
-
-  useEffect(() => {
-    if (selected || modules.length === 0) return
-    const params = new URLSearchParams(location.search)
-    const moduleParam = params.get('module')
-    if (moduleParam) {
-      const found = modules.find(m => m.id === moduleParam)
-      if (found) setSelected(found)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modules, location.search])
-
-  const initialStage = new URLSearchParams(location.search).get('stage') || 'all'
+  const params = new URLSearchParams(location.search)
+  const moduleParam = params.get('module')
+  const initialStage = params.get('stage') || 'all'
   // AUDIT FIX (search accuracy): a specific summary id from Search.tsx
   // (`?summary=<id>`), forwarded down so ModuleSummaries can open that
   // exact summary the moment its list finishes loading.
-  const initialSummaryId = new URLSearchParams(location.search).get('summary') || undefined
+  const initialSummaryId = params.get('summary') || undefined
+
+  // The module-picker grid page is gone. `/summaries` now always goes
+  // straight into one module's summaries: whichever module was passed
+  // in via `?module=`, or — if none was passed (e.g. a stale bookmark,
+  // or someone typing the URL directly) — the first active module,
+  // falling back to the first module of any status if there are no
+  // active ones.
+  const resolvedModule: SummaryModule | null =
+    (moduleParam && modules.find(m => m.id === moduleParam)) ||
+    modules.find(m => m.status === 'active') ||
+    modules[0] ||
+    null
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
       <PulseBackground />
-      {selected
-        ? <ModuleSummaries mod={selected} onBack={() => setSelected(null)} dark={dark} initialStage={initialStage} initialSummaryId={initialSummaryId} />
-        : <SummariesHome modules={modules} onSelect={setSelected} dark={dark} />}
+      {resolvedModule ? (
+        <ModuleSummaries mod={resolvedModule} dark={dark} initialStage={initialStage} initialSummaryId={initialSummaryId} />
+      ) : (
+        <div className="pulse-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body }}>
+          <div style={{ marginBottom: 8 }}>
+            <BackButton dark={dark} fallback="/" />
+          </div>
+          <div style={{ textAlign: 'center', padding: 40, color: ON_GRADIENT_TOP.secondary }}>
+            {modulesError
+              ? <ErrorBanner message="Couldn't load modules — check your connection." />
+              : !modulesLoaded ? 'Loading...' : 'No modules available yet.'}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
