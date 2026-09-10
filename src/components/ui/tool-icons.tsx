@@ -736,3 +736,13 @@ export function StarIcon({ color, size = 16 }: IconProps) {
     </svg>
   )
 }
+
+export function UploadIcon({ color, size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M12 15.5V4" stroke={color} strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M7.5 8.5L12 4l4.5 4.5" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />
+    </svg>
+  )
+}

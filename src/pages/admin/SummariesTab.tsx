@@ -9,7 +9,8 @@ import { ModuleIcon } from '../../lib/medicalIcons'
 import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
 import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
 import { fetchModuleStages } from '../../lib/moduleStages'
-import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon } from '../../components/ui/tool-icons'
+import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon, LinkIcon, UploadIcon } from '../../components/ui/tool-icons'
+import { publishSummary } from '../../lib/publishSummary'
 import type { AdminModule, AdminSubject, AdminLesson } from './adminTypes'
 
 const EXAM_STAGES = STAGE_META.map(s => ({ value: s.value, label: s.title }))
@@ -31,11 +32,19 @@ interface SummariesTabProps {
   lessons: AdminLesson[]
 }
 
+// Two ways to get a summary's `url` into the row: paste one directly
+// (unchanged, exactly as before — any host works, e.g. a Drive link),
+// or upload an HTML file (+ optional images) and let the backend
+// publish it to GitHub/jsdelivr and fill the URL in automatically.
+// Only available when adding a NEW summary — editing an existing row
+// still just edits its url/fields directly, same as before.
+type PublishMode = 'link' | 'upload'
+
 export default function SummariesTab({ dark, modules, subjects, lessons }: SummariesTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
   const [msg, setMsg] = useState('')
-  function showMsg(m: string) { setMsg(m); setTimeout(() => setMsg(''), 3000) }
+  function showMsg(m: string) { setMsg(m); setTimeout(() => setMsg(''), 4000) }
 
   const [summaries, setSummaries] = useState<SummaryRow[]>([])
   // AUDIT FIX (performance audit): own loading flag, same reasoning
@@ -53,6 +62,14 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
   // AUDIT FIX (performance audit — double-submit risk).
   const [saving, setSaving] = useState(false)
 
+  // New: publish-by-upload state. Kept entirely separate from the
+  // link-mode fields above so switching modes never clobbers what's
+  // already typed in the other one.
+  const [publishMode, setPublishMode] = useState<PublishMode>('link')
+  const [htmlFile, setHtmlFile] = useState<File | null>(null)
+  const [imageFiles, setImageFiles] = useState<File[]>([])
+  const [publishing, setPublishing] = useState(false)
+
   useEffect(() => { fetchSummaries() }, [])
   useEffect(() => {
     fetchModuleStages(sumModuleId).then(list => setSumStageOptions(list.map(s => ({ value: s.value, label: s.title }))))
@@ -67,6 +84,7 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
 
   function editSummary(s: SummaryRow) {
     setEditingSummaryId(s.id)
+    setPublishMode('link') // editing always edits the row's url directly
     setSumTitle(s.title); setSumUrl(s.url); setSumModuleId(s.module_id)
     setSumSubjectId(s.subject_id || ''); setSumLessonId(s.lesson_id || '')
     setSumExamStage(s.exam_stage || '')
@@ -74,6 +92,7 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
   function resetSummaryForm() {
     setEditingSummaryId(null); setSumTitle(''); setSumUrl('')
     setSumSubjectId(''); setSumLessonId(''); setSumExamStage('')
+    setHtmlFile(null); setImageFiles([])
   }
   async function saveSummary() {
     if (!sumTitle || !sumUrl || !sumModuleId || saving) return
@@ -96,6 +115,35 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
       else showMsg('❌ ' + error.message)
     }
   }
+
+  // New: publish an HTML file (+ optional images) instead of pasting
+  // a link. Only reachable when adding a new summary (publishMode is
+  // forced back to 'link' the moment an existing row is opened for
+  // editing — see editSummary above).
+  async function publishSummaryFromFile() {
+    if (!sumTitle || !sumModuleId || !htmlFile || publishing) {
+      return showMsg('❌ Title, module, and an HTML file are required')
+    }
+    setPublishing(true)
+    try {
+      const result = await publishSummary({
+        title: sumTitle,
+        htmlFile,
+        imageFiles,
+        moduleId: sumModuleId,
+        subjectId: sumSubjectId || null,
+        lessonId: sumLessonId || null,
+        examStage: sumExamStage || null,
+      })
+      showMsg('✅ Summary published! URL: ' + result.url)
+      resetSummaryForm()
+      fetchSummaries()
+    } catch (e: any) {
+      showMsg('❌ ' + (e?.message || 'Could not publish summary'))
+    }
+    setPublishing(false)
+  }
+
   async function deleteSummary(id: string) {
     if (!confirm('Delete this summary? This cannot be undone.')) return
     if (editingSummaryId === id) resetSummaryForm()
@@ -108,11 +156,45 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
   const filteredLessons = (subjectId: string) => lessons.filter(l => l.subject_id === subjectId)
   const visibleModules = moduleFilter === 'all' ? modules : modules.filter(m => m.id === moduleFilter)
 
+  const isBusy = saving || publishing
+  const totalUploadBytes = (htmlFile?.size || 0) + imageFiles.reduce((a, f) => a + f.size, 0)
+  const totalUploadMb = (totalUploadBytes / (1024 * 1024)).toFixed(1)
+  const overSizeLimit = totalUploadBytes > 4 * 1024 * 1024 // soft warning only — see note below field
+
   const form = (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
       <h3 style={{ color: pt.cobalt, marginBottom: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
         {editingSummaryId ? <><EditIcon color={pt.cobalt} size={16} /> Edit Summary</> : <><PlusIcon color={pt.cobalt} size={16} /> Add Summary</>}
       </h3>
+
+      {/* Link vs Upload toggle — only shown when adding a new summary.
+          Editing an existing row always edits its url field directly,
+          same as the app has always worked. */}
+      {!editingSummaryId && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <button
+            onClick={() => setPublishMode('link')}
+            style={{
+              flex: 1, padding: '9px', borderRadius: 10, cursor: 'pointer',
+              border: `1.5px solid ${publishMode === 'link' ? pt.cobalt : pt.border}`,
+              background: publishMode === 'link' ? `${pt.cobalt}18` : 'transparent',
+              color: publishMode === 'link' ? pt.cobalt : pt.sub, fontWeight: 700, fontSize: 12,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6
+            }}
+          ><LinkIcon color={publishMode === 'link' ? pt.cobalt : pt.sub} size={13} /> Paste a Link</button>
+          <button
+            onClick={() => setPublishMode('upload')}
+            style={{
+              flex: 1, padding: '9px', borderRadius: 10, cursor: 'pointer',
+              border: `1.5px solid ${publishMode === 'upload' ? pt.cobalt : pt.border}`,
+              background: publishMode === 'upload' ? `${pt.cobalt}18` : 'transparent',
+              color: publishMode === 'upload' ? pt.cobalt : pt.sub, fontWeight: 700, fontSize: 12,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6
+            }}
+          ><UploadIcon color={publishMode === 'upload' ? pt.cobalt : pt.sub} size={13} /> Upload HTML</button>
+        </div>
+      )}
+
       <label style={fieldLabel(pt)}>Module</label>
       <ModuleSelect modules={modules} value={sumModuleId} onChange={id => { setSumModuleId(id); setSumSubjectId(''); setSumLessonId('') }} dark={dark} />
 
@@ -139,13 +221,46 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
       </select>
 
       <input placeholder="Title (e.g. End Module Exam)" value={sumTitle} onChange={e => setSumTitle(e.target.value)} style={inStyle} />
-      <input placeholder="Summary URL" value={sumUrl} onChange={e => setSumUrl(e.target.value)} style={inStyle} />
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={saveSummary} disabled={saving} style={{ ...btnStyle(pt, dark), flex: 1, opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}>
-          {saving ? 'Saving...' : editingSummaryId ? 'Save Changes' : 'Add Summary'}
-        </button>
-        {editingSummaryId && <button onClick={resetSummaryForm} disabled={saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
-      </div>
+
+      {(editingSummaryId || publishMode === 'link') ? (
+        <>
+          <input placeholder="Summary URL" value={sumUrl} onChange={e => setSumUrl(e.target.value)} style={inStyle} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={saveSummary} disabled={isBusy} style={{ ...btnStyle(pt, dark), flex: 1, opacity: isBusy ? 0.7 : 1, cursor: isBusy ? 'not-allowed' : 'pointer' }}>
+              {saving ? 'Saving...' : editingSummaryId ? 'Save Changes' : 'Add Summary'}
+            </button>
+            {editingSummaryId && <button onClick={resetSummaryForm} disabled={isBusy} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
+          </div>
+        </>
+      ) : (
+        <>
+          <label style={fieldLabel(pt)}>HTML File</label>
+          <input
+            type="file" accept=".html,.htm"
+            onChange={e => setHtmlFile(e.target.files?.[0] || null)}
+            style={{ ...inStyle, padding: '10px 12px' }}
+          />
+          <label style={fieldLabel(pt)}>Images (optional — referenced by the HTML with relative paths)</label>
+          <input
+            type="file" accept="image/*" multiple
+            onChange={e => setImageFiles(Array.from(e.target.files || []))}
+            style={{ ...inStyle, padding: '10px 12px' }}
+          />
+          {imageFiles.length > 0 && (
+            <div style={{ color: pt.textMuted, fontSize: 11, marginTop: -8, marginBottom: 12 }}>
+              {imageFiles.length} image{imageFiles.length === 1 ? '' : 's'} selected
+            </div>
+          )}
+          {(htmlFile || imageFiles.length > 0) && (
+            <div style={{ color: overSizeLimit ? pt.danger : pt.textMuted, fontSize: 11, marginBottom: 12 }}>
+              Total: {totalUploadMb} MB{overSizeLimit ? ' — likely too large; compress images and keep the total under ~4 MB' : ''}
+            </div>
+          )}
+          <button onClick={publishSummaryFromFile} disabled={isBusy} style={{ ...btnStyle(pt, dark), width: '100%', opacity: isBusy ? 0.7 : 1, cursor: isBusy ? 'not-allowed' : 'pointer' }}>
+            {publishing ? 'Publishing...' : 'Publish Summary'}
+          </button>
+        </>
+      )}
     </LiquidGlassCard>
   )
 
