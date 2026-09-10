@@ -18,22 +18,39 @@ export const PULSE_BG = [
   '#010c4a 100%)',
 ].join(' ')
 
-// Particle palette — pulled directly from PULSE_BG's own lighter
-// stops (so the particles read as "light escaping the same
-// gradient," not a separate color system) plus the cyan already used
-// for the ECG hero's traveling beam (EcgHero.jsx), kept as the
-// brightest/most saturated option in the mix. Each particle picks one
-// of these at random when it's born.
-const PARTICLE_PALETTE = [
+// Particle palette — split into two sets so a particle always shows up
+// AGAINST the gradient behind it instead of blending into it: PULSE_BG
+// runs pale (top) to dark navy (bottom), so particles born in the top
+// half use a darker tone and particles born in the bottom half use a
+// lighter one. A particle's zone (and palette) is fixed at birth via
+// pickParticleColor below, keyed off its own y position — and since a
+// particle's x/y never change except by cursor nudging (see
+// ParticleField's fade-cycle-restart logic, which always carries the
+// current position forward via `at`), a particle keeps the same
+// palette for its whole lifetime even across respawns, rather than
+// flickering between palettes as it fades in and out in place.
+const PARTICLE_PALETTE_TOP = [
+  '39, 78, 121',   // #274e79 — gradient's mid-dark stop
+  '4, 42, 89',     // #042a59 — gradient's near-darkest stop
+  '1, 12, 74',     // #010c4a — gradient's darkest stop
+]
+const PARTICLE_PALETTE_BOTTOM = [
   '166, 210, 239', // #a6d2ef — gradient's palest stop
-  '151, 188, 215', // #5fd9ff — ECG cyan accent
-  '129, 166, 195', // #5fd9ff — ECG cyan accent
-  '95, 217, 255',  // #010c4a — gradient's darkest stop
+  '151, 188, 215', // ECG cyan accent
+  '95, 217, 255',  // ECG cyan accent
 ]
 
-// Caps how bright a particle is ever allowed to get, whether idly
-// fading in/out or fully lit by the cursor — keeps the whole field
-// dim/ambient rather than punchy.
+function pickParticleColor(y: number, h: number) {
+  const palette = y < h / 2 ? PARTICLE_PALETTE_TOP : PARTICLE_PALETTE_BOTTOM
+  return palette[Math.floor(Math.random() * palette.length)]
+}
+
+// Caps how bright a particle is ever allowed to get while idly
+// fading in/out — keeps the ambient field dim rather than punchy.
+// Deliberately NOT applied when the cursor is actively influencing a
+// particle (see the `rendered` calculation in the render loop below)
+// — a particle the cursor is near should be forced fully lit, not
+// capped down to this ambient ceiling.
 const MAX_BRIGHTNESS = 0.75
 
 // Water-like response tuning while the cursor is actively within
@@ -84,16 +101,19 @@ interface Particle {
 // `at` given). Every later fade-cycle restart passes its own current
 // position back in via `at`, so a particle spends its entire
 // lifetime — across as many fade in/out cycles as it goes through —
-// in the same place; only the cursor ever moves it.
+// in the same place (and therefore the same color zone); only the
+// cursor ever moves it.
 function makeParticle(w: number, h: number, now: number, initial: boolean, at?: { x: number; y: number }): Particle {
   const lifeDuration = 5000 + Math.random() * 7000 // ~5-12s fully visible cycle
+  const x = at ? at.x : Math.random() * w
+  const y = at ? at.y : Math.random() * h
   return {
-    x: at ? at.x : Math.random() * w,
-    y: at ? at.y : Math.random() * h,
+    x,
+    y,
     vx: 0,
     vy: 0,
     radius: 1 + Math.random() * 1.6,
-    colorRgb: PARTICLE_PALETTE[Math.floor(Math.random() * PARTICLE_PALETTE.length)],
+    colorRgb: pickParticleColor(y, h),
     // Irregular timing: staggered on first paint so particles don't
     // all appear at once, and staggered on respawn so they never
     // settle into lockstep with each other.
@@ -107,15 +127,17 @@ function makeParticle(w: number, h: number, now: number, initial: boolean, at?: 
 
 // Sparse, irregular ambient field — a handful of dim, multi-toned
 // points (colors pulled from PULSE_BG's own gradient, see
-// PARTICLE_PALETTE) that fade in and out forever in the SAME spot —
-// a fade cycle ending never relocates a particle, it just starts the
-// next cycle in place. The cursor is the only thing that ever moves
-// one: coming near it slowly eases its brightness up and gives it a
-// gentle, water-like push — small force, heavy momentum while the
-// cursor stays close — but the instant the cursor moves away, that
-// particle settles back to a stop within a couple of frames. Purely
-// decorative: skipped entirely under prefers-reduced-motion, same
-// convention EcgHero already uses for its beam.
+// PARTICLE_PALETTE_TOP/BOTTOM above) that fade in and out forever in
+// the SAME spot — a fade cycle ending never relocates a particle, it
+// just starts the next cycle in place. The cursor is the only thing
+// that ever moves one: coming near it slowly eases its brightness up
+// to FULL (overriding the ambient MAX_BRIGHTNESS cap — see the
+// `rendered` calculation below) and gives it a gentle, water-like
+// push — small force, heavy momentum while the cursor stays close —
+// but the instant the cursor moves away, that particle settles back
+// to a stop within a couple of frames. Purely decorative: skipped
+// entirely under prefers-reduced-motion, same convention EcgHero
+// already uses for its beam.
 function ParticleField() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const reducedMotion = usePrefersReducedMotion()
@@ -143,10 +165,9 @@ function ParticleField() {
     resize()
     window.addEventListener('resize', resize)
 
-    // Sparse on purpose — scales gently with screen size but stays
-    // capped in the 20-40 range so this reads as "a field of embers,"
-    // not a particle storm.
-    const count = Math.max(20, Math.min(40, Math.round((width * height) / 32000)))
+    // Scales gently with screen size but stays capped in the 25-50
+    // range so this reads as "a field of embers," not a particle storm.
+    const count = Math.max(25, Math.min(50, Math.round((width * height) / 32000)))
     const now0 = performance.now()
     const particles: Particle[] = Array.from({ length: count }, () => makeParticle(width, height, now0, true))
 
@@ -180,7 +201,8 @@ function ParticleField() {
         if (t > p.lifeDuration) {
           // Restart the fade cycle in place — same x/y carried
           // forward, so this never reads as "disappeared here,
-          // reappeared somewhere else."
+          // reappeared somewhere else," and its color stays fixed to
+          // its own zone since pickParticleColor sees the same y.
           Object.assign(p, makeParticle(width, height, now, false, { x: p.x, y: p.y }))
           continue
         }
@@ -242,7 +264,11 @@ function ParticleField() {
         if (p.y < EDGE_MARGIN) { p.y = EDGE_MARGIN; p.vy = 0 }
         if (p.y > height - EDGE_MARGIN) { p.y = height - EDGE_MARGIN; p.vy = 0 }
 
-        const rendered = p.glow * MAX_BRIGHTNESS
+        // Cursor-influenced particles are forced to full brightness
+        // (up to 1, uncapped) instead of the ambient MAX_BRIGHTNESS
+        // ceiling — that's what makes them visibly "light up" rather
+        // than just nudging along at their normal dim glow.
+        const rendered = influenced ? Math.min(1, p.glow) : p.glow * MAX_BRIGHTNESS
         if (rendered <= 0.01) continue
 
         ctx!.beginPath()
