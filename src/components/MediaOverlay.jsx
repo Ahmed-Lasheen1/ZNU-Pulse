@@ -1,4 +1,5 @@
 // src/components/MediaOverlay.jsx
+import { createPortal } from 'react-dom'
 import { previewKindFor } from '../lib/embedUrl'
 import { useBodyScrollLock } from '../lib/useBodyScrollLock'
 import { getPulseTheme, pulseFonts } from '../premiumTheme'
@@ -10,7 +11,26 @@ export default function MediaOverlay({ dark, onClose, src, title, fileType, allo
   const kind = previewKindFor(src, fileType)
   useBodyScrollLock(true)
 
-  return (
+  // AUDIT FIX: rendered through a portal into document.body instead
+  // of in place. Every call site renders this inline inside a
+  // `pulse-wide` div that has `position: relative; z-index: 1` —
+  // which establishes its own stacking context. A `position: fixed`
+  // descendant of a stacking-context-creating ancestor is NOT
+  // compared globally against other fixed elements on the page; it's
+  // scoped to that ancestor's stacking level. So this overlay's own
+  // zIndex:2100 was only ever being weighed against sibling content
+  // inside that zIndex:1 wrapper — not against the site header
+  // (rendered separately by App.jsx at zIndex:500) — and since the
+  // wrapper's own level (1) is less than the header's (500), the
+  // header painted on top of this overlay instead of being covered by
+  // it. SummaryOverlay never hit this because every one of its call
+  // sites does an early `return` that replaces the whole page's
+  // output, so it's never nested inside that wrapper to begin with.
+  // A portaled node sits directly under <body>, outside any
+  // ancestor's stacking context, so its zIndex now competes globally
+  // exactly like SummaryOverlay's does. Same fix ModuleSelect.tsx
+  // already uses for its dropdown panel.
+  return createPortal(
     <div style={{
       position: 'fixed', inset: 0, height: '100dvh',
       background: pt.canvas, zIndex: OVERLAY_Z, overflowY: 'auto'
@@ -52,6 +72,7 @@ export default function MediaOverlay({ dark, onClose, src, title, fileType, allo
           />
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   )
 }
