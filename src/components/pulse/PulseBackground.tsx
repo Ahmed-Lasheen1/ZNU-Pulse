@@ -35,7 +35,7 @@ const STAR_COLORS = [
 // never fully off (unlike a spawn/despawn cycle), just a slow,
 // gentle pulse between "dim" and "fully lit."
 const TWINKLE_MIN = 0
-const TWINKLE_MAX = 0.9
+const TWINKLE_MAX = 1
 
 // Water-like response tuning while the cursor is actively within
 // range: PUSH_FORCE is small (a nudge, not a yank) and FRICTION_IN is
@@ -137,7 +137,7 @@ function ParticleField() {
 
     // Scales gently with screen size but stays capped in the 25-50
     // range so this reads as "a field of stars," not a snowstorm.
-    const count = Math.max(25, Math.min(50, Math.round((width * height) / 32000)))
+    const count = Math.max(250, Math.min(500, Math.round((width * height) / 32000)))
     const particles: Particle[] = Array.from({ length: count }, () => makeParticle(width, height))
 
     let mouseX = -9999
