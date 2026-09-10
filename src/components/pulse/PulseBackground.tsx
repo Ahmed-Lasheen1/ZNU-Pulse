@@ -26,9 +26,9 @@ export const PULSE_BG = [
 // of these at random when it's born.
 const PARTICLE_PALETTE = [
   '166, 210, 239', // #a6d2ef — gradient's palest stop
-  '151, 188, 215', // #97bcd7
-  '129, 166, 195', // #81a6c3
-  '95, 217, 255',  // #5fd9ff — ECG cyan accent
+  '151, 188, 215', // #5fd9ff — ECG cyan accent
+  '129, 166, 195', // #5fd9ff — ECG cyan accent
+  '95, 217, 255',  // #010c4a — gradient's darkest stop
 ]
 
 // Caps how bright a particle is ever allowed to get, whether idly
@@ -47,12 +47,12 @@ const INFLUENCE_RADIUS = 150
 const PUSH_FORCE = 0.28
 const FRICTION_IN = 0.985
 const FRICTION_OUT = 0.8
-const MAX_SPEED = 1.1
+const MAX_SPEED = 0.8
 const GLOW_EASE = 0.035
 // Soft margin kept off the true edge — a particle nudged toward the
 // edge of the screen eases to a stop here instead of vanishing off
 // the visible area or wrapping to the opposite side.
-const EDGE_MARGIN = 50
+const EDGE_MARGIN = 10
 
 function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(false)
