@@ -24,6 +24,15 @@ export const PULSE_BG = [
 // color just for this effect.
 const PARTICLE_RGB = '95, 217, 255' // '#5fd9ff'
 
+// How hard a nearby cursor shoves a particle, and how slowly that
+// motion bleeds off afterward — high force + friction close to 1 is
+// what makes the movement read as "heavy" (a shove that keeps
+// carrying the particle for a while) rather than a snappy little
+// nudge that stops the instant the cursor moves on.
+const INFLUENCE_RADIUS = 150
+const PUSH_FORCE = 2.2
+const FRICTION = 0.965
+
 function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(false)
   useEffect(() => {
@@ -39,8 +48,8 @@ function usePrefersReducedMotion() {
 interface Particle {
   x: number
   y: number
-  angle: number
-  driftSpeed: number
+  vx: number
+  vy: number
   radius: number
   born: number
   lifeDuration: number
@@ -53,9 +62,9 @@ function makeParticle(w: number, h: number, now: number, initial: boolean): Part
   return {
     x: Math.random() * w,
     y: Math.random() * h,
-    angle: Math.random() * Math.PI * 2,
-    driftSpeed: 0.06 + Math.random() * 0.18,
-    radius: 1 + Math.random() * 2,
+    vx: 0,
+    vy: 0,
+    radius: 1 + Math.random() * 1.6,
     // Irregular timing: staggered on first paint so particles don't
     // all appear at once, and staggered on respawn so they never
     // settle into lockstep with each other.
@@ -66,10 +75,13 @@ function makeParticle(w: number, h: number, now: number, initial: boolean): Part
   }
 }
 
-// Sparse, irregular ambient glow — a handful of soft cyan points that
-// fade in and out on their own random schedule (never in sync with
-// each other), drift very slowly, and glow a little brighter / ease
-// away from the cursor when it's nearby. Purely decorative: skipped
+// Sparse, irregular ambient field — a handful of soft cyan points
+// that fade in and out on their own random schedule (never in sync
+// with each other) and otherwise sit perfectly still. The cursor is
+// the only thing that ever moves them: coming near one snaps it to
+// full brightness and gives it a hard shove away, which then coasts
+// to a stop under friction — a "star flung through space" moment
+// rather than a constant idle drift. Purely decorative: skipped
 // entirely under prefers-reduced-motion, same convention EcgHero
 // already uses for its beam.
 function ParticleField() {
@@ -100,9 +112,9 @@ function ParticleField() {
     window.addEventListener('resize', resize)
 
     // Sparse on purpose — scales gently with screen size but stays
-    // capped low so this reads as "a few embers," not a particle
-    // storm.
-    const count = Math.max(9, Math.min(22, Math.round((width * height) / 60000)))
+    // capped in the 20-40 range so this reads as "a field of embers,"
+    // not a particle storm.
+    const count = Math.max(20, Math.min(40, Math.round((width * height) / 32000)))
     const now0 = performance.now()
     const particles: Particle[] = Array.from({ length: count }, () => makeParticle(width, height, now0, true))
 
@@ -119,8 +131,6 @@ function ParticleField() {
     }
     window.addEventListener('pointermove', onPointerMove)
     window.addEventListener('pointerleave', onPointerLeave)
-
-    const INFLUENCE_RADIUS = 130
 
     let rafId: number
     function frame() {
@@ -146,46 +156,42 @@ function ParticleField() {
         else opacity = 1
         p.opacity = Math.max(0, Math.min(1, opacity))
 
-        // Slow ambient drift.
-        p.x += Math.cos(p.angle) * p.driftSpeed
-        p.y += Math.sin(p.angle) * p.driftSpeed
-        if (p.x < -20) p.x = width + 20
-        if (p.x > width + 20) p.x = -20
-        if (p.y < -20) p.y = height + 20
-        if (p.y > height + 20) p.y = -20
-
-        // A little cursor interaction: within range, particles glow
-        // brighter and ease gently away from the pointer instead of
-        // sitting under it.
-        let radius = p.radius
         let glow = p.opacity
+
         if (hasMouse) {
           const dx = p.x - mouseX
           const dy = p.y - mouseY
           const dist = Math.hypot(dx, dy)
           if (dist < INFLUENCE_RADIUS && dist > 0.01) {
             const pull = 1 - dist / INFLUENCE_RADIUS
-            p.x += (dx / dist) * pull * 0.6
-            p.y += (dy / dist) * pull * 0.6
-            radius = p.radius * (1 + pull * 0.8)
-            glow = Math.min(1, p.opacity + pull * 0.4)
+            // Squared falloff so the shove is dramatic right next to
+            // the cursor and tapers off well before the edge of the
+            // influence radius, instead of a linear ramp.
+            const force = pull * pull * PUSH_FORCE
+            p.vx += (dx / dist) * force
+            p.vy += (dy / dist) * force
+            glow = 1
           }
         }
 
+        // Inertial coast — particles keep moving after the cursor
+        // passes and slow down gradually, rather than snapping back
+        // to rest the instant they're no longer influenced.
+        p.x += p.vx
+        p.y += p.vy
+        p.vx *= FRICTION
+        p.vy *= FRICTION
+
+        if (p.x < -20) p.x = width + 20
+        if (p.x > width + 20) p.x = -20
+        if (p.y < -20) p.y = height + 20
+        if (p.y > height + 20) p.y = -20
+
         if (glow <= 0.01) continue
 
-        const gradient = ctx!.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius * 6)
-        gradient.addColorStop(0, `rgba(${PARTICLE_RGB}, ${0.55 * glow})`)
-        gradient.addColorStop(0.4, `rgba(${PARTICLE_RGB}, ${0.18 * glow})`)
-        gradient.addColorStop(1, `rgba(${PARTICLE_RGB}, 0)`)
-        ctx!.fillStyle = gradient
         ctx!.beginPath()
-        ctx!.arc(p.x, p.y, radius * 6, 0, Math.PI * 2)
-        ctx!.fill()
-
-        ctx!.beginPath()
-        ctx!.fillStyle = `rgba(${PARTICLE_RGB}, ${0.9 * glow})`
-        ctx!.arc(p.x, p.y, radius, 0, Math.PI * 2)
+        ctx!.fillStyle = `rgba(${PARTICLE_RGB}, ${glow})`
+        ctx!.arc(p.x, p.y, p.radius, 0, Math.PI * 2)
         ctx!.fill()
       }
 
