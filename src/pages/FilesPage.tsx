@@ -201,8 +201,8 @@ export default function FilesPage({ dark }: { dark: boolean }) {
             dark={dark}
             onClose={() => setViewer(null)}
             src={getDriveOrRawUrl(viewer.url)}
-            iframeTitle="PDF Viewer"
-            allow="autoplay" allowFullScreen={undefined}
+            title="PDF Viewer"
+            fileType="pdf"
           />
         )}
         {viewer && viewer.file_type === 'video' && (
@@ -210,8 +210,8 @@ export default function FilesPage({ dark }: { dark: boolean }) {
             dark={dark}
             onClose={() => setViewer(null)}
             src={getVideoEmbedUrl(viewer.url)}
-            iframeTitle="Video Player"
-            allowFullScreen allow={undefined}
+            title="Video Player"
+            fileType="video"
           />
         )}
         {viewer && viewer.file_type === 'audio' && (

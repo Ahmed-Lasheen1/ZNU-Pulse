@@ -130,8 +130,8 @@ export default function Schedule({ dark }: { dark: boolean }) {
             dark={dark}
             onClose={() => setViewer(null)}
             src={getDriveOrRawUrl(viewer.url)}
-            iframeTitle={viewer.title}
-            allow="autoplay" allowFullScreen={undefined}
+            title={viewer.title}
+            fileType="image"
           />
         )}
 
