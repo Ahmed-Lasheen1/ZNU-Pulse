@@ -2,32 +2,19 @@ import BackButton from './pulse/BackButton'
 import { previewKindFor } from '../lib/embedUrl'
 import { PULSE_BG } from './pulse/PulseBackground'
 
-// Full-screen "back + preview" viewer shared by every page that opens
-// a summary or lesson resource — StagePage, Summaries, SubjectPage,
-// LessonPage.
-//
-// Content type detected via previewKindFor() in lib/embedUrl.js.
-// Background uses the same PULSE_BG gradient every page sits on.
-// Content sits between a header-height gap (so Drive's own toolbar
-// isn't covered by the fixed site header above) and a dedicated
-// footer bar filled with the gradient's own dark bottom color, so the
-// footer reads as a distinct band rather than just "wherever the
-// gradient happens to end."
+const HEADER_OFFSET = 'calc(max(16px, env(safe-area-inset-top)) + 60px)'
+const FOOTER_HEIGHT = 'calc(max(16px, env(safe-area-inset-bottom)) + 44px)'
+
 export default function SummaryOverlay({ dark, onBack, url, title, fileType }) {
   const kind = previewKindFor(url, fileType)
-  const headerOffset = 'calc(max(16px, env(safe-area-inset-top)) + 60px)'
-  const footerHeight = 'calc(max(16px, env(safe-area-inset-bottom)) + 44px)'
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, height: '100dvh', background: PULSE_BG, zIndex: 400,
-      display: 'flex', flexDirection: 'column'
-    }}>
+    <div style={{ position: 'fixed', inset: 0, height: '100dvh', background: PULSE_BG, zIndex: 400 }}>
       <BackButton dark={dark} onClick={onBack} />
 
       {kind === 'image' ? (
         <div style={{
-          flex: 1, minHeight: 0, paddingTop: headerOffset,
+          position: 'absolute', top: HEADER_OFFSET, left: 0, right: 0, bottom: FOOTER_HEIGHT,
           display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto'
         }}>
           <img
@@ -37,7 +24,7 @@ export default function SummaryOverlay({ dark, onBack, url, title, fileType }) {
           />
         </div>
       ) : (
-        <div style={{ flex: 1, minHeight: 0, paddingTop: headerOffset }}>
+        <div style={{ position: 'absolute', top: HEADER_OFFSET, left: 0, right: 0, bottom: FOOTER_HEIGHT }}>
           <iframe
             src={url}
             style={{ height: '100%', width: '100%', border: 'none' }}
@@ -48,7 +35,10 @@ export default function SummaryOverlay({ dark, onBack, url, title, fileType }) {
         </div>
       )}
 
-      <div aria-hidden style={{ height: footerHeight, flexShrink: 0, background: PULSE_BG }} />
+      <div aria-hidden style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0, height: FOOTER_HEIGHT,
+        background: PULSE_BG
+      }} />
     </div>
   )
 }
