@@ -34,7 +34,7 @@ const PARTICLE_PALETTE = [
 // Caps how bright a particle is ever allowed to get, whether idly
 // fading in/out or fully lit by the cursor — keeps the whole field
 // dim/ambient rather than punchy.
-const MAX_BRIGHTNESS = 0.5
+const MAX_BRIGHTNESS = 0.75
 
 // Water-like response tuning while the cursor is actively within
 // range: PUSH_FORCE is small (a nudge, not a yank) and FRICTION_IN is
