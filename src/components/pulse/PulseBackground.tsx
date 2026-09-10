@@ -18,27 +18,35 @@ export const PULSE_BG = [
   '#010c4a 100%)',
 ].join(' ')
 
-// Color for the ambient particle field — the same cyan already used
-// for the ECG hero's traveling beam (see EcgHero.jsx), so this reads
-// as the same "pulse" accent rather than introducing a new color.
-const PARTICLE_RGB = '95, 217, 255' // '#5fd9ff'
+// Particle palette — pulled directly from PULSE_BG's own lighter
+// stops (so the particles read as "light escaping the same
+// gradient," not a separate color system) plus the cyan already used
+// for the ECG hero's traveling beam (EcgHero.jsx), kept as the
+// brightest/most saturated option in the mix. Each particle picks one
+// of these at random when it's born.
+const PARTICLE_PALETTE = [
+  '166, 210, 239', // #a6d2ef — gradient's palest stop
+  '151, 188, 215', // #97bcd7
+  '129, 166, 195', // #81a6c3
+  '95, 217, 255',  // #5fd9ff — ECG cyan accent
+]
 
-// Water-like response tuning:
-// - PUSH_FORCE is deliberately small — the cursor doesn't yank a
-//   particle, it nudges it, the way moving your hand through water
-//   pushes something floating nearby rather than flinging it.
-// - FRICTION very close to 1 means whatever velocity a particle picks
-//   up bleeds off slowly — long, heavy momentum instead of a quick
-//   stop.
-// - MAX_SPEED caps how fast a particle can ever move, so the motion
-//   reads as "wading," never a snap or a dart.
-// - GLOW_EASE controls how slowly brightness catches up to its
-//   target (1 near the cursor, its normal faded value otherwise) —
-//   small value = a slow, gradual brighten/dim rather than an
-//   instant flip.
+// Caps how bright a particle is ever allowed to get, whether idly
+// fading in/out or fully lit by the cursor — keeps the whole field
+// dim/ambient rather than punchy.
+const MAX_BRIGHTNESS = 0.5
+
+// Water-like response tuning while the cursor is actively within
+// range: PUSH_FORCE is small (a nudge, not a yank) and FRICTION_IN is
+// close to 1 so a push keeps carrying for a bit — heavy, viscous
+// motion. The moment a particle falls outside the cursor's influence,
+// FRICTION_OUT (much lower) brings it to a stop within a few frames
+// instead of letting it keep coasting — particles only ever move
+// while the cursor is actually near them.
 const INFLUENCE_RADIUS = 150
 const PUSH_FORCE = 0.28
-const FRICTION = 0.985
+const FRICTION_IN = 0.985
+const FRICTION_OUT = 0.8
 const MAX_SPEED = 1.1
 const GLOW_EASE = 0.035
 
@@ -60,11 +68,12 @@ interface Particle {
   vx: number
   vy: number
   radius: number
+  colorRgb: string
   born: number
   lifeDuration: number
   fadeDuration: number
   baseOpacity: number
-  glow: number // eased, rendered brightness — chases baseOpacity or 1
+  glow: number // eased, rendered brightness — chases its target
 }
 
 function makeParticle(w: number, h: number, now: number, initial: boolean): Particle {
@@ -75,6 +84,7 @@ function makeParticle(w: number, h: number, now: number, initial: boolean): Part
     vx: 0,
     vy: 0,
     radius: 1 + Math.random() * 1.6,
+    colorRgb: PARTICLE_PALETTE[Math.floor(Math.random() * PARTICLE_PALETTE.length)],
     // Irregular timing: staggered on first paint so particles don't
     // all appear at once, and staggered on respawn so they never
     // settle into lockstep with each other.
@@ -86,15 +96,17 @@ function makeParticle(w: number, h: number, now: number, initial: boolean): Part
   }
 }
 
-// Sparse, irregular ambient field — a handful of soft cyan points
-// that fade in and out on their own random schedule (never in sync
-// with each other) and otherwise sit perfectly still. The cursor is
-// the only thing that ever moves them: coming near one slowly eases
-// it toward full brightness and gives it a gentle, water-like push —
-// small force, heavy momentum, slow to speed up and slow to settle —
-// rather than a snap or a dart. Purely decorative: skipped entirely
-// under prefers-reduced-motion, same convention EcgHero already uses
-// for its beam.
+// Sparse, irregular ambient field — a handful of dim, multi-toned
+// points (colors pulled from PULSE_BG's own gradient, see
+// PARTICLE_PALETTE) that fade in and out on their own random schedule
+// and otherwise sit completely still. The cursor is the only thing
+// that ever moves a particle: coming near one slowly eases its
+// brightness up and gives it a gentle, water-like push — small force,
+// heavy momentum while the cursor stays close — but the instant the
+// cursor moves away, that particle settles back to a stop within a
+// couple of frames rather than continuing to drift. Purely
+// decorative: skipped entirely under prefers-reduced-motion, same
+// convention EcgHero already uses for its beam.
 function ParticleField() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const reducedMotion = usePrefersReducedMotion()
@@ -147,11 +159,9 @@ function ParticleField() {
     function frame() {
       const now = performance.now()
       ctx!.clearRect(0, 0, width, height)
-      // Normal (non-additive) blending — 'lighter' was what caused
-      // the soft halo: it brightens each dot's anti-aliased edge
-      // pixels against the gradient, which reads as a glow even
-      // without any radial-gradient fill. Plain source-over keeps
-      // every dot a crisp, flat circle.
+      // Normal (non-additive) blending — an earlier 'lighter' mode
+      // brightened each dot's anti-aliased edge pixels into a soft
+      // halo. Plain source-over keeps every dot a crisp, flat circle.
       ctx!.globalCompositeOperation = 'source-over'
 
       for (const p of particles) {
@@ -173,12 +183,14 @@ function ParticleField() {
         p.baseOpacity = Math.max(0, Math.min(1, baseOpacity))
 
         let targetGlow = p.baseOpacity
+        let influenced = false
 
         if (hasMouse) {
           const dx = p.x - mouseX
           const dy = p.y - mouseY
           const dist = Math.hypot(dx, dy)
           if (dist < INFLUENCE_RADIUS && dist > 0.01) {
+            influenced = true
             const pull = 1 - dist / INFLUENCE_RADIUS
             // Gentle, weighted push — small force, so it takes a
             // moment to get going, exactly like nudging something
@@ -190,14 +202,14 @@ function ParticleField() {
           }
         }
 
-        // Ease brightness toward its target instead of snapping —
-        // "full brightness happens slowly."
+        // Ease brightness toward its target instead of snapping.
         p.glow += (targetGlow - p.glow) * GLOW_EASE
 
-        // Heavy, viscous motion: velocity decays very slowly
-        // (FRICTION near 1) and is capped (MAX_SPEED) so it never
-        // reads as fast — long, slow-settling drift after each push,
-        // like swinging through water.
+        // While influenced: heavy, viscous motion (velocity decays
+        // very slowly, capped at MAX_SPEED so it never reads as
+        // fast). The moment the cursor is no longer close, a much
+        // stronger friction brings the particle to rest within a few
+        // frames — it never keeps drifting on its own.
         const speed = Math.hypot(p.vx, p.vy)
         if (speed > MAX_SPEED) {
           const scale = MAX_SPEED / speed
@@ -206,18 +218,20 @@ function ParticleField() {
         }
         p.x += p.vx
         p.y += p.vy
-        p.vx *= FRICTION
-        p.vy *= FRICTION
+        p.vx *= influenced ? FRICTION_IN : FRICTION_OUT
+        p.vy *= influenced ? FRICTION_IN : FRICTION_OUT
+        if (!influenced && Math.hypot(p.vx, p.vy) < 0.01) { p.vx = 0; p.vy = 0 }
 
         if (p.x < -20) p.x = width + 20
         if (p.x > width + 20) p.x = -20
         if (p.y < -20) p.y = height + 20
         if (p.y > height + 20) p.y = -20
 
-        if (p.glow <= 0.01) continue
+        const rendered = p.glow * MAX_BRIGHTNESS
+        if (rendered <= 0.01) continue
 
         ctx!.beginPath()
-        ctx!.fillStyle = `rgba(${PARTICLE_RGB}, ${p.glow})`
+        ctx!.fillStyle = `rgba(${p.colorRgb}, ${rendered})`
         ctx!.arc(p.x, p.y, p.radius, 0, Math.PI * 2)
         ctx!.fill()
       }
