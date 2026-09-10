@@ -51,11 +51,11 @@ export default function PulseBrand({ dark, logoSize = 44, fontSize = 20, animati
         role="link"
         tabIndex={0}
         aria-label="ZNU Pulse — go to home"
-        style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
+        style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
       >
         <div style={{
           width: logoSize, height: logoSize, flexShrink: 0,
-          borderRadius: 10, overflow: 'hidden',
+          borderRadius: 12, overflow: 'hidden',
           background: pt.surfaceFlat, border: `1px solid ${pt.cobaltBorder}`,
         }}>
           <img src={LOGO_SRC} alt="ZNU Pulse" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
