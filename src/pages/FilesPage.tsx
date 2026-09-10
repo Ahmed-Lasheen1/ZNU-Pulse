@@ -42,6 +42,12 @@ interface FilesSubject {
 
 const FILE_ACCENT = '#38bdf8'
 
+// Fixed display order for the type tabs — matches the order the type
+// cards used to appear in on ModulePage/StagePage's Study Materials
+// section, so nothing about the ordering feels different now that
+// it's a tab row instead of separate cards.
+const TYPE_ORDER = ['sharah', 'questions', 'lectures', 'courses'] as const
+
 // Icon + label for a given file_type value ('pdf' | 'video' | 'audio')
 // — replaces the old emoji-string getFileIcon/getOpenLabel helpers.
 function fileTypeIcon(type: string, color: string, size = 20) {
@@ -92,40 +98,40 @@ function AudioViewer({ url, name, onClose, dark }: { url: string; name: string; 
 
 export default function FilesPage({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
+  // AUDIT FIX (files-as-one-card): files are now fetched per MODULE
+  // (all types at once) instead of per TYPE. Previously the page was
+  // always reached via a dedicated "Explanation Files" / "Question
+  // Files" / etc card, so the type was already decided before arriving
+  // here and the query could filter to just that one type. Now that
+  // ModulePage/StagePage collapse those into a single "Files" card,
+  // the type itself is chosen here via a tab row — so this needs the
+  // full set of a module's files up front to know which type tabs to
+  // even show.
   const [files, setFiles] = useState<FileRow[]>([])
   const { modules, modulesLoaded, modulesError } = useModules() as {
     modules: FilesModule[]; modulesLoaded: boolean; modulesError: boolean
   }
-  // AUDIT FIX (performance audit — genuinely redundant request): this
-  // used to be `const [subjects, setSubjects] = useState<FilesSubject[]>([])`
-  // populated by a raw, uncached `supabase.from('subjects').select('*')`
-  // inside the SAME effect as the files fetch, keyed on `[fileType]` —
-  // so switching between Explanation/Question/Lecture/Course files
-  // (which only ever changes `fileType`, never which subjects exist)
-  // re-fetched the ENTIRE subjects table every single time. Every
-  // other page that needs subjects (ModulePage, StagePage, MCQ) goes
-  // through the shared in-memory cache in src/lib/subjects.js
-  // instead. This now does the same: `moduleSubjects` is fetched via
-  // `fetchSubjectsForModule`, which loads the whole subjects table
-  // ONCE per browser tab (cached, in-flight-deduped) no matter how
-  // many times this effect re-runs, and is keyed on `[activeModule]`
-  // (the thing it actually depends on) rather than `[fileType]`.
   const [moduleSubjects, setModuleSubjects] = useState<FilesSubject[]>([])
   const [activeModule, setActiveModule] = useState<string | null>(null)
   const [activeSubject, setActiveSubject] = useState('all')
+  const [activeType, setActiveType] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [viewer, setViewer] = useState<FileRow | null>(null)
   const [loadError, setLoadError] = useState(false)
   const location = useLocation()
   const params = new URLSearchParams(location.search)
-  const fileType = params.get('type')
   const moduleParam = params.get('module')
+  // Still accepted for backward compatibility (old links, or a
+  // specific-file Search result — see fileParam below) — just no
+  // longer the only way to land on a given type, and no longer
+  // required at all.
+  const typeParam = params.get('type')
   // AUDIT FIX (search accuracy): a specific file id from Search.tsx
   // (`?file=<id>`) — once this module's files finish loading, the
   // matching file's viewer opens directly (see the effect below)
   // instead of leaving the person to find it again in the list.
   const fileParam = params.get('file')
-  const typeMeta = fileType ? TYPE_META[fileType] : null
+  const typeMeta = activeType ? TYPE_META[activeType] : null
 
   useHistoryOverlay(!!viewer, () => setViewer(null))
 
@@ -140,12 +146,13 @@ export default function FilesPage({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules, moduleParam])
 
-  // Files — the only thing that actually depends on `fileType`.
+  // All of this module's files, every type at once.
   useEffect(() => {
+    if (!activeModule) return
     let ignore = false
     async function fetchFiles() {
       setLoading(true)
-      const { data, error } = await supabase.from('files').select('*').eq('type', fileType).order('created_at', { ascending: false })
+      const { data, error } = await supabase.from('files').select('*').eq('module_id', activeModule).order('created_at', { ascending: false })
       if (ignore) return
       if (data) setFiles(data)
       if (error) setLoadError(true)
@@ -153,11 +160,29 @@ export default function FilesPage({ dark }: { dark: boolean }) {
     }
     fetchFiles()
     return () => { ignore = true }
-  }, [fileType])
+  }, [activeModule])
 
-  // Subjects for the current module — keyed on `activeModule`, not
-  // `fileType`, and served from the shared cache instead of a fresh
-  // network call every time.
+  // Which type tabs are actually worth showing for this module, in a
+  // fixed display order.
+  const availableTypes = TYPE_ORDER.filter(t => files.some(f => f.type === t))
+
+  // Resolves activeType once files are in: honor `?type=` from a
+  // direct/old link if that type actually has files here, otherwise
+  // default to the first type that does (per the "first type that
+  // actually has files" default). Re-runs whenever the module changes
+  // (a new module can have a completely different set of types).
+  useEffect(() => {
+    if (loading) return
+    if (typeParam && availableTypes.includes(typeParam as typeof availableTypes[number])) {
+      setActiveType(typeParam)
+      return
+    }
+    setActiveType(availableTypes[0] || null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, activeModule, files])
+
+  // Subjects for the current module — served from the shared cache
+  // (see src/lib/subjects.js) instead of a fresh network call.
   useEffect(() => {
     let ignore = false
     fetchSubjectsForModule(activeModule || '').then(({ subjects, error }) => {
@@ -169,20 +194,25 @@ export default function FilesPage({ dark }: { dark: boolean }) {
   }, [activeModule])
 
   // AUDIT FIX (search accuracy): opens the exact file a Search result
-  // pointed at, the moment it shows up in the fetched list. Guarded on
-  // `viewer` being empty so it never fights with the person manually
-  // closing it and opening a different file afterward.
+  // pointed at, and switches the type tab to whichever type that file
+  // actually belongs to, so it's visible in the filtered list
+  // underneath once the viewer is closed. Guarded on `viewer` being
+  // empty so it never fights with the person manually closing it and
+  // opening a different file afterward.
   useEffect(() => {
     if (!fileParam || viewer) return
     const match = files.find(f => f.id === fileParam)
-    if (match) setViewer(match)
+    if (match) {
+      setViewer(match)
+      setActiveType(match.type)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileParam, files])
 
   const filtered = files.filter(f => {
-    const moduleMatch = f.module_id === activeModule
+    const typeMatch = f.type === activeType
     const subjectMatch = activeSubject === 'all' || f.subject_id === activeSubject
-    return moduleMatch && subjectMatch
+    return typeMatch && subjectMatch
   })
 
   return (
@@ -227,9 +257,25 @@ export default function FilesPage({ dark }: { dark: boolean }) {
         <TabRow
           items={activeModules.map(m => ({ value: m.id, label: m.name, icon: m.icon, color: m.color, completed: m.status === 'completed' }))}
           active={activeModule}
-          onSelect={(id) => { setActiveModule(id); setActiveSubject('all') }}
+          onSelect={(id) => { setActiveModule(id); setActiveSubject('all'); setActiveType(null) }}
           dark={dark}
         />
+
+        {/* Type tab row — this is the new "choose what you want"
+            control that replaced separate cards per type on
+            ModulePage/StagePage. Only rendered once we know which
+            types this module actually has (avoids a flash of a
+            single-tab row before files finish loading). */}
+        {!loading && availableTypes.length > 0 && (
+          <TabRow
+            items={availableTypes.map(t => ({ value: t, label: TYPE_META[t].label, Icon: TYPE_META[t].Icon }))}
+            active={activeType}
+            onSelect={setActiveType}
+            dark={dark}
+            accentColor={FILE_ACCENT}
+            style={{ marginBottom: 20 }}
+          />
+        )}
 
         {moduleSubjects.length > 0 && (
           <TabRow
@@ -244,7 +290,13 @@ export default function FilesPage({ dark }: { dark: boolean }) {
 
         {loading && <p style={{ color: ON_GRADIENT_TOP.secondary, textAlign: 'center' }}>Loading...</p>}
 
-        {!loading && filtered.length === 0 && (
+        {!loading && availableTypes.length === 0 && (
+          <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
+            <p style={{ color: pt.sub }}>No files yet 🚧</p>
+          </LiquidGlassCard>
+        )}
+
+        {!loading && availableTypes.length > 0 && filtered.length === 0 && (
           <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
             <p style={{ color: pt.sub }}>No files yet 🚧</p>
           </LiquidGlassCard>

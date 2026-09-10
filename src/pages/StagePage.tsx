@@ -13,13 +13,12 @@ import { fetchModuleStages, stageMetaFrom } from '../lib/moduleStages'
 import { fetchSubjectsForModule } from '../lib/subjects'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
 import { getPreviewUrl } from '../lib/embedUrl'
-import { FILE_CARDS } from '../lib/fileCards'
 // AUDIT FIX: isSafeExternalUrl guards the admin-entered Drive link before
 // it's ever shown as a clickable card / passed to window.open() — see
 // src/lib/embedUrl.js for details.
 import { isSafeExternalUrl } from '../lib/embedUrl'
 import { ModuleIcon, ExamIcon, NotesIcon } from '../lib/medicalIcons'
-import { StudyMaterialsIcon, StudyByLessonIcon, SmartSummariesIcon, PracticeIcon, BookIcon } from '@/components/ui/tool-icons'
+import { StudyMaterialsIcon, StudyByLessonIcon, SmartSummariesIcon, PracticeIcon, BookIcon, FolderIcon } from '@/components/ui/tool-icons'
 
 interface PageModule { id: string; name: string; icon?: string | null; color: string }
 interface PageSubject { id: string; module_id: string; name: string; icon?: string | null; color?: string | null }
@@ -108,19 +107,6 @@ export default function StagePage({ dark }: { dark: boolean }) {
     />
   )
 
-  const filteredFileCards = FILE_CARDS.filter(card => presentFileTypes.has(card.type))
-
-  const renderFileCard = (card: typeof FILE_CARDS[number], i: number) => (
-    <LiquidGlassCard key={i} dark={dark} delay={i * 80}
-      onClick={() => navigate(`/files?type=${card.type}&module=${moduleId}`)}
-      style={{ padding: 'clamp(20px, 2vw, 28px)', textAlign: 'center' }}>
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-        <card.Icon color={card.color} size={36} />
-      </div>
-      <div style={{ ...pulseType.cardTitle, fontSize: 'clamp(13px, 1.1vw, 16px)', color: pt.textPrimary }}>{card.title}</div>
-    </LiquidGlassCard>
-  )
-
   function openSummaries() {
     if (summaries.length === 1) setSelectedSummary(summaries[0])
     else navigate(`/summaries?module=${moduleId}&stage=${stage}`)
@@ -131,6 +117,53 @@ export default function StagePage({ dark }: { dark: boolean }) {
   // window.open target" gap that embedUrl.js's isSafeUrl() closes for
   // iframe/audio src elsewhere in the app.
   const driveUrlIsSafe = !!driveUrl && isSafeExternalUrl(driveUrl)
+
+  // AUDIT FIX (files-as-one-card, per user request): same consolidation
+  // as ModulePage.tsx — one "Files" card instead of one card per file
+  // type, sitting next to Drive. Note this still links WITHOUT a stage
+  // param (`?module=...`, no `&stage=...`), matching the pre-existing
+  // behavior of the old per-type cards here, which never passed stage
+  // either — FilesPage has never filtered by exam stage, only by
+  // module/subject/type, so this isn't a new gap, just an unchanged one.
+  const materialsCards: JSX.Element[] = []
+  if (presentFileTypes.size > 0) {
+    materialsCards.push(
+      <LiquidGlassCard key="files" dark={dark} delay={0}
+        onClick={() => navigate(`/files?module=${moduleId}`)}
+        style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{
+          background: `${pt.cobalt}20`, border: `1px solid ${pt.cobaltBorder}`,
+          borderRadius: 12, width: 44, height: 44,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+        }}>
+          <FolderIcon color={pt.cobalt} size={20} />
+        </div>
+        <div>
+          <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>Files</div>
+          <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2 }}>Explanations, questions, lectures & more</div>
+        </div>
+      </LiquidGlassCard>
+    )
+  }
+  if (driveUrlIsSafe) {
+    materialsCards.push(
+      <LiquidGlassCard key="drive" dark={dark} delay={0}
+        onClick={() => window.open(driveUrl, '_blank', 'noopener,noreferrer')}
+        style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{
+          background: `${pt.cobalt}20`, border: `1px solid ${pt.cobaltBorder}`,
+          borderRadius: 12, width: 44, height: 44,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+        }}>
+          <StudyMaterialsIcon color={pt.cobalt} size={20} />
+        </div>
+        <div>
+          <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>University Google Drive</div>
+          <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2 }}>Lectures, recordings & more</div>
+        </div>
+      </LiquidGlassCard>
+    )
+  }
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
@@ -153,38 +186,16 @@ export default function StagePage({ dark }: { dark: boolean }) {
           </div>
         </div>
 
-        {(filteredFileCards.length > 0 || driveUrlIsSafe) && (
+        {materialsCards.length > 0 && (
           <div style={{ marginBottom: 32 }}>
             <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
               <StudyMaterialsIcon color={ON_GRADIENT_TOP.muted} size={14} /> Study Materials
             </h2>
-            {filteredFileCards.length > 0 && (
-              filteredFileCards.length === 1 ? (
-                <div className="auto-grid-single">{renderFileCard(filteredFileCards[0], 0)}</div>
-              ) : (
-                <div className="auto-grid" style={{ ['--auto-grid-cols' as any]: gridCols(filteredFileCards.length) }}>
-                  {filteredFileCards.map(renderFileCard)}
-                </div>
-              )
-            )}
-
-            {driveUrlIsSafe && (
-              <div className="auto-grid-single" style={{ marginTop: filteredFileCards.length > 0 ? 16 : 0 }}>
-                <LiquidGlassCard dark={dark} delay={0}
-                  onClick={() => window.open(driveUrl, '_blank', 'noopener,noreferrer')}
-                  style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div style={{
-                    background: `${pt.cobalt}20`, border: `1px solid ${pt.cobaltBorder}`,
-                    borderRadius: 12, width: 44, height: 44,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                  }}>
-                    <StudyMaterialsIcon color={pt.cobalt} size={20} />
-                  </div>
-                  <div>
-                    <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>University Google Drive</div>
-                    <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2 }}>Lectures, recordings & more</div>
-                  </div>
-                </LiquidGlassCard>
+            {materialsCards.length === 1 ? (
+              <div className="auto-grid-single">{materialsCards[0]}</div>
+            ) : (
+              <div className="auto-grid" style={{ ['--auto-grid-cols' as any]: gridCols(materialsCards.length) }}>
+                {materialsCards}
               </div>
             )}
           </div>
