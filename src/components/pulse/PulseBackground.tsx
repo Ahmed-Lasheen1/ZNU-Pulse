@@ -49,6 +49,10 @@ const FRICTION_IN = 0.985
 const FRICTION_OUT = 0.8
 const MAX_SPEED = 1.1
 const GLOW_EASE = 0.035
+// Soft margin kept off the true edge — a particle nudged toward the
+// edge of the screen eases to a stop here instead of vanishing off
+// the visible area or wrapping to the opposite side.
+const EDGE_MARGIN = 50
 
 function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(false)
@@ -76,11 +80,16 @@ interface Particle {
   glow: number // eased, rendered brightness — chases its target
 }
 
-function makeParticle(w: number, h: number, now: number, initial: boolean): Particle {
+// `x`/`y` are only randomized when a particle is first created (no
+// `at` given). Every later fade-cycle restart passes its own current
+// position back in via `at`, so a particle spends its entire
+// lifetime — across as many fade in/out cycles as it goes through —
+// in the same place; only the cursor ever moves it.
+function makeParticle(w: number, h: number, now: number, initial: boolean, at?: { x: number; y: number }): Particle {
   const lifeDuration = 5000 + Math.random() * 7000 // ~5-12s fully visible cycle
   return {
-    x: Math.random() * w,
-    y: Math.random() * h,
+    x: at ? at.x : Math.random() * w,
+    y: at ? at.y : Math.random() * h,
     vx: 0,
     vy: 0,
     radius: 1 + Math.random() * 1.6,
@@ -98,13 +107,13 @@ function makeParticle(w: number, h: number, now: number, initial: boolean): Part
 
 // Sparse, irregular ambient field — a handful of dim, multi-toned
 // points (colors pulled from PULSE_BG's own gradient, see
-// PARTICLE_PALETTE) that fade in and out on their own random schedule
-// and otherwise sit completely still. The cursor is the only thing
-// that ever moves a particle: coming near one slowly eases its
-// brightness up and gives it a gentle, water-like push — small force,
-// heavy momentum while the cursor stays close — but the instant the
-// cursor moves away, that particle settles back to a stop within a
-// couple of frames rather than continuing to drift. Purely
+// PARTICLE_PALETTE) that fade in and out forever in the SAME spot —
+// a fade cycle ending never relocates a particle, it just starts the
+// next cycle in place. The cursor is the only thing that ever moves
+// one: coming near it slowly eases its brightness up and gives it a
+// gentle, water-like push — small force, heavy momentum while the
+// cursor stays close — but the instant the cursor moves away, that
+// particle settles back to a stop within a couple of frames. Purely
 // decorative: skipped entirely under prefers-reduced-motion, same
 // convention EcgHero already uses for its beam.
 function ParticleField() {
@@ -169,7 +178,10 @@ function ParticleField() {
 
         const t = now - p.born
         if (t > p.lifeDuration) {
-          Object.assign(p, makeParticle(width, height, now, false))
+          // Restart the fade cycle in place — same x/y carried
+          // forward, so this never reads as "disappeared here,
+          // reappeared somewhere else."
+          Object.assign(p, makeParticle(width, height, now, false, { x: p.x, y: p.y }))
           continue
         }
 
@@ -222,10 +234,13 @@ function ParticleField() {
         p.vy *= influenced ? FRICTION_IN : FRICTION_OUT
         if (!influenced && Math.hypot(p.vx, p.vy) < 0.01) { p.vx = 0; p.vy = 0 }
 
-        if (p.x < -20) p.x = width + 20
-        if (p.x > width + 20) p.x = -20
-        if (p.y < -20) p.y = height + 20
-        if (p.y > height + 20) p.y = -20
+        // Clamp to the visible area instead of wrapping — a particle
+        // nudged toward an edge eases to a stop there, it never
+        // teleports to the opposite side.
+        if (p.x < EDGE_MARGIN) { p.x = EDGE_MARGIN; p.vx = 0 }
+        if (p.x > width - EDGE_MARGIN) { p.x = width - EDGE_MARGIN; p.vx = 0 }
+        if (p.y < EDGE_MARGIN) { p.y = EDGE_MARGIN; p.vy = 0 }
+        if (p.y > height - EDGE_MARGIN) { p.y = height - EDGE_MARGIN; p.vy = 0 }
 
         const rendered = p.glow * MAX_BRIGHTNESS
         if (rendered <= 0.01) continue
