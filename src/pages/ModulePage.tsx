@@ -205,7 +205,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
             {materialsCards.length === 1 ? (
               <div className="auto-grid-single">{materialsCards[0]}</div>
             ) : (
-              <div className="auto-grid" style={{ ['--auto-grid-cols' as any]: gridCols(materialsCards.length) }}>
+              <div className="summary-practice-row">
                 {materialsCards}
               </div>
             )}
