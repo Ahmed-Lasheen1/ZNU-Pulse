@@ -26,9 +26,9 @@ export const PULSE_BG = [
 // against whichever part of the gradient it happens to sit over.
 const STAR_COLORS = [
   '248, 247, 255', // #a6d2ef — pale blue 
-  '155, 176, 255', // #9bb0ff — blue white
+  '155, 176, 255', // #5fd9ff — cyan ECG
   '255, 204, 111', // #5fd9ff — cyan ECG
-  '202, 215, 255', // #cad7ff — pale blue
+  '202, 215, 255', // #a6d2ef — pale blue
 ]
 
 // Ambient brightness range a star idles within while twinkling —
