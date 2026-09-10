@@ -76,13 +76,14 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
   )
 
   return (
-    <div className="pulse-wide summaries-list-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body }}>
-      {/* Scoped narrower column just for this list — .pulse-wide alone
-          caps out at 1800px (shared by nearly every page), which made
-          each summary row's hover scale-up (see LiquidGlassCard) stretch
-          across a very wide row on large screens. .summaries-list-wide
-          (defined below) caps this specific page at 900px instead,
-          same pattern as Review.tsx's own .review-wide. */}
+    <div className="pulse-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body }}>
+      {/* Scoped narrower column just for the summary list further down
+          — .pulse-wide alone caps out at 1800px (shared by nearly every
+          page), which made each summary row's hover scale-up (see
+          LiquidGlassCard) stretch across a very wide row on large
+          screens. .summaries-list-wide (defined below) caps ONLY the
+          list itself at 900px — the back button, title, and TabRow
+          above it stay at the full .pulse-wide width. */}
       <style>{`
         .summaries-list-wide { max-width: 900px; margin: 0 auto; }
       `}</style>
@@ -132,7 +133,7 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
         </LiquidGlassCard>
       )}
 
-      <div style={{ display: 'grid', gap: 12 }}>
+      <div className="summaries-list-wide" style={{ display: 'grid', gap: 12 }}>
         {filtered.map((sum, i) => (
           <LiquidGlassCard key={sum.id} dark={dark} delay={i * 70} onClick={() => setSelected(sum)}
             style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
