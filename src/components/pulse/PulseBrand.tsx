@@ -63,7 +63,7 @@ export default function PulseBrand({ dark, logoSize = 44, fontSize = 20, animati
         <div>
           <div style={{
             ...pulseType.sectionTitle,
-            fontFamily: pulseFonts.display, fontWeight: 800, fontSize, letterSpacing: 1,
+            fontFamily: pulseFonts.display, fontWeight: 800, fontSize, letterSpacing: 1.2,
             color: ON_GRADIENT_TOP.primary, lineHeight: 1
           }}>
             ZNU <span style={{ color: pt.cobalt }}>PULSE</span>
