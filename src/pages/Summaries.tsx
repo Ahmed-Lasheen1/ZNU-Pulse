@@ -76,7 +76,17 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
   )
 
   return (
-    <div className="pulse-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body }}>
+    <div className="pulse-wide summaries-list-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body }}>
+      {/* Scoped narrower column just for this list — .pulse-wide alone
+          caps out at 1800px (shared by nearly every page), which made
+          each summary row's hover scale-up (see LiquidGlassCard) stretch
+          across a very wide row on large screens. .summaries-list-wide
+          (defined below) caps this specific page at 900px instead,
+          same pattern as Review.tsx's own .review-wide. */}
+      <style>{`
+        .summaries-list-wide { max-width: 900px; margin: 0 auto; }
+      `}</style>
+
       {/* No more "back to module grid" — Summaries no longer has a
           module-picker page, so Back now does a real navigation
           (e.g. back to the module page that linked here, or Home). */}
