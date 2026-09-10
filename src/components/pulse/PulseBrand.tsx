@@ -60,12 +60,19 @@ export default function PulseBrand({ dark, logoSize = 44, fontSize = 20, animati
         }}>
           <img src={LOGO_SRC} alt="ZNU Pulse" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
         </div>
-        <div style={{
-          ...pulseType.sectionTitle,
-          fontFamily: pulseFonts.display, fontWeight: 800, fontSize, letterSpacing: 1,
-          color: ON_GRADIENT_TOP.primary, lineHeight: 1
-        }}>
-          ZNU <span style={{ color: pt.cobalt }}>PULSE</span>
+        <div>
+          <div style={{
+            ...pulseType.sectionTitle,
+            fontFamily: pulseFonts.display, fontWeight: 800, fontSize, letterSpacing: 1,
+            color: ON_GRADIENT_TOP.primary, lineHeight: 1
+          }}>
+            ZNU <span style={{ color: pt.cobalt }}>PULSE</span>
+          </div>
+          <div style={{
+            ...pulseType.sectionLabel,
+            fontSize: 9, letterSpacing: 2.5,
+            color: ON_GRADIENT_TOP.muted, marginTop: 5,
+          }}>For Future Doctors</div>
         </div>
       </div>
     )
