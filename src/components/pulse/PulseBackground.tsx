@@ -25,8 +25,8 @@ export const PULSE_BG = [
 // reads clearly as "a star," rather than trying to camouflage itself
 // against whichever part of the gradient it happens to sit over.
 const STAR_COLORS = [
-  '248, 247, 255', // #f8f7ff — warm white
-  '155, 176, 255', // #9bb0ff — blue-white
+  '248, 247, 255', // #a6d2ef — pale blue 
+  '155, 176, 255', // #9bb0ff — blue white
   '255, 204, 111', // #5fd9ff — cyan ECG
   '202, 215, 255', // #cad7ff — pale blue
 ]
@@ -34,7 +34,7 @@ const STAR_COLORS = [
 // Ambient brightness range a star idles within while twinkling —
 // never fully off (unlike a spawn/despawn cycle), just a slow,
 // gentle pulse between "dim" and "fully lit."
-const TWINKLE_MIN = 0.25
+const TWINKLE_MIN = 0
 const TWINKLE_MAX = 0.9
 
 // Water-like response tuning while the cursor is actively within
