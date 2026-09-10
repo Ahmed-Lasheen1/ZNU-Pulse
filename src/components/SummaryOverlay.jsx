@@ -6,32 +6,28 @@ import { PULSE_BG } from './pulse/PulseBackground'
 // a summary or lesson resource — StagePage, Summaries, SubjectPage,
 // LessonPage.
 //
-// Content type is detected via previewKindFor() in lib/embedUrl.js:
-// `fileType` is an optional hint ('pdf' | 'html' | 'image' | 'video')
-// a caller can pass when it already knows the kind — without a hint,
-// it's inferred from the URL itself (image extension -> image,
-// YouTube link -> video, everything else -> plain iframe).
-//
-// Background uses the same PULSE_BG gradient every other page sits
-// on, instead of solid black — so the light top zone shows behind the
-// fixed site header, and the gradient naturally darkens toward the
-// bottom to match the rest of the app.
-//
-// Iframe/image content is pushed down below the header's real height
-// (headerOffset) so any toolbar the embedded content shows near its
-// own top edge — e.g. Google Drive's preview toolbar — isn't
-// physically covered by the header sitting above it.
+// Content type detected via previewKindFor() in lib/embedUrl.js.
+// Background uses the same PULSE_BG gradient every page sits on.
+// Content sits between a header-height gap (so Drive's own toolbar
+// isn't covered by the fixed site header above) and a dedicated
+// footer bar filled with the gradient's own dark bottom color, so the
+// footer reads as a distinct band rather than just "wherever the
+// gradient happens to end."
 export default function SummaryOverlay({ dark, onBack, url, title, fileType }) {
   const kind = previewKindFor(url, fileType)
   const headerOffset = 'calc(max(16px, env(safe-area-inset-top)) + 60px)'
+  const footerHeight = 'calc(max(16px, env(safe-area-inset-bottom)) + 44px)'
 
   return (
-    <div style={{ position: 'fixed', inset: 0, height: '100dvh', background: PULSE_BG, zIndex: 400 }}>
+    <div style={{
+      position: 'fixed', inset: 0, height: '100dvh', background: PULSE_BG, zIndex: 400,
+      display: 'flex', flexDirection: 'column'
+    }}>
       <BackButton dark={dark} onClick={onBack} />
 
       {kind === 'image' ? (
         <div style={{
-          height: `calc(100% - ${headerOffset})`, marginTop: headerOffset,
+          flex: 1, minHeight: 0, paddingTop: headerOffset,
           display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto'
         }}>
           <img
@@ -41,7 +37,7 @@ export default function SummaryOverlay({ dark, onBack, url, title, fileType }) {
           />
         </div>
       ) : (
-        <div style={{ height: `calc(100% - ${headerOffset})`, marginTop: headerOffset }}>
+        <div style={{ flex: 1, minHeight: 0, paddingTop: headerOffset }}>
           <iframe
             src={url}
             style={{ height: '100%', width: '100%', border: 'none' }}
@@ -51,6 +47,8 @@ export default function SummaryOverlay({ dark, onBack, url, title, fileType }) {
           />
         </div>
       )}
+
+      <div aria-hidden style={{ height: footerHeight, flexShrink: 0, background: PULSE_BG }} />
     </div>
   )
 }
