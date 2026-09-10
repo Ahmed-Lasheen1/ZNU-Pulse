@@ -1,12 +1,25 @@
 import BackButton from './pulse/BackButton'
 import { previewKindFor } from '../lib/embedUrl'
+import { PULSE_BG } from './pulse/PulseBackground'
 
 // Full-screen "back + preview" viewer for schedule images/PDFs,
 // question-bank PDFs, and lecture videos (Schedule, FilesPage).
-// Same content-type detection as SummaryOverlay: `fileType` is an
-// optional hint ('pdf' | 'image' | 'video') a caller can pass when it
-// already knows the kind (e.g. a stored file_type column) — without
-// a hint, the kind is inferred from the URL itself.
+//
+// Content type is detected the same way SummaryOverlay does:
+// `fileType` is an optional hint ('pdf' | 'image' | 'video') a caller
+// can pass when it already knows the kind (e.g. a stored file_type
+// column) — without a hint, the kind is inferred from the URL itself
+// via previewKindFor() in lib/embedUrl.js.
+//
+// Background uses the same PULSE_BG gradient every other page sits
+// on, instead of solid black — so the light top zone shows behind the
+// fixed site header (rather than a hard black bar), and the gradient
+// naturally darkens toward the bottom to match the rest of the app.
+//
+// Iframe/image content is pushed down below the header's real height
+// (headerOffset) so any toolbar the embedded content shows near its
+// own top edge — e.g. Google Drive's preview toolbar — isn't
+// physically covered by the header sitting above it.
 export default function MediaOverlay({ dark, onClose, src, title, fileType, allow, allowFullScreen }) {
   const kind = previewKindFor(src, fileType)
   const headerOffset = 'calc(max(16px, env(safe-area-inset-top)) + 60px)'
@@ -14,7 +27,7 @@ export default function MediaOverlay({ dark, onClose, src, title, fileType, allo
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.95)', zIndex: 400,
+      background: PULSE_BG, zIndex: 400,
       display: 'flex', flexDirection: 'column'
     }}>
       <BackButton dark={dark} onClick={onClose} />
