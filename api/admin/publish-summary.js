@@ -47,22 +47,30 @@ async function githubPutFile(path, base64Content, message) {
   return res.json()
 }
 
-// Best-effort only — jsdelivr caches aggressively at the edge. If the
-// purge call fails for any reason, the file is still live, it just
-// takes a little longer (up to jsdelivr's normal TTL) to reflect on
-// every edge node. Never blocks the publish itself.
-async function purgeJsdelivr(path) {
-  try {
-    const url = `https://purge.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${path}`
-    await fetch(url)
-  } catch {
-    // ignore
-  }
+// NOTE: jsdelivr was the original plan here, but jsdelivr deliberately
+// serves .html files as `text/plain` (not `text/html`) as an anti-
+// phishing/anti-XSS measure — a summary opened via jsdelivr shows raw
+// source code instead of rendering. GitHub Pages serves the correct
+// content-type for every file extension, so the public URL below is
+// built from the repo's Pages URL instead. Requires GitHub Pages to
+// be enabled on the repo (Settings → Pages → Deploy from branch →
+// main → /root) and a `.nojekyll` file committed to the repo root
+// (stops Jekyll processing from mangling folders/files, which isn't
+// needed for a plain static-file repo like this one).
+//
+// GitHub Pages rebuilds asynchronously after a push — usually live
+// within a minute, occasionally longer on the very first deploy after
+// enabling Pages. A summary published moments ago may briefly 404
+// until that rebuild finishes; there's nothing to poll for here since
+// Pages doesn't expose a "build finished" webhook this function could
+// wait on.
+function buildPagesUrl(path) {
+  return `https://${GITHUB_OWNER.toLowerCase()}.github.io/${GITHUB_REPO}/${path}`
 }
 
 // Publishes an admin-uploaded HTML summary (+ optional images) to the
 // dedicated GitHub "summaries" repo, then saves the resulting public
-// jsdelivr URL into the existing `summaries` table — the exact same
+// GitHub Pages URL into the existing `summaries` table — the exact same
 // row shape as a manually-pasted-link summary, so the student-facing
 // SummaryOverlay needs zero changes. Auth is verified server-side
 // (mirrors api/push/broadcast.js): the caller must send a valid
@@ -120,9 +128,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Could not publish files to GitHub — ' + err.message })
   }
 
-  await purgeJsdelivr(`${basePath}/index.html`)
-
-  const publicUrl = `https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${basePath}/index.html`
+  const publicUrl = buildPagesUrl(`${basePath}/index.html`)
 
   const payload = {
     title,
