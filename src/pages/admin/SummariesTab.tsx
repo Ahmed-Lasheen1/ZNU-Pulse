@@ -126,12 +126,16 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
     }
     setPublishing(true)
     try {
+      const mod = modules.find(m => m.id === sumModuleId)
+      const sub = subjects.find(s => s.id === sumSubjectId)
       const result = await publishSummary({
         title: sumTitle,
         htmlFile,
         imageFiles,
         moduleId: sumModuleId,
+        moduleName: mod?.name || sumModuleId,
         subjectId: sumSubjectId || null,
+        subjectName: sub?.name || null,
         lessonId: sumLessonId || null,
         examStage: sumExamStage || null,
       })

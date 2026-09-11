@@ -95,7 +95,7 @@ export default async function handler(req, res) {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', userData.user.id).single()
   if (profile?.role !== 'admin') return res.status(403).json({ error: 'Admin access required' })
 
-  const { title, html, images, module_id, subject_id, lesson_id, exam_stage } = req.body || {}
+  const { title, html, images, module_id, subject_id, lesson_id, exam_stage, module_name, subject_name } = req.body || {}
 
   if (!title || !html?.content || !html?.name || !module_id) {
     return res.status(400).json({ error: 'title, an HTML file, and a module are required' })
@@ -114,8 +114,16 @@ export default async function handler(req, res) {
     }
   }
 
+  // Organizes the repo as summaries/<module>/<subject>/<title>-<id>/ so
+  // browsing the GitHub repo directly stays readable as it grows —
+  // the subject level is skipped entirely when no subject was picked,
+  // matching the existing "Subject (optional)" behavior in the form.
   const folderSlug = `${slugify(title)}-${Date.now().toString(36)}`
-  const basePath = `summaries/${folderSlug}`
+  const modulePart = slugify(module_name || module_id)
+  const subjectPart = subject_name ? slugify(subject_name) : null
+  const basePath = subjectPart
+    ? `summaries/${modulePart}/${subjectPart}/${folderSlug}`
+    : `summaries/${modulePart}/${folderSlug}`
 
   try {
     await githubPutFile(`${basePath}/index.html`, html.content, `Publish summary: ${title}`)

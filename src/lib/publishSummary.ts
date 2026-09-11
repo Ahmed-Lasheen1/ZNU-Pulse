@@ -19,7 +19,9 @@ export interface PublishSummaryParams {
   htmlFile: File
   imageFiles: File[]
   moduleId: string
+  moduleName: string
   subjectId?: string | null
+  subjectName?: string | null
   lessonId?: string | null
   examStage?: string | null
 }
@@ -37,7 +39,7 @@ export interface PublishSummaryResult {
 // flow already produces, so nothing downstream (SummaryOverlay, the
 // student-facing Summary button) needs to know the difference.
 export async function publishSummary(params: PublishSummaryParams): Promise<PublishSummaryResult> {
-  const { title, htmlFile, imageFiles, moduleId, subjectId, lessonId, examStage } = params
+  const { title, htmlFile, imageFiles, moduleId, moduleName, subjectId, subjectName, lessonId, examStage } = params
 
   const [htmlContent, ...imageContents] = await Promise.all([
     readFileAsBase64(htmlFile),
@@ -55,7 +57,9 @@ export async function publishSummary(params: PublishSummaryParams): Promise<Publ
       html: { name: htmlFile.name, content: htmlContent },
       images: imageFiles.map((f, i) => ({ name: f.name, content: imageContents[i] })),
       module_id: moduleId,
+      module_name: moduleName,
       subject_id: subjectId || null,
+      subject_name: subjectName || null,
       lesson_id: lessonId || null,
       exam_stage: examStage || null,
     }),
