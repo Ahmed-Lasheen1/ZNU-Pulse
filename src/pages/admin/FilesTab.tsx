@@ -7,6 +7,7 @@ import AdminSplitLayout from './AdminSplitLayout'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
+import { useAdminMessage } from './useAdminMessage'
 import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
 import { fetchModuleStages } from '../../lib/moduleStages'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon, VideoIcon, AudioIcon, DocumentIcon } from '../../components/ui/tool-icons'
@@ -36,12 +37,9 @@ interface FilesTabProps {
 export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
-  const [msg, setMsg] = useState('')
-  function showMsg(m: string) { setMsg(m); setTimeout(() => setMsg(''), 3000) }
+  const { message: msg, showMessage: showMsg } = useAdminMessage()
 
   const [files, setFiles] = useState<FileRow[]>([])
-  // AUDIT FIX (performance audit): own loading flag, same reasoning
-  // as the other tabs with an independent fetch.
   const [filesLoading, setFilesLoading] = useState(true)
   const [editingFileId, setEditingFileId] = useState<string | null>(null)
   const [fileName, setFileName] = useState('')
@@ -54,7 +52,6 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
   const [fileExamStage, setFileExamStage] = useState('')
   const [fileStageOptions, setFileStageOptions] = useState(EXAM_STAGES)
   const [moduleFilter, setModuleFilter] = useState('all')
-  // AUDIT FIX (performance audit — double-submit risk).
   const [saving, setSaving] = useState(false)
 
   useEffect(() => { fetchFiles() }, [])

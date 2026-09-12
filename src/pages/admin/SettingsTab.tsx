@@ -4,32 +4,22 @@ import { getPulseTheme, pulseType } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { btnStyle, inStyle as adminInStyle, fieldLabel } from './adminStyles'
+import { useAdminMessage } from './useAdminMessage'
 import { MegaphoneIcon, SendIcon, LinkIcon } from '../../components/ui/tool-icons'
 
 interface SettingsTabProps {
   dark: boolean
 }
 
-// AUDIT FIX (announcement preview accuracy, per user request): the
-// real announcement card on Home renders at very different widths
-// depending on context — the narrow `pulse-dash-report` column on the
-// desktop dashboard grid (`1fr 1.3fr 1fr`, so roughly ~30% of the
-// page), or the full stacked width on mobile once that grid collapses
-// to one column. Both of those land in a similar ballpark once you
-// account for typical device/window sizes, so capping the preview
-// here to roughly that width means a line long enough to wrap on the
-// real Home card will now also wrap in this preview — instead of
-// admins writing something that looks like one line here (this card
-// used to be free to stretch across up to half the admin panel, which
-// is far wider than the real card ever gets) and then discovering it
-// wraps awkwardly once real students see it.
+// Capped to roughly match the real announcement card's width on Home
+// (the narrow desktop dashboard column, or full width on mobile), so
+// a line that wraps here also wraps on the real card.
 const ANNOUNCEMENT_PREVIEW_MAX_WIDTH = 380
 
 export default function SettingsTab({ dark }: SettingsTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
-  const [msg, setMsg] = useState('')
-  function showMsg(m: string) { setMsg(m); setTimeout(() => setMsg(''), 3000) }
+  const { message: msg, showMessage: showMsg } = useAdminMessage()
 
   const [announcement, setAnnouncement] = useState('')
   const [announcementSaving, setAnnouncementSaving] = useState(false)

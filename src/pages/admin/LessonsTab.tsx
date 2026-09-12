@@ -8,6 +8,7 @@ import IconPicker from '../../components/admin/IconPicker'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading } from './adminStyles'
+import { useAdminMessage } from './useAdminMessage'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon } from '../../components/ui/tool-icons'
 import type { AdminModule, AdminSubject, AdminLesson } from './adminTypes'
 
@@ -17,15 +18,13 @@ interface LessonsTabProps {
   subjects: AdminSubject[]
   lessons: AdminLesson[]
   fetchLessons: () => void
-  // AUDIT FIX (performance audit): see ModulesTab.tsx.
   refDataLoading: boolean
 }
 
 export default function LessonsTab({ dark, modules, subjects, lessons, fetchLessons, refDataLoading }: LessonsTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
-  const [msg, setMsg] = useState('')
-  function showMsg(m: string) { setMsg(m); setTimeout(() => setMsg(''), 3000) }
+  const { message: msg, showMessage: showMsg } = useAdminMessage()
 
   const [editingLessonId, setEditingLessonId] = useState<string | null>(null)
   const [lessonModuleId, setLessonModuleId] = useState('')
@@ -33,8 +32,6 @@ export default function LessonsTab({ dark, modules, subjects, lessons, fetchLess
   const [lessonTitle, setLessonTitle] = useState('')
   const [lessonIcon, setLessonIcon] = useState('')
   const [moduleFilter, setModuleFilter] = useState('all')
-  // AUDIT FIX (performance audit — double-submit risk): see
-  // ModulesTab.tsx's saving state for the same reasoning.
   const [saving, setSaving] = useState(false)
 
   function editLesson(l: AdminLesson) {

@@ -9,6 +9,7 @@ import { ModuleIcon } from '../../lib/medicalIcons'
 import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
 import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
 import { fetchModuleStages } from '../../lib/moduleStages'
+import { useAdminMessage } from './useAdminMessage'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon, ListIcon, SearchIcon2, RobotIcon, BookIcon, GraduationCapIcon } from '../../components/ui/tool-icons'
 import QuestionSourceBadge from '../../components/QuestionSourceBadge'
 import type { AdminModule, AdminSubject, AdminLesson } from './adminTypes'
@@ -37,14 +38,9 @@ interface QuestionsTabProps {
 export default function QuestionsTab({ dark, modules, subjects, lessons }: QuestionsTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
-  const [msg, setMsg] = useState('')
-  function showMsg(m: string) { setMsg(m); setTimeout(() => setMsg(''), 3000) }
+  const { message: msg, showMessage: showMsg } = useAdminMessage()
 
   const [questions, setQuestions] = useState<QuestionRow[]>([])
-  // AUDIT FIX (performance audit): QuestionsTab fetches its own
-  // primary list independently of Admin's reference-data load, so it
-  // needs its own loading flag — without one, "No questions yet" was
-  // able to flash before fetchQuestions() had actually resolved.
   const [questionsLoading, setQuestionsLoading] = useState(true)
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null)
   const [qText, setQText] = useState('')
@@ -64,10 +60,6 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
   const [bulkMode, setBulkMode] = useState(false)
   const [bulkText, setBulkText] = useState('')
   const [bulkSaving, setBulkSaving] = useState(false)
-  // AUDIT FIX (performance audit — double-submit risk): the single-
-  // question save path had no in-flight flag at all (bulk add already
-  // had bulkSaving) — this brings it in line so "Add Question"/"Save
-  // Changes" can't double-fire.
   const [saving, setSaving] = useState(false)
   const [moduleFilter, setModuleFilter] = useState('all')
   const [search, setSearch] = useState('')

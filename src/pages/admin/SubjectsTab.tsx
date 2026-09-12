@@ -8,6 +8,7 @@ import IconPicker from '../../components/admin/IconPicker'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading } from './adminStyles'
+import { useAdminMessage } from './useAdminMessage'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon } from '../../components/ui/tool-icons'
 import type { AdminModule, AdminSubject } from './adminTypes'
 
@@ -16,17 +17,13 @@ interface SubjectsTabProps {
   modules: AdminModule[]
   subjects: AdminSubject[]
   fetchSubjects: () => void
-  // AUDIT FIX (performance audit): see ModulesTab.tsx for why this
-  // exists — avoids flashing the empty state before the initial
-  // reference-data fetch resolves.
   refDataLoading: boolean
 }
 
 export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, refDataLoading }: SubjectsTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
-  const [msg, setMsg] = useState('')
-  function showMsg(m: string) { setMsg(m); setTimeout(() => setMsg(''), 3000) }
+  const { message: msg, showMessage: showMsg } = useAdminMessage()
 
   const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null)
   const [subName, setSubName] = useState('')
@@ -35,8 +32,6 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
   const [subIcon, setSubIcon] = useState('📖')
   const [subColor, setSubColor] = useState('#34d399')
   const [moduleFilter, setModuleFilter] = useState('all')
-  // AUDIT FIX (performance audit — double-submit risk): see
-  // ModulesTab.tsx's saving state for the same reasoning.
   const [saving, setSaving] = useState(false)
 
   function editSubject(sub: AdminSubject) {

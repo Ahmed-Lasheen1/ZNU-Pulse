@@ -7,6 +7,7 @@ import AdminSplitLayout from './AdminSplitLayout'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
+import { useAdminMessage } from './useAdminMessage'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon, CalendarDotIcon } from '../../components/ui/tool-icons'
 import { ExamIcon } from '../../lib/medicalIcons'
 import type { AdminModule } from './adminTypes'
@@ -17,12 +18,8 @@ interface ScheduleRow {
   url: string
   type: 'study' | 'exam'
   module_id: string
-  // AUDIT FIX (multi-date support): a single exam schedule item can now
-  // carry more than one date (e.g. a full staged exam schedule for a
-  // module, not just one exam day). Replaces the old singular `date`
-  // column — see the `schedules_add_dates_array` migration, which
-  // backfilled every existing single-date row into a one-element array
-  // so nothing already saved was lost.
+  // A schedule item can carry more than one exam date (e.g. a full
+  // staged exam schedule), stored as an array rather than a single date.
   dates?: string[] | null
 }
 
@@ -34,24 +31,18 @@ interface SchedulesTabProps {
 export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
-  const [msg, setMsg] = useState('')
-  function showMsg(m: string) { setMsg(m); setTimeout(() => setMsg(''), 3000) }
+  const { message: msg, showMessage: showMsg } = useAdminMessage()
 
   const [schedules, setSchedules] = useState<ScheduleRow[]>([])
-  // AUDIT FIX (performance audit): own loading flag for this tab's
-  // own fetch, same reasoning as QuestionsTab.
   const [schedulesLoading, setSchedulesLoading] = useState(true)
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null)
   const [schTitle, setSchTitle] = useState('')
   const [schUrl, setSchUrl] = useState('')
   const [schType, setSchType] = useState<'study' | 'exam'>('study')
   const [schModuleId, setSchModuleId] = useState('')
-  // Multiple exam dates for this one schedule item — always at least
-  // one input row, even when empty, so there's always somewhere to
-  // type the first date.
+  // Always at least one date input row, even when empty.
   const [schDates, setSchDates] = useState<string[]>([''])
   const [moduleFilter, setModuleFilter] = useState('all')
-  // AUDIT FIX (performance audit — double-submit risk).
   const [saving, setSaving] = useState(false)
 
   useEffect(() => { fetchSchedules() }, [])

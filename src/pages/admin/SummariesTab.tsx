@@ -9,6 +9,7 @@ import { ModuleIcon } from '../../lib/medicalIcons'
 import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
 import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
 import { fetchModuleStages } from '../../lib/moduleStages'
+import { useAdminMessage } from './useAdminMessage'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon, LinkIcon, UploadIcon } from '../../components/ui/tool-icons'
 import { publishSummary } from '../../lib/publishSummary'
 import type { AdminModule, AdminSubject, AdminLesson } from './adminTypes'
@@ -32,23 +33,18 @@ interface SummariesTabProps {
   lessons: AdminLesson[]
 }
 
-// Two ways to get a summary's `url` into the row: paste one directly
-// (unchanged, exactly as before — any host works, e.g. a Drive link),
-// or upload an HTML file (+ optional images) and let the backend
-// publish it to GitHub/jsdelivr and fill the URL in automatically.
-// Only available when adding a NEW summary — editing an existing row
-// still just edits its url/fields directly, same as before.
+// Two ways to get a summary's `url`: paste one directly, or upload an
+// HTML file (+ optional images) and let the backend publish it and
+// fill the URL in automatically. Upload is only available when adding
+// a NEW summary — editing always edits url/fields directly.
 type PublishMode = 'link' | 'upload'
 
 export default function SummariesTab({ dark, modules, subjects, lessons }: SummariesTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
-  const [msg, setMsg] = useState('')
-  function showMsg(m: string) { setMsg(m); setTimeout(() => setMsg(''), 4000) }
+  const { message: msg, showMessage: showMsg } = useAdminMessage(4000)
 
   const [summaries, setSummaries] = useState<SummaryRow[]>([])
-  // AUDIT FIX (performance audit): own loading flag, same reasoning
-  // as QuestionsTab/SchedulesTab.
   const [summariesLoading, setSummariesLoading] = useState(true)
   const [editingSummaryId, setEditingSummaryId] = useState<string | null>(null)
   const [sumTitle, setSumTitle] = useState('')
@@ -59,12 +55,10 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
   const [sumExamStage, setSumExamStage] = useState('')
   const [sumStageOptions, setSumStageOptions] = useState(EXAM_STAGES)
   const [moduleFilter, setModuleFilter] = useState('all')
-  // AUDIT FIX (performance audit — double-submit risk).
   const [saving, setSaving] = useState(false)
 
-  // New: publish-by-upload state. Kept entirely separate from the
-  // link-mode fields above so switching modes never clobbers what's
-  // already typed in the other one.
+  // Publish-by-upload state — kept separate from the link-mode fields
+  // so switching modes never clobbers what's already typed.
   const [publishMode, setPublishMode] = useState<PublishMode>('link')
   const [htmlFile, setHtmlFile] = useState<File | null>(null)
   const [imageFiles, setImageFiles] = useState<File[]>([])
@@ -84,7 +78,7 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
 
   function editSummary(s: SummaryRow) {
     setEditingSummaryId(s.id)
-    setPublishMode('link') // editing always edits the row's url directly
+    setPublishMode('link')
     setSumTitle(s.title); setSumUrl(s.url); setSumModuleId(s.module_id)
     setSumSubjectId(s.subject_id || ''); setSumLessonId(s.lesson_id || '')
     setSumExamStage(s.exam_stage || '')
@@ -116,10 +110,6 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
     }
   }
 
-  // New: publish an HTML file (+ optional images) instead of pasting
-  // a link. Only reachable when adding a new summary (publishMode is
-  // forced back to 'link' the moment an existing row is opened for
-  // editing — see editSummary above).
   async function publishSummaryFromFile() {
     if (!sumTitle || !sumModuleId || !htmlFile || publishing) {
       return showMsg('❌ Title, module, and an HTML file are required')
@@ -163,7 +153,7 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
   const isBusy = saving || publishing
   const totalUploadBytes = (htmlFile?.size || 0) + imageFiles.reduce((a, f) => a + f.size, 0)
   const totalUploadMb = (totalUploadBytes / (1024 * 1024)).toFixed(1)
-  const overSizeLimit = totalUploadBytes > 4 * 1024 * 1024 // soft warning only — see note below field
+  const overSizeLimit = totalUploadBytes > 4 * 1024 * 1024 // soft warning only
 
   const form = (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
@@ -171,9 +161,6 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
         {editingSummaryId ? <><EditIcon color={pt.cobalt} size={16} /> Edit Summary</> : <><PlusIcon color={pt.cobalt} size={16} /> Add Summary</>}
       </h3>
 
-      {/* Link vs Upload toggle — only shown when adding a new summary.
-          Editing an existing row always edits its url field directly,
-          same as the app has always worked. */}
       {!editingSummaryId && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
           <button

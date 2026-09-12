@@ -8,6 +8,7 @@ import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle } from './adminStyles'
 import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
 import { invalidateModuleStagesCache } from '../../lib/moduleStages'
+import { useAdminMessage } from './useAdminMessage'
 import { TargetIcon, GearIcon, DotIcon, TrashIcon, CheckCircleIcon } from '../../components/ui/tool-icons'
 import type { AdminModule } from './adminTypes'
 
@@ -31,8 +32,7 @@ function slugify(text: string) {
 export default function StagesTab({ dark, modules }: StagesTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
-  const [msg, setMsg] = useState('')
-  function showMsg(m: string) { setMsg(m); setTimeout(() => setMsg(''), 3000) }
+  const { message: msg, showMessage: showMsg } = useAdminMessage()
 
   const [stageModuleId, setStageModuleId] = useState('')
   const [moduleStagesList, setModuleStagesList] = useState<StageRow[]>([])

@@ -7,6 +7,7 @@ import AdminSplitLayout from './AdminSplitLayout'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle } from './adminStyles'
+import { useAdminMessage } from './useAdminMessage'
 import { EditIcon, PlusIcon, TrashIcon, PauseIcon, PlayIcon, DotIcon, CheckCircleIcon, ConstructionIcon } from '../../components/ui/tool-icons'
 import type { AdminModule } from './adminTypes'
 
@@ -14,31 +15,24 @@ interface ModulesTabProps {
   dark: boolean
   modules: AdminModule[]
   fetchModules: () => void
-  // AUDIT FIX (performance audit): true only during Admin's initial
-  // reference-data load — lets this tab show a neutral loading state
-  // instead of briefly flashing "No modules yet" before the real
-  // data has arrived. See Admin.tsx for where this is set.
+  // True only during Admin's initial reference-data load — lets this
+  // tab show a neutral loading state instead of briefly flashing "No
+  // modules yet" before the real data has arrived.
   refDataLoading: boolean
 }
 
 export default function ModulesTab({ dark, modules, fetchModules, refDataLoading }: ModulesTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
-  const [msg, setMsg] = useState('')
-  function showMsg(m: string) { setMsg(m); setTimeout(() => setMsg(''), 3000) }
+  const { message: msg, showMessage: showMsg } = useAdminMessage()
 
   const [editingModuleId, setEditingModuleId] = useState<string | null>(null)
   const [modName, setModName] = useState('')
   const [modColor, setModColor] = useState('#38bdf8')
   const [modIcon, setModIcon] = useState('📚')
   const [modStatus, setModStatus] = useState<'active' | 'completed'>('active')
-  // AUDIT FIX (performance audit — double-submit risk): saveModule()
-  // previously had no in-flight state at all, so the "Add Module" /
-  // "Save Changes" button stayed fully clickable while the insert/
-  // update was still in the air — a fast double-click could fire two
-  // writes before the first one's showMsg/refetch ever landed. Same
-  // pattern already existed correctly in StagesTab/SettingsTab; this
-  // just brings ModulesTab in line with it.
+  // Prevents a fast double-click from firing two writes before the
+  // first one's response lands.
   const [saving, setSaving] = useState(false)
 
   function editModule(mod: AdminModule) {
