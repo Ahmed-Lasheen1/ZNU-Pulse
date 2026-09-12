@@ -1,5 +1,5 @@
 import { getPulseTheme, pulseFonts } from '../../premiumTheme'
-import { liquidGlassBackdrop, liquidGlassTint, glassBorderColor } from '../../lib/liquidGlass'
+import { liquidGlassBackdrop, liquidGlassTint } from '../../lib/liquidGlass'
 
 // Shared glass-style primitives for the ZNU Pulse redesign — used by
 // Auth, ResetPassword, and (as we roll it out) every other page, so
@@ -20,12 +20,6 @@ import { liquidGlassBackdrop, liquidGlassTint, glassBorderColor } from '../../li
 // PulseGlassRow already do) — so tuning glass opacity globally is now
 // genuinely a one-file change, everywhere in the app.
 //
-// glassPanel's border also used to hardcode its own
-// 'rgba(255,255,255,0.08)'/'rgba(255,255,255,0.55)' pair — now sourced
-// from glassBorderColor(dark) in liquidGlass.js, the same place
-// "reduce the border brightness" would be changed for every other
-// glass surface.
-//
 // Blur comes from liquidGlassBackdrop() (the same function
 // LiquidGlassCard, PulseGlassRow, and NavMenu's glass all use) instead
 // of each function here hardcoding its own value. One blur constant,
@@ -34,6 +28,10 @@ import { liquidGlassBackdrop, liquidGlassTint, glassBorderColor } from '../../li
 // shadow — stays as-is; that's what makes an input/button read as
 // "interactive" rather than "elevated card," and is unrelated to the
 // tint/blur centralization fix.
+//
+// CLEANUP: PulseFullScreen, GradientBlobs, and glassPanel were removed
+// from this file (pre-launch audit) — no remaining page used them;
+// every full-screen page renders <PulseBackground> directly instead.
 
 export function glassInput(pt, dark) {
   return {
@@ -84,46 +82,5 @@ export function glassTabBtn(pt, dark, active) {
     background: active ? pt.cobaltSoft : liquidGlassTint(dark),
     ...liquidGlassBackdrop(),
     color: active ? pt.cobalt : pt.sub, fontWeight: 700, fontSize: 12, fontFamily: pulseFonts.body
-  }
-}
-
-// Full-viewport glass background — reused by any page that wants the
-// "whole screen is the surface" Auth treatment instead of a content
-// column. Wrap page content in <PulseFullScreen dark={dark}>...</PulseFullScreen>.
-export function PulseFullScreen({ dark, children }) {
-  const pt = getPulseTheme(dark)
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, overflowY: 'auto',
-      background: dark
-        ? `linear-gradient(180deg, ${pt.canvasAlt}, ${pt.canvas})`
-        : `linear-gradient(180deg, ${pt.canvas}, ${pt.canvasAlt})`,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontFamily: pulseFonts.body
-    }}>
-      <GradientBlobs pt={pt} />
-      {children}
-    </div>
-  )
-}
-
-export function GradientBlobs({ pt }) {
-  return (
-    <div aria-hidden style={{ position: 'fixed', inset: 0, overflow: 'hidden', zIndex: 0, pointerEvents: 'none' }}>
-      <div style={{ position: 'absolute', width: 520, height: 520, borderRadius: '50%', background: `radial-gradient(circle, ${pt.cobalt}55, transparent 70%)`, top: '-15%', left: '-10%', filter: 'blur(70px)' }} />
-      <div style={{ position: 'absolute', width: 460, height: 460, borderRadius: '50%', background: `radial-gradient(circle, ${pt.terracotta}45, transparent 70%)`, bottom: '-15%', right: '-10%', filter: 'blur(70px)' }} />
-      <div style={{ position: 'absolute', width: 380, height: 380, borderRadius: '50%', background: `radial-gradient(circle, ${pt.indigo}35, transparent 70%)`, top: '35%', right: '15%', filter: 'blur(80px)' }} />
-    </div>
-  )
-}
-
-export function glassPanel(pt, dark, extra = {}) {
-  return {
-    position: 'relative', zIndex: 1,
-    background: liquidGlassTint(dark),
-    ...liquidGlassBackdrop(),
-    border: `1px solid ${glassBorderColor(dark)}`,
-    borderRadius: 28, padding: '40px 36px', width: '92%', maxWidth: 400,
-    ...extra
   }
 }
