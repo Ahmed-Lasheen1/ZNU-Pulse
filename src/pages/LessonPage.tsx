@@ -40,7 +40,7 @@ export default function LessonPage({ dark }: { dark: boolean }) {
     setLoading(true)
     Promise.all([
       fetchLessonById(lessonId!),
-      supabase.from('questions').select('id', { count: 'exact', head: true }).eq('lesson_id', lessonId),
+      supabase.from('questions_public').select('id', { count: 'exact', head: true }).eq('lesson_id', lessonId),
       supabase.from('summaries').select('*').eq('lesson_id', lessonId).order('created_at')
     ]).then(([lessonRes, countRes, summaryRes]) => {
       if (ignore) return

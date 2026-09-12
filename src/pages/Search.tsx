@@ -77,7 +77,7 @@ export default function Search({ dark }: { dark: boolean }) {
       // clicking a question result had nothing to open except the
       // parent module — now the full question row is available so a
       // click can open that exact question directly (see openResult).
-      supabase.from('questions').select('id, question, option_a, option_b, option_c, option_d, module_id, subject_id, exam_type, exam_stage, created_at').ilike('question', like).limit(20),
+      supabase.from('questions_public').select('id, question, option_a, option_b, option_c, option_d, module_id, subject_id, exam_type, exam_stage, created_at').ilike('question', like).limit(20),
       supabase.from('summaries').select('*').ilike('title', like).limit(20),
       supabase.from('schedules').select('*').ilike('title', like).limit(20),
     ])

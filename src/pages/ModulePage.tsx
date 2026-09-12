@@ -86,7 +86,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
         setHasModuleSummaries((count || 0) > 0)
         if (error) setLoadError(true)
       })
-    supabase.from('questions').select('id', { count: 'exact', head: true }).eq('module_id', moduleId)
+    supabase.from('questions_public').select('id', { count: 'exact', head: true }).eq('module_id', moduleId)
       .then(({ count, error }) => {
         if (ignore) return
         setHasModuleQuestions((count || 0) > 0)
@@ -98,7 +98,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
     // hold. Any one of the three is enough for the stage to "count".
     Promise.all([
       supabase.from('files').select('exam_stage').eq('module_id', moduleId).not('exam_stage', 'is', null),
-      supabase.from('questions').select('exam_stage').eq('module_id', moduleId).not('exam_stage', 'is', null),
+      supabase.from('questions_public').select('exam_stage').eq('module_id', moduleId).not('exam_stage', 'is', null),
       supabase.from('summaries').select('exam_stage').eq('module_id', moduleId).not('exam_stage', 'is', null),
     ]).then(([filesRes, questionsRes, summariesRes]) => {
       if (ignore) return

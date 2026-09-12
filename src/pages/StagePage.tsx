@@ -88,7 +88,7 @@ export default function StagePage({ dark }: { dark: boolean }) {
         if (error) setLoadError(true)
         setSummariesLoaded(true)
       })
-    supabase.from('questions').select('id', { count: 'exact', head: true }).eq('module_id', moduleId).eq('exam_stage', stage)
+    supabase.from('questions_public').select('id', { count: 'exact', head: true }).eq('module_id', moduleId).eq('exam_stage', stage)
       .then(({ count, error }) => {
         if (ignore) return
         setHasStageQuestions((count || 0) > 0)

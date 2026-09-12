@@ -220,7 +220,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     setLoading(!hadCache)
 
     const { data, error } = await supabase
-      .from('questions')
+      .from('questions_public')
       .select('id, question, option_a, option_b, option_c, option_d, exam_type, exam_stage, module_id, subject_id, lesson_id, source, created_at')
       .eq('module_id', moduleId)
       .order('created_at')

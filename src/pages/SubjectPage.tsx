@@ -67,7 +67,7 @@ export default function SubjectPage({ dark }: { dark: boolean }) {
       // Lesson-scoped summaries live in `summaries` (via lesson_id) —
       // there is no `lessons.summary_url` column.
       supabase.from('summaries').select('id, title, url, lesson_id').eq('subject_id', subjectId).not('lesson_id', 'is', null),
-      supabase.from('questions').select('id', { count: 'exact', head: true }).eq('subject_id', subjectId),
+      supabase.from('questions_public').select('id', { count: 'exact', head: true }).eq('subject_id', subjectId),
     ]).then(async ([subjectRes, lessonRes, summaryRes, questionCountRes]) => {
       if (ignore) return
       setSubject(subjectRes.subject)
@@ -81,7 +81,7 @@ export default function SubjectPage({ dark }: { dark: boolean }) {
         // tagged with this exact exam_stage, scoped to this subject.
         const [filesRes, questionsRes, stageSummaryRes] = await Promise.all([
           supabase.from('files').select('lesson_id').eq('subject_id', subjectId).eq('exam_stage', stageParam).not('lesson_id', 'is', null),
-          supabase.from('questions').select('lesson_id').eq('subject_id', subjectId).eq('exam_stage', stageParam).not('lesson_id', 'is', null),
+          supabase.from('questions_public').select('lesson_id').eq('subject_id', subjectId).eq('exam_stage', stageParam).not('lesson_id', 'is', null),
           supabase.from('summaries').select('lesson_id').eq('subject_id', subjectId).eq('exam_stage', stageParam).not('lesson_id', 'is', null),
         ])
         if (ignore) return
