@@ -8,6 +8,7 @@ import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PulseBackground from '../components/pulse/PulseBackground'
 import BackButton from '../components/pulse/BackButton'
 import SummaryOverlay from '../components/SummaryOverlay'
+import { useToast } from '../components/ToastProvider'
 import { useModules } from '../contexts'
 import { fetchModuleStages, stageMetaFrom } from '../lib/moduleStages'
 import { fetchSubjectsForModule } from '../lib/subjects'
@@ -31,12 +32,19 @@ export default function StagePage({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const { moduleId, stage } = useParams()
   const navigate = useNavigate()
+  const showToast = useToast() as (message: string, type?: 'success' | 'error') => void
   const { modules, modulesLoaded, modulesError } = useModules() as { modules: PageModule[]; modulesLoaded: boolean; modulesError: boolean }
   const module = modules.find(m => m.id === moduleId) || null
   const [stages, setStages] = useState<ExamStage[]>([])
   const meta = stageMetaFrom(stages, stage!)
   const [presentFileTypes, setPresentFileTypes] = useState<Set<string>>(new Set())
   const [summaries, setSummaries] = useState<Summary[]>([])
+  // AUDIT FIX (per user request): tracks whether the summaries fetch
+  // has actually resolved yet, so a click that lands before it does
+  // can't be mistaken for "genuinely zero summaries" and trigger a
+  // false toast.
+  const [summariesLoaded, setSummariesLoaded] = useState(false)
+  const [hasStageQuestions, setHasStageQuestions] = useState<boolean | null>(null)
   const [selectedSummary, setSelectedSummary] = useState<Summary | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [driveUrl, setDriveUrl] = useState('')
@@ -65,6 +73,7 @@ export default function StagePage({ dark }: { dark: boolean }) {
 
   useEffect(() => {
     let ignore = false
+    setSummariesLoaded(false)
 
     supabase.from('files').select('type').eq('module_id', moduleId).eq('exam_stage', stage)
       .then(({ data, error }) => {
@@ -76,6 +85,13 @@ export default function StagePage({ dark }: { dark: boolean }) {
       .then(({ data, error }) => {
         if (ignore) return
         if (data) setSummaries(data)
+        if (error) setLoadError(true)
+        setSummariesLoaded(true)
+      })
+    supabase.from('questions').select('id', { count: 'exact', head: true }).eq('module_id', moduleId).eq('exam_stage', stage)
+      .then(({ count, error }) => {
+        if (ignore) return
+        setHasStageQuestions((count || 0) > 0)
         if (error) setLoadError(true)
       })
     fetchSubjectsForModule(moduleId!).then(({ subjects, error }) => {
@@ -107,9 +123,17 @@ export default function StagePage({ dark }: { dark: boolean }) {
     />
   )
 
+  // AUDIT FIX (per user request): a toast (plain style, not the red
+  // error one) replaces navigating into an empty Summaries/MCQ page
+  // once we actually know there's nothing for this stage.
   function openSummaries() {
+    if (summariesLoaded && summaries.length === 0) { showToast('No summaries added for this stage yet'); return }
     if (summaries.length === 1) setSelectedSummary(summaries[0])
     else navigate(`/summaries?module=${moduleId}&stage=${stage}`)
+  }
+  function openPractice() {
+    if (hasStageQuestions === false) { showToast('No questions added for this stage yet'); return }
+    navigate(`/mcq?module=${moduleId}&stage=${stage}`)
   }
 
   // AUDIT FIX: only render/open the Drive link when it's a real http(s)
@@ -239,7 +263,9 @@ export default function StagePage({ dark }: { dark: boolean }) {
 
         {/* Smart Summaries & Practice — side by side from tablet width
             up (.summary-practice-row, see index.css), stacked on
-            phones like every other section on this page. */}
+            phones like every other section on this page. Both now
+            toast instead of navigating when there's genuinely nothing
+            for this stage — see openSummaries/openPractice above. */}
         <div className="summary-practice-row" style={{ marginBottom: 32 }}>
           <div>
             <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -260,7 +286,7 @@ export default function StagePage({ dark }: { dark: boolean }) {
             <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
               <PracticeIcon color={ON_GRADIENT_TOP.muted} size={14} /> Practice
             </h2>
-            <LiquidGlassCard dark={dark} delay={0} onClick={() => navigate(`/mcq?module=${moduleId}&stage=${stage}`)} style={{ padding: 24, textAlign: 'center' }}>
+            <LiquidGlassCard dark={dark} delay={0} onClick={openPractice} style={{ padding: 24, textAlign: 'center' }}>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
                 <ExamIcon color="#e2725b" size={30} />
               </div>

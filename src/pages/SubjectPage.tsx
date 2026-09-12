@@ -46,6 +46,11 @@ export default function SubjectPage({ dark }: { dark: boolean }) {
   const [lessons, setLessons] = useState<Lesson[]>([])
   const [stageLessonIds, setStageLessonIds] = useState<Set<string> | null>(null)
   const [lessonSummaries, setLessonSummaries] = useState<LessonSummary[]>([])
+  // AUDIT FIX (per user request): whether this subject has any
+  // questions at all — "All MCQs" toasts instead of navigating into
+  // MCQ Bank when it's genuinely empty. `null` (not checked yet) never
+  // blocks a click; only a confirmed `false` does.
+  const [hasSubjectQuestions, setHasSubjectQuestions] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [selectedSummary, setSelectedSummary] = useState<{ title: string; url: string } | null>(null)
@@ -61,13 +66,15 @@ export default function SubjectPage({ dark }: { dark: boolean }) {
       fetchLessonsForSubject(subjectId!),
       // Lesson-scoped summaries live in `summaries` (via lesson_id) —
       // there is no `lessons.summary_url` column.
-      supabase.from('summaries').select('id, title, url, lesson_id').eq('subject_id', subjectId).not('lesson_id', 'is', null)
-    ]).then(async ([subjectRes, lessonRes, summaryRes]) => {
+      supabase.from('summaries').select('id, title, url, lesson_id').eq('subject_id', subjectId).not('lesson_id', 'is', null),
+      supabase.from('questions').select('id', { count: 'exact', head: true }).eq('subject_id', subjectId),
+    ]).then(async ([subjectRes, lessonRes, summaryRes, questionCountRes]) => {
       if (ignore) return
       setSubject(subjectRes.subject)
       setLessons(lessonRes.lessons)
       if (summaryRes.data) setLessonSummaries(summaryRes.data)
-      if (subjectRes.error || lessonRes.error || summaryRes.error) setLoadError(true)
+      setHasSubjectQuestions((questionCountRes.count || 0) > 0)
+      if (subjectRes.error || lessonRes.error || summaryRes.error || questionCountRes.error) setLoadError(true)
 
       if (stageParam) {
         // Union of lesson_ids that have a file, question, or summary
@@ -118,6 +125,11 @@ export default function SubjectPage({ dark }: { dark: boolean }) {
     }
   }
 
+  function openAllMcqs() {
+    if (hasSubjectQuestions === false) { showToast('No MCQs added for this subject yet'); return }
+    navigate(`/mcq?module=${moduleId}&subject=${subjectId}`)
+  }
+
   // Only apply the stage filter once it's actually resolved (non-null)
   // — while stageLessonIds is still null and a stage param is present,
   // `loading` is still true anyway, so this never flashes the
@@ -165,8 +177,11 @@ export default function SubjectPage({ dark }: { dark: boolean }) {
           </div>
         </div>
 
+        {/* AUDIT FIX (per user request): both buttons toast (plain,
+            non-error style) instead of navigating into an empty page
+            once we've confirmed this subject genuinely has nothing. */}
         <div style={{ display: 'flex', gap: 16, marginBottom: 28, justifyContent: 'center' }}>
-          <LiquidGlassCard dark={dark} delay={0} onClick={() => navigate(`/mcq?module=${moduleId}&subject=${subjectId}`)}
+          <LiquidGlassCard dark={dark} delay={0} onClick={openAllMcqs}
             style={{ width: 'clamp(130px, 32vw, 180px)', padding: '22px 16px', textAlign: 'center' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
               <ExamIcon color="#e2725b" size={28} />

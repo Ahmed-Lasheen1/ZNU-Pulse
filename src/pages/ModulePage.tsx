@@ -7,6 +7,7 @@ import ErrorBanner from '../components/ErrorBanner'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PulseBackground from '../components/pulse/PulseBackground'
 import BackButton from '../components/pulse/BackButton'
+import { useToast } from '../components/ToastProvider'
 import { useModules } from '../contexts'
 import { fetchModuleStages } from '../lib/moduleStages'
 import { fetchSubjectsForModule } from '../lib/subjects'
@@ -29,6 +30,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const { moduleId } = useParams()
   const navigate = useNavigate()
+  const showToast = useToast() as (message: string, type?: 'success' | 'error') => void
   const { modules, modulesLoaded, modulesError } = useModules() as { modules: PageModule[]; modulesLoaded: boolean; modulesError: boolean }
   const module = modules.find(m => m.id === moduleId) || null
   const [presentFileTypes, setPresentFileTypes] = useState<Set<string>>(new Set())
@@ -45,6 +47,16 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   // Materials / Practice / Summaries sections.
   const [stagesWithContent, setStagesWithContent] = useState<Set<string>>(new Set())
   const [subjects, setSubjects] = useState<PageSubject[]>([])
+  // AUDIT FIX (per user request): "All Summaries" / "MCQ Bank" used to
+  // always navigate, even when this module has zero summaries/questions
+  // — landing the person on a page whose only content is its own empty
+  // state. `null` means "not checked yet" (so a click before the count
+  // resolves still navigates rather than false-blocking); `false` means
+  // "checked, and there's genuinely nothing there" — that's the only
+  // case that shows a toast and stays put, mirroring SubjectPage's
+  // existing openAllSummaries pattern.
+  const [hasModuleSummaries, setHasModuleSummaries] = useState<boolean | null>(null)
+  const [hasModuleQuestions, setHasModuleQuestions] = useState<boolean | null>(null)
 
   useEffect(() => {
     let ignore = false
@@ -67,6 +79,19 @@ export default function ModulePage({ dark }: { dark: boolean }) {
       setSubjects(subjects)
       if (error) setLoadError(true)
     })
+
+    supabase.from('summaries').select('id', { count: 'exact', head: true }).eq('module_id', moduleId)
+      .then(({ count, error }) => {
+        if (ignore) return
+        setHasModuleSummaries((count || 0) > 0)
+        if (error) setLoadError(true)
+      })
+    supabase.from('questions').select('id', { count: 'exact', head: true }).eq('module_id', moduleId)
+      .then(({ count, error }) => {
+        if (ignore) return
+        setHasModuleQuestions((count || 0) > 0)
+        if (error) setLoadError(true)
+      })
 
     // Which exam_stage values actually have something tagged to them in
     // this module — checked across all three content types a stage can
@@ -103,6 +128,15 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   // file/question/summary are shown — the section itself disappears
   // entirely when none qualify, rather than showing an empty grid.
   const visibleExamStages = examStages.filter(stage => stagesWithContent.has(stage.value))
+
+  function openAllSummaries() {
+    if (hasModuleSummaries === false) { showToast('No summaries added for this module yet'); return }
+    navigate(`/summaries?module=${moduleId}`)
+  }
+  function openPractice() {
+    if (hasModuleQuestions === false) { showToast('No questions added for this module yet'); return }
+    navigate(`/mcq?module=${moduleId}`)
+  }
 
   // AUDIT FIX: only render/open the Drive link when it's a real http(s)
   // URL — closes the same "unvalidated admin-entered URL used as a
@@ -158,11 +192,10 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   }
 
   // Shared per-stage/per-subject card renderers so the "single item ->
-  // .auto-grid-single, multiple -> .auto-grid" switch below (AUDIT FIX,
-  // per user request: a lone card no longer stretches edge-to-edge —
-  // .auto-grid-single caps it at a reasonable, centered width, same
-  // treatment Study Materials already had) doesn't duplicate the card
-  // markup itself.
+  // .auto-grid-single, multiple -> .auto-grid" switch below (a lone
+  // card no longer stretches edge-to-edge — .auto-grid-single caps it
+  // at a reasonable, centered width, same treatment Study Materials
+  // already had) doesn't duplicate the card markup itself.
   const renderStageCard = (stage: ExamStage, i: number) => (
     <LiquidGlassCard key={stage.value} dark={dark} delay={i * 80}
       onClick={() => navigate(`/module/${moduleId}/stage/${stage.value}`)}
@@ -269,13 +302,18 @@ export default function ModulePage({ dark }: { dark: boolean }) {
 
         {/* Smart Summaries & Practice — side by side from tablet width
             up (.summary-practice-row, see index.css), stacked on
-            phones like every other section on this page. */}
+            phones like every other section on this page.
+
+            AUDIT FIX (per user request): both cards now check whether
+            this module actually has anything to show first — a toast
+            (same plain, non-error style as SubjectPage's "All
+            Summaries") replaces navigating into an empty page. */}
         <div className="summary-practice-row" style={{ marginBottom: 32 }}>
           <div>
             <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
               <SmartSummariesIcon color={ON_GRADIENT_TOP.muted} size={14} /> Smart Summaries
             </h2>
-            <LiquidGlassCard dark={dark} delay={0} onClick={() => navigate(`/summaries?module=${moduleId}`)} style={{ padding: 24, textAlign: 'center' }}>
+            <LiquidGlassCard dark={dark} delay={0} onClick={openAllSummaries} style={{ padding: 24, textAlign: 'center' }}>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
                 <NotesIcon color={pt.success} size={30} />
               </div>
@@ -288,7 +326,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
             <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
               <PracticeIcon color={ON_GRADIENT_TOP.muted} size={14} /> Practice
             </h2>
-            <LiquidGlassCard dark={dark} delay={0} onClick={() => navigate(`/mcq?module=${moduleId}`)} style={{ padding: 24, textAlign: 'center' }}>
+            <LiquidGlassCard dark={dark} delay={0} onClick={openPractice} style={{ padding: 24, textAlign: 'center' }}>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
                 <ExamIcon color="#e2725b" size={30} />
               </div>
