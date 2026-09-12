@@ -35,6 +35,15 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   const [loadError, setLoadError] = useState(false)
   const [driveUrl, setDriveUrl] = useState('')
   const [examStages, setExamStages] = useState<ExamStage[]>([])
+  // AUDIT FIX (per user request): exam stages are hidden entirely until
+  // there's actually something tagged to them — otherwise a brand-new
+  // module (or one where nobody has tagged content to a given stage yet)
+  // shows 4 dead-end stage cards that lead to an empty StagePage. A
+  // stage "has data" if at least one file, question, or summary in this
+  // module carries that exam_stage value — matching the same three
+  // content types StagePage itself pulls from for a stage's Study
+  // Materials / Practice / Summaries sections.
+  const [stagesWithContent, setStagesWithContent] = useState<Set<string>>(new Set())
   const [subjects, setSubjects] = useState<PageSubject[]>([])
 
   useEffect(() => {
@@ -58,6 +67,24 @@ export default function ModulePage({ dark }: { dark: boolean }) {
       setSubjects(subjects)
       if (error) setLoadError(true)
     })
+
+    // Which exam_stage values actually have something tagged to them in
+    // this module — checked across all three content types a stage can
+    // hold. Any one of the three is enough for the stage to "count".
+    Promise.all([
+      supabase.from('files').select('exam_stage').eq('module_id', moduleId).not('exam_stage', 'is', null),
+      supabase.from('questions').select('exam_stage').eq('module_id', moduleId).not('exam_stage', 'is', null),
+      supabase.from('summaries').select('exam_stage').eq('module_id', moduleId).not('exam_stage', 'is', null),
+    ]).then(([filesRes, questionsRes, summariesRes]) => {
+      if (ignore) return
+      const stages = new Set<string>()
+      ;[filesRes, questionsRes, summariesRes].forEach(res => {
+        if (res.error) { setLoadError(true); return }
+        (res.data || []).forEach((row: any) => { if (row.exam_stage) stages.add(row.exam_stage) })
+      })
+      setStagesWithContent(stages)
+    })
+
     return () => { ignore = true }
   }, [moduleId])
 
@@ -71,6 +98,11 @@ export default function ModulePage({ dark }: { dark: boolean }) {
       </div>
     </div>
   )
+
+  // AUDIT FIX (per user request): only stages with at least one tagged
+  // file/question/summary are shown — the section itself disappears
+  // entirely when none qualify, rather than showing an empty grid.
+  const visibleExamStages = examStages.filter(stage => stagesWithContent.has(stage.value))
 
   // AUDIT FIX: only render/open the Drive link when it's a real http(s)
   // URL — closes the same "unvalidated admin-entered URL used as a
@@ -150,26 +182,29 @@ export default function ModulePage({ dark }: { dark: boolean }) {
           </div>
         </div>
 
-        {/* Exam Stage */}
-        <div style={{ marginBottom: 32 }}>
-          <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ExamStageIcon color={ON_GRADIENT_TOP.muted} size={14} /> Exam Stage
-          </h2>
-          <div className="auto-grid" style={{ ['--auto-grid-cols' as any]: gridCols(examStages.length) }}>
-            {examStages.map((stage, i) => (
-              <LiquidGlassCard key={stage.value} dark={dark} delay={i * 80}
-                onClick={() => navigate(`/module/${moduleId}/stage/${stage.value}`)}
-                style={{ padding: 'clamp(20px, 2vw, 28px)', textAlign: 'center' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-                  {stage.Icon
-                    ? <stage.Icon color={stage.color} size={38} />
-                    : <span style={{ fontSize: 'clamp(28px, 3vw, 42px)' }}>{stage.emoji}</span>}
-                </div>
-                <div style={{ ...pulseType.cardTitle, fontSize: 'clamp(13px, 1.1vw, 16px)', color: pt.textPrimary }}>{stage.title}</div>
-              </LiquidGlassCard>
-            ))}
+        {/* Exam Stage — hidden entirely when no stage has any content
+            tagged to it yet (see stagesWithContent above). */}
+        {visibleExamStages.length > 0 && (
+          <div style={{ marginBottom: 32 }}>
+            <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <ExamStageIcon color={ON_GRADIENT_TOP.muted} size={14} /> Exam Stage
+            </h2>
+            <div className="auto-grid" style={{ ['--auto-grid-cols' as any]: gridCols(visibleExamStages.length) }}>
+              {visibleExamStages.map((stage, i) => (
+                <LiquidGlassCard key={stage.value} dark={dark} delay={i * 80}
+                  onClick={() => navigate(`/module/${moduleId}/stage/${stage.value}`)}
+                  style={{ padding: 'clamp(20px, 2vw, 28px)', textAlign: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+                    {stage.Icon
+                      ? <stage.Icon color={stage.color} size={38} />
+                      : <span style={{ fontSize: 'clamp(28px, 3vw, 42px)' }}>{stage.emoji}</span>}
+                  </div>
+                  <div style={{ ...pulseType.cardTitle, fontSize: 'clamp(13px, 1.1vw, 16px)', color: pt.textPrimary }}>{stage.title}</div>
+                </LiquidGlassCard>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Study by Lesson */}
         {subjects.length > 0 && (

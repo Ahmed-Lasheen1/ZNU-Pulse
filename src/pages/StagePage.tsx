@@ -201,6 +201,12 @@ export default function StagePage({ dark }: { dark: boolean }) {
           </div>
         )}
 
+        {/* AUDIT FIX (per user request): links now carry the current
+            stage (`?stage=<value>`) so SubjectPage can narrow its
+            lesson list down to only the lessons that actually have
+            content tagged to THIS stage, instead of showing every
+            lesson in the subject regardless of which stage got you
+            here. See SubjectPage.tsx's own handling of this param. */}
         {subjects.length > 0 && (
           <div style={{ marginBottom: 32 }}>
             <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -209,7 +215,7 @@ export default function StagePage({ dark }: { dark: boolean }) {
             <div className="auto-grid" style={{ ['--auto-grid-cols' as any]: gridCols(subjects.length) }}>
               {subjects.map((sub, i) => (
                 <LiquidGlassCard key={sub.id} dark={dark} delay={i * 80}
-                  onClick={() => navigate(`/module/${moduleId}/subject/${sub.id}`)}
+                  onClick={() => navigate(`/module/${moduleId}/subject/${sub.id}?stage=${stage}`)}
                   style={{ padding: 'clamp(20px, 2vw, 28px)', textAlign: 'center' }}>
                   <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
                     {sub.icon

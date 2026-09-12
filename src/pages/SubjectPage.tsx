@@ -1,6 +1,6 @@
 // src/pages/SubjectPage.tsx
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
 import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
 import ErrorBanner from '../components/ErrorBanner'
@@ -28,11 +28,23 @@ export default function SubjectPage({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const { moduleId, subjectId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const showToast = useToast() as (message: string) => void
   const { modules, modulesLoaded, modulesError } = useModules() as { modules: PageModule[]; modulesLoaded: boolean; modulesError: boolean }
   const module = modules.find(m => m.id === moduleId) || null
+
+  // AUDIT FIX (per user request): when arriving here from an exam-stage
+  // page (StagePage's "Study by Lesson" links now carry `?stage=`),
+  // only lessons that actually have content (a file, question, or
+  // summary) tagged to THIS subject + THIS exam stage are shown. When
+  // there's no `stage` param — e.g. reached from ModulePage's own
+  // (stage-agnostic) "Study by Lesson" section, or a bookmarked link —
+  // every lesson in the subject shows, exactly as before.
+  const stageParam = new URLSearchParams(location.search).get('stage')
+
   const [subject, setSubject] = useState<Subject | null>(null)
   const [lessons, setLessons] = useState<Lesson[]>([])
+  const [stageLessonIds, setStageLessonIds] = useState<Set<string> | null>(null)
   const [lessonSummaries, setLessonSummaries] = useState<LessonSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
@@ -50,16 +62,36 @@ export default function SubjectPage({ dark }: { dark: boolean }) {
       // Lesson-scoped summaries live in `summaries` (via lesson_id) —
       // there is no `lessons.summary_url` column.
       supabase.from('summaries').select('id, title, url, lesson_id').eq('subject_id', subjectId).not('lesson_id', 'is', null)
-    ]).then(([subjectRes, lessonRes, summaryRes]) => {
+    ]).then(async ([subjectRes, lessonRes, summaryRes]) => {
       if (ignore) return
       setSubject(subjectRes.subject)
       setLessons(lessonRes.lessons)
       if (summaryRes.data) setLessonSummaries(summaryRes.data)
       if (subjectRes.error || lessonRes.error || summaryRes.error) setLoadError(true)
+
+      if (stageParam) {
+        // Union of lesson_ids that have a file, question, or summary
+        // tagged with this exact exam_stage, scoped to this subject.
+        const [filesRes, questionsRes, stageSummaryRes] = await Promise.all([
+          supabase.from('files').select('lesson_id').eq('subject_id', subjectId).eq('exam_stage', stageParam).not('lesson_id', 'is', null),
+          supabase.from('questions').select('lesson_id').eq('subject_id', subjectId).eq('exam_stage', stageParam).not('lesson_id', 'is', null),
+          supabase.from('summaries').select('lesson_id').eq('subject_id', subjectId).eq('exam_stage', stageParam).not('lesson_id', 'is', null),
+        ])
+        if (ignore) return
+        const ids = new Set<string>()
+        ;[filesRes, questionsRes, stageSummaryRes].forEach(res => {
+          if (res.error) { setLoadError(true); return }
+          (res.data || []).forEach((row: any) => { if (row.lesson_id) ids.add(row.lesson_id) })
+        })
+        setStageLessonIds(ids)
+      } else {
+        setStageLessonIds(null)
+      }
+
       setLoading(false)
     })
     return () => { ignore = true }
-  }, [subjectId])
+  }, [subjectId, stageParam])
 
   if (!module) return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
@@ -86,6 +118,14 @@ export default function SubjectPage({ dark }: { dark: boolean }) {
     }
   }
 
+  // Only apply the stage filter once it's actually resolved (non-null)
+  // — while stageLessonIds is still null and a stage param is present,
+  // `loading` is still true anyway, so this never flashes the
+  // unfiltered list first.
+  const visibleLessons = stageParam && stageLessonIds
+    ? lessons.filter(l => stageLessonIds.has(l.id))
+    : lessons
+
   // Same reasoning as ModulePage/StagePage's renderFileCard: a single
   // lesson used to still go through the full-width `.auto-grid`
   // (gridCols(1) === 1 column stretched to the row's whole width) —
@@ -110,7 +150,7 @@ export default function SubjectPage({ dark }: { dark: boolean }) {
       <div className="pulse-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body }}>
 
         <div style={{ marginBottom: 8 }}>
-          <BackButton dark={dark} fallback={`/module/${moduleId}`} />
+          <BackButton dark={dark} fallback={stageParam ? `/module/${moduleId}/stage/${stageParam}` : `/module/${moduleId}`} />
         </div>
 
         <div style={{ textAlign: 'center', padding: '10px 0 30px' }}>
@@ -158,20 +198,21 @@ export default function SubjectPage({ dark }: { dark: boolean }) {
         {loading && <p style={{ color: ON_GRADIENT_TOP.secondary, textAlign: 'center' }}>Loading...</p>}
         {loadError && <ErrorBanner />}
 
-        {!loading && lessons.length === 0 && (
+        {!loading && visibleLessons.length === 0 && (
           <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
             <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              <ConstructionIcon color={pt.sub} size={14} /> No lessons here yet
+              <ConstructionIcon color={pt.sub} size={14} />
+              {stageParam ? 'No lessons tagged to this exam stage yet' : 'No lessons here yet'}
             </p>
           </LiquidGlassCard>
         )}
 
-        {lessons.length > 0 && (
-          lessons.length === 1 ? (
-            <div className="auto-grid-single">{renderLessonCard(lessons[0], 0)}</div>
+        {visibleLessons.length > 0 && (
+          visibleLessons.length === 1 ? (
+            <div className="auto-grid-single">{renderLessonCard(visibleLessons[0], 0)}</div>
           ) : (
-            <div className="auto-grid" style={{ ['--auto-grid-cols' as any]: gridCols(lessons.length) }}>
-              {lessons.map(renderLessonCard)}
+            <div className="auto-grid" style={{ ['--auto-grid-cols' as any]: gridCols(visibleLessons.length) }}>
+              {visibleLessons.map(renderLessonCard)}
             </div>
           )
         )}
