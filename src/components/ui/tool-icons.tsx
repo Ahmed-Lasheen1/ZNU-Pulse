@@ -746,3 +746,60 @@ export function UploadIcon({ color, size = 16 }: IconProps) {
     </svg>
   )
 }
+
+// ── Weekly Report card icons (moved from Home.tsx for reuse) ───────
+
+export function WeeklyReportIcon({ color, size = 18 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path
+        d="M4 9.5l4.5-3.5 4.5 2.5L19 3"
+        stroke={color}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity="0.5"
+      />
+      <path d="M4 20v-6.5" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M9.5 20V11" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M15 20v-9" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M20 20V6" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function StreakFlameIcon({ color, size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      {/* Outer flame body — flickering, asymmetric silhouette */}
+      <path
+        d="M12.6 1.5c.35 1.9-.4 3.05-1.35 4.25C9.9 7.35 8.4 9.1 8.4 11.9c0 .95.18 1.75.42 2.45-.85-.55-1.42-1.5-1.42-2.75 0-.55.08-1 .2-1.4C5.9 11.6 5 13.85 5 16.05 5 19.9 8.1 23 11.95 23c4.15 0 7.55-3.05 7.55-7.3 0-2.55-1.15-4.3-2.35-5.9-.35 1.1-.95 1.85-1.7 2.5.35-1.35.35-2.65-.05-3.95-.55-1.85-1.85-3.15-2.8-4.85Z"
+        stroke={color}
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        opacity="0.9"
+      />
+      {/* Mid flame — offset tongue for depth */}
+      <path
+        d="M13.4 9.4c.6 1.25.75 2.55.4 3.9-.3 1.15-1 2-1.85 2.75.5-1.05.55-2.05.15-3.05-.3-.75-.85-1.3-1.35-1.9-.45-.55-.8-1.15-.75-1.95.05-.85.55-1.5 1.05-2.15.35.85.9 1.55 2.35 2.4Z"
+        fill={color}
+        opacity="0.28"
+      />
+      {/* Inner glow — hottest core near the base */}
+      <path
+        d="M12 21.2c1.9 0 3.45-1.45 3.45-3.5 0-1.35-.75-2.25-1.4-3.15-.25.95-.75 1.5-1.4 1.95.15-1.1-.15-2-1-2.85-.35 1.05-1.15 1.7-1.9 2.45-.7.7-1.2 1.5-1.2 2.5 0 1.55 1.35 2.6 3.45 2.6Z"
+        fill={color}
+        opacity="0.45"
+      />
+      {/* Small pulsing ember */}
+      <motion.circle
+        cx="17.2" cy="6.4" r="0.85"
+        fill={color}
+        initial={{ opacity: 0.3, scale: 0.7 }}
+        animate={{ opacity: [0.3, 0.9, 0.3], scale: [0.7, 1, 0.7] }}
+        transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+      />
+    </svg>
+  )
+}

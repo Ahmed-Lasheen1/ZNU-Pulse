@@ -19,7 +19,7 @@ import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import EcgHero from '../components/pulse/EcgHero'
 import PulseBackground from '../components/pulse/PulseBackground'
 import PulseBrand from '../components/pulse/PulseBrand'
-import { ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, PauseIcon, LightningIcon, CheckCircleIcon } from '@/components/ui/tool-icons'
+import { ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, PauseIcon, LightningIcon, CheckCircleIcon, WeeklyReportIcon, StreakFlameIcon } from '@/components/ui/tool-icons'
 import { NumberTicker } from '@/components/ui/number-ticker'
 import { ModuleIcon } from '../lib/medicalIcons'
 import { accuracyTier, accuracyColor, type AccuracyTier } from './mcq/mcqShared'
@@ -92,49 +92,6 @@ function weeklyAccuracyFeedback(accuracy: number, pt: ReturnType<typeof getPulse
     needs_work: "Let's turn it around this week.",
   }
   return { label: labels[accuracyTier(accuracy)], color: accuracyColor(accuracy, pt) }
-}
-
-// ── Custom line-art icons for the Weekly Report card ────────────────
-// Drawn in the same convention as src/components/ui/tool-icons.tsx
-// (thin ~1.6-1.8px rounded strokes) — replaces the plain 📊 and 🔥
-// emoji with purpose-built glyphs instead.
-
-function WeeklyReportIcon({ color, size = 18 }: { color: string; size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path
-        d="M4 9.5l4.5-3.5 4.5 2.5L19 3"
-        stroke={color}
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity="0.5"
-      />
-      <path d="M4 20v-6.5" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M9.5 20V11" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M15 20v-9" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M20 20V6" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function StreakFlameIcon({ color, size = 16 }: { color: string; size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path
-        d="M12 21c4.2 0 7-2.9 7-6.8 0-3-1.9-4.8-3-7.6-.9 2.6-2.7 2.8-2.7 5.3 0-2.8-1.9-4.6-.9-7.4C9.5 6.3 7 9.7 7 13.4 7 17.6 9.4 21 12 21Z"
-        stroke={color}
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-      <path
-        d="M12 21c1.7 0 3-1.3 3-3.1 0-1.6-1.1-2.5-1.6-3.6-.5 1.1-1.4 1.3-1.4 2.6 0-1.3-.9-2-.6-3.3-1.5 1-2.4 2.7-2.4 4.3 0 1.8 1.3 3.1 3 3.1Z"
-        fill={color}
-        opacity="0.35"
-      />
-    </svg>
-  )
 }
 
 // Major dashboard-number style (weekly accuracy %, questions attempted,
