@@ -106,6 +106,11 @@ const CLOSE_DURATION = 0.55
 // avoid the iOS Safari address-bar collapse/expand gap.
 const PANEL_MAX_HEIGHT = 'calc(100dvh - 140px)'
 
+// Per-row nav-item stagger (see the AUDIT FIX note above the nav
+// items block below) — how far apart each row's own reveal/hide
+// delay is from its neighbor's, in seconds.
+const NAV_ITEM_STAGGER = 0.03
+
 // AUDIT FIX (respect prefers-reduced-motion): none of the animated
 // bits below — the panel's scale/opacity, the content's y/opacity, the
 // decorative bloom, the trigger button's hover/tap scale — used to
@@ -699,19 +704,51 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
 
           {/* Navigation — icon before label, same icon set (and
               accent colors) as Home's own tool cards. Hover is the
-              GlassRow pop now, not a letter animation. */}
-          {navItems.map(item => {
+              GlassRow pop now, not a letter animation.
+
+              AUDIT FIX (per user request): each row is now wrapped in
+              its own motion.div that staggers in/out — same spring
+              feel as the reference ListItem component's entrance
+              (type: spring, bounce: 0.1, duration: 0.25), just driven
+              by this panel's own `open` boolean instead of a
+              mount/unmount. On open, row 0 leads and each subsequent
+              row is delayed a further NAV_ITEM_STAGGER seconds — a
+              simple staggered reveal, top to bottom. On close, the
+              delay order is reversed (the LAST row gets the shortest
+              delay, the FIRST row gets the longest), so closing plays
+              as a genuine mirror of opening: the bottom row disappears
+              first and the top row lingers longest, rather than every
+              row just fading out in the same top-to-bottom order they
+              appeared in. Skips the stagger and the `y` slide entirely
+              under prefers-reduced-motion, matching every other
+              animated piece in this panel. */}
+          {navItems.map((item, index) => {
             const Icon = item.Icon
             const iconColor = pt[item.accent] || pt.text
+            const openDelay = index * NAV_ITEM_STAGGER
+            const closeDelay = (navItems.length - 1 - index) * NAV_ITEM_STAGGER
             return (
-              <GlassRow key={item.href} dark={dark} radius={16} onClick={() => goTo(item.href)} tabIndex={open ? 0 : -1}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px' }}>
-                  <Icon color={iconColor} size={17} />
-                  <span style={{ color: pt.text, fontWeight: item.href === '/' ? 800 : 600, fontSize: 14, fontFamily: 'inherit' }}>
-                    {item.label}
-                  </span>
-                </div>
-              </GlassRow>
+              <motion.div
+                key={item.href}
+                initial={false}
+                animate={reducedMotion
+                  ? { opacity: open ? 1 : 0 }
+                  : { opacity: open ? 1 : 0, y: open ? 0 : 24 }
+                }
+                transition={reducedMotion
+                  ? { duration: 0.15 }
+                  : { type: 'spring', bounce: 0.1, duration: 0.25, delay: open ? openDelay : closeDelay }
+                }
+              >
+                <GlassRow dark={dark} radius={16} onClick={() => goTo(item.href)} tabIndex={open ? 0 : -1}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px' }}>
+                    <Icon color={iconColor} size={17} />
+                    <span style={{ color: pt.text, fontWeight: item.href === '/' ? 800 : 600, fontSize: 14, fontFamily: 'inherit' }}>
+                      {item.label}
+                    </span>
+                  </div>
+                </GlassRow>
+              </motion.div>
             )
           })}
 
