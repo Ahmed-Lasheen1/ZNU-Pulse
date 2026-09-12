@@ -47,7 +47,7 @@ export default function Footer({ dark }) {
       <div className="pulse-wide" style={{ padding: '0 20px' }}>
         <div className="site-footer-legal">
           <span style={{ color: ON_GRADIENT_BOTTOM.secondary, fontSize: 13, fontWeight: 600 }}>
-            Made with ❤️ by Ahmed Lasheen
+            Designed & built by Ahmed Lasheen
           </span>
 
           <div style={{ marginTop: 2 }}>
@@ -68,9 +68,6 @@ export default function Footer({ dark }) {
             </PulseGlassRow>
           </div>
 
-          <span style={{ color: ON_GRADIENT_BOTTOM.muted, fontSize: 12, fontWeight: 600 }}>
-            © {year} ZNU Pulse. All rights reserved.
-          </span>
           <div style={{ marginTop: 4 }}>
             <PulseGlassRow dark={true} radius={999} hoverTint={HOVER_TINT} onClick={backToTop}
               role="button" tabIndex={0}
@@ -80,6 +77,10 @@ export default function Footer({ dark }) {
               </div>
             </PulseGlassRow>
           </div>
+
+          <span style={{ color: ON_GRADIENT_BOTTOM.muted, fontSize: 12, fontWeight: 600 }}>
+            © {year} ZNU Pulse
+          </span>
         </div>
       </div>
     </footer>
