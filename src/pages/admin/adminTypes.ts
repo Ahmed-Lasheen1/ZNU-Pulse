@@ -27,4 +27,5 @@ export interface AdminLesson {
   subject_id: string
   title: string
   icon?: string | null
+  exam_stage?: string | null
 }
