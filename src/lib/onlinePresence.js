@@ -1,11 +1,9 @@
 import { supabase } from '../supabase'
 
-// Lightweight "who's online right now" signal using Supabase Realtime
-// Presence — no table needed. Every function here is wrapped in its
-// own try/catch: this stat is a nice-to-have for the Admin Analytics
-// tab, and NOTHING it does should ever be able to crash the page it's
-// shown on. If Realtime isn't available or misbehaves for any reason,
-// callers just get a count of 0 instead of an exception.
+// "Who's online right now" for Admin Analytics, via Supabase Realtime
+// Presence — no table needed. Every function is wrapped in try/catch:
+// this is a nice-to-have stat, and nothing here should ever crash the
+// page it's shown on.
 const CHANNEL_NAME = 'znu-online-presence'
 
 let channel = null
@@ -40,9 +38,8 @@ function safeSubscribe(ch, onStatus) {
   }
 }
 
-// Call once when the app mounts (see App.jsx) so every visitor —
-// signed in or guest — shows up in the count. Safe to call more than
-// once — reuses the same underlying channel.
+// Call once when the app mounts so every visitor — signed in or guest
+// — counts. Safe to call more than once; reuses the same channel.
 export function subscribeOnlinePresence() {
   try {
     const ch = safeGetChannel()
@@ -67,11 +64,8 @@ export function subscribeOnlinePresence() {
   }
 }
 
-// Used by the Admin Analytics tab to read the live count. Reuses the
-// SAME channel the rest of the app already tracks presence on. Calls
-// onCount() with the current number of distinct tabs/devices online,
-// and again automatically whenever someone joins or leaves. Every step
-// is guarded — worst case it just reports 0 instead of throwing.
+// Used by Admin Analytics to read the live count and get notified on
+// every join/leave. Every step is guarded — worst case reports 0.
 export function watchOnlineCount(onCount) {
   try {
     const ch = safeGetChannel()

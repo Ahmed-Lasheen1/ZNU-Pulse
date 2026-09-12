@@ -1,9 +1,6 @@
 import { supabase } from '../supabase'
 
-// Set as VITE_VAPID_PUBLIC_KEY in Vercel's environment variables —
-// safe to expose to the browser (that's the whole point of the
-// public half of the VAPID keypair). The private key never goes
-// near client code.
+// Public half of the VAPID keypair — safe to expose to the browser.
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY
 
 function urlBase64ToUint8Array(base64String) {
@@ -13,24 +10,16 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)))
 }
 
-// Call this right after Notification permission is granted, and also
-// silently on every page load (see NotifyPermissionButton) to keep the
-// server-side record in sync. Reuses an existing subscription if the
-// browser already has one; otherwise creates one and saves it.
+// Call right after Notification permission is granted, and also
+// silently on every page load, to keep the server-side record in
+// sync. Reuses an existing browser subscription if present.
 //
-// Saves it via the upsert_push_subscription RPC rather than a direct
-// table upsert. Direct table access to push_subscriptions is
-// intentionally locked down now (RLS only exposes a row you already
-// own, nothing "unclaimed") — the RPC is a security-definer function
-// that can see the one row matching this exact endpoint, insert it if
-// new, and claim it for the signed-in caller (via auth.uid(), not a
-// client-supplied id) without ever needing broader table access. If
-// the endpoint is already claimed by a DIFFERENT account, the RPC
-// silently no-ops rather than overwriting someone else's keys.
-//
-// Returns { success: boolean, reason?: string } so the caller can
-// actually tell the student what went wrong instead of nothing
-// happening with no explanation.
+// Saves via the upsert_push_subscription RPC rather than a direct
+// table upsert — RLS locks push_subscriptions to "a row you already
+// own," so this security-definer RPC can see the one row matching
+// this endpoint, insert if new, and claim it via auth.uid() without
+// broader table access. If already claimed by a different account,
+// it silently no-ops.
 export async function subscribeToPush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     console.warn('[push] Push not supported in this browser.')
@@ -71,17 +60,10 @@ export async function subscribeToPush() {
   }
 }
 
-// Turns push off for this device — used by the Profile page's
-// notification toggle. Unsubscribes the browser's own PushManager
-// subscription (so it genuinely stops receiving pushes) and removes
-// the matching row from push_subscriptions (so this device also stops
-// counting toward Admin Analytics' "Notifications Enabled" stat).
-//
-// The delete is a direct table call rather than an RPC, on the same
-// assumption subscribeToPush's RLS comment describes: a caller can
-// only ever see/mutate a row it already owns, so a plain delete
-// filtered to this device's own endpoint is safe — there's no
-// "someone else's row" it could reach.
+// Turns push off for this device — unsubscribes the browser's own
+// PushManager subscription and removes the matching server row (via
+// a security-definer RPC, since guest rows have user_id IS NULL and
+// RLS's `auth.uid() = user_id` never matches NULL = NULL).
 export async function unsubscribeFromPush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     return { success: false, reason: 'unsupported' }
@@ -90,17 +72,12 @@ export async function unsubscribeFromPush() {
   try {
     const reg = await navigator.serviceWorker.ready
     const sub = await reg.pushManager.getSubscription()
-    if (!sub) return { success: true } // nothing to turn off
+    if (!sub) return { success: true }
 
     const endpoint = sub.endpoint
     await sub.unsubscribe()
 
-   // Goes through a security-definer RPC (mirrors upsert_push_subscription's
-   // own ownership rule) instead of a direct table delete — a plain
-   // delete().eq('endpoint', endpoint) silently matched zero rows for guest
-   // devices, since their row has user_id IS NULL and the RLS delete policy
-   // (auth.uid() = user_id) never matches NULL = NULL.
-   const { error } = await supabase.rpc('delete_push_subscription', { p_endpoint: endpoint })
+    const { error } = await supabase.rpc('delete_push_subscription', { p_endpoint: endpoint })
     if (error) {
       console.warn('[push] Could not remove subscription from Supabase:', error)
       return { success: false, reason: 'db_delete_failed', error }

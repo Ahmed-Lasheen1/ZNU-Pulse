@@ -3,13 +3,10 @@ import { supabase } from '../supabase'
 import { subscribeToPush } from './pushNotifications'
 
 // Shared "is push actually working on this device right now" check —
-// used by both NotifyPermissionButton (the inline call-to-action on
-// Home/Checklist/AnonQuestions) and NotificationToggle (the
-// persistent on/off switch on the Profile page), so the two never
-// disagree about what "enabled" means. `enabled` here means a real,
-// server-verified subscription — not just Notification.permission
-// being 'granted', which can be true even with no working
-// subscription behind it (see the RPC check below).
+// used by both NotifyPermissionButton and NotificationToggle so the
+// two never disagree. `enabled` means a real, server-verified
+// subscription — not just Notification.permission === 'granted',
+// which can be true with no working subscription behind it.
 export function useNotificationStatus() {
   const supported = typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window
   const [permission, setPermission] = useState(() =>
@@ -40,16 +37,15 @@ export function useNotificationStatus() {
         return
       }
 
-      // See push_subscription_exists' own comment in pushNotifications.js
-      // for why this goes through an RPC rather than a direct select.
+      // Goes through an RPC (see push_subscription_exists) rather than
+      // a direct select — see pushNotifications.js for the RLS reasoning.
       const { data: exists, error } = await supabase.rpc('push_subscription_exists', { p_endpoint: sub.endpoint })
 
       if (!error && exists) {
         setEnabled(true)
       } else {
-        // Browser has a subscription object and permission is granted,
-        // but the server doesn't have (or can't yet claim) it — try to
-        // silently (re)save it once before reporting "off".
+        // Browser has a subscription and permission is granted, but the
+        // server doesn't have it yet — try to silently (re)save it once.
         const result = await subscribeToPush()
         setEnabled(!!result.success)
       }
@@ -63,9 +59,8 @@ export function useNotificationStatus() {
     let cancelled = false
     check()
 
-    // Re-check whenever the tab regains focus/visibility — catches a
-    // permission grant/denial made from the browser's own site-
-    // settings UI while this tab was backgrounded.
+    // Re-check on tab focus/visibility, to catch a permission change
+    // made from the browser's own site-settings UI while backgrounded.
     function onVisibilityChange() {
       if (document.visibilityState === 'visible' && !cancelled) check()
     }
