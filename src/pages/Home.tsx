@@ -487,7 +487,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                     </div>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, color: pt.terracotta }}>
-                        <StreakFlameIcon color={pt.terracotta} size={16} />
+                        <StreakFlameIcon size={16} />
                         <span style={{ ...pulseType.display, fontSize: 22, lineHeight: 1 }}>
                           {playEntrance
                             ? <NumberTicker value={streak} delay={tickerBaseDelay + 0.3} />
