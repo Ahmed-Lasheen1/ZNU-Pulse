@@ -771,41 +771,47 @@ export function WeeklyReportIcon({ color, size = 18 }: IconProps) {
 
 export function StreakFlameIcon({ size = 16 }: { size?: number }) {
   const gradientId = useId()
+  const height = (size * 511.4) / 384
+
   return (
-    <svg width={size} height={size} viewBox="-33 0 255 255" xmlns="http://www.w3.org/2000/svg">
+    <svg width={size} height={height} viewBox="0 0 384 511.4" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id={gradientId} gradientUnits="userSpaceOnUse" x1="94.141" y1="255" x2="94.141" y2="0.188">
-          <stop offset="0" stopColor="#ff4c0d" />
-          <stop offset="1" stopColor="#fc9502" />
+        <linearGradient id={gradientId} gradientUnits="userSpaceOnUse" x1="163.52" y1="286.47" x2="163.52" y2="500.71">
+          <stop offset="0" stopColor="#FB6404" />
+          <stop offset="1" stopColor="#F2BE10" />
         </linearGradient>
       </defs>
+
+      {/* One-time entrance — same draw-in curve/duration ScheduleIcon
+          uses for its checkmark (drawTransition), adapted to a
+          scale+fade reveal since this is a filled shape rather than a
+          stroked path. */}
       <motion.g
         style={{ transformOrigin: '50% 100%' }}
-        animate={{
-          scaleY: [1, 1.06, 0.96, 1.04, 1],
-          scaleX: [1, 0.97, 1.03, 0.98, 1],
-          rotate: [0, -1.5, 1.5, -1, 0],
-        }}
-        transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
+        initial={{ opacity: 0, scale: 0.4 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ ...drawTransition, delay: 0.15 }}
       >
-        <path
-          d="M187.899,164.809 C185.803,214.868 144.574,254.812 94.000,254.812 C42.085,254.812 -0.000,211.312 -0.000,160.812 C-0.000,154.062 -0.121,140.572 10.000,117.812 C16.057,104.191 19.856,95.634 22.000,87.812 C23.178,83.513 25.469,76.683 32.000,87.812 C35.851,94.374 36.000,103.812 36.000,103.812 C36.000,103.812 50.328,92.817 60.000,71.812 C74.179,41.019 62.866,22.612 59.000,9.812 C57.662,5.384 56.822,-2.574 66.000,0.812 C75.352,4.263 100.076,21.570 113.000,39.812 C131.445,65.847 138.000,90.812 138.000,90.812 C138.000,90.812 143.906,83.482 146.000,75.812 C148.365,67.151 148.400,58.573 155.999,67.813 C163.226,76.600 173.959,93.113 180.000,108.812 C190.969,137.321 187.899,164.809 187.899,164.809 Z"
-          fill={`url(#${gradientId})`}
-          fillRule="evenodd"
-        />
-        <path
-          d="M94.000,254.812 C58.101,254.812 29.000,225.711 29.000,189.812 C29.000,168.151 37.729,155.000 55.896,137.166 C67.528,125.747 78.415,111.722 83.042,102.172 C83.953,100.292 86.026,90.495 94.019,101.966 C98.212,107.982 104.785,118.681 109.000,127.812 C116.266,143.555 118.000,158.812 118.000,158.812 C118.000,158.812 125.121,154.616 130.000,143.812 C131.573,140.330 134.753,127.148 143.643,140.328 C150.166,150.000 159.127,167.390 159.000,189.812 C159.000,225.711 129.898,254.812 94.000,254.812 Z"
-          fill="#fc9502"
-          fillRule="evenodd"
-        />
-        <motion.path
-          d="M95.000,183.812 C104.250,183.812 104.250,200.941 116.000,223.812 C123.824,239.041 112.121,254.812 95.000,254.812 C77.879,254.812 69.000,240.933 69.000,223.812 C69.000,206.692 85.750,183.812 95.000,183.812 Z"
-          fill="#fce202"
-          fillRule="evenodd"
-          style={{ transformOrigin: '50% 60%' }}
-          animate={{ scale: [1, 1.12, 0.95, 1.08, 1], opacity: [0.9, 1, 0.85, 1, 0.9] }}
-          transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut', delay: 0.2 }}
-        />
+        {/* Continuous flicker — same idea as the previous flame icon's
+            own animation, just wrapping the new artwork. */}
+        <motion.g
+          style={{ transformOrigin: '50% 100%' }}
+          animate={{
+            scaleY: [1, 1.06, 0.96, 1.04, 1],
+            scaleX: [1, 0.97, 1.03, 0.98, 1],
+            rotate: [0, -1.5, 1.5, -1, 0],
+          }}
+          transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          <path
+            fill="#E20919"
+            d="M77.46 228.43C65.33 119.85 128.78 43.48 247.72 0c-72.85 94.5 62.09 196.88 69.53 295.03 17.44-29.75 27.34-69.48 29.3-122.55 89.18 139.92 15.25 368.59-181.02 335.73-18.02-3.01-35.38-8.7-51.21-17.17C42.76 452.8 0 369.53 0 290c0-50.69 21.68-95.95 49.74-131.91 3.75 35.23 11.73 61.51 27.72 70.34z"
+          />
+          <path
+            fill={`url(#${gradientId})`}
+            d="M139.16 372.49c-21.83-57.66-18.81-150.75 42.33-183.41.43 107.03 103.57 120.64 84.44 234.9 17.64-20.39 26.51-53.02 28.1-78.75 27.96 65.38 6.04 117.72-33.81 144.37-121.15 81-225.48-83.23-156.11-173.26 2.08 20.07 26.14 51.12 35.05 56.15z"
+          />
+        </motion.g>
       </motion.g>
     </svg>
   )
