@@ -8,28 +8,15 @@ interface QuestionRailProps {
   accent: string
 }
 
-// Slim segmented progress rail shown above the focused question in
-// MCQ's single-question quiz view — replaces the old numbered-grid
-// QuestionPalette. Each segment represents one question: solid for the
-// current question, translucent for answered ones, outlined/neutral
-// for untouched ones, with a small dot above any flagged question
-// regardless of its answered state. Tapping a segment jumps straight
-// to that question.
+// Segmented progress rail above the focused question in MCQ's
+// single-question view — one segment per question, tap to jump.
 export default function QuestionRail({
   total, currentIndex, answeredIndexes, flaggedIndexes, onGoTo, dark, accent
 }: QuestionRailProps) {
   return (
     <div style={{
       display: 'flex',
-      // AUDIT FIX: this was a flat `gap: 4`. Practice quizzes run up
-      // to 50 questions and mock exams up to 36 — at 50 segments that's
-      // 49 gaps × 4px = 196px eaten by gaps alone, which on a ~360-380px
-      // mobile viewport left each segment only 3-4px wide (before its
-      // own border/shadow), collapsing the rail into an indistinguishable
-      // stripe right on the device this "jump to question" control
-      // matters most on. clamp() lets the gap shrink proportionally on
-      // narrow screens while resolving to the exact same 4px as before
-      // on desktop (0.6vw only exceeds 4px above ~666px viewport width).
+      // Gap shrinks on narrow viewports so up to 50 segments still fit.
       gap: 'clamp(1px, 0.6vw, 4px)',
       marginBottom: 18, alignItems: 'flex-end'
     }}>

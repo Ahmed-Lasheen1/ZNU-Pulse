@@ -8,42 +8,21 @@ import { useOncePerSession } from '../lib/useOncePerSession'
 import { useLimitedAppearance } from '../lib/useLimitedAppearance'
 import { BellIcon } from './ui/tool-icons'
 
-// How many page loads this prompt gets to appear on before it retires
-// for good — see the AUDIT FIX note below.
+// Max page loads this prompt shows before retiring permanently for this device.
 const MAX_PROMPT_SHOWS = 3
 
-// Strips a leading emoji/symbol (and any trailing whitespace) off a
-// label string — lets existing callers that still pass an
-// emoji-prefixed label (e.g. "🔔 Enable reminders") keep working
-// unchanged, now that the bell icon itself is rendered separately
-// below instead of relying on that leading emoji character.
+// Strips a leading emoji/symbol from a label (e.g. "🔔 Enable reminders")
+// since the bell icon is now rendered separately from the text.
 function stripLeadingEmoji(text) {
   return text.replace(/^[^\p{L}\p{N}]+/u, '').trim()
 }
 
-// Small reusable "Enable notifications" call-to-action button.
-//
-// Support/permission/subscription state comes from the shared
-// useNotificationStatus hook — the same one the persistent toggle on
-// the Profile page reads (see NotificationToggle.tsx) — so the two
-// can never disagree about whether notifications are actually on for
-// this device.
-//
-// AUDIT FIX (per user request): this used to render on every single
-// reload for as long as notifications stayed off, which trained
-// people to tune it out rather than act on it — annoying, especially
-// since Profile's NotificationToggle is always available as a manual
-// way in. The prompt now only shows on the first MAX_PROMPT_SHOWS page
-// loads (see useLimitedAppearance) and then disappears permanently,
-// regardless of whether the person ever tapped it. Enabling
-// notifications (or a browser permission change) is unaffected — this
-// only governs whether the *ask* itself keeps resurfacing.
-//
-// AUDIT FIX (still true): the "not supported" and "blocked" cases
-// don't render inline explanatory text — both are a single toast,
-// shown once per browser tab session (see useOncePerSession). The
-// student can check or fix their notification setting any time from
-// the toggle on the Profile page.
+// "Enable notifications" call-to-action button. Shares status with
+// NotificationToggle.tsx (Profile page) via useNotificationStatus so the
+// two never disagree about whether push is actually on for this device.
+// The prompt itself only appears for the first MAX_PROMPT_SHOWS page loads
+// (see useLimitedAppearance), then disappears for good regardless of
+// whether it was ever tapped — Profile's toggle remains available always.
 export default function NotifyPermissionButton({ dark, label = 'Enable notifications' }) {
   const pt = getPulseTheme(dark)
   const showToast = useToast()
@@ -53,13 +32,14 @@ export default function NotifyPermissionButton({ dark, label = 'Enable notificat
   const canToastUnsupported = useOncePerSession('znu_notif_unsupported_toast')
   const canToastDenied = useOncePerSession('znu_notif_denied_toast')
 
-  // Everything that would make this button worth showing at all,
-  // independent of the reload budget below — kept separate so the
-  // budget is only ever spent on loads where the button actually had
-  // something to say.
+  // Whether this button has anything worth showing, independent of the
+  // reload budget — so the budget is only ever spent on loads where it
+  // actually had something to say.
   const wouldShow = checked && supported && permission !== 'denied' && !enabled
   const allowedByBudget = useLimitedAppearance('znu_notif_prompt', wouldShow, MAX_PROMPT_SHOWS)
 
+  // "Not supported" and "blocked" states surface as a one-time toast per
+  // tab session rather than persistent inline text.
   useEffect(() => {
     if (!checked || !canToastUnsupported) return
     if (!supported) {

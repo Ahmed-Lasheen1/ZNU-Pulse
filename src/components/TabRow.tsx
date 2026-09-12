@@ -5,21 +5,12 @@ import PulseGlassRow from './pulse/PulseGlassRow'
 export interface TabRowItem {
   value: string
   label: string
-  // Emoji or "icon:<key>" — rendered via ModuleIcon. Omit for
-  // plain-text pills (stage/subject filters usually just bake the
-  // emoji straight into `label` instead).
+  // Emoji or "icon:<key>" string, resolved via ModuleIcon.
   icon?: string | null
-  // A real icon component to render directly instead of going through
-  // ModuleIcon's string-based resolver — used for the 4 built-in exam
-  // stages (see src/lib/examStages.js), which now carry a real icon
-  // component rather than an emoji string. Takes precedence over
-  // `icon` when both are present.
+  // Real icon component — takes precedence over `icon` when both are set.
   Icon?: (props: { color: string; size?: number }) => JSX.Element
-  // Per-item color (module color, subject color). Falls back to
-  // `accentColor` when not set, so a stage/subject filter row with
-  // one shared accent doesn't need to repeat it on every item.
+  // Per-item color; falls back to `accentColor` when unset.
   color?: string
-  // Shows a small trailing checkmark — used for completed modules.
   completed?: boolean
 }
 
@@ -32,24 +23,9 @@ interface TabRowProps {
   style?: React.CSSProperties
 }
 
-// Single shared "row of glass pills" component. Covers module
-// switching (Checklist/Schedule/FilesPage), exam-stage filtering
-// (MCQ/Summaries), and subject filtering (MCQ/FilesPage) — anywhere a
-// page needs "pick one of N options, show which is active."
-//
-// Replaces ModuleTabs.tsx (whose own comment incorrectly claimed MCQ
-// used it — MCQ actually rendered a static label, not a tab row) plus
-// three independently hand-rolled inline PulseGlassRow blocks that
-// had drifted slightly out of sync with each other (Summaries' stage
-// row used smaller padding/font size than MCQ's identical-looking
-// row). One component now, one place to tune padding/radius/hover for
-// every tab-like row in the app.
-//
-// Ships with the scroll-snap treatment (paddingRight + scrollSnapType
-// + per-pill scrollSnapAlign) that used to be copy-pasted as a
-// one-off "AUDIT FIX" into MCQ.tsx and Summaries.tsx individually —
-// every consumer gets it for free now, including FilesPage's old
-// subject row, which never had it.
+// Shared row of glass pills for tab-style selection — module switching,
+// exam-stage filters, and subject filters across MCQ/Summaries/Checklist/
+// Schedule/FilesPage all use this instead of separately hand-rolled rows.
 export default function TabRow({ items, active, onSelect, dark, accentColor, style }: TabRowProps) {
   const pt = getPulseTheme(dark)
   const hoverTint = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'
