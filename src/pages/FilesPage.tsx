@@ -8,9 +8,10 @@ import ErrorBanner from '../components/ErrorBanner'
 import TabRow from '../components/TabRow'
 import MediaOverlay from '../components/MediaOverlay'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
-import PulseBackground from '../components/pulse/PulseBackground'
-import BackButton from '../components/pulse/BackButton'
+import PageShell from '../components/pulse/PageShell'
 import PageIntro from '../components/pulse/PageIntro'
+import LoadingText from '../components/pulse/LoadingText'
+import EmptyState from '../components/pulse/EmptyState'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
 import { fetchSubjectsForModule } from '../lib/subjects'
 import { getDriveOrRawUrl, getVideoEmbedUrl } from '../lib/embedUrl'
@@ -42,14 +43,9 @@ interface FilesSubject {
 
 const FILE_ACCENT = '#38bdf8'
 
-// Fixed display order for the type tabs — matches the order the type
-// cards used to appear in on ModulePage/StagePage's Study Materials
-// section, so nothing about the ordering feels different now that
-// it's a tab row instead of separate cards.
+// Fixed display order for the type tabs, matching the old per-type cards.
 const TYPE_ORDER = ['sharah', 'questions', 'lectures', 'courses'] as const
 
-// Icon + label for a given file_type value ('pdf' | 'video' | 'audio')
-// — replaces the old emoji-string getFileIcon/getOpenLabel helpers.
 function fileTypeIcon(type: string, color: string, size = 20) {
   if (type === 'video') return <VideoIcon color={color} size={size} />
   if (type === 'audio') return <AudioIcon color={color} size={size} />
@@ -98,15 +94,6 @@ function AudioViewer({ url, name, onClose, dark }: { url: string; name: string; 
 
 export default function FilesPage({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
-  // AUDIT FIX (files-as-one-card): files are now fetched per MODULE
-  // (all types at once) instead of per TYPE. Previously the page was
-  // always reached via a dedicated "Explanation Files" / "Question
-  // Files" / etc card, so the type was already decided before arriving
-  // here and the query could filter to just that one type. Now that
-  // ModulePage/StagePage collapse those into a single "Files" card,
-  // the type itself is chosen here via a tab row — so this needs the
-  // full set of a module's files up front to know which type tabs to
-  // even show.
   const [files, setFiles] = useState<FileRow[]>([])
   const { modules, modulesLoaded, modulesError } = useModules() as {
     modules: FilesModule[]; modulesLoaded: boolean; modulesError: boolean
@@ -121,15 +108,7 @@ export default function FilesPage({ dark }: { dark: boolean }) {
   const location = useLocation()
   const params = new URLSearchParams(location.search)
   const moduleParam = params.get('module')
-  // Still accepted for backward compatibility (old links, or a
-  // specific-file Search result — see fileParam below) — just no
-  // longer the only way to land on a given type, and no longer
-  // required at all.
   const typeParam = params.get('type')
-  // AUDIT FIX (search accuracy): a specific file id from Search.tsx
-  // (`?file=<id>`) — once this module's files finish loading, the
-  // matching file's viewer opens directly (see the effect below)
-  // instead of leaving the person to find it again in the list.
   const fileParam = params.get('file')
   const typeMeta = activeType ? TYPE_META[activeType] : null
 
@@ -162,15 +141,10 @@ export default function FilesPage({ dark }: { dark: boolean }) {
     return () => { ignore = true }
   }, [activeModule])
 
-  // Which type tabs are actually worth showing for this module, in a
-  // fixed display order.
   const availableTypes = TYPE_ORDER.filter(t => files.some(f => f.type === t))
 
-  // Resolves activeType once files are in: honor `?type=` from a
-  // direct/old link if that type actually has files here, otherwise
-  // default to the first type that does (per the "first type that
-  // actually has files" default). Re-runs whenever the module changes
-  // (a new module can have a completely different set of types).
+  // Honor `?type=` from a link if that type has files here, else default
+  // to the first type that does.
   useEffect(() => {
     if (loading) return
     if (typeParam && availableTypes.includes(typeParam as typeof availableTypes[number])) {
@@ -181,8 +155,6 @@ export default function FilesPage({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, activeModule, files])
 
-  // Subjects for the current module — served from the shared cache
-  // (see src/lib/subjects.js) instead of a fresh network call.
   useEffect(() => {
     let ignore = false
     fetchSubjectsForModule(activeModule || '').then(({ subjects, error }) => {
@@ -193,12 +165,7 @@ export default function FilesPage({ dark }: { dark: boolean }) {
     return () => { ignore = true }
   }, [activeModule])
 
-  // AUDIT FIX (search accuracy): opens the exact file a Search result
-  // pointed at, and switches the type tab to whichever type that file
-  // actually belongs to, so it's visible in the filtered list
-  // underneath once the viewer is closed. Guarded on `viewer` being
-  // empty so it never fights with the person manually closing it and
-  // opening a different file afterward.
+  // Opens the exact file a Search result pointed at, switching to its type tab.
   useEffect(() => {
     if (!fileParam || viewer) return
     const match = files.find(f => f.id === fileParam)
@@ -216,118 +183,101 @@ export default function FilesPage({ dark }: { dark: boolean }) {
   })
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh' }}>
-      <PulseBackground />
-      <div className="pulse-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body }}>
+    <PageShell dark={dark} backFallback="/">
+      {(loadError || modulesError) && <ErrorBanner />}
 
-        <div style={{ marginBottom: 8 }}>
-          <BackButton dark={dark} fallback="/" />
-        </div>
-
-        {(loadError || modulesError) && <ErrorBanner />}
-
-        {viewer && viewer.file_type === 'pdf' && (
-          <MediaOverlay
-            dark={dark}
-            onClose={() => setViewer(null)}
-            src={getDriveOrRawUrl(viewer.url)}
-            title="PDF Viewer"
-            fileType="pdf"
-          />
-        )}
-        {viewer && viewer.file_type === 'video' && (
-          <MediaOverlay
-            dark={dark}
-            onClose={() => setViewer(null)}
-            src={getVideoEmbedUrl(viewer.url)}
-            title="Video Player"
-            fileType="video"
-          />
-        )}
-        {viewer && viewer.file_type === 'audio' && (
-          <AudioViewer url={viewer.url} name={viewer.name} onClose={() => setViewer(null)} dark={dark} />
-        )}
-
-        <PageIntro
+      {viewer && viewer.file_type === 'pdf' && (
+        <MediaOverlay
           dark={dark}
-          emoji={typeMeta ? <typeMeta.Icon color={ON_GRADIENT_TOP.primary} size={40} /> : <FolderIcon color={ON_GRADIENT_TOP.primary} size={40} />}
-          title={typeMeta ? typeMeta.label : 'Files'}
+          onClose={() => setViewer(null)}
+          src={getDriveOrRawUrl(viewer.url)}
+          title="PDF Viewer"
+          fileType="pdf"
         />
+      )}
+      {viewer && viewer.file_type === 'video' && (
+        <MediaOverlay
+          dark={dark}
+          onClose={() => setViewer(null)}
+          src={getVideoEmbedUrl(viewer.url)}
+          title="Video Player"
+          fileType="video"
+        />
+      )}
+      {viewer && viewer.file_type === 'audio' && (
+        <AudioViewer url={viewer.url} name={viewer.name} onClose={() => setViewer(null)} dark={dark} />
+      )}
 
+      <PageIntro
+        dark={dark}
+        emoji={typeMeta ? <typeMeta.Icon color={ON_GRADIENT_TOP.primary} size={40} /> : <FolderIcon color={ON_GRADIENT_TOP.primary} size={40} />}
+        title={typeMeta ? typeMeta.label : 'Files'}
+      />
+
+      <TabRow
+        items={activeModules.map(m => ({ value: m.id, label: m.name, icon: m.icon, color: m.color, completed: m.status === 'completed' }))}
+        active={activeModule}
+        onSelect={(id) => { setActiveModule(id); setActiveSubject('all'); setActiveType(null) }}
+        dark={dark}
+      />
+
+      {!loading && availableTypes.length > 0 && (
         <TabRow
-          items={activeModules.map(m => ({ value: m.id, label: m.name, icon: m.icon, color: m.color, completed: m.status === 'completed' }))}
-          active={activeModule}
-          onSelect={(id) => { setActiveModule(id); setActiveSubject('all'); setActiveType(null) }}
+          items={availableTypes.map(t => ({ value: t, label: TYPE_META[t].label, Icon: TYPE_META[t].Icon }))}
+          active={activeType}
+          onSelect={setActiveType}
           dark={dark}
+          accentColor={FILE_ACCENT}
+          style={{ marginBottom: 20 }}
         />
+      )}
 
-        {/* Type tab row — this is the new "choose what you want"
-            control that replaced separate cards per type on
-            ModulePage/StagePage. Only rendered once we know which
-            types this module actually has (avoids a flash of a
-            single-tab row before files finish loading). */}
-        {!loading && availableTypes.length > 0 && (
-          <TabRow
-            items={availableTypes.map(t => ({ value: t, label: TYPE_META[t].label, Icon: TYPE_META[t].Icon }))}
-            active={activeType}
-            onSelect={setActiveType}
-            dark={dark}
-            accentColor={FILE_ACCENT}
-            style={{ marginBottom: 20 }}
-          />
-        )}
+      {moduleSubjects.length > 0 && (
+        <TabRow
+          items={[{ value: 'all', label: 'All' }, ...moduleSubjects.map(sub => ({ value: sub.id, label: sub.name }))]}
+          active={activeSubject}
+          onSelect={setActiveSubject}
+          dark={dark}
+          accentColor={FILE_ACCENT}
+          style={{ marginBottom: 20 }}
+        />
+      )}
 
-        {moduleSubjects.length > 0 && (
-          <TabRow
-            items={[{ value: 'all', label: 'All' }, ...moduleSubjects.map(sub => ({ value: sub.id, label: sub.name }))]}
-            active={activeSubject}
-            onSelect={setActiveSubject}
-            dark={dark}
-            accentColor={FILE_ACCENT}
-            style={{ marginBottom: 20 }}
-          />
-        )}
+      {loading && <LoadingText />}
 
-        {loading && <p style={{ color: ON_GRADIENT_TOP.secondary, textAlign: 'center' }}>Loading...</p>}
+      {!loading && availableTypes.length === 0 && (
+        <EmptyState dark={dark} message="No files yet 🚧" />
+      )}
 
-        {!loading && availableTypes.length === 0 && (
-          <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-            <p style={{ color: pt.sub }}>No files yet 🚧</p>
-          </LiquidGlassCard>
-        )}
+      {!loading && availableTypes.length > 0 && filtered.length === 0 && (
+        <EmptyState dark={dark} message="No files yet 🚧" />
+      )}
 
-        {!loading && availableTypes.length > 0 && filtered.length === 0 && (
-          <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-            <p style={{ color: pt.sub }}>No files yet 🚧</p>
-          </LiquidGlassCard>
-        )}
-
-        {filtered.map((file, i) => {
-          const isLast = i === filtered.length - 1
-          return (
-            <div key={file.id} style={{ marginBottom: isLast ? 0 : 12 }}>
-              <LiquidGlassCard dark={dark} delay={i * 70} style={{
-                padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+      {filtered.map((file, i) => {
+        const isLast = i === filtered.length - 1
+        return (
+          <div key={file.id} style={{ marginBottom: isLast ? 0 : 12 }}>
+            <LiquidGlassCard dark={dark} delay={i * 70} style={{
+              padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                <span style={{ flexShrink: 0, display: 'inline-flex' }}>{fileTypeIcon(file.file_type, pt.textPrimary, 22)}</span>
+                <span style={{ ...pulseType.cardTitle, color: pt.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {file.name}
+                </span>
+              </div>
+              <button onClick={() => setViewer(file)} style={{
+                background: FILE_ACCENT, color: '#0f172a', border: 'none',
+                padding: '8px 16px', borderRadius: 999, cursor: 'pointer',
+                fontWeight: 700, fontSize: 13, fontFamily: pulseFonts.body, whiteSpace: 'nowrap', flexShrink: 0,
+                display: 'inline-flex', alignItems: 'center', gap: 6
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-                  <span style={{ flexShrink: 0, display: 'inline-flex' }}>{fileTypeIcon(file.file_type, pt.textPrimary, 22)}</span>
-                  <span style={{ ...pulseType.cardTitle, color: pt.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {file.name}
-                  </span>
-                </div>
-                <button onClick={() => setViewer(file)} style={{
-                  background: FILE_ACCENT, color: '#0f172a', border: 'none',
-                  padding: '8px 16px', borderRadius: 999, cursor: 'pointer',
-                  fontWeight: 700, fontSize: 13, fontFamily: pulseFonts.body, whiteSpace: 'nowrap', flexShrink: 0,
-                  display: 'inline-flex', alignItems: 'center', gap: 6
-                }}>
-                  {openActionIcon(file.file_type, '#0f172a', 13)} {openActionLabel(file.file_type)}
-                </button>
-              </LiquidGlassCard>
-            </div>
-          )
-        })}
-      </div>
-    </div>
+                {openActionIcon(file.file_type, '#0f172a', 13)} {openActionLabel(file.file_type)}
+              </button>
+            </LiquidGlassCard>
+          </div>
+        )
+      })}
+    </PageShell>
   )
 }

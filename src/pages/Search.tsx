@@ -2,14 +2,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
-import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
+import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
 import { glassInput } from '../components/pulse/PulseUI'
 import { useModules } from '../contexts'
 import ErrorBanner from '../components/ErrorBanner'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
-import PulseBackground from '../components/pulse/PulseBackground'
-import BackButton from '../components/pulse/BackButton'
+import PageShell from '../components/pulse/PageShell'
 import PageIntro from '../components/pulse/PageIntro'
+import LoadingText from '../components/pulse/LoadingText'
+import EmptyState from '../components/pulse/EmptyState'
 import { ModuleIcon } from '../lib/medicalIcons'
 import { SearchIcon2, DocumentIcon } from '../components/ui/tool-icons'
 import { Building2, FlaskConical, BookOpenText, CalendarDays } from 'lucide-react'
@@ -72,11 +73,6 @@ export default function Search({ dark }: { dark: boolean }) {
     const like = `%${q}%`
     const [fileRes, questionRes, summaryRes, scheduleRes] = await Promise.all([
       supabase.from('files').select('*').ilike('name', like).limit(20),
-      // AUDIT FIX (search accuracy): pulled in option_a-d and
-      // subject_id, which weren't selected before. Without them,
-      // clicking a question result had nothing to open except the
-      // parent module — now the full question row is available so a
-      // click can open that exact question directly (see openResult).
       supabase.from('questions_public').select('id, question, option_a, option_b, option_c, option_d, module_id, subject_id, exam_type, exam_stage, created_at').ilike('question', like).limit(20),
       supabase.from('summaries').select('*').ilike('title', like).limit(20),
       supabase.from('schedules').select('*').ilike('title', like).limit(20),
@@ -101,24 +97,9 @@ export default function Search({ dark }: { dark: boolean }) {
     setLoading(false)
   }
 
-  // AUDIT FIX (search accuracy): every non-module result used to just
-  // drop the person on the parent module page (or, for schedules, the
-  // Schedule page with nothing selected), leaving them to re-find the
-  // exact thing they searched for by hand. Each type below now opens
-  // the exact item:
-  // - file: Files page pre-filtered to the right module/type, with
-  //   this exact file's viewer opened via the `file` query param
-  //   (see FilesPage.tsx).
-  // - question: jumps straight into a one-question quiz for this
-  //   exact question, using the same retryQuestions mechanism Review's
-  //   "Retry this one" already uses (see MCQ.tsx's handling of
-  //   location.state.retryQuestions).
-  // - summary: Summaries page pre-filtered to the right module, with
-  //   this exact summary opened via the `summary` query param (see
-  //   Summaries.tsx).
-  // - schedule: Schedule page pre-filtered to the right module/type,
-  //   with this exact item opened via the `item` query param (see
-  //   Schedule.tsx).
+  // Opens the exact item a search result points at rather than just
+  // its parent module — file/question/summary/schedule each resolve
+  // to a deep link that pre-selects and opens the exact match.
   function openResult(r: SearchResult) {
     if (r.type === 'module') return navigate(`/module/${r.id}`)
     if (r.type === 'file') return navigate(`/files?type=${r.raw.type}&module=${r.raw.module_id}&file=${r.raw.id}`)
@@ -141,79 +122,67 @@ export default function Search({ dark }: { dark: boolean }) {
   const inStyle = { ...glassInput(pt, dark), padding: '15px 20px', marginBottom: 0, borderRadius: 999, fontSize: 15 }
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh' }}>
-      <PulseBackground />
-      <div className="pulse-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body, maxWidth: 700, margin: '0 auto' }}>
+    <PageShell dark={dark} backFallback="/" maxWidth={700}>
+      <PageIntro dark={dark} emoji={<SearchIcon2 color={ON_GRADIENT_TOP.primary} size={40} />} title="Search" subtitle="Modules, files, questions, summaries & schedules" paddingBottom={20} />
 
-        <div style={{ marginBottom: 8 }}>
-          <BackButton dark={dark} fallback="/" />
-        </div>
+      <input
+        ref={inputRef}
+        type="search"
+        aria-label="Search modules, files, questions, summaries and schedules"
+        placeholder="Search..."
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+        style={{ ...inStyle, marginBottom: 20, width: '100%' }}
+      />
 
-        <PageIntro dark={dark} emoji={<SearchIcon2 color={ON_GRADIENT_TOP.primary} size={40} />} title="Search" subtitle="Modules, files, questions, summaries & schedules" paddingBottom={20} />
+      {error && <ErrorBanner message="Search failed — check your connection and try again." />}
 
-        <input
-          ref={inputRef}
-          type="search"
-          aria-label="Search modules, files, questions, summaries and schedules"
-          placeholder="Search..."
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          style={{ ...inStyle, marginBottom: 20, width: '100%' }}
-        />
+      {query.trim().length > 0 && query.trim().length < 2 && (
+        <p style={{ color: ON_GRADIENT_TOP.secondary, textAlign: 'center', fontSize: 13 }}>Keep typing — at least 2 characters.</p>
+      )}
 
-        {error && <ErrorBanner message="Search failed — check your connection and try again." />}
+      {loading && <LoadingText label="Searching..." />}
 
-        {query.trim().length > 0 && query.trim().length < 2 && (
-          <p style={{ color: ON_GRADIENT_TOP.secondary, textAlign: 'center', fontSize: 13 }}>Keep typing — at least 2 characters.</p>
-        )}
+      {!loading && results && results.length === 0 && (
+        <EmptyState dark={dark} icon={<SearchIcon2 color={pt.sub} size={15} />} message={`No results for "${query}"`} />
+      )}
 
-        {loading && <p style={{ color: ON_GRADIENT_TOP.secondary, textAlign: 'center' }}>Searching...</p>}
-
-        {!loading && results && results.length === 0 && (
-          <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-            <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              <SearchIcon2 color={pt.sub} size={15} /> No results for "{query}"
-            </p>
-          </LiquidGlassCard>
-        )}
-
-        {!loading && results && results.length > 0 && (
-          <div style={{ display: 'grid', gap: 10 }}>
-            {results.map((r, i) => {
-              const meta = typeMeta[r.type]
-              return (
-                <LiquidGlassCard
-                  key={`${r.type}-${r.id}`}
-                  dark={dark}
-                  delay={i * 40}
-                  onClick={() => openResult(r)}
-                  style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}
-                >
+      {!loading && results && results.length > 0 && (
+        <div style={{ display: 'grid', gap: 10 }}>
+          {results.map((r, i) => {
+            const meta = typeMeta[r.type]
+            return (
+              <LiquidGlassCard
+                key={`${r.type}-${r.id}`}
+                dark={dark}
+                delay={i * 40}
+                onClick={() => openResult(r)}
+                style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}
+              >
+                <div style={{
+                  width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+                  background: `${meta.color}20`, border: `1px solid ${meta.color}40`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}><meta.Icon color={meta.color} size={18} /></div>
+                <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{
-                    width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-                    background: `${meta.color}20`, border: `1px solid ${meta.color}40`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                  }}><meta.Icon color={meta.color} size={18} /></div>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{
-                      ...pulseType.cardTitle, color: pt.textPrimary,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-                    }}>{r.title}</div>
-                    <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                      {meta.label}
-                      {r.module && (
-                        <>
-                          · <ModuleIcon value={r.module.icon} size={12} color={pt.textMuted} /> {r.module.name}
-                        </>
-                      )}
-                    </div>
+                    ...pulseType.cardTitle, color: pt.textPrimary,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                  }}>{r.title}</div>
+                  <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {meta.label}
+                    {r.module && (
+                      <>
+                        · <ModuleIcon value={r.module.icon} size={12} color={pt.textMuted} /> {r.module.name}
+                      </>
+                    )}
                   </div>
-                </LiquidGlassCard>
-              )
-            })}
-          </div>
-        )}
-      </div>
-    </div>
+                </div>
+              </LiquidGlassCard>
+            )
+          })}
+        </div>
+      )}
+    </PageShell>
   )
 }
