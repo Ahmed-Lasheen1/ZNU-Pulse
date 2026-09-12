@@ -165,6 +165,22 @@ export default function StagePage({ dark }: { dark: boolean }) {
     )
   }
 
+  // AUDIT FIX (per user request): pulled out so the single-subject case
+  // below can reuse it inside .auto-grid-single instead of stretching
+  // a lone card across the whole row.
+  const renderSubjectCard = (sub: PageSubject, i: number) => (
+    <LiquidGlassCard key={sub.id} dark={dark} delay={i * 80}
+      onClick={() => navigate(`/module/${moduleId}/subject/${sub.id}?stage=${stage}`)}
+      style={{ padding: 'clamp(20px, 2vw, 28px)', textAlign: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+        {sub.icon
+          ? <ModuleIcon value={sub.icon} size={38} color={sub.color || '#34d399'} />
+          : <BookIcon color={sub.color || '#34d399'} size={38} />}
+      </div>
+      <div style={{ ...pulseType.cardTitle, fontSize: 'clamp(13px, 1.1vw, 16px)', color: pt.textPrimary }}>{sub.name}</div>
+    </LiquidGlassCard>
+  )
+
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
       <PulseBackground />
@@ -201,31 +217,23 @@ export default function StagePage({ dark }: { dark: boolean }) {
           </div>
         )}
 
-        {/* AUDIT FIX (per user request): links now carry the current
-            stage (`?stage=<value>`) so SubjectPage can narrow its
-            lesson list down to only the lessons that actually have
-            content tagged to THIS stage, instead of showing every
-            lesson in the subject regardless of which stage got you
-            here. See SubjectPage.tsx's own handling of this param. */}
+        {/* AUDIT FIX (per user request): links carry the current stage
+            (`?stage=<value>`) so SubjectPage can narrow its lesson list
+            to only the lessons that actually have content tagged to
+            THIS stage. A single subject renders centered/width-capped
+            instead of stretching across the whole row. */}
         {subjects.length > 0 && (
           <div style={{ marginBottom: 32 }}>
             <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
               <StudyByLessonIcon color={ON_GRADIENT_TOP.muted} size={14} /> Study by Lesson
             </h2>
-            <div className="auto-grid" style={{ ['--auto-grid-cols' as any]: gridCols(subjects.length) }}>
-              {subjects.map((sub, i) => (
-                <LiquidGlassCard key={sub.id} dark={dark} delay={i * 80}
-                  onClick={() => navigate(`/module/${moduleId}/subject/${sub.id}?stage=${stage}`)}
-                  style={{ padding: 'clamp(20px, 2vw, 28px)', textAlign: 'center' }}>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-                    {sub.icon
-                      ? <ModuleIcon value={sub.icon} size={38} color={sub.color || '#34d399'} />
-                      : <BookIcon color={sub.color || '#34d399'} size={38} />}
-                  </div>
-                  <div style={{ ...pulseType.cardTitle, fontSize: 'clamp(13px, 1.1vw, 16px)', color: pt.textPrimary }}>{sub.name}</div>
-                </LiquidGlassCard>
-              ))}
-            </div>
+            {subjects.length === 1 ? (
+              <div className="auto-grid-single">{renderSubjectCard(subjects[0], 0)}</div>
+            ) : (
+              <div className="auto-grid" style={{ ['--auto-grid-cols' as any]: gridCols(subjects.length) }}>
+                {subjects.map(renderSubjectCard)}
+              </div>
+            )}
           </div>
         )}
 

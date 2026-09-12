@@ -157,6 +157,38 @@ export default function ModulePage({ dark }: { dark: boolean }) {
     )
   }
 
+  // Shared per-stage/per-subject card renderers so the "single item ->
+  // .auto-grid-single, multiple -> .auto-grid" switch below (AUDIT FIX,
+  // per user request: a lone card no longer stretches edge-to-edge —
+  // .auto-grid-single caps it at a reasonable, centered width, same
+  // treatment Study Materials already had) doesn't duplicate the card
+  // markup itself.
+  const renderStageCard = (stage: ExamStage, i: number) => (
+    <LiquidGlassCard key={stage.value} dark={dark} delay={i * 80}
+      onClick={() => navigate(`/module/${moduleId}/stage/${stage.value}`)}
+      style={{ padding: 'clamp(20px, 2vw, 28px)', textAlign: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+        {stage.Icon
+          ? <stage.Icon color={stage.color} size={38} />
+          : <span style={{ fontSize: 'clamp(28px, 3vw, 42px)' }}>{stage.emoji}</span>}
+      </div>
+      <div style={{ ...pulseType.cardTitle, fontSize: 'clamp(13px, 1.1vw, 16px)', color: pt.textPrimary }}>{stage.title}</div>
+    </LiquidGlassCard>
+  )
+
+  const renderSubjectCard = (sub: PageSubject, i: number) => (
+    <LiquidGlassCard key={sub.id} dark={dark} delay={i * 80}
+      onClick={() => navigate(`/module/${moduleId}/subject/${sub.id}`)}
+      style={{ padding: 'clamp(20px, 2vw, 28px)', textAlign: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+        {sub.icon
+          ? <ModuleIcon value={sub.icon} size={38} color={sub.color || '#34d399'} />
+          : <BookIcon color={sub.color || '#34d399'} size={38} />}
+      </div>
+      <div style={{ ...pulseType.cardTitle, fontSize: 'clamp(13px, 1.1vw, 16px)', color: pt.textPrimary }}>{sub.name}</div>
+    </LiquidGlassCard>
+  )
+
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
       <PulseBackground />
@@ -183,49 +215,37 @@ export default function ModulePage({ dark }: { dark: boolean }) {
         </div>
 
         {/* Exam Stage — hidden entirely when no stage has any content
-            tagged to it yet (see stagesWithContent above). */}
+            tagged to it yet (see stagesWithContent above). A single
+            qualifying stage renders centered/width-capped instead of
+            stretching the whole row. */}
         {visibleExamStages.length > 0 && (
           <div style={{ marginBottom: 32 }}>
             <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
               <ExamStageIcon color={ON_GRADIENT_TOP.muted} size={14} /> Exam Stage
             </h2>
-            <div className="auto-grid" style={{ ['--auto-grid-cols' as any]: gridCols(visibleExamStages.length) }}>
-              {visibleExamStages.map((stage, i) => (
-                <LiquidGlassCard key={stage.value} dark={dark} delay={i * 80}
-                  onClick={() => navigate(`/module/${moduleId}/stage/${stage.value}`)}
-                  style={{ padding: 'clamp(20px, 2vw, 28px)', textAlign: 'center' }}>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-                    {stage.Icon
-                      ? <stage.Icon color={stage.color} size={38} />
-                      : <span style={{ fontSize: 'clamp(28px, 3vw, 42px)' }}>{stage.emoji}</span>}
-                  </div>
-                  <div style={{ ...pulseType.cardTitle, fontSize: 'clamp(13px, 1.1vw, 16px)', color: pt.textPrimary }}>{stage.title}</div>
-                </LiquidGlassCard>
-              ))}
-            </div>
+            {visibleExamStages.length === 1 ? (
+              <div className="auto-grid-single">{renderStageCard(visibleExamStages[0], 0)}</div>
+            ) : (
+              <div className="auto-grid" style={{ ['--auto-grid-cols' as any]: gridCols(visibleExamStages.length) }}>
+                {visibleExamStages.map(renderStageCard)}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Study by Lesson */}
+        {/* Study by Lesson — same single-item centering treatment. */}
         {subjects.length > 0 && (
           <div style={{ marginBottom: 32 }}>
             <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
               <StudyByLessonIcon color={ON_GRADIENT_TOP.muted} size={14} /> Study by Lesson
             </h2>
-            <div className="auto-grid" style={{ ['--auto-grid-cols' as any]: gridCols(subjects.length) }}>
-              {subjects.map((sub, i) => (
-                <LiquidGlassCard key={sub.id} dark={dark} delay={i * 80}
-                  onClick={() => navigate(`/module/${moduleId}/subject/${sub.id}`)}
-                  style={{ padding: 'clamp(20px, 2vw, 28px)', textAlign: 'center' }}>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-                    {sub.icon
-                      ? <ModuleIcon value={sub.icon} size={38} color={sub.color || '#34d399'} />
-                      : <BookIcon color={sub.color || '#34d399'} size={38} />}
-                  </div>
-                  <div style={{ ...pulseType.cardTitle, fontSize: 'clamp(13px, 1.1vw, 16px)', color: pt.textPrimary }}>{sub.name}</div>
-                </LiquidGlassCard>
-              ))}
-            </div>
+            {subjects.length === 1 ? (
+              <div className="auto-grid-single">{renderSubjectCard(subjects[0], 0)}</div>
+            ) : (
+              <div className="auto-grid" style={{ ['--auto-grid-cols' as any]: gridCols(subjects.length) }}>
+                {subjects.map(renderSubjectCard)}
+              </div>
+            )}
           </div>
         )}
 
