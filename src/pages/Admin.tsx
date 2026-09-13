@@ -24,8 +24,7 @@ import AnalyticsTab from './admin/AnalyticsTab'
 import SettingsTab from './admin/SettingsTab'
 import type { AdminModule, AdminSubject, AdminLesson } from './admin/adminTypes'
 
-// Cap on the lessons list fetched here for cross-tab use — matches
-// LIST_LIMIT in admin/adminStyles.ts.
+// Cap on the lessons list fetched here for cross-tab use.
 const LESSONS_LIST_LIMIT = 200
 
 const TABS = ['modules', 'subjects', 'lessons', 'files', 'schedules', 'questions', 'summaries', 'stages', 'analytics', 'settings'] as const
@@ -57,24 +56,13 @@ export default function Admin({ dark }: AdminProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>('modules')
 
   // Reference data shared by several tabs (ModuleSelect dropdowns,
-  // grouping lists by module/subject). Fetched once here and handed
-  // down as props + refetch callbacks.
+  // grouping lists by module/subject) — fetched once here.
   const [modules, setModules] = useState<AdminModule[]>([])
   const [subjects, setSubjects] = useState<AdminSubject[]>([])
   const [lessons, setLessons] = useState<AdminLesson[]>([])
 
-  // AUDIT FIX (performance audit — loading states): previously there
-  // was no flag distinguishing "haven't fetched yet" from "fetched,
-  // genuinely empty". Every reference-data tab (Modules/Subjects/
-  // Lessons) rendered its own list straight off `modules`/`subjects`/
-  // `lessons`, which all start as `[]` — so on every single Admin
-  // visit, for the brief window between mount and the fetch actually
-  // resolving, each tab would flash its real "No modules yet — add
-  // one on the left" empty state before the true data arrived. This
-  // tracks the INITIAL load only (not every subsequent refetch a tab
-  // triggers after a save, which should feel instant / not re-show a
-  // loading state), so it's set once per Admin mount via Promise.all
-  // over the three initial fetches.
+  // True only during the initial reference-data load, so tabs can
+  // show a neutral loading state instead of flashing an empty state.
   const [refDataLoading, setRefDataLoading] = useState(true)
 
   useEffect(() => {
@@ -101,12 +89,9 @@ export default function Admin({ dark }: AdminProps) {
     if (data) setLessons(data as AdminLesson[])
   }
 
-  // Security-through-obscurity note (unchanged): this only hides that
-  // an admin panel exists from casual visitors — real protection is
-  // Supabase RLS. While auth is still loading, show a blank state
-  // instead of flashing 404 for a moment on every visit (including
-  // the real admin's own) before we actually know if this person is
-  // signed in and what their role is.
+  // Real access control is Supabase RLS — this only hides the panel
+  // from casual visitors. While auth is loading, show a blank state
+  // instead of flashing 404 before we know the person's role.
   if (!authLoaded) {
     return (
       <div style={{ position: 'relative', minHeight: '100vh' }}>
@@ -125,15 +110,6 @@ export default function Admin({ dark }: AdminProps) {
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
       <PulseBackground />
-      {/* AUDIT FIX: the sidebar-nav experiment traded away the
-          familiar top tab strip and, combined with the old 48px
-          title padding, left a lot of dead space between the site
-          header and any actual content. Tabs are back on top (a
-          single wrapping row on desktop, horizontal-scroll on
-          mobile — unchanged from the original), and every spacing
-          value between the fixed header and the tab row has been
-          trimmed down so content starts right away instead of after
-          a big empty gap. */}
       <div className="pulse-wide admin-shell" style={{ position: 'relative', zIndex: 1, padding: '4px 20px 100px', fontFamily: pulseFonts.body, maxWidth: 1500, margin: '0 auto' }}>
         <style>{`
           .admin-tabs {
@@ -155,18 +131,8 @@ export default function Admin({ dark }: AdminProps) {
           <BackButton dark={dark} fallback="/" />
         </div>
 
-        {/* AUDIT FIX: GearIcon (an inline <svg>, a "replaced" element
-            like <img>) was drifting a couple pixels below the <h1>'s
-            visual center in this flex row — browsers baseline-align
-            inline replaced elements against surrounding text metrics
-            even inside `align-items: center` once the h1's line-height
-            multiplier doesn't cleanly match the icon's own box height.
-            Wrapping the icon in its own `inline-flex` span (with
-            `lineHeight: 0` to strip any residual inline box padding)
-            and pinning the h1's line-height to match the icon's pixel
-            size removes the ambiguity entirely, so the two are
-            genuinely centered on the same axis instead of relying on
-            font-metric coincidence. */}
+        {/* Icon wrapped in its own inline-flex span (lineHeight: 0) so
+            it aligns cleanly on the same axis as the heading text. */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '8px 0 16px' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', lineHeight: 0, position: 'relative', top: -10 }}>
             <GearIcon color={pt.text} size={24} />

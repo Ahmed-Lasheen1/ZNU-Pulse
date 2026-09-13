@@ -7,7 +7,7 @@ import AdminSplitLayout from './AdminSplitLayout'
 import IconPicker from '../../components/admin/IconPicker'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { ModuleIcon } from '../../lib/medicalIcons'
-import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading } from './adminStyles'
+import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon } from '../../components/ui/tool-icons'
 import type { AdminModule, AdminSubject, AdminLesson } from './adminTypes'
@@ -89,7 +89,7 @@ export default function LessonsTab({ dark, modules, subjects, lessons, fetchLess
       <input placeholder="Lesson title" value={lessonTitle} onChange={e => setLessonTitle(e.target.value)} style={inStyle} />
       <IconPicker value={lessonIcon} onChange={setLessonIcon} inStyle={inStyle} pt={pt} />
       <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={saveLesson} disabled={saving} style={{ ...btnStyle(pt, dark), flex: 1, opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}>
+        <button onClick={saveLesson} disabled={saving} style={submitBtnStyle(pt, dark, saving)}>
           {saving ? 'Saving...' : editingLessonId ? 'Save Changes' : 'Add Lesson'}
         </button>
         {editingLessonId && <button onClick={resetLessonForm} disabled={saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}

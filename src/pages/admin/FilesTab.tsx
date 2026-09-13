@@ -6,10 +6,10 @@ import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { ModuleIcon } from '../../lib/medicalIcons'
-import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
-import { useAdminMessage } from './useAdminMessage'
+import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
 import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
 import { fetchModuleStages } from '../../lib/moduleStages'
+import { useAdminMessage } from './useAdminMessage'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon, VideoIcon, AudioIcon, DocumentIcon } from '../../components/ui/tool-icons'
 import type { AdminModule, AdminSubject, AdminLesson } from './adminTypes'
 
@@ -166,7 +166,7 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
       </select>
 
       <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={saveFile} disabled={saving} style={{ ...btnStyle(pt, dark), flex: 1, opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}>
+        <button onClick={saveFile} disabled={saving} style={submitBtnStyle(pt, dark, saving)}>
           {saving ? 'Saving...' : editingFileId ? 'Save Changes' : 'Add File'}
         </button>
         {editingFileId && <button onClick={resetFileForm} disabled={saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}

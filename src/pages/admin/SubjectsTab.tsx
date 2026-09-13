@@ -7,7 +7,7 @@ import AdminSplitLayout from './AdminSplitLayout'
 import IconPicker from '../../components/admin/IconPicker'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { ModuleIcon } from '../../lib/medicalIcons'
-import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading } from './adminStyles'
+import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon } from '../../components/ui/tool-icons'
 import type { AdminModule, AdminSubject } from './adminTypes'
@@ -17,6 +17,8 @@ interface SubjectsTabProps {
   modules: AdminModule[]
   subjects: AdminSubject[]
   fetchSubjects: () => void
+  // See ModulesTab.tsx for why this exists — avoids flashing the
+  // empty state before the initial reference-data fetch resolves.
   refDataLoading: boolean
 }
 
@@ -98,7 +100,7 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
         <option value="practical">Practical Only</option>
       </select>
       <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={saveSubject} disabled={saving} style={{ ...btnStyle(pt, dark), flex: 1, opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}>
+        <button onClick={saveSubject} disabled={saving} style={submitBtnStyle(pt, dark, saving)}>
           {saving ? 'Saving...' : editingSubjectId ? 'Save Changes' : 'Add Subject'}
         </button>
         {editingSubjectId && <button onClick={resetSubjectForm} disabled={saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}

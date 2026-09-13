@@ -6,7 +6,7 @@ import IconPicker from '../../components/admin/IconPicker'
 import AdminSplitLayout from './AdminSplitLayout'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { ModuleIcon } from '../../lib/medicalIcons'
-import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle } from './adminStyles'
+import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
 import { EditIcon, PlusIcon, TrashIcon, PauseIcon, PlayIcon, DotIcon, CheckCircleIcon, ConstructionIcon } from '../../components/ui/tool-icons'
 import type { AdminModule } from './adminTypes'
@@ -119,7 +119,7 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
         </div>
       </div>
       <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-        <button onClick={saveModule} disabled={saving} style={{ ...btnStyle(pt, dark), flex: 1, opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}>
+        <button onClick={saveModule} disabled={saving} style={submitBtnStyle(pt, dark, saving)}>
           {saving ? 'Saving...' : editingModuleId ? 'Save Changes' : 'Add Module'}
         </button>
         {editingModuleId && <button onClick={resetModuleForm} disabled={saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}

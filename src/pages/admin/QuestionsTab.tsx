@@ -6,7 +6,7 @@ import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { ModuleIcon } from '../../lib/medicalIcons'
-import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
+import { btnStyle, miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
 import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
 import { fetchModuleStages } from '../../lib/moduleStages'
 import { useAdminMessage } from './useAdminMessage'
@@ -69,6 +69,9 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
     fetchModuleStages(qModuleId).then(list => setQStageOptions(list.map(s => ({ value: s.value, label: s.title }))))
   }, [qModuleId])
 
+  // List fetch — deliberately excludes answer-bearing columns
+  // (option_a-d, correct, explanation); those are only ever loaded
+  // per-question via the admin_get_question RPC when editing.
   async function fetchQuestions() {
     setQuestionsLoading(true)
     const { data } = await supabase
@@ -123,6 +126,7 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
     }
   }
 
+  // Parses the plain-text bulk-add format (Q:/A)/B)/C)/D)/Correct:/Explanation: lines)
   function parseBulkQuestions(text: string) {
     const blocks = text.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean)
     const parsed: any[] = []
@@ -303,7 +307,7 @@ Correct: A`}</pre>
             value={bulkText}
             onChange={e => setBulkText(e.target.value)}
             style={{ ...inStyle, minHeight: 240, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }} />
-          <button onClick={bulkAddQuestions} disabled={bulkSaving} style={{ ...btnStyle(pt, dark), width: '100%', opacity: bulkSaving ? 0.7 : 1, cursor: bulkSaving ? 'not-allowed' : 'pointer' }}>
+          <button onClick={bulkAddQuestions} disabled={bulkSaving} style={submitBtnStyle(pt, dark, bulkSaving, { width: '100%' })}>
             {bulkSaving ? 'Adding...' : 'Parse & Add All'}
           </button>
         </>
@@ -325,7 +329,7 @@ Correct: A`}</pre>
           </select>
           <textarea placeholder="Explanation (optional)" value={qExplanation} onChange={e => setQExplanation(e.target.value)} style={{ ...inStyle, minHeight: 60, resize: 'vertical' }} />
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={saveQuestion} disabled={saving} style={{ ...btnStyle(pt, dark), flex: 1, opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}>
+            <button onClick={saveQuestion} disabled={saving} style={submitBtnStyle(pt, dark, saving)}>
               {saving ? 'Saving...' : editingQuestionId ? 'Save Changes' : 'Add Question'}
             </button>
             {editingQuestionId && <button onClick={resetQuestionForm} disabled={saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}

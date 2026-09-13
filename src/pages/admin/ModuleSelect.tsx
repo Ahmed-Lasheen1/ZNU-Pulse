@@ -22,22 +22,9 @@ interface ModuleSelectProps {
   placeholder?: string
 }
 
-// AUDIT FIX (dropdown cut off in StagesTab): the floating option panel
-// used to be a plain `position: absolute` child of the trigger. That
-// works fine as long as every ancestor has default overflow — but
-// AdminSplitLayout's sticky form column sets `overflow-y: auto` (on
-// purpose, so a long form can scroll independently), and CSS clips
-// ANY descendant that overflows a scrollable ancestor's box,
-// regardless of that descendant's own position. StagesTab's form
-// column is short, so the dropdown had nowhere to open without being
-// sliced off at the column's edge.
-//
-// Rendered through a portal into document.body instead, positioned
-// with `position: fixed` from the trigger's own measured rect. A
-// portaled node is outside the component tree in the DOM, so no
-// ancestor's overflow/clipping can ever touch it — this fixes the
-// cutoff in StagesTab and preempts the same issue anywhere else this
-// component is dropped into a scrollable container.
+// Custom module dropdown. Rendered through a portal into document.body
+// so its floating option panel is never clipped by an ancestor's
+// overflow (e.g. AdminSplitLayout's sticky, scrollable form column).
 export default function ModuleSelect({ modules, value, onChange, dark, placeholder = 'Select Module' }: ModuleSelectProps) {
   const [open, setOpen] = useState(false)
   const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null)
@@ -71,8 +58,7 @@ export default function ModuleSelect({ modules, value, onChange, dark, placehold
     document.addEventListener('mousedown', onClickOutside)
     document.addEventListener('keydown', onEscape)
     window.addEventListener('resize', onReposition)
-    // capture: true catches scrolling on any scrollable ancestor, not
-    // just window — including AdminSplitLayout's own sticky column.
+    // capture: true catches scroll on any scrollable ancestor, not just window
     window.addEventListener('scroll', onReposition, true)
     return () => {
       document.removeEventListener('mousedown', onClickOutside)

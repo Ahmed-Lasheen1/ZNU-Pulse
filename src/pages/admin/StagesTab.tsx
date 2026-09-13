@@ -44,6 +44,8 @@ export default function StagesTab({ dark, modules }: StagesTabProps) {
     if (stageModuleId) loadModuleStagesForAdmin(stageModuleId)
   }, [stageModuleId])
 
+  // Loads this module's custom stages if it has any, otherwise falls
+  // back to the 4 global defaults.
   async function loadModuleStagesForAdmin(moduleId: string) {
     setStagesLoading(true)
     const { data } = await supabase.from('module_exam_stages').select('*').eq('module_id', moduleId).order('position')

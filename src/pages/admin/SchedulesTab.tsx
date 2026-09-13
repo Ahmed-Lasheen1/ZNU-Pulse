@@ -6,7 +6,7 @@ import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { ModuleIcon } from '../../lib/medicalIcons'
-import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
+import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon, CalendarDotIcon } from '../../components/ui/tool-icons'
 import { ExamIcon } from '../../lib/medicalIcons'
@@ -19,7 +19,8 @@ interface ScheduleRow {
   type: 'study' | 'exam'
   module_id: string
   // A schedule item can carry more than one exam date (e.g. a full
-  // staged exam schedule), stored as an array rather than a single date.
+  // staged exam schedule for a module) — stored as an array rather
+  // than a single date column.
   dates?: string[] | null
 }
 
@@ -144,7 +145,7 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
       <label style={fieldLabel(pt)}>Module</label>
       <ModuleSelect modules={modules} value={schModuleId} onChange={setSchModuleId} dark={dark} />
       <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={saveSchedule} disabled={saving} style={{ ...btnStyle(pt, dark), flex: 1, opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}>
+        <button onClick={saveSchedule} disabled={saving} style={submitBtnStyle(pt, dark, saving)}>
           {saving ? 'Saving...' : editingScheduleId ? 'Save Changes' : 'Add Schedule'}
         </button>
         {editingScheduleId && <button onClick={resetScheduleForm} disabled={saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
