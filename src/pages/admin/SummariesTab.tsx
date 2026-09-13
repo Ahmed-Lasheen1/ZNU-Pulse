@@ -4,6 +4,8 @@ import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
 import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
+import AdminStatusCard from './AdminStatusCard'
+import AdminModuleFilterSelect from './AdminModuleFilterSelect'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
@@ -155,6 +157,7 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
   const totalUploadMb = (totalUploadBytes / (1024 * 1024)).toFixed(1)
   const overSizeLimit = totalUploadBytes > 4 * 1024 * 1024 // soft warning only
 
+  // Create / edit / publish-from-upload form
   const form = (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
       <h3 style={{ color: pt.cobalt, marginBottom: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -255,25 +258,15 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
     </LiquidGlassCard>
   )
 
+  // Summaries grouped by module
   const list = (
     <div>
-      <div style={{ marginBottom: 16 }}>
-        <select value={moduleFilter} onChange={e => setModuleFilter(e.target.value)} style={{ ...inStyle, width: 'auto', marginBottom: 0 }}>
-          <option value="all">All modules ({summaries.length})</option>
-          {modules.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-        </select>
-      </div>
+      <AdminModuleFilterSelect modules={modules} value={moduleFilter} onChange={setModuleFilter} totalCount={summaries.length} inStyle={inStyle} />
 
-      {summariesLoading && (
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-          <p style={{ color: pt.sub }}>Loading...</p>
-        </LiquidGlassCard>
-      )}
+      {summariesLoading && <AdminStatusCard dark={dark} message="Loading..." />}
 
       {!summariesLoading && summaries.length === 0 && (
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-          <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><ConstructionIcon color={pt.sub} size={14} /> No summaries yet — add one on the left</p>
-        </LiquidGlassCard>
+        <AdminStatusCard dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No summaries yet — add one on the left</>} />
       )}
 
       {!summariesLoading && visibleModules.map(mod => {

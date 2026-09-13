@@ -4,6 +4,7 @@ import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
 import IconPicker from '../../components/admin/IconPicker'
 import AdminSplitLayout from './AdminSplitLayout'
+import AdminStatusCard from './AdminStatusCard'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle } from './adminStyles'
@@ -42,6 +43,7 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
   function resetModuleForm() {
     setEditingModuleId(null); setModName(''); setModColor('#38bdf8'); setModIcon('📚'); setModStatus('active')
   }
+
   async function saveModule() {
     if (!modName || saving) return
     const dup = modules.some(m => m.name.trim().toLowerCase() === modName.trim().toLowerCase() && m.id !== editingModuleId)
@@ -96,6 +98,7 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
     )
   }
 
+  // Create / edit form
   const form = (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
       <h3 style={{ color: pt.cobalt, marginBottom: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -127,13 +130,10 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
     </LiquidGlassCard>
   )
 
+  // Active / Completed module lists
   const list = (
     <div>
-      {refDataLoading && (
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-          <p style={{ color: pt.sub }}>Loading...</p>
-        </LiquidGlassCard>
-      )}
+      {refDataLoading && <AdminStatusCard dark={dark} message="Loading..." />}
 
       {!refDataLoading && activeModules.length > 0 && (
         <div style={{ marginBottom: 16 }}>
@@ -154,9 +154,7 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
       )}
 
       {!refDataLoading && modules.length === 0 && (
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-          <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><ConstructionIcon color={pt.sub} size={14} /> No modules yet — add one on the left</p>
-        </LiquidGlassCard>
+        <AdminStatusCard dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No modules yet — add one on the left</>} />
       )}
     </div>
   )

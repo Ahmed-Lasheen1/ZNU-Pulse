@@ -4,6 +4,7 @@ import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
 import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
+import AdminStatusCard from './AdminStatusCard'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import { btnStyle, miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
@@ -209,6 +210,7 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
   const visibleModules = moduleFilter === 'all' ? modules : modules.filter(m => m.id === moduleFilter)
   const searchLower = search.trim().toLowerCase()
 
+  // Create / edit / bulk-add form
   const form = (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
@@ -339,6 +341,7 @@ Correct: A`}</pre>
     </LiquidGlassCard>
   )
 
+  // Questions grouped by module, filterable by module + search
   const list = (
     <div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -358,16 +361,10 @@ Correct: A`}</pre>
         </select>
       </div>
 
-      {questionsLoading && (
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-          <p style={{ color: pt.sub }}>Loading...</p>
-        </LiquidGlassCard>
-      )}
+      {questionsLoading && <AdminStatusCard dark={dark} message="Loading..." />}
 
       {!questionsLoading && questions.length === 0 && (
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-          <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><ConstructionIcon color={pt.sub} size={14} /> No questions yet — add one on the left</p>
-        </LiquidGlassCard>
+        <AdminStatusCard dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No questions yet — add one on the left</>} />
       )}
 
       {!questionsLoading && visibleModules.map(mod => {

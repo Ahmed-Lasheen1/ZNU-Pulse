@@ -4,6 +4,8 @@ import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
 import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
+import AdminStatusCard from './AdminStatusCard'
+import AdminModuleFilterSelect from './AdminModuleFilterSelect'
 import IconPicker from '../../components/admin/IconPicker'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { ModuleIcon } from '../../lib/medicalIcons'
@@ -17,8 +19,6 @@ interface SubjectsTabProps {
   modules: AdminModule[]
   subjects: AdminSubject[]
   fetchSubjects: () => void
-  // See ModulesTab.tsx for why this exists — avoids flashing the
-  // empty state before the initial reference-data fetch resolves.
   refDataLoading: boolean
 }
 
@@ -45,6 +45,7 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
     setEditingSubjectId(null); setSubName(''); setSubType('both')
     setSubIcon('📖'); setSubColor('#34d399')
   }
+
   async function saveSubject() {
     if (!subName || !subModuleId || saving) return
     const existing = subjects.filter(s => s.module_id === subModuleId && s.id !== editingSubjectId)
@@ -80,6 +81,7 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
   const filteredSubjects = (moduleId: string) => subjects.filter(s => s.module_id === moduleId)
   const visibleModules = moduleFilter === 'all' ? modules : modules.filter(m => m.id === moduleFilter)
 
+  // Create / edit form
   const form = (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
       <h3 style={{ color: pt.cobalt, marginBottom: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -108,25 +110,15 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
     </LiquidGlassCard>
   )
 
+  // Subjects grouped by module
   const list = (
     <div>
-      <div style={{ marginBottom: 16 }}>
-        <select value={moduleFilter} onChange={e => setModuleFilter(e.target.value)} style={{ ...inStyle, width: 'auto', marginBottom: 0 }}>
-          <option value="all">All modules ({subjects.length})</option>
-          {modules.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-        </select>
-      </div>
+      <AdminModuleFilterSelect modules={modules} value={moduleFilter} onChange={setModuleFilter} totalCount={subjects.length} inStyle={inStyle} />
 
-      {refDataLoading && (
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-          <p style={{ color: pt.sub }}>Loading...</p>
-        </LiquidGlassCard>
-      )}
+      {refDataLoading && <AdminStatusCard dark={dark} message="Loading..." />}
 
       {!refDataLoading && subjects.length === 0 && (
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-          <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><ConstructionIcon color={pt.sub} size={14} /> No subjects yet — add one on the left</p>
-        </LiquidGlassCard>
+        <AdminStatusCard dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No subjects yet — add one on the left</>} />
       )}
 
       {!refDataLoading && visibleModules.map(mod => {

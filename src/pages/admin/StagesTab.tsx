@@ -4,6 +4,7 @@ import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
 import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
+import AdminStatusCard from './AdminStatusCard'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle } from './adminStyles'
 import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
@@ -106,6 +107,7 @@ export default function StagesTab({ dark, modules }: StagesTabProps) {
     loadModuleStagesForAdmin(stageModuleId)
   }
 
+  // Module picker
   const form = (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
       <h3 style={{ color: pt.cobalt, marginBottom: 8, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -120,12 +122,11 @@ export default function StagesTab({ dark, modules }: StagesTabProps) {
     </LiquidGlassCard>
   )
 
+  // Per-module stage editor
   const list = (
     <div>
       {!stageModuleId && (
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-          <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><TargetIcon color={pt.sub} size={15} /> Pick a module on the left to edit its exam stages</p>
-        </LiquidGlassCard>
+        <AdminStatusCard dark={dark} message={<><TargetIcon color={pt.sub} size={15} /> Pick a module on the left to edit its exam stages</>} />
       )}
 
       {stageModuleId && (

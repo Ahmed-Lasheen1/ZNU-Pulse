@@ -4,6 +4,8 @@ import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
 import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
+import AdminStatusCard from './AdminStatusCard'
+import AdminModuleFilterSelect from './AdminModuleFilterSelect'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
@@ -112,6 +114,7 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
   const FileTypeIcon = ({ t, color, size }: { t: string; color: string; size: number }) =>
     t === 'video' ? <VideoIcon color={color} size={size} /> : t === 'audio' ? <AudioIcon color={color} size={size} /> : <DocumentIcon color={color} size={size} />
 
+  // Create / edit form
   const form = (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
       <h3 style={{ color: pt.cobalt, marginBottom: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -174,25 +177,15 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
     </LiquidGlassCard>
   )
 
+  // Files grouped by module
   const list = (
     <div>
-      <div style={{ marginBottom: 16 }}>
-        <select value={moduleFilter} onChange={e => setModuleFilter(e.target.value)} style={{ ...inStyle, width: 'auto', marginBottom: 0 }}>
-          <option value="all">All modules ({files.length})</option>
-          {modules.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-        </select>
-      </div>
+      <AdminModuleFilterSelect modules={modules} value={moduleFilter} onChange={setModuleFilter} totalCount={files.length} inStyle={inStyle} />
 
-      {filesLoading && (
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-          <p style={{ color: pt.sub }}>Loading...</p>
-        </LiquidGlassCard>
-      )}
+      {filesLoading && <AdminStatusCard dark={dark} message="Loading..." />}
 
       {!filesLoading && files.length === 0 && (
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-          <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><ConstructionIcon color={pt.sub} size={14} /> No files yet — add one on the left</p>
-        </LiquidGlassCard>
+        <AdminStatusCard dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No files yet — add one on the left</>} />
       )}
 
       {!filesLoading && visibleModules.map(mod => {

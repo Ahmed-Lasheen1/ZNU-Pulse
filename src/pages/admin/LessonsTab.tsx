@@ -4,6 +4,8 @@ import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
 import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
+import AdminStatusCard from './AdminStatusCard'
+import AdminModuleFilterSelect from './AdminModuleFilterSelect'
 import IconPicker from '../../components/admin/IconPicker'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { ModuleIcon } from '../../lib/medicalIcons'
@@ -42,6 +44,7 @@ export default function LessonsTab({ dark, modules, subjects, lessons, fetchLess
   function resetLessonForm() {
     setEditingLessonId(null); setLessonTitle(''); setLessonIcon('')
   }
+
   async function saveLesson() {
     if (!lessonTitle || !lessonSubjectId || !lessonModuleId || saving) return showMsg('❌ Pick a module, subject, and title first')
     const payload = { title: lessonTitle, subject_id: lessonSubjectId, module_id: lessonModuleId, icon: lessonIcon || null }
@@ -58,6 +61,7 @@ export default function LessonsTab({ dark, modules, subjects, lessons, fetchLess
       else showMsg('❌ ' + error.message)
     }
   }
+
   async function deleteLesson(id: string) {
     if (!confirm('Delete this lesson? Questions tagged to it keep their module/subject tags but lose the lesson link. This cannot be undone.')) return
     if (editingLessonId === id) resetLessonForm()
@@ -69,6 +73,7 @@ export default function LessonsTab({ dark, modules, subjects, lessons, fetchLess
   const filteredSubjects = (moduleId: string) => subjects.filter(s => s.module_id === moduleId)
   const visibleModules = moduleFilter === 'all' ? modules : modules.filter(m => m.id === moduleFilter)
 
+  // Create / edit form
   const form = (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
       <h3 style={{ color: pt.cobalt, marginBottom: 8, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -97,25 +102,15 @@ export default function LessonsTab({ dark, modules, subjects, lessons, fetchLess
     </LiquidGlassCard>
   )
 
+  // Lessons grouped by module, then by subject
   const list = (
     <div>
-      <div style={{ marginBottom: 16 }}>
-        <select value={moduleFilter} onChange={e => setModuleFilter(e.target.value)} style={{ ...inStyle, width: 'auto', marginBottom: 0 }}>
-          <option value="all">All modules ({lessons.length})</option>
-          {modules.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-        </select>
-      </div>
+      <AdminModuleFilterSelect modules={modules} value={moduleFilter} onChange={setModuleFilter} totalCount={lessons.length} inStyle={inStyle} />
 
-      {refDataLoading && (
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-          <p style={{ color: pt.sub }}>Loading...</p>
-        </LiquidGlassCard>
-      )}
+      {refDataLoading && <AdminStatusCard dark={dark} message="Loading..." />}
 
       {!refDataLoading && lessons.length === 0 && (
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-          <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><ConstructionIcon color={pt.sub} size={14} /> No lessons yet — add one on the left</p>
-        </LiquidGlassCard>
+        <AdminStatusCard dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No lessons yet — add one on the left</>} />
       )}
 
       {!refDataLoading && visibleModules.map(mod => {

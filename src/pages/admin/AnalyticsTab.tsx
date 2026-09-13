@@ -4,6 +4,7 @@ import { getPulseTheme } from '../../premiumTheme'
 import { watchOnlineCount } from '../../lib/onlinePresence'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
+import AdminStatusCard from './AdminStatusCard'
 import { DotIcon, PeopleIcon, BellIcon, ChartBarIcon, ConstructionIcon } from '../../components/ui/tool-icons'
 import type { PulseTheme } from './adminStyles'
 import type { AdminModule } from './adminTypes'
@@ -101,6 +102,7 @@ export default function AnalyticsTab({ dark, modules }: AnalyticsTabProps) {
 
   return (
     <div>
+      {/* Overview stats */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <StatCard label="Online Now" Icon={DotIcon} value={onlineCount} color="#22c55e" pt={pt} dark={dark} loading={false} />
         <StatCard label="Registered Accounts" Icon={PeopleIcon} value={accountCount} color={pt.cobalt} pt={pt} dark={dark} loading={statsLoading} />
@@ -111,6 +113,7 @@ export default function AnalyticsTab({ dark, modules }: AnalyticsTabProps) {
         "Notifications Enabled" counts devices that turned on push notifications, including guest devices.
       </p>
 
+      {/* Hardest questions */}
       <div style={{ marginBottom: 16 }}>
         <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
           <h3 style={{ color: pt.cobalt, marginBottom: 8, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -126,9 +129,7 @@ export default function AnalyticsTab({ dark, modules }: AnalyticsTabProps) {
       {difficultyLoading && <p style={{ color: pt.sub, textAlign: 'center' }}>Loading...</p>}
 
       {!difficultyLoading && difficulty.length === 0 && (
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-          <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><ConstructionIcon color={pt.sub} size={14} /> Not enough attempts yet to report on</p>
-        </LiquidGlassCard>
+        <AdminStatusCard dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> Not enough attempts yet to report on</>} />
       )}
 
       <div className="admin-list-grid">
