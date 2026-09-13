@@ -96,10 +96,21 @@ export default function Review({ dark }: { dark: boolean }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [moduleFilter, setModuleFilter] = useState('all')
 
-  useEffect(() => { fetchTab() }, [tab, user])
+  // BUG FIX: fetchTab previously had no cancellation guard. Switching
+  // between the History and Flagged tabs quickly (or toggling
+  // while a slow request from the PREVIOUS tab was still in flight)
+  // could let a stale response land after a newer one and briefly
+  // show the wrong tab's data. isIgnored() is threaded through
+  // fetchTab so a stale response's state updates are skipped.
+  useEffect(() => {
+    let ignore = false
+    fetchTab(() => ignore)
+    return () => { ignore = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, user])
   useEffect(() => { setSearchQuery(''); setModuleFilter('all'); setSelectedHistory(null) }, [tab])
 
-  async function fetchTab() {
+  async function fetchTab(isIgnored: () => boolean = () => false) {
     setLoading(true)
     setLoadError(false)
 
@@ -111,11 +122,14 @@ export default function Review({ dark }: { dark: boolean }) {
           .eq('user_id', user.id)
           .order('completed_at', { ascending: false })
           .limit(50)
+        if (isIgnored()) return
         if (error) setLoadError(true)
         setHistory((data || []) as HistoryRow[])
       } else {
+        if (isIgnored()) return
         setHistory(getGuestHistory() as HistoryRow[])
       }
+      if (isIgnored()) return
       setLoading(false)
       return
     }
@@ -123,19 +137,23 @@ export default function Review({ dark }: { dark: boolean }) {
     // flagged
     if (user) {
       const { data, error } = await supabase.from('flagged_questions').select('question_id').eq('user_id', user.id)
+      if (isIgnored()) return
       if (error) setLoadError(true)
       const ids = (data || []).map((r: any) => r.question_id)
       if (ids.length === 0) {
         setFlaggedItems([])
       } else {
         const { data: qData, error: qError } = await supabase.rpc('get_review_questions', { p_question_ids: ids })
+        if (isIgnored()) return
         if (qError) setLoadError(true)
         setFlaggedItems(qData || [])
       }
     } else {
       const local = getGuestFlags()
+      if (isIgnored()) return
       setFlaggedItems(local.map((q: any) => ({ ...q, attempted: !!q.explanation })))
     }
+    if (isIgnored()) return
     setLoading(false)
   }
 
@@ -271,8 +289,17 @@ export default function Review({ dark }: { dark: boolean }) {
             {history.map((h, i) => {
               const mod = moduleFor(h.module_id)
               const isLast = i === history.length - 1
+              // BUG FIX: guest history rows have no `id`, so this used
+              // to fall back to the array index alone as the React
+              // key. Combined with `completed_at` here as a fallback
+              // instead, so the key stays stable/unique per row even
+              // if the list order ever changes, avoiding subtle list
+              // reconciliation glitches (index-only keys can cause
+              // React to reuse/misattribute DOM nodes across
+              // reorders).
+              const rowKey = h.id || `${h.completed_at}-${i}`
               return (
-                <div key={h.id || i} style={{ marginBottom: isLast ? 0 : ITEM_GAP }}>
+                <div key={rowKey} style={{ marginBottom: isLast ? 0 : ITEM_GAP }}>
                   <LiquidGlassCard dark={dark} delay={i * 50} onClick={() => setSelectedHistory(h)} style={{
                     padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12
                   }}>

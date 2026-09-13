@@ -67,6 +67,17 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const timerRef = useRef<ReturnType<typeof setInterval>>()
   const quizStartedAtRef = useRef<number | null>(null)
   const [usingCache, setUsingCache] = useState(false)
+  const gradingInFlightRef = useRef<Set<number>>(new Set())
+  // BUG FIX (perf): debounces the paused-exam autosave. This effect
+  // used to call persistActiveExam() — a Supabase write for signed-in
+  // users — on every single answer/navigation change, which meant up
+  // to ~36 writes during one mock exam. Debouncing to fire 1.5s after
+  // the last change cuts that dramatically with no visible behavior
+  // change: stopQuiz()/submitQuiz() already call clearActiveExam()
+  // directly on real exit paths, so this timer only ever governs the
+  // "resume where you left off" snapshot while a student is actively
+  // answering.
+  const persistTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
 
   // ── Initial data load ──────────────────────────────────────────────
   useEffect(() => {
@@ -90,9 +101,19 @@ export default function MCQ({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules])
 
+  // BUG FIX: fetchQuestionsForModule previously had no cancellation
+  // guard, unlike every other data-fetching effect in this app
+  // (StagePage, SubjectPage, ModulePage, FilesPage, LessonPage all use
+  // an `ignore` flag). If a student tapped between module tabs
+  // quickly, an older in-flight request for module A could resolve
+  // AFTER a newer request for module B and overwrite `questions` with
+  // the wrong module's data. `isIgnored()` is threaded through so any
+  // state update from a stale request is skipped.
   useEffect(() => {
-    if (activeModule) fetchQuestionsForModule(activeModule)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!activeModule) return
+    let ignore = false
+    fetchQuestionsForModule(activeModule, () => ignore)
+    return () => { ignore = true }
   }, [activeModule])
 
   // ── Deep-link entry points (retry / lesson / subject) ──────────────
@@ -128,11 +149,17 @@ export default function MCQ({ dark }: { dark: boolean }) {
     return () => { cancelled = true }
   }, [user, quizMode])
 
-  useEffect(() => {
+    useEffect(() => {
     if (!quizMode || submitted || quizMode === 'retry') return
-    persistActiveExam(user, {
-      activeModule, quizMode, quizQuestions, answers, startedAt: quizStartedAtRef.current
-    })
+    if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current)
+    persistTimeoutRef.current = setTimeout(() => {
+      persistActiveExam(user, {
+        activeModule, quizMode, quizQuestions, answers, startedAt: quizStartedAtRef.current
+      })
+    }, 1500)
+    return () => {
+      if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quizMode, quizQuestions, answers, submitted])
 
@@ -206,24 +233,34 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
   // Answer key columns are excluded here — questions_public strips
   // correct/explanation so a guest can never read them client-side.
-  async function fetchQuestionsForModule(moduleId: string) {
+  //
+  // BUG FIX: accepts an optional isIgnored() check (defaults to
+  // "never ignored" so any other caller keeps working unchanged).
+  // The effect above supplies a real one, so a state update from a
+  // request for a module the student has already navigated away from
+  // is skipped instead of clobbering the newer module's data.
+  async function fetchQuestionsForModule(moduleId: string, isIgnored: () => boolean = () => false) {
     const cacheKey = `mcq_questions_cache_${moduleId}`
     const cached = localStorage.getItem(cacheKey)
     let hadCache = false
     if (cached) {
       try {
-        setQuestions(JSON.parse(cached))
-        setUsingCache(true)
+        if (!isIgnored()) {
+          setQuestions(JSON.parse(cached))
+          setUsingCache(true)
+        }
         hadCache = true
       } catch { /* ignore corrupt cache */ }
     }
-    setLoading(!hadCache)
+    if (!isIgnored()) setLoading(!hadCache)
 
     const { data, error } = await supabase
       .from('questions_public')
       .select('id, question, option_a, option_b, option_c, option_d, exam_type, exam_stage, module_id, subject_id, lesson_id, source, created_at')
       .eq('module_id', moduleId)
       .order('created_at')
+
+    if (isIgnored()) return
 
     if (error) {
       if (!hadCache) setLoadError(true)
@@ -331,6 +368,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     setElapsedSeconds(0)
     setShowReview(false)
     setStruckOut({})
+    gradingInFlightRef.current.clear()
     loadFlagsFor(qs.map(q => q.id)).then(setFlaggedIds)
 
     quizStartedAtRef.current = Date.now()
@@ -354,6 +392,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     setElapsedSeconds(0)
     setShowReview(false)
     setStruckOut({})
+    gradingInFlightRef.current.clear()
     quizStartedAtRef.current = Date.now()
     startTimer(quizStartedAtRef.current, 'retry')
     loadFlagsFor(list.map(q => q.id)).then(setFlaggedIds)
@@ -371,6 +410,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     setCurrentIndex(0)
     setShowReview(false)
     setStruckOut({})
+    gradingInFlightRef.current.clear()
     quizStartedAtRef.current = resumeData.startedAt
     loadFlagsFor((resumeData.quizQuestions || []).map((q: any) => q.id)).then(setFlaggedIds)
 
@@ -397,6 +437,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     setCurrentIndex(0)
     setShowReview(false)
     setStruckOut({})
+    gradingInFlightRef.current.clear()
   }
 
   // ── Tutor Mode grading ───────────────────────────────────────────────
@@ -409,6 +450,10 @@ export default function MCQ({ dark }: { dark: boolean }) {
     const q = quizQuestions[qi]
     if (!q) return
     const { data, error } = await supabase.rpc('grade_mcq', { p_answers: [{ id: q.id, answer: opt }] })
+    // BUG FIX: release the in-flight lock for this question regardless
+    // of success/failure so a genuinely failed grading attempt doesn't
+    // permanently block the student from retrying that question.
+    gradingInFlightRef.current.delete(qi)
     if (!error && data && data[0]) {
       const r = data[0]
       setResults(prev => ({
@@ -424,8 +469,17 @@ export default function MCQ({ dark }: { dark: boolean }) {
     if (submitted) return
     const q = quizQuestions[qi]
     if (isTutorMode && q && results[q.id]) return
+    // BUG FIX: while a grading request for this question is already
+    // in flight, ignore further taps rather than firing an
+    // overlapping second request whose response could land after the
+    // first and leave the displayed result out of sync with the
+    // currently selected option.
+    if (isTutorMode && gradingInFlightRef.current.has(qi)) return
     setAnswers(prev => ({ ...prev, [qi]: opt }))
-    if (isTutorMode) tutorGradeAnswer(qi, opt)
+    if (isTutorMode) {
+      gradingInFlightRef.current.add(qi)
+      tutorGradeAnswer(qi, opt)
+    }
   }
 
   function toggleStrike(qi: number, label: string) {

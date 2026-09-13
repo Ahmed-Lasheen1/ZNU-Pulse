@@ -124,7 +124,20 @@ export default function Checklist({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded])
 
-  useEffect(() => { if (activeModule) fetchTasks() }, [activeModule, user])
+  // BUG FIX: previously called fetchTasks() with no cancellation
+  // guard, unlike the fetch effects elsewhere in the app. Switching
+  // module tabs quickly could let an older, slower request for module
+  // A resolve after a newer request for module B and overwrite
+  // `tasks` with the wrong module's list. `isIgnored()` is threaded
+  // through fetchTasks so a stale response's setTasks call is skipped.
+  useEffect(() => {
+    if (!activeModule) return
+    let ignore = false
+    fetchTasks(() => ignore)
+    return () => { ignore = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeModule, user])
+
   useEffect(() => { setShowCompleted(false) }, [activeModule])
 
   const notifiedSignedInRef = useRef(false)
@@ -135,13 +148,15 @@ export default function Checklist({ dark }: { dark: boolean }) {
     }
   }, [user, showToast])
 
-  async function fetchTasks() {
+  async function fetchTasks(isIgnored: () => boolean = () => false) {
     if (user) {
       const { data } = await supabase.from('user_checklist')
         .select('*').eq('user_id', user.id).eq('module_id', activeModule).order('created_at')
+      if (isIgnored()) return
       if (data) setTasks(data as ChecklistTask[])
     } else {
       const saved = JSON.parse(localStorage.getItem(`checklist_${activeModule}`) || '[]')
+      if (isIgnored()) return
       setTasks(saved)
     }
   }
