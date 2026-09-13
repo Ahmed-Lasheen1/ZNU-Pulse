@@ -7,6 +7,8 @@ import ErrorBanner from '../components/ErrorBanner'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PulseBackground from '../components/pulse/PulseBackground'
 import BackButton from '../components/pulse/BackButton'
+import ModuleNotFoundState from '../components/pulse/ModuleNotFoundState'
+import EntityPageHeader from '../components/pulse/EntityPageHeader'
 import SummaryOverlay from '../components/SummaryOverlay'
 import { useModules } from '../contexts'
 import { fetchLessonById } from '../lib/lessons'
@@ -54,14 +56,7 @@ export default function LessonPage({ dark }: { dark: boolean }) {
   }, [lessonId])
 
   if (!module) return (
-    <div style={{ position: 'relative', minHeight: '100vh' }}>
-      <PulseBackground />
-      <div style={{ position: 'relative', zIndex: 1, padding: 24, textAlign: 'center', color: ON_GRADIENT_TOP.secondary }}>
-        {(loadError || modulesError)
-          ? <ErrorBanner message="Couldn't load this — check your connection." />
-          : !modulesLoaded ? 'Loading...' : "This module doesn't exist or was removed."}
-      </div>
-    </div>
+    <ModuleNotFoundState hasError={loadError || modulesError} loaded={modulesLoaded} />
   )
 
   if (selectedSummary) return (
@@ -88,22 +83,17 @@ export default function LessonPage({ dark }: { dark: boolean }) {
 
         {lesson && (
           <>
-            <div style={{ textAlign: 'center', padding: '10px 0 30px' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-                {lesson.icon
-                  ? <ModuleIcon value={lesson.icon} size={44} color={pt.success} />
-                  : <NotesIcon color={pt.success} size={44} />}
-              </div>
-              <h1 style={{ ...pulseType.pageTitle, fontSize: 24, color: pt.success, marginBottom: 6 }}>{lesson.title}</h1>
-              <div style={{ color: ON_GRADIENT_TOP.secondary, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                <ModuleIcon value={module.icon} size={14} color={ON_GRADIENT_TOP.secondary} /> {module.name}
-              </div>
-            </div>
+            <EntityPageHeader
+              icon={lesson.icon
+                ? <ModuleIcon value={lesson.icon} size={44} color={pt.success} />
+                : <NotesIcon color={pt.success} size={44} />}
+              title={lesson.title}
+              titleColor={pt.success}
+              moduleIcon={module.icon}
+              moduleName={module.name}
+            />
 
-            {/* Summary & Practice — side by side from tablet width up
-                (.summary-practice-row, see index.css), stacked on
-                phones. Same layout as ModulePage/StagePage's Smart
-                Summaries + Practice pairing. */}
+            {/* Summary & Practice — side by side from tablet width up */}
             <div className="summary-practice-row" style={{ marginBottom: 32 }}>
               <div>
                 <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>

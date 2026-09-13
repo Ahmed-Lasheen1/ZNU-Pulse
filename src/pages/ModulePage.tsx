@@ -1,3 +1,4 @@
+// src/pages/ModulePage.tsx
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
@@ -19,6 +20,7 @@ import { ExamStageIcon, SmartSummariesIcon, PracticeIcon } from '@/components/ui
 interface PageModule {
   id: string; name: string; icon?: string | null; color: string; status: 'active' | 'completed'
 }
+interface PageSubject { id: string; module_id: string; name: string; icon?: string | null; color?: string | null }
 interface ExamStage { value: string; title: string; emoji?: string; Icon?: (p: { color: string; size?: number }) => JSX.Element; color: string }
 
 export default function ModulePage({ dark }: { dark: boolean }) {
@@ -33,9 +35,9 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   const [loadError, setLoadError] = useState(false)
   const [driveUrl, setDriveUrl] = useState('')
   const [examStages, setExamStages] = useState<ExamStage[]>([])
-  // Only stages that actually have tagged content (file/question/summary) are shown.
+  // Only stages with at least one tagged file/question/summary are shown.
   const [stagesWithContent, setStagesWithContent] = useState<Set<string>>(new Set())
-  const [subjects, setSubjects] = useState<{ id: string; module_id: string; name: string; icon?: string | null; color?: string | null }[]>([])
+  const [subjects, setSubjects] = useState<PageSubject[]>([])
   // null = not checked yet (never blocks a click); false = confirmed empty.
   const [hasModuleSummaries, setHasModuleSummaries] = useState<boolean | null>(null)
   const [hasModuleQuestions, setHasModuleQuestions] = useState<boolean | null>(null)

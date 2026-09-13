@@ -1,7 +1,8 @@
+// src/pages/StagePage.tsx
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
-import { getPulseTheme, pulseFonts, pulseType } from '../premiumTheme'
+import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PulseBackground from '../components/pulse/PulseBackground'
 import BackButton from '../components/pulse/BackButton'
@@ -20,6 +21,7 @@ import { ExamIcon, NotesIcon } from '../lib/medicalIcons'
 import { SmartSummariesIcon, PracticeIcon } from '@/components/ui/tool-icons'
 
 interface PageModule { id: string; name: string; icon?: string | null; color: string }
+interface PageSubject { id: string; module_id: string; name: string; icon?: string | null; color?: string | null }
 interface ExamStage { value: string; title: string; emoji?: string; Icon?: (p: { color: string; size?: number }) => JSX.Element; color: string }
 interface Summary { id: string; title: string; url: string }
 
@@ -40,7 +42,7 @@ export default function StagePage({ dark }: { dark: boolean }) {
   const [selectedSummary, setSelectedSummary] = useState<Summary | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [driveUrl, setDriveUrl] = useState('')
-  const [subjects, setSubjects] = useState<{ id: string; module_id: string; name: string; icon?: string | null; color?: string | null }[]>([])
+  const [subjects, setSubjects] = useState<PageSubject[]>([])
 
   // Hardware/browser back closes the summary overlay instead of leaving the page.
   useHistoryOverlay(!!selectedSummary, () => setSelectedSummary(null))
@@ -146,8 +148,8 @@ export default function StagePage({ dark }: { dark: boolean }) {
         {/* Smart Summaries & Practice — each toasts instead of navigating when empty */}
         <div className="summary-practice-row" style={{ marginBottom: 32 }}>
           <div>
-            <h2 style={{ ...pulseType.sectionLabel, color: pt.textMuted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <SmartSummariesIcon color={pt.textMuted} size={14} /> Smart Summaries
+            <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <SmartSummariesIcon color={ON_GRADIENT_TOP.muted} size={14} /> Smart Summaries
             </h2>
             <LiquidGlassCard dark={dark} delay={0} onClick={openSummaries} style={{ padding: 24, textAlign: 'center' }}>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
@@ -161,8 +163,8 @@ export default function StagePage({ dark }: { dark: boolean }) {
           </div>
 
           <div>
-            <h2 style={{ ...pulseType.sectionLabel, color: pt.textMuted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <PracticeIcon color={pt.textMuted} size={14} /> Practice
+            <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <PracticeIcon color={ON_GRADIENT_TOP.muted} size={14} /> Practice
             </h2>
             <LiquidGlassCard dark={dark} delay={0} onClick={openPractice} style={{ padding: 24, textAlign: 'center' }}>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
