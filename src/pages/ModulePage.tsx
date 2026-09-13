@@ -2,10 +2,9 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
-import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
+import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
-import PulseBackground from '../components/pulse/PulseBackground'
-import BackButton from '../components/pulse/BackButton'
+import PageShell from '../components/pulse/PageShell'
 import ModuleNotFoundState from '../components/pulse/ModuleNotFoundState'
 import StudyMaterialsSection from '../components/pulse/StudyMaterialsSection'
 import StudyByLessonSection from '../components/pulse/StudyByLessonSection'
@@ -128,75 +127,67 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   )
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh' }}>
-      <PulseBackground />
-      <div className="pulse-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body }}>
-
-        <div style={{ marginBottom: 8 }}>
-          <BackButton dark={dark} fallback="/" />
+    <PageShell dark={dark} backFallback="/">
+      <div style={{ textAlign: 'center', padding: '20px 0 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
+          <ModuleIcon value={module.icon} size={52} color={module.color} />
         </div>
-
-        <div style={{ textAlign: 'center', padding: '20px 0 24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-            <ModuleIcon value={module.icon} size={52} color={module.color} />
-          </div>
-          <h1 style={{ ...pulseType.pageTitle, fontSize: 26, color: module.color, marginBottom: 6 }}>{module.name}</h1>
-          <div style={{
-            display: 'inline-block',
-            background: module.status === 'active' ? 'rgba(74,222,128,0.14)' : (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
-            color: module.status === 'active' ? '#4ade80' : ON_GRADIENT_TOP.muted,
-            border: `1px solid ${module.status === 'active' ? 'rgba(74,222,128,0.35)' : pt.border}`,
-            borderRadius: 999, padding: '4px 14px', fontSize: 12, fontWeight: 700
-          }}>
-            {module.status === 'active' ? '● Active' : '✓ Completed'}
-          </div>
-        </div>
-
-        {/* Exam Stage — hidden entirely when no stage has tagged content */}
-        {visibleExamStages.length > 0 && (
-          <div style={{ marginBottom: 32 }}>
-            <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <ExamStageIcon color={ON_GRADIENT_TOP.muted} size={14} /> Exam Stage
-            </h2>
-            <AutoGrid>
-              {visibleExamStages.map(renderStageCard)}
-            </AutoGrid>
-          </div>
-        )}
-
-        <StudyByLessonSection dark={dark} moduleId={moduleId as string} subjects={subjects} />
-
-        <StudyMaterialsSection dark={dark} moduleId={moduleId as string} presentFileTypes={presentFileTypes} driveUrl={driveUrl} />
-
-        {/* Smart Summaries & Practice — each checks it has content before navigating */}
-        <div className="summary-practice-row" style={{ marginBottom: 32 }}>
-          <div>
-            <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <SmartSummariesIcon color={ON_GRADIENT_TOP.muted} size={14} /> Smart Summaries
-            </h2>
-            <LiquidGlassCard dark={dark} delay={0} onClick={openAllSummaries} style={{ padding: 24, textAlign: 'center' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-                <NotesIcon color={pt.success} size={30} />
-              </div>
-              <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>All Summaries</div>
-              <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>View summaries for this module</div>
-            </LiquidGlassCard>
-          </div>
-
-          <div>
-            <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <PracticeIcon color={ON_GRADIENT_TOP.muted} size={14} /> Practice
-            </h2>
-            <LiquidGlassCard dark={dark} delay={0} onClick={openPractice} style={{ padding: 24, textAlign: 'center' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-                <ExamIcon color="#e2725b" size={30} />
-              </div>
-              <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>MCQ Bank</div>
-              <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>Practice questions for this module</div>
-            </LiquidGlassCard>
-          </div>
+        <h1 style={{ ...pulseType.pageTitle, fontSize: 26, color: module.color, marginBottom: 6 }}>{module.name}</h1>
+        <div style={{
+          display: 'inline-block',
+          background: module.status === 'active' ? 'rgba(74,222,128,0.14)' : (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
+          color: module.status === 'active' ? '#4ade80' : ON_GRADIENT_TOP.muted,
+          border: `1px solid ${module.status === 'active' ? 'rgba(74,222,128,0.35)' : pt.border}`,
+          borderRadius: 999, padding: '4px 14px', fontSize: 12, fontWeight: 700
+        }}>
+          {module.status === 'active' ? '● Active' : '✓ Completed'}
         </div>
       </div>
-    </div>
+
+      {/* Exam Stage — hidden entirely when no stage has tagged content */}
+      {visibleExamStages.length > 0 && (
+        <div style={{ marginBottom: 32 }}>
+          <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ExamStageIcon color={ON_GRADIENT_TOP.muted} size={14} /> Exam Stage
+          </h2>
+          <AutoGrid>
+            {visibleExamStages.map(renderStageCard)}
+          </AutoGrid>
+        </div>
+      )}
+
+      <StudyByLessonSection dark={dark} moduleId={moduleId as string} subjects={subjects} />
+
+      <StudyMaterialsSection dark={dark} moduleId={moduleId as string} presentFileTypes={presentFileTypes} driveUrl={driveUrl} />
+
+      {/* Smart Summaries & Practice — each checks it has content before navigating */}
+      <div className="summary-practice-row" style={{ marginBottom: 32 }}>
+        <div>
+          <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <SmartSummariesIcon color={ON_GRADIENT_TOP.muted} size={14} /> Smart Summaries
+          </h2>
+          <LiquidGlassCard dark={dark} delay={0} onClick={openAllSummaries} style={{ padding: 24, textAlign: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+              <NotesIcon color={pt.success} size={30} />
+            </div>
+            <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>All Summaries</div>
+            <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>View summaries for this module</div>
+          </LiquidGlassCard>
+        </div>
+
+        <div>
+          <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <PracticeIcon color={ON_GRADIENT_TOP.muted} size={14} /> Practice
+          </h2>
+          <LiquidGlassCard dark={dark} delay={0} onClick={openPractice} style={{ padding: 24, textAlign: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+              <ExamIcon color="#e2725b" size={30} />
+            </div>
+            <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>MCQ Bank</div>
+            <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>Practice questions for this module</div>
+          </LiquidGlassCard>
+        </div>
+      </div>
+    </PageShell>
   )
 }

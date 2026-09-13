@@ -2,10 +2,9 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
-import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
+import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
-import PulseBackground from '../components/pulse/PulseBackground'
-import BackButton from '../components/pulse/BackButton'
+import PageShell from '../components/pulse/PageShell'
 import ModuleNotFoundState from '../components/pulse/ModuleNotFoundState'
 import EntityPageHeader from '../components/pulse/EntityPageHeader'
 import StudyMaterialsSection from '../components/pulse/StudyMaterialsSection'
@@ -124,58 +123,50 @@ export default function StagePage({ dark }: { dark: boolean }) {
   }
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh' }}>
-      <PulseBackground />
-      <div className="pulse-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body }}>
+    <PageShell dark={dark} backFallback={`/module/${moduleId}`}>
+      <EntityPageHeader
+        icon={meta.Icon ? <meta.Icon color={meta.color} size={44} /> : <span style={{ fontSize: 44 }}>{meta.emoji}</span>}
+        title={meta.title}
+        titleColor={meta.color}
+        moduleIcon={module.icon}
+        moduleName={module.name}
+      />
 
-        <div style={{ marginBottom: 8 }}>
-          <BackButton dark={dark} fallback={`/module/${moduleId}`} />
+      <StudyMaterialsSection dark={dark} moduleId={moduleId as string} presentFileTypes={presentFileTypes} driveUrl={driveUrl} />
+
+      {/* Links carry ?stage= so SubjectPage narrows its lesson list to this stage */}
+      <StudyByLessonSection dark={dark} moduleId={moduleId as string} subjects={subjects} stage={stage} />
+
+      {/* Smart Summaries & Practice — each toasts instead of navigating when empty */}
+      <div className="summary-practice-row" style={{ marginBottom: 32 }}>
+        <div>
+          <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <SmartSummariesIcon color={ON_GRADIENT_TOP.muted} size={14} /> Smart Summaries
+          </h2>
+          <LiquidGlassCard dark={dark} delay={0} onClick={openSummaries} style={{ padding: 24, textAlign: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+              <NotesIcon color={pt.success} size={30} />
+            </div>
+            <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>Summaries</div>
+            <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>
+              {summaries.length === 0 ? `${meta.title} summaries` : summaries.length === 1 ? summaries[0].title : `${summaries.length} available`}
+            </div>
+          </LiquidGlassCard>
         </div>
 
-        <EntityPageHeader
-          icon={meta.Icon ? <meta.Icon color={meta.color} size={44} /> : <span style={{ fontSize: 44 }}>{meta.emoji}</span>}
-          title={meta.title}
-          titleColor={meta.color}
-          moduleIcon={module.icon}
-          moduleName={module.name}
-        />
-
-        <StudyMaterialsSection dark={dark} moduleId={moduleId as string} presentFileTypes={presentFileTypes} driveUrl={driveUrl} />
-
-        {/* Links carry ?stage= so SubjectPage narrows its lesson list to this stage */}
-        <StudyByLessonSection dark={dark} moduleId={moduleId as string} subjects={subjects} stage={stage} />
-
-        {/* Smart Summaries & Practice — each toasts instead of navigating when empty */}
-        <div className="summary-practice-row" style={{ marginBottom: 32 }}>
-          <div>
-            <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <SmartSummariesIcon color={ON_GRADIENT_TOP.muted} size={14} /> Smart Summaries
-            </h2>
-            <LiquidGlassCard dark={dark} delay={0} onClick={openSummaries} style={{ padding: 24, textAlign: 'center' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-                <NotesIcon color={pt.success} size={30} />
-              </div>
-              <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>Summaries</div>
-              <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>
-                {summaries.length === 0 ? `${meta.title} summaries` : summaries.length === 1 ? summaries[0].title : `${summaries.length} available`}
-              </div>
-            </LiquidGlassCard>
-          </div>
-
-          <div>
-            <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <PracticeIcon color={ON_GRADIENT_TOP.muted} size={14} /> Practice
-            </h2>
-            <LiquidGlassCard dark={dark} delay={0} onClick={openPractice} style={{ padding: 24, textAlign: 'center' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-                <ExamIcon color="#e2725b" size={30} />
-              </div>
-              <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>MCQ Bank</div>
-              <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>Practice {meta.title} questions</div>
-            </LiquidGlassCard>
-          </div>
+        <div>
+          <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <PracticeIcon color={ON_GRADIENT_TOP.muted} size={14} /> Practice
+          </h2>
+          <LiquidGlassCard dark={dark} delay={0} onClick={openPractice} style={{ padding: 24, textAlign: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+              <ExamIcon color="#e2725b" size={30} />
+            </div>
+            <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>MCQ Bank</div>
+            <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>Practice {meta.title} questions</div>
+          </LiquidGlassCard>
         </div>
       </div>
-    </div>
+    </PageShell>
   )
 }

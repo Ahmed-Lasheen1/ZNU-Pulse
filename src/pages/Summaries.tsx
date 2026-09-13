@@ -2,13 +2,12 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
-import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
+import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
 import ErrorBanner from '../components/ErrorBanner'
 import SummaryOverlay from '../components/SummaryOverlay'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
-import PulseBackground from '../components/pulse/PulseBackground'
+import PageShell from '../components/pulse/PageShell'
 import TabRow from '../components/TabRow'
-import BackButton from '../components/pulse/BackButton'
 import { useModules } from '../contexts'
 import { fetchModuleStages } from '../lib/moduleStages'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
@@ -23,8 +22,6 @@ interface Summary {
   id: string; title: string; url: string; module_id: string; exam_stage?: string | null
 }
 interface ExamStage { value: string; title: string; emoji?: string; Icon?: (p: { color: string; size?: number }) => JSX.Element; color: string }
-
-function gridCols(n: number) { return n === 1 ? 1 : 2 }
 
 function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
   mod: SummaryModule; dark: boolean; initialStage?: string; initialSummaryId?: string
@@ -53,12 +50,8 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
       })
   }, [mod.id])
 
-  // AUDIT FIX (search accuracy): when arriving here from a Search
-  // result for a specific summary (see Search.tsx's `summary` query
-  // param), open that exact summary directly instead of leaving the
-  // person to find it again in the list. Also switches the stage tab
-  // to whichever stage that summary actually belongs to, so it's
-  // visible in the filtered list underneath if the overlay is closed.
+  // Arriving from a Search result for a specific summary opens it
+  // directly and switches to its stage tab.
   useEffect(() => {
     if (!initialSummaryId || summaries.length === 0) return
     const match = summaries.find(s => s.id === initialSummaryId)
@@ -76,24 +69,11 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
   )
 
   return (
-    <div className="pulse-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body }}>
-      {/* Scoped narrower column just for the summary list further down
-          — .pulse-wide alone caps out at 1800px (shared by nearly every
-          page), which made each summary row's hover scale-up (see
-          LiquidGlassCard) stretch across a very wide row on large
-          screens. .summaries-list-wide (defined below) caps ONLY the
-          list itself at 900px — the back button, title, and TabRow
-          above it stay at the full .pulse-wide width. */}
+    <PageShell dark={dark} backFallback={`/module/${mod.id}`}>
+      {/* Caps just the list at 900px — back button/title/TabRow stay full-width */}
       <style>{`
         .summaries-list-wide { max-width: 900px; margin: 0 auto; }
       `}</style>
-
-      {/* No more "back to module grid" — Summaries no longer has a
-          module-picker page, so Back now does a real navigation
-          (e.g. back to the module page that linked here, or Home). */}
-      <div style={{ marginBottom: 8 }}>
-        <BackButton dark={dark} fallback={`/module/${mod.id}`} />
-      </div>
 
       <div style={{ textAlign: 'center', padding: '10px 0 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
@@ -161,52 +141,39 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
           </LiquidGlassCard>
         ))}
       </div>
-    </div>
+    </PageShell>
   )
 }
 
 export default function Summaries({ dark }: { dark: boolean }) {
   const { modules, modulesLoaded, modulesError } = useModules() as { modules: SummaryModule[]; modulesLoaded: boolean; modulesError: boolean }
   const location = useLocation()
-  const pt = getPulseTheme(dark)
 
   const params = new URLSearchParams(location.search)
   const moduleParam = params.get('module')
   const initialStage = params.get('stage') || 'all'
-  // AUDIT FIX (search accuracy): a specific summary id from Search.tsx
-  // (`?summary=<id>`), forwarded down so ModuleSummaries can open that
-  // exact summary the moment its list finishes loading.
+  // Specific summary id from Search.tsx (`?summary=<id>`), forwarded so
+  // ModuleSummaries can open that exact summary once its list loads.
   const initialSummaryId = params.get('summary') || undefined
 
-  // The module-picker grid page is gone. `/summaries` now always goes
-  // straight into one module's summaries: whichever module was passed
-  // in via `?module=`, or — if none was passed (e.g. a stale bookmark,
-  // or someone typing the URL directly) — the first active module,
-  // falling back to the first module of any status if there are no
-  // active ones.
+  // No module-picker grid page — goes straight into one module's
+  // summaries: whichever was passed via `?module=`, else the first
+  // active module, else the first module of any status.
   const resolvedModule: SummaryModule | null =
     (moduleParam && modules.find(m => m.id === moduleParam)) ||
     modules.find(m => m.status === 'active') ||
     modules[0] ||
     null
 
-  return (
-    <div style={{ position: 'relative', minHeight: '100vh' }}>
-      <PulseBackground />
-      {resolvedModule ? (
-        <ModuleSummaries mod={resolvedModule} dark={dark} initialStage={initialStage} initialSummaryId={initialSummaryId} />
-      ) : (
-        <div className="pulse-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body }}>
-          <div style={{ marginBottom: 8 }}>
-            <BackButton dark={dark} fallback="/" />
-          </div>
-          <div style={{ textAlign: 'center', padding: 40, color: ON_GRADIENT_TOP.secondary }}>
-            {modulesError
-              ? <ErrorBanner message="Couldn't load modules — check your connection." />
-              : !modulesLoaded ? 'Loading...' : 'No modules available yet.'}
-          </div>
-        </div>
-      )}
-    </div>
+  return resolvedModule ? (
+    <ModuleSummaries mod={resolvedModule} dark={dark} initialStage={initialStage} initialSummaryId={initialSummaryId} />
+  ) : (
+    <PageShell dark={dark} backFallback="/">
+      <div style={{ textAlign: 'center', padding: 40, color: ON_GRADIENT_TOP.secondary }}>
+        {modulesError
+          ? <ErrorBanner message="Couldn't load modules — check your connection." />
+          : !modulesLoaded ? 'Loading...' : 'No modules available yet.'}
+      </div>
+    </PageShell>
   )
 }
