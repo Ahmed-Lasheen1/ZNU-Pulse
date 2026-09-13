@@ -10,8 +10,9 @@ interface EntityPageHeaderProps {
   moduleName: string
 }
 
-// Centered icon + title + "under this module" line — shared header
-// used by StagePage, SubjectPage, and LessonPage.
+// Shared "icon + title + parent module" header used by StagePage,
+// SubjectPage, and LessonPage — title color is per-entity (exam
+// stage color, subject color, etc.), unlike PageIntro's fixed color.
 export default function EntityPageHeader({ icon, title, titleColor, moduleIcon, moduleName }: EntityPageHeaderProps) {
   return (
     <div style={{ textAlign: 'center', padding: '10px 0 30px' }}>

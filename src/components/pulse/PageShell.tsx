@@ -13,10 +13,9 @@ interface PageShellProps {
   containerStyle?: CSSProperties
 }
 
-// Shared full-page chrome used by every simple content page (Schedule,
-// Checklist, FilesPage, AnonQuestions, Search, Review): the fixed
-// PulseBackground, the `.pulse-wide` (or page-specific) container, and
-// the "← Back" pill in its usual spot. Pages only supply their content.
+// Shared full-page chrome (background + container + "← Back" pill)
+// used by Schedule, Checklist, FilesPage, AnonQuestions, Search, and
+// Review — pages only supply their content.
 export default function PageShell({
   dark, children, backFallback = '/', onBack,
   maxWidth, containerClassName = 'pulse-wide', containerStyle = {},

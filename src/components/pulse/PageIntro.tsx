@@ -9,15 +9,11 @@ interface PageIntroProps {
   paddingBottom?: number
 }
 
-// Shared "emoji + title + optional subtitle" header block repeated at
-// the top of Schedule, Checklist, FilesPage, AnonQuestions, Search,
-// and Review. This text sits DIRECTLY on the PULSE_BG gradient (no
-// glass surface behind it), and it always renders near the top of the
-// page — the light/pale-blue zone of the fixed gradient — so it uses
-// the ON_GRADIENT_TOP tokens (readability fix), not the Liquid Glass
-// text tokens (pt.text/pt.sub), which are meant for text sitting on a
-// tinted glass card and would otherwise render white-on-pale-blue in
-// dark mode.
+// Shared "emoji + title + optional subtitle" header used at the top of
+// Schedule, Checklist, FilesPage, AnonQuestions, Search, and Review.
+// Sits directly on the PULSE_BG gradient (no glass surface), always
+// near the top (light zone) of the fixed gradient, so it uses the
+// ON_GRADIENT_TOP tokens rather than the Liquid Glass text tokens.
 export default function PageIntro({ dark, emoji, title, subtitle, paddingBottom = 24 }: PageIntroProps) {
   return (
     <div style={{ textAlign: 'center', padding: `10px 0 ${paddingBottom}px` }}>
