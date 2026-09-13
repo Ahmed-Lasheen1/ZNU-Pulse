@@ -51,10 +51,8 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [showReview, setShowReview] = useState(false)
   const [struckOut, setStruckOut] = useState<Record<number, Set<string>>>({})
-  // Adjustable text size for the question/answer text — matches
-  // ExamSoft's "Adjust Text Size" control, a standard accessibility
-  // feature on every reference exam platform. Persisted like the
-  // app's existing theme preference (localStorage, not per-account).
+
+  // Adjustable question text size, persisted like the theme preference.
   const FONT_SCALES = [0.9, 1, 1.15, 1.3]
   const [fontScale, setFontScale] = useState<number>(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('znu_mcq_font_scale') : null
@@ -65,10 +63,12 @@ export default function MCQ({ dark }: { dark: boolean }) {
   function cycleFontScale() {
     setFontScale(prev => FONT_SCALES[(FONT_SCALES.indexOf(prev) + 1) % FONT_SCALES.length])
   }
+
   const timerRef = useRef<ReturnType<typeof setInterval>>()
   const quizStartedAtRef = useRef<number | null>(null)
   const [usingCache, setUsingCache] = useState(false)
 
+  // ── Initial data load ──────────────────────────────────────────────
   useEffect(() => {
     fetchSubjects()
     fetchLessons()
@@ -95,6 +95,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeModule])
 
+  // ── Deep-link entry points (retry / lesson / subject) ──────────────
   useEffect(() => {
     if (location.state?.retryQuestions?.length) {
       startRetryQuiz(location.state.retryQuestions)
@@ -119,6 +120,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subjectFilter, lessonFilter, questions])
 
+  // ── Paused-exam persistence ─────────────────────────────────────────
   useEffect(() => {
     if (quizMode) return
     let cancelled = false
@@ -146,12 +148,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     fetchModuleStages(activeModule).then(setStages)
   }, [activeModule])
 
-  // Keyboard shortcuts, desktop only in practice (touch devices don't
-  // fire keydown for taps) — plain number keys rather than a modifier
-  // combo like ExamSoft's Ctrl/Cmd+Shift+Letter, since this page has
-  // no text inputs to conflict with. Ignored while grading/submitted,
-  // and skips re-selecting once Tutor Mode has already revealed an
-  // answer for the current question.
+  // ── Keyboard shortcuts (desktop only — touch devices don't fire keydown) ──
   useEffect(() => {
     if (!quizMode || submitted || grading) return
     function handleKeyDown(e: KeyboardEvent) {
@@ -183,6 +180,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [quizMode, submitted, grading, currentIndex, quizQuestions, results])
 
+  // ── Data fetching ────────────────────────────────────────────────────
   async function fetchSubjects() {
     const { data, error } = await supabase.from('subjects').select('*').order('name')
     if (error) {
@@ -206,6 +204,8 @@ export default function MCQ({ dark }: { dark: boolean }) {
     }
   }
 
+  // Answer key columns are excluded here — questions_public strips
+  // correct/explanation so a guest can never read them client-side.
   async function fetchQuestionsForModule(moduleId: string) {
     const cacheKey = `mcq_questions_cache_${moduleId}`
     const cached = localStorage.getItem(cacheKey)
@@ -257,6 +257,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
   function shuffle<T>(arr: T[]): T[] { return [...arr].sort(() => Math.random() - 0.5) }
 
+  // ── Flags ────────────────────────────────────────────────────────────
   async function loadFlagsFor(ids: string[]) {
     if (ids.length === 0) return new Set<string>()
     if (user) {
@@ -292,11 +293,8 @@ export default function MCQ({ dark }: { dark: boolean }) {
     setFlaggedIds(next)
   }
 
-  // Unified exam timer — counts down for mock (urgency escalates as it
-  // runs low), counts up for practice/retry (so a timer is always
-  // visible during an exam). Always clears any previous interval
-  // first, since "Try Again" can start a fresh quiz before the old
-  // one's own timer has stopped.
+  // ── Timer ────────────────────────────────────────────────────────────
+  // Counts down for mock exams, counts up for practice/retry.
   function startTimer(startedAt: number, mode: string) {
     clearInterval(timerRef.current)
     const tick = () => {
@@ -308,9 +306,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     timerRef.current = setInterval(tick, 1000)
   }
 
-  // AUDIT FIX (per user request): if the current selection has zero
-  // eligible questions, don't let the student enter an empty exam
-  // screen at all — show a toast and stay on the browsing view.
+  // ── Starting a quiz ──────────────────────────────────────────────────
   function startQuiz(type: string, subjectId: string | null = null) {
     let qs = type === 'mock'
       ? shuffle(getFilteredQuestions('mock')).slice(0, 36)
@@ -339,15 +335,9 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
     quizStartedAtRef.current = Date.now()
     startTimer(quizStartedAtRef.current, type)
-    // Entering exam mode should start from a known position — the mini
-    // status header assumes it's sitting near the top of the gradient.
     window.scrollTo({ top: 0 })
   }
 
-  // Same guard as startQuiz above — a retry list can legitimately be
-  // empty (e.g. every flagged/incorrect question for a filter has
-  // since been deleted), so this is checked here too rather than only
-  // at the two call sites that already guard it themselves.
   function startRetryQuiz(list: any[]) {
     if (!list || list.length === 0) {
       showToast('❌ No questions to retry', 'error')
@@ -409,20 +399,10 @@ export default function MCQ({ dark }: { dark: boolean }) {
     setStruckOut({})
   }
 
-  // Tutor Mode: practice and retry quizzes reveal correct/incorrect +
-  // explanation the instant a question is answered (matches how every
-  // major board-exam question bank — UWorld, TrueLearn, BoardVitals —
-  // splits "tutor" from "timed" mode). Mock Exam stays strictly
-  // deferred until submission, since it's meant to simulate real test
-  // conditions.
-  //
-  // Note: this per-question, in-the-moment grading still goes through
-  // grade_mcq (unchanged) — that RPC is only ever used for immediate
-  // feedback while a quiz is in progress, never for the recorded score.
-  // The recorded score/points/history for signed-in users now come
-  // exclusively from submit_quiz_attempt (see submitQuiz below), which
-  // re-grades everything itself server-side rather than trusting
-  // whatever the client already showed on screen.
+  // ── Tutor Mode grading ───────────────────────────────────────────────
+  // Practice/retry reveal correct/incorrect + explanation immediately.
+  // This per-question feedback still goes through grade_mcq (unchanged);
+  // the recorded score/points/history come only from submit_quiz_attempt.
   const isTutorMode = quizMode === 'practice' || quizMode === 'retry'
 
   async function tutorGradeAnswer(qi: number, opt: string) {
@@ -479,32 +459,14 @@ export default function MCQ({ dark }: { dark: boolean }) {
     startRetryQuiz(incorrectQs)
   }
 
-  // AUDIT FIX (score-integrity, pre-launch security audit):
-  //
-  // This function used to (1) call grade_mcq for every question,
-  // (2) compute total/correct/score/points itself in the browser from
-  // that response, and then (3) write answered_questions, exam_history,
-  // and a points amount directly to the database via plain table
-  // calls + `award_points({ p_amount: newPoints })`. Since every one of
-  // those writes only ever checked `auth.uid() = user_id` at the
-  // database layer (not whether the score/points being written were
-  // ever actually earned), a signed-in user could skip taking a quiz
-  // entirely and insert an arbitrary score/points combination directly
-  // from the browser console, using nothing but their own already-
-  // authenticated session and the public anon key.
-  //
-  // For signed-in users, all of that now happens in ONE atomic,
-  // server-side call: submit_quiz_attempt(). The RPC re-grades every
-  // submitted answer itself against the real answer key, and is the
-  // only thing that writes answered_questions/exam_history/points —
-  // the client never sends a score, a correctness flag, or a points
-  // amount for a signed-in user again. See the accompanying SQL
-  // migration for the RPC definition.
-  //
-  // Guests (no account) are unaffected: nothing is persisted server-
-  // side for them regardless, so grade_mcq + local (per-device)
-  // bookkeeping — exactly as before — is still the right, lowest-risk
-  // path for that case.
+  // ── Submitting a quiz ────────────────────────────────────────────────
+  // For signed-in users, submit_quiz_attempt() re-grades every answer
+  // server-side and is the only thing that writes
+  // answered_questions/exam_history/points — the client never sends a
+  // score or points amount. This keeps a signed-in student from being
+  // able to award themselves an arbitrary score/points from the console.
+  // Guests aren't persisted server-side at all, so grade_mcq + local
+  // (per-device) bookkeeping is the correct, lowest-risk path for them.
   async function submitQuiz() {
     clearInterval(timerRef.current)
     setGrading(true)
@@ -527,8 +489,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     const resultMap: Record<string, any> = {}
 
     if (user) {
-      // Signed-in path — server is authoritative for grading, scoring,
-      // points, and the exam_history record. See comment above.
       const { data: graded, error } = await supabase.rpc('submit_quiz_attempt', {
         p_answers: payload,
         p_module_id: historyModuleId,
@@ -553,16 +513,9 @@ export default function MCQ({ dark }: { dark: boolean }) {
         })
       }
 
-      // The RPC already recorded everything server-side — refresh the
-      // locally-cached profile/answered-ids state to reflect it rather
-      // than re-deriving anything from the client's own computation.
       fetchProfile(user.id)
       fetchAnsweredIds()
     } else {
-      // Guest path — unchanged. Nothing is persisted server-side for a
-      // guest regardless of what the client sends, so there's no
-      // integrity gap here to close; grade_mcq + local bookkeeping is
-      // still the correct, lowest-risk approach.
       const { data: graded, error } = await supabase.rpc('grade_mcq', { p_answers: payload })
 
       if (error) {
@@ -625,7 +578,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     setFinishTimeSec(quizMode === 'mock' ? (timeSec as number) : elapsedSeconds)
   }
 
-  // ── Exam mode (taking + results) ────────────────────────────────────
+  // ── Render: exam mode (taking + results) ────────────────────────────
   if (quizMode) {
     return (
       <MCQExamFlow
@@ -663,7 +616,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     )
   }
 
-  // ── Module / subject browsing view ─────────────────────────────────
+  // ── Render: module / subject browsing view ──────────────────────────
   return (
     <MCQBrowse
       dark={dark}

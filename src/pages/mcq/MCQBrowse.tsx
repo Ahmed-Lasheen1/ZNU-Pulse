@@ -1,8 +1,7 @@
 // src/pages/mcq/MCQBrowse.tsx
-// Module / subject browsing view — pulled out of MCQ.tsx. Renders the
-// "pick a module, pick a stage/subject, start Mock Exam or Practice"
-// screen. All quiz state lives in the MCQ.tsx container; this just
-// takes props and fires callbacks back up.
+// Module / subject browsing view — the "pick a module, pick a
+// stage/subject, start Mock Exam or Practice" screen. All quiz state
+// lives in MCQ.tsx; this just takes props and fires callbacks back up.
 import { useNavigate } from 'react-router-dom'
 import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../../premiumTheme'
 import ErrorBanner from '../../components/ErrorBanner'
@@ -46,20 +45,14 @@ export default function MCQBrowse({
   const navigate = useNavigate()
   const hoverTint = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'
 
-  // AUDIT FIX: these two TabRows used to hardcode accentColor={pt.cobalt},
-  // so their active-tab text was always the same blue no matter which
-  // module was selected. Summaries.tsx's equivalent stage TabRow passes
-  // accentColor={mod.color} (the current module's own color) — this now
-  // matches that same convention so the MCQ page's tab rows read
-  // consistently with Summaries instead of always defaulting to cobalt.
+  // Tab accent follows the current module's own color, matching Summaries.tsx.
   const tabAccentColor = activeModuleObj?.color || pt.cobalt
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
       <PulseBackground />
       <div className="pulse-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body }}>
-        {/* Back button only lives on this browsing view — exam mode
-            (MCQExamFlow) never renders this, so it can't show up mid-quiz. */}
+        {/* Back button only lives on this browsing view — never shown mid-quiz */}
         <div style={{ marginBottom: 8 }}>
           <BackButton dark={dark} fallback="/" />
         </div>
@@ -177,7 +170,7 @@ export default function MCQBrowse({
           </LiquidGlassCard>
         </div>
 
-        {/* Practice by Subject — horizontal scroll-snap carousel. */}
+        {/* Practice by Subject — horizontal scroll-snap carousel */}
         <h3 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16 }}>Practice by Subject</h3>
         <div style={{
           display: 'flex', gap: 14, overflowX: 'auto',

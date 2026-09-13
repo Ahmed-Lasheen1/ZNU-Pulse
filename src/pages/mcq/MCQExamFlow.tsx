@@ -1,8 +1,7 @@
 // src/pages/mcq/MCQExamFlow.tsx
 // Taking + Results + Review Answers — everything that renders while
-// quizMode is set. Pulled out of MCQ.tsx unchanged in behavior; all
-// derived values (score, subjectStats, timerColor, etc.) are computed
-// here from props instead of being passed down pre-computed.
+// quizMode is set. All derived values (score, subjectStats, timerColor,
+// etc.) are computed here from props.
 import { motion } from 'framer-motion'
 import { getPulseTheme, pulseFonts, pulseType } from '../../premiumTheme'
 import QuestionRail from '../../components/QuestionRail'
@@ -10,6 +9,7 @@ import QuestionSourceBadge from '../../components/QuestionSourceBadge'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PulseBackground from '../../components/pulse/PulseBackground'
 import { FlagIcon, SearchIcon2, LightbulbIcon } from '../../components/ui/tool-icons'
+import { wrapText } from '../../lib/textStyles'
 import {
   MOCK_MINUTES, MCQ_ACCENT,
   EXAM_TOP_TEXT, EXAM_TOP_TEXT_MUTED, EXAM_TOP_AMBER, EXAM_TOP_RED,
@@ -51,12 +51,26 @@ interface MCQExamFlowProps {
   goNext: () => void
 }
 
-// Shared wrap rules for the question/answer/explanation blocks below —
-// same pattern already used on Review.tsx — so long unbroken tokens
-// (drug names, dosages, abbreviations with no spaces) can always break
-// onto a new line instead of forcing the box wider than its card and
-// getting clipped by the card's own overflow boundary.
-const wrapText: React.CSSProperties = { wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }
+// Two small local style helpers — the results/review screens repeat a
+// "glass pill" button (translucent navy fill, white border) and a
+// solid cobalt "DONE" button several times each with the same base
+// properties. Kept local to this file since nothing outside it uses
+// them.
+function glassPillBtn(overrides: React.CSSProperties = {}): React.CSSProperties {
+  return {
+    background: 'rgba(1,12,74,0.28)',
+    border: '1px solid rgba(255,255,255,0.35)', borderRadius: 999,
+    color: EXAM_LOW_TEXT, textShadow: EXAM_LOW_SHADOW,
+    cursor: 'pointer', fontWeight: 700, fontSize: 13, letterSpacing: 0.5, fontFamily: pulseFonts.body,
+    ...overrides
+  }
+}
+function solidPillBtn(pt: ReturnType<typeof getPulseTheme>): React.CSSProperties {
+  return {
+    flex: 1, background: pt.cobalt, border: 'none', borderRadius: 999, padding: '13px',
+    color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 13, letterSpacing: 0.5, fontFamily: pulseFonts.body
+  }
+}
 
 export default function MCQExamFlow({
   dark, quizMode, submitted, grading, quizQuestions, answers, results,
@@ -73,10 +87,7 @@ export default function MCQExamFlow({
     return quizQuestions.filter(q => results[q.id]?.is_correct).length
   }
 
-  // Gradual urgency for the mock-exam countdown — normal (dark navy,
-  // since the timer sits in the light top zone), then a deepened amber
-  // under ~28% remaining (~10 min of 36), then a deepened red under
-  // ~14% (~5 min). No sudden full-screen warning, just a color shift.
+  // Mock-exam timer: normal, then amber under ~28% remaining, then red under ~14%.
   function timerColor() {
     if (quizMode !== 'mock') return EXAM_TOP_TEXT
     const pctLeft = timeLeft / (MOCK_MINUTES * 60)
@@ -89,10 +100,7 @@ export default function MCQExamFlow({
   const total = quizQuestions.length
   const percent = total > 0 ? Math.round((score / total) * 100) : 0
 
-  // Color and verdict for the big results number — shared tiers with
-  // the Home page's Weekly Report card and the weekly push
-  // notification (see accuracyTier/accuracyColor in mcqShared.tsx), so
-  // a change to the breakpoints in one place updates everywhere.
+  // Same accuracy tiers as the Weekly Report card and weekly push notification.
   const resultColor = accuracyColor(percent, pt)
   const resultVerdict = {
     excellent: 'EXCELLENT.',
@@ -109,9 +117,7 @@ export default function MCQExamFlow({
   const answeredCount = Object.keys(answers).length
   const isLastQuestion = safeIndex === total - 1
 
-  // Real per-subject breakdown from this session's own results — no
-  // invented numbers. Only subjects actually present among the
-  // graded questions are included.
+  // Per-subject breakdown from this session's own results only.
   const subjectStats = submitted ? (() => {
     const map: Record<string, { name: string; total: number; correct: number }> = {}
     quizQuestions.forEach(q => {
@@ -146,11 +152,9 @@ export default function MCQExamFlow({
         @media (hover: hover) and (pointer: fine) { .kbd-hint { display: block; } }
       `}</style>
 
-      {/* Short entrance — a quick fade/slide, not a takeover. The
-          real site header (rendered above this by App.jsx) stays
-          exactly where it is; exam mode is just this page's content.
-          No BackButton in exam mode — the ✕ EXIT control in the
-          status header below is the intended way out of a quiz. */}
+      {/* Short entrance — the real site header stays put; this is just
+          the page content. No BackButton in exam mode — ✕ EXIT is the
+          intended way out. */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -517,26 +521,15 @@ export default function MCQExamFlow({
             )}
 
             <div style={{ marginTop: 20 }}>
-              <button onClick={() => setShowReview(true)} className="exam-btn" style={{
-                width: '100%', background: 'rgba(1,12,74,0.28)',
-                border: '1px solid rgba(255,255,255,0.35)', borderRadius: 999, padding: '12px',
-                color: EXAM_LOW_TEXT, textShadow: EXAM_LOW_SHADOW,
-                cursor: 'pointer', fontWeight: 700, fontSize: 13, letterSpacing: 0.5, fontFamily: pulseFonts.body,
+              <button onClick={() => setShowReview(true)} className="exam-btn" style={glassPillBtn({
+                width: '100%', padding: '12px',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
-              }}><SearchIcon2 color={EXAM_LOW_TEXT} size={14} /> REVIEW ANSWERS</button>
+              })}><SearchIcon2 color={EXAM_LOW_TEXT} size={14} /> REVIEW ANSWERS</button>
             </div>
 
             <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-              <button onClick={tryAgain} className="exam-btn" style={{
-                flex: 1, background: 'rgba(1,12,74,0.28)',
-                border: '1px solid rgba(255,255,255,0.35)', borderRadius: 999, padding: '13px',
-                color: EXAM_LOW_TEXT, textShadow: EXAM_LOW_SHADOW,
-                cursor: 'pointer', fontWeight: 700, fontSize: 13, letterSpacing: 0.5, fontFamily: pulseFonts.body
-              }}>TRY AGAIN</button>
-              <button onClick={stopQuiz} className="exam-btn" style={{
-                flex: 1, background: pt.cobalt, border: 'none', borderRadius: 999, padding: '13px',
-                color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 13, letterSpacing: 0.5, fontFamily: pulseFonts.body
-              }}>DONE</button>
+              <button onClick={tryAgain} className="exam-btn" style={glassPillBtn({ flex: 1, padding: '13px' })}>TRY AGAIN</button>
+              <button onClick={stopQuiz} className="exam-btn" style={solidPillBtn(pt)}>DONE</button>
             </div>
           </div>
         )}
@@ -563,14 +556,6 @@ export default function MCQExamFlow({
               const showLessonTag = !lessonFilter && !!lesson
               return (
                 <div key={qi} style={{ marginBottom: isLast ? 0 : 14 }}>
-                  {/* AUDIT FIX: this card, like every LiquidGlassCard,
-                      now sizes itself to whatever content is actually
-                      inside it (see liquid-glass-card.tsx) instead of
-                      being locked to a fixed height and clipping the
-                      rest. `width: '100%'` and `boxSizing: 'border-box'`
-                      are added defensively so a very wide unbroken
-                      token in an option/explanation can't force this
-                      card wider than its column either. */}
                   <LiquidGlassCard dark={dark} delay={0} style={{
                     padding: '18px 20px', width: '100%', boxSizing: 'border-box',
                     boxShadow: `inset 0 0 0 2px ${isCorrect ? '#4ade80' : userAnswer ? '#f87171' : 'transparent'}`
@@ -632,16 +617,8 @@ export default function MCQExamFlow({
             })}
 
             <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-              <button onClick={() => setShowReview(false)} className="exam-btn" style={{
-                flex: 1, background: 'rgba(1,12,74,0.28)',
-                border: '1px solid rgba(255,255,255,0.35)', borderRadius: 999, padding: '13px',
-                color: EXAM_LOW_TEXT, textShadow: EXAM_LOW_SHADOW,
-                cursor: 'pointer', fontWeight: 700, fontSize: 13, letterSpacing: 0.5, fontFamily: pulseFonts.body
-              }}>← BACK</button>
-              <button onClick={stopQuiz} className="exam-btn" style={{
-                flex: 1, background: pt.cobalt, border: 'none', borderRadius: 999, padding: '13px',
-                color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 13, letterSpacing: 0.5, fontFamily: pulseFonts.body
-              }}>DONE</button>
+              <button onClick={() => setShowReview(false)} className="exam-btn" style={glassPillBtn({ flex: 1, padding: '13px' })}>← BACK</button>
+              <button onClick={stopQuiz} className="exam-btn" style={solidPillBtn(pt)}>DONE</button>
             </div>
           </div>
         )}

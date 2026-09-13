@@ -2,8 +2,6 @@
 // Small constants, colors, and presentational atoms shared between
 // MCQ.tsx (state/logic container), MCQBrowse.tsx (module/subject
 // browsing view) and MCQExamFlow.tsx (taking + results + review).
-// Split out purely so MCQ.tsx doesn't keep growing — no behavior
-// changes from the original single-file version.
 import { pulseFonts, ON_GRADIENT_TOP, ON_GRADIENT_BOTTOM } from '../../premiumTheme'
 
 export const MOCK_MINUTES = 36
@@ -12,13 +10,10 @@ export const MOCK_MINUTES = 36
 export const MCQ_ACCENT = '#e2725b'
 
 // ── Shared accuracy tiers ────────────────────────────────────────────
-// Single source of truth for the score bands used everywhere accuracy
-// gets a color or a verdict: the MCQ results screen (EXCELLENT./GREAT
-// WORK./etc in MCQExamFlow.tsx), the per-subject accuracy bars, and
-// the Home page's Weekly Report card (see weeklyAccuracyFeedback in
-// Home.tsx) and the weekly push notification (api/push/weekly-report.js
-// mirrors these same breakpoints server-side). Keeping the breakpoints
-// in one place means changing them only ever needs to happen here.
+// Single source of truth for score bands used across the app: the MCQ
+// results screen, per-subject accuracy bars, the Home page's Weekly
+// Report card, and the weekly push notification (which mirrors these
+// breakpoints server-side). Change the breakpoints only here.
 export type AccuracyTier = 'excellent' | 'great' | 'good' | 'keep_practicing' | 'needs_work'
 
 export function accuracyTier(accuracy: number): AccuracyTier {
@@ -38,12 +33,10 @@ export function accuracyColor(accuracy: number, pt: { success: string; cobalt: s
 }
 
 // ── Gradient-aware text colors ──────────────────────────────────────
-// PulseBackground's gradient is fixed to the *viewport* (not the
-// scrolled page) and always runs pale blue (top) → dark navy (bottom),
-// in both themes. Anything rendered directly on it (not inside a
-// LiquidGlassCard, which has its own backing) needs colors chosen for
-// whichever zone it actually sits in, not the theme's usual card-text
-// colors.
+// PulseBackground's gradient is fixed to the viewport (pale blue top,
+// dark navy bottom) in both themes. Anything rendered directly on it
+// (not inside a LiquidGlassCard) needs colors chosen for whichever
+// zone it sits in, not the theme's usual card-text colors.
 export const EXAM_TOP_TEXT = ON_GRADIENT_TOP.primary
 export const EXAM_TOP_TEXT_MUTED = ON_GRADIENT_TOP.muted
 export const EXAM_TOP_AMBER = '#b45309'
@@ -58,10 +51,8 @@ export const optionLabels = ['a', 'b', 'c', 'd']
 export const optionTexts = (q: any) => [q.option_a, q.option_b, q.option_c, q.option_d]
 export const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`
 
-// Small labeled number used on the results screen ("CORRECT 28",
-// "INCORRECT 8", "TIME 31:42") — plain typography, no chart chrome.
-// Lives in the lower/results zone, so it always carries the legibility
-// shadow regardless of the color passed in for its accent.
+// Small labeled number for the results screen ("CORRECT 28", "TIME 31:42").
+// Always in the lower/results zone, so it always carries the legibility shadow.
 export function StatChip({ label, value, color }: { label: string; value: string | number; color: string }) {
   return (
     <div style={{ textAlign: 'center' }}>
@@ -71,9 +62,7 @@ export function StatChip({ label, value, color }: { label: string; value: string
   )
 }
 
-// Generic subject/lesson context tag, same pill treatment as
-// QuestionSourceBadge — shown next to it based on how broad the
-// current quiz is (see showSubjectTag/showLessonTag in MCQExamFlow).
+// Generic subject/lesson context tag — same pill treatment as QuestionSourceBadge.
 export function InfoTag({ label, color }: { label: string; color: string }) {
   return (
     <span style={{
