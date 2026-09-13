@@ -35,28 +35,10 @@ const toolCards = [
   { Icon: LeaderboardIcon, title: 'Leaderboard', sub: 'See where you stand', to: '/profile?tab=leaderboard', accent: 'amber' },
 ] as const
 
-// ── Fixed accents for text/marks rendered directly on PULSE_BG ─────
-// These two live outside any LiquidGlassCard/PulseGlassRow, sitting
-// straight on the gradient — so per the same rule that governs
-// ON_GRADIENT_TOP/ON_GRADIENT_BOTTOM, they must not silently swap
-// shade just because the app's Light/Dark toggle changes. A plain
-// `pt.cobalt`/`pt.textMuted` read here would do exactly that, since
-// those are Liquid Glass tokens meant for glass surfaces.
-//
-// "Active Modules" sits in the gradient's pale/light top zone in both
-// themes — frozen to the LIGHT-mode cobalt shade (the darker, more
-// saturated blue), since the brighter dark-mode cyan reads oddly
-// against that same pale top once the background stops changing with
-// the toggle.
+// Fixed accents for marks rendered directly on PULSE_BG (not inside a
+// glass card) — these must not shift with the light/dark toggle since
+// the gradient itself doesn't.
 const ACTIVE_MODULES_ACCENT = getPulseTheme(false).cobalt
-
-// The "Keep the pulse. Shape the future." footer sits in the
-// gradient's dark/bottom zone in both themes (see ON_GRADIENT_BOTTOM
-// above it), so its two flanking divider lines must stay fixed too —
-// previously they read `pt.border`, a Liquid Glass token that changes
-// between the light and dark app themes even though this text/its
-// dividers never move off the same dark gradient zone. Frozen to the
-// DARK-mode border value per the request to "use the dark one."
 const FOOTER_LINE_COLOR = getPulseTheme(true).border
 
 const MODULE_BLURBS: Record<string, string> = {
@@ -71,18 +53,9 @@ function moduleBlurb(name: string) {
   return key ? MODULE_BLURBS[key] : 'Master the essentials of this module.'
 }
 
-// ── Weekly Report accuracy feedback ─────────────────────────────────
-// A short, warm one-liner reflecting this week's accuracy — the same
-// tiered-feedback idea already used on the MCQ results screen
-// (EXCELLENT / GREAT WORK / GOOD WORK / KEEP PRACTICING, see
-// MCQExamFlow.tsx), adapted for this card's tone: sentence case rather
-// than all-caps, phrased as encouragement rather than a verdict, since
-// this is a standing weekly dashboard a student sees every time they
-// open the app — not a one-off exam result. Tiers and colors come from
-// accuracyTier/accuracyColor in mcqShared.tsx — the same single source
-// of truth used by the MCQ results screen and mirrored server-side by
-// the weekly push notification (api/push/weekly-report.js) — so all
-// three surfaces always agree.
+// Weekly Report accuracy feedback — same tiers/colors used by the MCQ
+// results screen and the weekly push notification (mcqShared.tsx),
+// so all three surfaces always agree.
 function weeklyAccuracyFeedback(accuracy: number, pt: ReturnType<typeof getPulseTheme>) {
   const labels: Record<AccuracyTier, string> = {
     excellent: 'Outstanding week!',
@@ -94,13 +67,10 @@ function weeklyAccuracyFeedback(accuracy: number, pt: ReturnType<typeof getPulse
   return { label: labels[accuracyTier(accuracy)], color: accuracyColor(accuracy, pt) }
 }
 
-// Major dashboard-number style (weekly accuracy %, questions attempted,
-// streak) — sourced from the shared typography hierarchy, scaled down
-// from the full `display` size since these sit inside compact stat
-// tiles rather than as a page hero number.
+// Major dashboard-number style, scaled down from the shared `display` size.
 const statNumStyle = { ...pulseType.display, fontSize: 28, lineHeight: 1.1 }
 
-// ── Reveal order ───────────────────────────────────────────────────
+// Entrance-animation reveal order
 const HERO_DELAY = ENTRANCE_PAUSE
 const LOGO_DELAY = ENTRANCE_PAUSE + 0.5
 const NOTIFY_DELAY = LOGO_DELAY + 0.3
@@ -114,7 +84,7 @@ function msFor(targetSeconds: number) {
   return Math.round(((targetSeconds - ENTRANCE_PAUSE) / 1.5) * 1000)
 }
 
-// ── Brand block timeline ──────────────────────────────────────────
+// Brand block timeline
 const BRAND_WORDS_START = LOGO_DELAY + 0.45
 const BRAND_WORD_STAGGER = 0.2
 const BRAND_TAGLINE_DELAY = BRAND_WORDS_START + BRAND_WORD_STAGGER * 2 + 0.2
@@ -131,52 +101,30 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
   const [pausedExam, setPausedExam] = useState<any>(null)
   const [weeklySummary, setWeeklySummary] = useState<WeeklySummary | null>(null)
 
-  // Collapsible disclosure for Completed Modules — collapsed by
-  // default so finished modules don't compete visually with active
-  // ones, but presented as the same pill-card treatment as Active
-  // Modules (just muted) rather than a flat row-list, per feedback.
+  // Collapsible Completed Modules disclosure — collapsed by default
   const [archiveOpen, setArchiveOpen] = useState(false)
 
-  // Tracks whether the expand/collapse height animation has finished.
-  // The wrapping motion.div needs `overflow: hidden` WHILE it's
-  // animating height (0 -> auto), but hidden overflow also clips each
-  // card's own hover scale-up effect once the list is fully open —
-  // that's what made completed-module cards look "cut off" on hover.
-  // Switching to `overflow: visible` only after the height animation
-  // completes keeps the collapse/expand working while letting hover
-  // effects breathe once the list is settled.
+  // overflow stays hidden during the height animation (needed for the
+  // collapse/expand), then switches to visible so card hover effects
+  // aren't clipped once the list is settled.
   const [archiveOverflowVisible, setArchiveOverflowVisible] = useState(false)
 
   useEffect(() => {
     if (!archiveOpen) setArchiveOverflowVisible(false)
   }, [archiveOpen])
 
-  // True only the first time Home mounts in this browser tab session
-  // (survives reloads, resets when the tab closes). The full
-  // staggered entrance plays once; navigating back to Home afterward
-  // in the same tab renders everything instantly in its final state.
+  // Plays the full staggered entrance once per browser tab session;
+  // returning to Home later in the same tab renders instantly.
   const playEntrance = useOncePerSession('znu_home_entrance_played')
 
+  // Home announcement banner
   useEffect(() => {
     supabase.from('site_settings').select('value').eq('key', 'home_announcement').single()
       .then(({ data }) => { if (data?.value) setAnnouncement(data.value) })
   }, [])
 
-  // AUDIT FIX: streak and the weekly accuracy/total-attempted summary
-  // used to each run their own independent supabase.from('exam_history')
-  // query for signed-in users — two round trips to the same table on
-  // every single Home load, one unfiltered (streak needs the
-  // student's FULL history, since a streak can span more than a
-  // week) and one filtered to the last 7 days (weekly summary). Both
-  // only ever need completed_at/total/correct/subject_id, so one
-  // unfiltered fetch now serves both: streak is computed from every
-  // row's completed_at, and the weekly summary is computed by
-  // filtering that same already-fetched result set to the last 7 days
-  // client-side, instead of asking the database for overlapping data
-  // twice. The guest (no-account) path was never actually duplicated
-  // — getGuestHistory() reads a local array from localStorage, not
-  // the network — so it's left exactly as it was, just now computed
-  // inside the same effect as the signed-in path for symmetry.
+  // Streak + weekly accuracy summary — one exam_history fetch serves
+  // both (streak needs full history; weekly summary filters it client-side).
   useEffect(() => {
     async function loadStreakAndWeeklySummary() {
       const weekAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000
@@ -220,47 +168,20 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
     loadStreakAndWeeklySummary()
   }, [user])
 
+  // Resume-exam card
   useEffect(() => {
     loadSavedActiveExam(user).then(setPausedExam)
   }, [user])
 
-  // AUDIT FIX (H1): a client-side `checkExamReminders()` effect used to
-  // live here, firing an in-tab `new Notification(...)` for exams
-  // within 2 days whenever Home mounted (deduped once per calendar day
-  // via a localStorage flag). That duplicated
-  // api/push/exam-reminders.js, which already runs daily via GitHub
-  // Actions (.github/workflows/exam-reminders-push.yml) and delivers a
-  // real Web Push notification — including when the app isn't open at
-  // all, which the client-side version could never do anyway. A
-  // student with push enabled who also opened Home on reminder day
-  // could receive the same reminder twice, from two different code
-  // paths with two different dedup keys. The server-side cron is now
-  // the single source of truth for exam reminders; this effect has
-  // been removed rather than left to fire alongside it.
+  // Exam reminders are handled entirely by the server-side cron
+  // (api/push/exam-reminders.js) — no client-side check here.
 
   const activeModules = modules.filter(m => m.status === 'active')
   const completedModules = modules.filter(m => m.status === 'completed')
 
-  // Section eyebrow labels ("Tools", "✓ Completed Modules") — these
-  // render directly on PulseBackground (outside any LiquidGlassCard),
-  // so they must use the gradient-zone tokens (ON_GRADIENT_TOP /
-  // ON_GRADIENT_BOTTOM), never the Glass tokens (pt.textMuted).
-  //
-  // AUDIT FIX: both headings used to read the Glass token
-  // `pt.textMuted` even though neither sits on a glass surface. Which
-  // gradient zone applies depends on where the section actually sits
-  // on the page: "Tools" is still within the first fold (light/top
-  // zone), while "✓ Completed Modules" only appears after scrolling
-  // well past the fold, into the gradient's dark lower zone — the
-  // same reasoning Footer.jsx already documents for its own text
-  // color. `zone` lets each call site pick the correct one instead of
-  // both sharing one Glass-token color regardless of position.
-  //
-  // AUDIT FIX (contrast): both headings previously always used the
-  // `muted` (62%-opacity) tone regardless of context, which read too
-  // faint sitting directly on the gradient. `strong` lets a call site
-  // opt into the near-full-opacity `secondary` tone instead, without
-  // touching any other caller of this helper.
+  // Section eyebrow labels rendered directly on PulseBackground — the
+  // color zone (top/bottom) depends on where the section sits on the
+  // page, since the gradient itself doesn't change with the theme toggle.
   const sectionTitle = (
     text: string,
     delaySeconds: number,
@@ -309,19 +230,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
           pointerEvents: 'auto'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            {/* AUDIT FIX: this used to be wrapped in a react-router
-                <Link to="/">, which does a client-side (non-reloading)
-                navigation on click — layered on top of PulseBrand's
-                own goHome() handler, which sets window.location.href
-                and forces a full reload. The two competed for the
-                same click; PulseBrand's full-reload navigation still
-                won, but only by chance of ordering, not by design.
-                PulseBrand already handles its own click-to-home
-                navigation (and is now the same component every other
-                page's header renders via PulseOverlayHeader), so the
-                <Link> wrapper is removed here to match — one
-                navigation path, not two fighting over the same
-                click. */}
+            {/* PulseBrand owns its own click-to-home navigation */}
             <PulseBrand
               dark={dark}
               instant={!playEntrance}
@@ -366,11 +275,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
           }
           @media (max-width: 1000px) {
             .pulse-dash-grid { grid-template-columns: 1fr; }
-            /* Mobile stacking order: ECG hero first, then the weekly
-               report / paused-exam / announcement column, then Active
-               Modules. Desktop keeps its normal grid column order
-               (no order property applied there), so this only affects
-               the single-column mobile layout. */
+            /* Mobile stacking order: hero, then report column, then modules */
             .pulse-hero-panel { order: 1; }
             .pulse-dash-report { order: 2; }
             .pulse-dash-modules { order: 3; }
@@ -396,31 +301,11 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
           @media (max-width: 640px) {
             .pulse-fold { gap: 12px; padding-top: 0; }
             .pulse-report-grid { gap: 8px; }
-            /* Pull the ECG hero up toward the header now that it's
-               first in mobile stacking order — the clamp()-based top
-               padding above was tuned for the old order (report card
-               first), which left a big gap above the hero once it
-               moved to the top. Combined with the corrected header
-               spacer above, this puts the hero right under the
-               header instead of floating with empty space above it. */
             .pulse-hero-panel { margin-top: -30px; min-height: clamp(90px, 38vw, 190px); }
           }
         `}</style>
 
-        {/* AUDIT FIX: this used to be `calc(76px + env(safe-area-inset-top))`
-            — a flat 76px PLUS the full safe-area inset, added
-            together. But the header block above sets its own top
-            padding as `max(16px, env(safe-area-inset-top))` — it uses
-            WHICHEVER is bigger, never both (same root-cause bug
-            already fixed in BackButton.tsx's HEADER_GAP). On a phone
-            with a notch/Dynamic Island the safe-area inset is
-            typically 47-59px, so the old formula was double-counting
-            that extra 16px and leaving a bigger empty gap above the
-            page content than the header actually needs. Corrected to
-            mirror the header's real math: `max(16px,
-            env(safe-area-inset-top))` for the top padding, + 44px for
-            the logo row, + 16px for the header's own bottom padding —
-            i.e. the header's true rendered height, nothing extra. */}
+        {/* Matches the header's real rendered height: max(16px, safe-area) + logo row + bottom padding */}
         <div style={{ height: 'calc(max(16px, env(safe-area-inset-top)) + 60px)' }} />
 
         <div className="pulse-fold">
@@ -508,15 +393,6 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                         <PauseIcon color={pt.cobalt} size={13} /> Continue where you left off →
                       </div>
                     ) : (
-                      // Multi-line announcement support: explicit
-                      // `white-space: 'pre-line'` (not 'normal') so an
-                      // admin-authored line break (see
-                      // admin/SettingsTab.tsx) actually renders as a
-                      // line break here, while a long line with no
-                      // explicit break still wraps on its own to fit
-                      // the card instead of being cut off — the card
-                      // has no fixed height, so it just grows taller
-                      // to fit whatever text is here.
                       <div style={{
                         ...pulseType.bodyEmphasis, fontSize: 13, color: pt.textPrimary,
                         lineHeight: 1.5, whiteSpace: 'pre-line', wordBreak: 'break-word'
@@ -626,37 +502,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
           </motion.div>
         </div>
 
-        {/* ── Completed Modules — collapsible, muted card treatment ───
-            Same pill-shaped LiquidGlassCard used by Active Modules
-            (so it still visually reads as "a card" in this app), just
-            desaturated: grayscale icon circle, muted text, a small
-            checkmark badge instead of the colored active-dot. The
-            whole list is collapsed by default (finished modules are
-            lower priority than active ones) with a chevron + count
-            badge as the expand affordance, and the expand/collapse is
-            animated via AnimatePresence rather than an instant
-            show/hide. The section is capped to 640px and centered so
-            it doesn't stretch edge-to-edge on wide desktop screens.
-
-            AUDIT FIX (per user request): the per-card "✓ Completed"
-            text pill was redundant — the card is already grayscale,
-            muted, and sitting inside a section literally titled
-            "✓ Completed Modules", so repeating the word again on every
-            row added nothing. Replaced with a small icon-only
-            checkmark badge: still a visual anchor confirming the
-            card's state at a glance, without repeating text that's
-            already said twice elsewhere on the same screen.
-
-            The toggle itself is now a centered LiquidGlassCard pill
-            (same glass treatment as the announcement card above) so
-            the "✓ Completed Modules" label and its chevron sit close
-            together in the middle of the row instead of being spread
-            across the full width with the chevron pinned to the far
-            right. Its text/badge/chevron colors now read the
-            Liquid Glass tokens (pt.*) instead of the fixed
-            ON_GRADIENT_BOTTOM tokens, so — like the announcement card
-            — they respond to the light/dark theme toggle rather than
-            staying frozen to one shade. */}
+        {/* Completed Modules — collapsible, muted card treatment */}
         {completedModules.length > 0 && (
           <div className="pulse-wide" style={{ paddingBottom: 'max(40px, env(safe-area-inset-bottom))' }}>
             <div style={{ maxWidth: 640, margin: '0 auto' }}>
