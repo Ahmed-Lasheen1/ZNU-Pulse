@@ -1,5 +1,5 @@
 // ZNU Pulse — additive design tokens for the Home page redesign
-// (and now shared glass pages like Checklist).
+// (and shared glass pages like Checklist).
 import { FONT_FAMILY, type as pulseType } from './lib/typography'
 
 export const pulseFonts = {
@@ -16,39 +16,26 @@ export const pulseWeights = {
   bold: 700,
 }
 
-// ── Text directly on the PULSE_BG gradient (no glass underneath) ───
-// PULSE_BG is a fixed, theme-independent gradient (see
-// PulseBackground.tsx) that always runs pale blue at the top to dark
-// navy at the bottom, in both light and dark app themes. Anything
-// rendered straight on top of it — not inside a
-// LiquidGlassCard/PulseGlassRow — needs colors picked for whichever
-// zone it actually sits in, not the Liquid Glass tokens below (those
-// assume a tinted, blurred backdrop). These two token sets are the
-// only approved colors for that case.
-//
-// AUDIT FIX: `muted` below had drifted to the exact Light Liquid
-// Glass muted value ('#405A70'), which is a different token family
-// meant for text on a tinted glass backdrop — not for plain text
-// directly on the gradient. Restored to the correct alpha-fade of
-// this zone's own primary color instead.
+// Text rendered directly on PULSE_BG (no glass surface underneath).
+// PULSE_BG is a fixed gradient (pale blue top → dark navy bottom) in
+// both app themes, so text sitting straight on it needs colors tied
+// to gradient position, not the light/dark theme toggle.
 export const ON_GRADIENT_TOP = {
-  // Text over the light/upper portion of the gradient.
   primary: '#062B50',
   secondary: '#062B50',
   muted: 'rgba(6,43,80,0.62)',
 }
 
 export const ON_GRADIENT_BOTTOM = {
-  // Text over the dark/lower portion of the gradient.
   primary: '#FFFFFF',
   secondary: 'rgba(255,255,255,0.80)',
   muted: 'rgba(255,255,255,0.62)',
 }
 
+// Full theme token set, keyed by dark/light.
 export function getPulseTheme(dark) {
   return dark
     ? {
-        // Canvas / surfaces — unchanged, out of typography scope.
         canvas: '#18263A',
         canvasAlt: '#162238',
         surface: 'linear-gradient(160deg, #263953, #21324A)',
@@ -57,9 +44,7 @@ export function getPulseTheme(dark) {
         border: '#3A527A66',
         borderStrong: '#4A6690',
 
-        // Text — Dark Liquid Glass. Primary #FFFFFF, Secondary
-        // rgba(255,255,255,.82), Muted rgba(255,255,255,.62) — exact
-        // values, not opacity applied to primary.
+        // Dark Liquid Glass text: primary #FFFFFF, secondary .82, muted .62
         text: '#FFFFFF',
         sub: 'rgba(255,255,255,0.82)',
         faint: 'rgba(255,255,255,0.62)',
@@ -67,10 +52,7 @@ export function getPulseTheme(dark) {
         textSecondary: 'rgba(255,255,255,0.82)',
         textMuted: 'rgba(255,255,255,0.62)',
 
-        // Accents — Bright Cyan for links/tags/progress rings; Neon
-        // Orange reserved for status/streak indicators specifically
-        // (fire icons, streak counts) so it stays a distinct "hot"
-        // highlight rather than competing with cyan everywhere.
+        // Accents — cyan for links/tags/progress, orange reserved for streaks
         cobalt: '#38BDF8',
         cobaltSoft: 'rgba(56,189,248,0.16)',
         cobaltBorder: 'rgba(56,189,248,0.4)',
@@ -81,25 +63,10 @@ export function getPulseTheme(dark) {
         terracottaSoft: 'rgba(255,107,0,0.16)',
         amber: '#FF6B00',
         warning: '#FF6B00',
-        // AUDIT FIX (readability): dark-mode danger/error was
-        // '#EF6B57', a coral-salmon red tuned for contrast against a
-        // solid near-black surface. Several places that read this
-        // token — most visibly the Home page's Weekly Report card —
-        // sit on translucent glass layered over the *light/pale-blue
-        // top* zone of the fixed PULSE_BG gradient, not a true dark
-        // background, so that red ended up too close in brightness to
-        // read comfortably. Replaced with '#F87171' (the red commonly
-        // used for dark-theme error/danger text in modern UI kits,
-        // e.g. Tailwind's red-400) — it stays clearly "red" (unlike
-        // Material's more muted/pink dark-error '#CF6679') while
-        // testing well against both this app's genuinely dark
-        // surfaces (canvas/surfaceFlat) and its lighter glass-over-
-        // gradient surfaces like the Weekly Report card.
         danger: '#F87171',
         error: '#F87171',
         success: '#4ADE80',
 
-        // ECG mark
         ecgBase: '#3A5170',
         ecgLine: '#7FB0FF',
         ecgGlow: '#38BDF8',
@@ -113,12 +80,7 @@ export function getPulseTheme(dark) {
         border: '#C7D3E3',
         borderStrong: '#AFC0D6',
 
-        // Text — Light Liquid Glass. Primary #10243A, Secondary
-        // #29445C, Muted #405A70 — exact approved values.
-        //
-        // AUDIT FIX: `faint`/`textMuted` had drifted to '#526A7F',
-        // which is not one of the three approved Light Liquid Glass
-        // typography values. Restored to the approved '#405A70'.
+        // Light Liquid Glass text: primary #10243A, secondary #29445C, muted #405A70
         text: '#10243A',
         sub: '#29445C',
         faint: '#405A70',
@@ -126,9 +88,7 @@ export function getPulseTheme(dark) {
         textSecondary: '#29445C',
         textMuted: '#405A70',
 
-        // Accents — Electric Cyan/Blue replaces the old soft purple-
-        // leaning blue for tags/stats; Vibrant Crimson Orange for
-        // status/streak indicators.
+        // Accents — electric cyan/blue, vibrant crimson-orange for streaks
         cobalt: '#0284C7',
         cobaltSoft: 'rgba(2,132,199,0.10)',
         cobaltBorder: 'rgba(2,132,199,0.35)',
@@ -149,7 +109,7 @@ export function getPulseTheme(dark) {
       }
 }
 
-// Liquid-glass card treatment — unchanged, out of typography/color scope.
+// Liquid-glass card treatment (background/blur/border/shadow bundle).
 export function pulseGlass(dark) {
   return dark
     ? {
@@ -176,11 +136,7 @@ export function pulseGlass(dark) {
       }
 }
 
-// Shared "← Back" pill button used at the top of full-screen viewer
-// pages (SummaryOverlay). Moved here from the now-retired theme.js —
-// same visual output, just sourced from the Pulse system instead of
-// the old one so theme.js can be deleted with nothing left pointing
-// at it.
+// Shared "← Back" pill button (used by SummaryOverlay's viewer header).
 export function backBtnStyle() {
   return {
     background: 'rgba(255,255,255,0.08)',
