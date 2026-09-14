@@ -35,7 +35,6 @@ export default function StagePage({ dark }: { dark: boolean }) {
   const meta = stageMetaFrom(stages, stage!)
   const [presentFileTypes, setPresentFileTypes] = useState<Set<string>>(new Set())
   const [summaries, setSummaries] = useState<Summary[]>([])
-  // Guards against a click landing before the summaries fetch resolves.
   const [summariesLoaded, setSummariesLoaded] = useState(false)
   const [hasStageQuestions, setHasStageQuestions] = useState<boolean | null>(null)
   const [selectedSummary, setSelectedSummary] = useState<Summary | null>(null)
@@ -43,7 +42,6 @@ export default function StagePage({ dark }: { dark: boolean }) {
   const [driveUrl, setDriveUrl] = useState('')
   const [subjects, setSubjects] = useState<PageSubject[]>([])
 
-  // Hardware/browser back closes the summary overlay instead of leaving the page.
   useHistoryOverlay(!!selectedSummary, () => setSelectedSummary(null))
 
   useEffect(() => {
@@ -54,14 +52,10 @@ export default function StagePage({ dark }: { dark: boolean }) {
 
   useEffect(() => {
     let ignore = false
-    supabase.from('site_settings').select('key, value').in('key', ['drive_url', `drive_url_${stage}`])
-      .then(({ data }) => {
-        if (ignore || !data) return
-        const byKey = Object.fromEntries(data.map((r: any) => [r.key, r.value]))
-        setDriveUrl(byKey[`drive_url_${stage}`] || byKey['drive_url'] || '')
-      })
+    supabase.from('site_settings').select('value').eq('key', 'drive_url').maybeSingle()
+      .then(({ data }) => { if (!ignore) setDriveUrl(data?.value || '') })
     return () => { ignore = true }
-  }, [stage])
+  }, [])
 
   useEffect(() => {
     let ignore = false
@@ -134,10 +128,8 @@ export default function StagePage({ dark }: { dark: boolean }) {
 
       <StudyMaterialsSection dark={dark} moduleId={moduleId as string} presentFileTypes={presentFileTypes} driveUrl={driveUrl} />
 
-      {/* Links carry ?stage= so SubjectPage narrows its lesson list to this stage */}
       <StudyByLessonSection dark={dark} moduleId={moduleId as string} subjects={subjects} stage={stage} />
 
-      {/* Smart Summaries & Practice — each toasts instead of navigating when empty */}
       <div className="summary-practice-row" style={{ marginBottom: 32 }}>
         <div>
           <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>

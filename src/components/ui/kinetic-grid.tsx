@@ -1,8 +1,6 @@
 import { useEffect, useRef, useCallback, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 interface Point {
   x: number;
   y: number;
@@ -16,8 +14,6 @@ interface Ripple {
   born: number;
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
 const CELL_SIZE = 55;
 const INFLUENCE_RADIUS = 260;
 const MAX_WARP = 24;
@@ -27,8 +23,6 @@ const LERP_SPEED = 0.08;
 const LINE_BASE = { r: 255, g: 255, b: 255, a: 0.13 };
 const NODE_BASE_RADIUS = 1.8;
 const NODE_ACTIVE_RADIUS = 3.2;
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function lerpN(a: number, b: number, t: number) {
   return a + (b - a) * t;
@@ -58,18 +52,10 @@ function usePrefersReducedMotion() {
   return ref;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-//
-// AUDIT NOTE (ZNU Pulse integration): this is adapted from the
-// standalone kinetic-grid.tsx demo. Two changes from the original:
-// 1. Dropped the Next.js `"use client"` directive — this project is
-//    Vite, not Next, so it's a no-op there and would just be dead code.
-// 2. Added an `overlay` mode. In overlay mode the canvas skips its own
-//    solid background fill + dot texture and renders nothing but the
-//    warping grid lines/nodes at reduced opacity — meant to sit ON TOP
-//    of an existing background (see PulseBackground.tsx) instead of
-//    replacing it outright. Standalone usage (no `overlay` prop) is
-//    unchanged from the original component.
+// Adapted from the standalone kinetic-grid demo for ZNU Pulse. `overlay`
+// mode skips the solid background + dot texture and renders only the
+// warping grid lines/nodes at reduced opacity, to sit on top of
+// PulseBackground.tsx instead of replacing it.
 export default function KineticGrid({
   children,
   className,
@@ -157,9 +143,6 @@ export default function KineticGrid({
       const mouse = mouseRef.current;
       const ripples = ripplesRef.current;
 
-      // Overlay mode lowers every alpha value so this reads as a
-      // faint texture over the existing Pulse gradient instead of
-      // fighting it for attention.
       const overlayScale = overlay ? 0.55 : 1;
 
       const theme = {
@@ -309,15 +292,23 @@ export default function KineticGrid({
       sizeRef.current = { w, h };
     };
 
-    setSize();
-    window.addEventListener("resize", setSize);
+    // Debounced so rapid resize/orientation events don't reallocate
+    // the canvas on every single tick.
+    let resizeTimeout: ReturnType<typeof setTimeout> | undefined;
+    const debouncedSetSize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(setSize, 150);
+    };
 
-    // Respect prefers-reduced-motion: no cursor tracking, no click
-    // ripples, no rAF loop — just one static frame drawn once, same
-    // pattern this app already uses in NavMenu.tsx / EcgHero.jsx.
+    setSize();
+    window.addEventListener("resize", debouncedSetSize);
+
     if (reducedMotionRef.current) {
       draw(performance.now());
-      return () => window.removeEventListener("resize", setSize);
+      return () => {
+        clearTimeout(resizeTimeout);
+        window.removeEventListener("resize", debouncedSetSize);
+      };
     }
 
     const onMouseMove = (e: MouseEvent) => {
@@ -332,7 +323,8 @@ export default function KineticGrid({
     rafRef.current = requestAnimationFrame(animate);
 
     return () => {
-      window.removeEventListener("resize", setSize);
+      clearTimeout(resizeTimeout);
+      window.removeEventListener("resize", debouncedSetSize);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("click", onClick);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -341,9 +333,6 @@ export default function KineticGrid({
   }, [animate, draw]);
 
   if (overlay) {
-    // No wrapping div/background/children here — this is meant to be
-    // dropped inside an already-positioned container (PulseBackground)
-    // as a pure decorative canvas layer.
     return (
       <canvas
         ref={canvasRef}

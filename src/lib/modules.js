@@ -1,7 +1,8 @@
 import { supabase } from '../supabase'
 
-// Same load-and-sort logic that used to be duplicated in App.jsx and
-// Admin.jsx (active modules first, then completed), now lives in one place.
+// Load-and-sort logic shared by App.jsx and Admin.jsx. The query
+// itself already orders active-before-completed (alphabetical) and
+// created_at descending within each, so no client-side re-sort is needed.
 export async function fetchModulesSorted() {
   const { data, error } = await supabase
     .from('modules')
@@ -11,9 +12,5 @@ export async function fetchModulesSorted() {
 
   if (error || !data) return { modules: [], error }
 
-  const sorted = [
-    ...data.filter(m => m.status === 'active'),
-    ...data.filter(m => m.status !== 'active')
-  ]
-  return { modules: sorted, error: null }
+  return { modules: data, error: null }
 }
