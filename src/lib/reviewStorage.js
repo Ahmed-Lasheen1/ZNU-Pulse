@@ -7,6 +7,10 @@ const INCORRECT_KEY = 'mcq_incorrect'
 const HISTORY_KEY = 'mcq_history'
 const ACTIVE_EXAM_KEY = 'mcq_active_exam'
 
+// Caps growth for long-term guest devices — oldest entries are dropped.
+const MAX_FLAGGED = 200
+const MAX_INCORRECT = 200
+
 function readList(key) {
   try { return JSON.parse(localStorage.getItem(key) || '[]') } catch { return [] }
 }
@@ -26,6 +30,7 @@ export function toggleGuestFlag(entry) {
     return false
   }
   list.push({ ...entry, flaggedAt: Date.now() })
+  if (list.length > MAX_FLAGGED) list.splice(0, list.length - MAX_FLAGGED)
   writeList(FLAGGED_KEY, list)
   return true
 }
@@ -42,6 +47,7 @@ export function saveGuestIncorrect(entry) {
   const idx = list.findIndex(q => q.question_id === entry.question_id)
   if (idx >= 0) list[idx] = { ...list[idx], ...entry, updatedAt: Date.now() }
   else list.push({ ...entry, updatedAt: Date.now() })
+  if (list.length > MAX_INCORRECT) list.splice(0, list.length - MAX_INCORRECT)
   writeList(INCORRECT_KEY, list)
 }
 

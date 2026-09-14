@@ -68,11 +68,10 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const quizStartedAtRef = useRef<number | null>(null)
   const [usingCache, setUsingCache] = useState(false)
   const gradingInFlightRef = useRef<Set<number>>(new Set())
-  // Debounces the paused-exam autosave (Supabase write for signed-in users)
-  // so answering doesn't fire a write on every single change.
+  // Bumped on every quiz start/resume/stop so an in-flight grade_mcq
+  // response from a discarded session can't write into a new one.
+  const sessionIdRef = useRef(0)
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
-  // Guards submitQuiz against being fired twice at once (e.g. the mock
-  // timer hitting zero at the same instant the student taps SUBMIT).
   const submittingRef = useRef(false)
 
   // ── Initial data load ──────────────────────────────────────────────
@@ -289,12 +288,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     return new Set<string>(flags.filter((f: any) => ids.includes(f.question_id)).map((f: any) => f.question_id))
   }
 
-  // BUG FIX: this used to update flaggedIds (and show a success toast)
-  // regardless of whether the Supabase write actually succeeded, so a
-  // failed insert/delete could leave the UI showing a flag state that
-  // doesn't match the database. Local state now only changes after a
-  // confirmed success (or immediately for guests, who have no server
-  // round-trip to fail).
   async function toggleFlagFor(q: any) {
     if (!q) return
     const isFlagged = flaggedIds.has(q.id)
@@ -366,6 +359,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     setShowReview(false)
     setStruckOut({})
     gradingInFlightRef.current.clear()
+    sessionIdRef.current++
     loadFlagsFor(qs.map(q => q.id)).then(setFlaggedIds)
 
     quizStartedAtRef.current = Date.now()
@@ -390,6 +384,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     setShowReview(false)
     setStruckOut({})
     gradingInFlightRef.current.clear()
+    sessionIdRef.current++
     quizStartedAtRef.current = Date.now()
     startTimer(quizStartedAtRef.current, 'retry')
     loadFlagsFor(list.map(q => q.id)).then(setFlaggedIds)
@@ -408,6 +403,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     setShowReview(false)
     setStruckOut({})
     gradingInFlightRef.current.clear()
+    sessionIdRef.current++
     quizStartedAtRef.current = resumeData.startedAt
     loadFlagsFor((resumeData.quizQuestions || []).map((q: any) => q.id)).then(setFlaggedIds)
 
@@ -435,6 +431,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     setShowReview(false)
     setStruckOut({})
     gradingInFlightRef.current.clear()
+    sessionIdRef.current++
   }
 
   // ── Tutor Mode grading ───────────────────────────────────────────────
@@ -443,8 +440,10 @@ export default function MCQ({ dark }: { dark: boolean }) {
   async function tutorGradeAnswer(qi: number, opt: string) {
     const q = quizQuestions[qi]
     if (!q) return
+    const sessionId = sessionIdRef.current
     const { data, error } = await supabase.rpc('grade_mcq', { p_answers: [{ id: q.id, answer: opt }] })
     gradingInFlightRef.current.delete(qi)
+    if (sessionId !== sessionIdRef.current) return // quiz was reset while this was in flight
     if (!error && data && data[0]) {
       const r = data[0]
       setResults(prev => ({
@@ -500,10 +499,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
   }
 
   // ── Submitting a quiz ────────────────────────────────────────────────
-  // BUG FIX: added a submittingRef guard so an in-flight submit can't
-  // be started twice (e.g. the mock-exam timer hitting zero at the
-  // same instant the student taps SUBMIT, which could otherwise fire
-  // two overlapping submissions/writes).
   async function submitQuiz() {
     if (submittingRef.current) return
     submittingRef.current = true

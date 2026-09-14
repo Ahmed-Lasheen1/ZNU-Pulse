@@ -10,7 +10,7 @@ const BAD_WORDS = [
   // Arabic (written in Arabic script and common Latin transliterations)
   'كس', 'طيز', 'زبي', 'شرموط', 'شرموطة', 'عاهر', 'عاهرة', 'قحبه', 'قحبة',
   'منيك', 'خول', 'كسمك', 'ابن الكلب', 'يلعن',
-  'kos', 'zebi', '5awal', 'kosomak', 'sharmota', '2ahba',
+  'zebi', '5awal', 'kosomak', 'sharmota', '2ahba',
 ]
 
 function normalize(text) {

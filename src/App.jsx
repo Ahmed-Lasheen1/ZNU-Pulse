@@ -1,5 +1,5 @@
 // src/App.jsx
-import { useState, useEffect, Suspense, lazy } from 'react'
+import { useState, useEffect, useRef, Suspense, lazy } from 'react'
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
 import { supabase } from './supabase'
 import { getPulseTheme } from './premiumTheme'
@@ -132,6 +132,11 @@ export default function App() {
   const [modulesLoaded, setModulesLoaded] = useState(false)
   const [modulesError, setModulesError] = useState(false)
 
+  // Guards against getSession() and onAuthStateChange's initial event
+  // both running ensureProfile/fetchProfile/migrateGuestData for the
+  // same sign-in.
+  const lastHandledUserIdRef = useRef(null)
+
   async function loadModules() {
     const { modules: sorted, error } = await fetchModulesSorted()
     setModules(sorted)
@@ -157,15 +162,19 @@ export default function App() {
     }
   }
 
+  async function handleSignedIn(sessionUser) {
+    if (lastHandledUserIdRef.current === sessionUser.id) return
+    lastHandledUserIdRef.current = sessionUser.id
+    await ensureProfile(sessionUser)
+    await fetchProfile(sessionUser.id)
+    migrateGuestDataIfNeeded(sessionUser.id)
+  }
+
   useEffect(() => {
     async function initSession() {
       const { data: { session } } = await supabase.auth.getSession()
       setUser(session?.user ?? null)
-      if (session?.user) {
-        await ensureProfile(session.user)
-        await fetchProfile(session.user.id)
-        migrateGuestDataIfNeeded(session.user.id)
-      }
+      if (session?.user) await handleSignedIn(session.user)
       cleanUpAuthHash()
       setAuthLoaded(true)
     }
@@ -173,12 +182,11 @@ export default function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        await ensureProfile(session.user)
         setUser(session.user)
-        await fetchProfile(session.user.id)
-        migrateGuestDataIfNeeded(session.user.id)
+        await handleSignedIn(session.user)
         cleanUpAuthHash()
       } else {
+        lastHandledUserIdRef.current = null
         setUser(null)
         setProfile(null)
       }

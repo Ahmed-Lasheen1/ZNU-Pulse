@@ -292,8 +292,6 @@ export default function KineticGrid({
       sizeRef.current = { w, h };
     };
 
-    // Debounced so rapid resize/orientation events don't reallocate
-    // the canvas on every single tick.
     let resizeTimeout: ReturnType<typeof setTimeout> | undefined;
     const debouncedSetSize = () => {
       clearTimeout(resizeTimeout);
@@ -318,15 +316,27 @@ export default function KineticGrid({
       ripplesRef.current.push({ x: e.clientX, y: e.clientY, radius: 0, opacity: 1, born: performance.now() });
     };
 
+    // Stops the rAF loop while the tab is backgrounded — no reason to
+    // keep redrawing a canvas nobody can see.
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      } else {
+        rafRef.current = requestAnimationFrame(animate);
+      }
+    };
+
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("click", onClick);
-    rafRef.current = requestAnimationFrame(animate);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    if (!document.hidden) rafRef.current = requestAnimationFrame(animate);
 
     return () => {
       clearTimeout(resizeTimeout);
       window.removeEventListener("resize", debouncedSetSize);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("click", onClick);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
