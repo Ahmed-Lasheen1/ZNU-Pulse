@@ -138,12 +138,25 @@ export default function Profile({ dark }: { dark: boolean }) {
   const [editing, setEditing] = useState(false)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
 
-  useEffect(() => { fetchData() }, [user])
+  // BUG FIX: fetchData previously had no cancellation guard, unlike
+  // the equivalent fetch effects in Review.tsx/Checklist.tsx/etc. If
+  // `user` changed quickly (e.g. sign-in immediately followed by
+  // sign-out, or two auth events in a row), an older in-flight
+  // request could resolve after a newer one and overwrite `profile`/
+  // `leaderboard` with stale data. `isIgnored()` is threaded through
+  // fetchData so a stale response's state updates are skipped.
+  useEffect(() => {
+    let ignore = false
+    fetchData(() => ignore)
+    return () => { ignore = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
 
-  async function fetchData() {
+  async function fetchData(isIgnored: () => boolean = () => false) {
     setLoading(true)
     if (user) {
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      if (isIgnored()) return
       if (data) setProfile(data)
     }
     const { data: lb } = await supabase
@@ -151,6 +164,7 @@ export default function Profile({ dark }: { dark: boolean }) {
       .select('name, points')
       .order('points', { ascending: false })
       .limit(10)
+    if (isIgnored()) return
     if (lb) setLeaderboard(lb as Profile[])
     setLoading(false)
   }

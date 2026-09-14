@@ -43,7 +43,14 @@ export default function ModulePage({ dark }: { dark: boolean }) {
 
   useEffect(() => {
     let ignore = false
-    supabase.from('site_settings').select('value').eq('key', 'drive_url').single()
+    // BUG FIX: `.single()` treats zero matching rows as an error
+    // condition — but `drive_url` in site_settings may legitimately
+    // not exist yet (before an admin ever sets one), and the code
+    // below already handles a missing value gracefully via
+    // `data?.value`. `.maybeSingle()` is the correct call for a row
+    // that may or may not be present; it returns `data: null` instead
+    // of an error in that case.
+    supabase.from('site_settings').select('value').eq('key', 'drive_url').maybeSingle()
       .then(({ data }) => { if (!ignore && data?.value) setDriveUrl(data.value) })
     return () => { ignore = true }
   }, [])

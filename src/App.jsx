@@ -83,6 +83,49 @@ function SiteHeader({ dark, toggleTheme }) {
   )
 }
 
+// BUG FIX: ErrorBoundary previously sat around the routes but was
+// never tied to the current URL, so it never got a fresh start when
+// navigating client-side. Once ANY page tripped a render error, the
+// boundary's `hasError` stayed true forever — every route visited
+// afterward kept showing the fallback screen until a full manual
+// reload. This small wrapper lives INSIDE <Router> so it can read the
+// current path via useLocation() and hand it to ErrorBoundary as
+// `resetKey` — ErrorBoundary clears its own error state whenever that
+// key changes (see componentDidUpdate in ErrorBoundary.jsx), so a
+// crash on one page no longer poisons every page after it.
+// `toggleTheme` is passed in as a prop (rather than closed over)
+// because this component, not App() itself, is what renders the Home
+// route.
+function RoutedContent({ dark, toggleTheme }) {
+  const location = useLocation()
+  return (
+    <ErrorBoundary resetKey={location.pathname}>
+      <Suspense fallback={<PageLoader dark={dark} />}>
+        <Routes>
+          <Route path="/" element={<Home dark={dark} toggleTheme={toggleTheme} />} />
+          <Route path="/module/:moduleId" element={<ModulePage dark={dark} />} />
+          <Route path="/module/:moduleId/stage/:stage" element={<StagePage dark={dark} />} />
+          <Route path="/module/:moduleId/subject/:subjectId" element={<SubjectPage dark={dark} />} />
+          <Route path="/module/:moduleId/subject/:subjectId/lesson/:lessonId" element={<LessonPage dark={dark} />} />
+          <Route path="/checklist" element={<Checklist dark={dark} />} />
+          <Route path="/schedule" element={<Schedule dark={dark} />} />
+          <Route path="/files" element={<FilesPage dark={dark} />} />
+          <Route path="/summaries" element={<Summaries dark={dark} />} />
+          <Route path="/admin" element={<Admin dark={dark} />} />
+          <Route path="/mcq" element={<MCQ dark={dark} />} />
+          <Route path="/review" element={<Review dark={dark} />} />
+          <Route path="/auth" element={<Auth dark={dark} />} />
+          <Route path="/reset-password" element={<ResetPassword dark={dark} />} />
+          <Route path="/profile" element={<Profile dark={dark} />} />
+          <Route path="/anon-questions" element={<AnonQuestions dark={dark} />} />
+          <Route path="/search" element={<Search dark={dark} />} />
+          <Route path="*" element={<NotFound dark={dark} />} />
+        </Routes>
+      </Suspense>
+    </ErrorBoundary>
+  )
+}
+
 export default function App() {
   const [dark, setDark] = useState(() => {
     const saved = localStorage.getItem('znu_theme')
@@ -237,6 +280,8 @@ export default function App() {
     ? 'linear-gradient(135deg, #0a0f1e 0%, #0d1a2e 50%, #0a1628 100%)'
     : 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0f9ff 100%)'
 
+  const toggleTheme = () => setDark(prev => !prev)
+
   return (
     <ThemeContextProvider dark={dark}>
       <AuthContextProvider user={user} signOut={signOut} profile={profile} fetchProfile={fetchProfile} authLoaded={authLoaded}>
@@ -250,32 +295,9 @@ export default function App() {
             fontFamily: "'Segoe UI', sans-serif"
           }}>
             <ScrollToTop />
-            <SiteHeader dark={dark} toggleTheme={() => setDark(!dark)} />
+            <SiteHeader dark={dark} toggleTheme={toggleTheme} />
             <div style={{ flex: 1 }}>
-              <ErrorBoundary>
-                <Suspense fallback={<PageLoader dark={dark} />}>
-                  <Routes>
-                    <Route path="/" element={<Home dark={dark} toggleTheme={() => setDark(!dark)} />} />
-                    <Route path="/module/:moduleId" element={<ModulePage dark={dark} />} />
-                    <Route path="/module/:moduleId/stage/:stage" element={<StagePage dark={dark} />} />
-                    <Route path="/module/:moduleId/subject/:subjectId" element={<SubjectPage dark={dark} />} />
-                    <Route path="/module/:moduleId/subject/:subjectId/lesson/:lessonId" element={<LessonPage dark={dark} />} />
-                    <Route path="/checklist" element={<Checklist dark={dark} />} />
-                    <Route path="/schedule" element={<Schedule dark={dark} />} />
-                    <Route path="/files" element={<FilesPage dark={dark} />} />
-                    <Route path="/summaries" element={<Summaries dark={dark} />} />
-                    <Route path="/admin" element={<Admin dark={dark} />} />
-                    <Route path="/mcq" element={<MCQ dark={dark} />} />
-                    <Route path="/review" element={<Review dark={dark} />} />
-                    <Route path="/auth" element={<Auth dark={dark} />} />
-                    <Route path="/reset-password" element={<ResetPassword dark={dark} />} />
-                    <Route path="/profile" element={<Profile dark={dark} />} />
-                    <Route path="/anon-questions" element={<AnonQuestions dark={dark} />} />
-                    <Route path="/search" element={<Search dark={dark} />} />
-                    <Route path="*" element={<NotFound dark={dark} />} />
-                  </Routes>
-                </Suspense>
-              </ErrorBoundary>
+              <RoutedContent dark={dark} toggleTheme={toggleTheme} />
             </div>
             <Footer dark={dark} />
           </div>

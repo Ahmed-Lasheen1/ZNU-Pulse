@@ -66,17 +66,30 @@ export function subscribeOnlinePresence() {
 
 // Used by Admin Analytics to read the live count and get notified on
 // every join/leave. Every step is guarded — worst case reports 0.
+//
+// BUG FIX: the channel's 'presence' listener used to be attached with
+// no way to ever stop it — the returned cleanup was a bare `() => {}`.
+// Since the underlying channel is a module-level singleton shared
+// across mounts (see refCount above), every time AnalyticsTab mounted
+// (switching tabs, leaving, coming back) it registered ANOTHER
+// listener that kept calling `onCount` — a state setter belonging to
+// a component instance that may already be unmounted — forever. The
+// `cancelled` flag below is checked inside `report()` so a caller's
+// cleanup actually silences its own callback instead of leaking it.
 export function watchOnlineCount(onCount) {
+  let cancelled = false
+
   try {
     const ch = safeGetChannel()
     if (!ch) { onCount(0); return () => {} }
 
     function report() {
+      if (cancelled) return
       try {
         const state = ch.presenceState()
         onCount(Object.keys(state || {}).length)
       } catch {
-        onCount(0)
+        if (!cancelled) onCount(0)
       }
     }
 
@@ -91,7 +104,8 @@ export function watchOnlineCount(onCount) {
   } catch (e) {
     console.warn('[onlinePresence] watchOnlineCount failed:', e)
     onCount(0)
+    return () => {}
   }
 
-  return () => {}
+  return () => { cancelled = true }
 }

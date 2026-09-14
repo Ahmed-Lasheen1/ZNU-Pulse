@@ -6,6 +6,14 @@ import { WarningIcon, RefreshIcon } from './ui/tool-icons'
 // white (React unmounts the whole tree above the nearest boundary when
 // an error isn't caught — without this, one bad component can blank
 // the entire app). Wrapped once around the routed pages in App.jsx.
+//
+// BUG FIX: `hasError` used to never reset once set, since this
+// component never unmounts on client-side navigation. That meant one
+// render crash on any page permanently showed this fallback for every
+// route visited afterward, until a full manual reload. App.jsx now
+// passes `resetKey={location.pathname}` — whenever the route actually
+// changes, componentDidUpdate below clears the error state so the new
+// page gets a real chance to render.
 export default class ErrorBoundary extends Component {
   constructor(props) {
     super(props)
@@ -17,9 +25,13 @@ export default class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    // Logged so it can be read from the browser console (F12 → Console)
-    // and reported back for diagnosis.
     console.error('[ErrorBoundary] Caught a render error:', error, info)
+  }
+
+  componentDidUpdate(prevProps) {
+    if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
+      this.setState({ hasError: false })
+    }
   }
 
   render() {

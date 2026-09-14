@@ -171,8 +171,15 @@ export default function MCQ({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLeft])
 
+  // BUG FIX: previously had no cancellation guard. Switching modules
+  // quickly could let an older fetchModuleStages(A) resolve after a
+  // newer fetchModuleStages(B) and leave the stage tabs showing the
+  // wrong module's stages. Mirrors the ignore-guard already used a
+  // few effects above for fetchQuestionsForModule.
   useEffect(() => {
-    fetchModuleStages(activeModule).then(setStages)
+    let ignore = false
+    fetchModuleStages(activeModule).then(result => { if (!ignore) setStages(result) })
+    return () => { ignore = true }
   }, [activeModule])
 
   // ── Keyboard shortcuts (desktop only — touch devices don't fire keydown) ──

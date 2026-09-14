@@ -74,10 +74,24 @@ export default function StagesTab({ dark, modules }: StagesTabProps) {
     setModuleStagesList(prev => [...prev, { id: null, value, title: 'New Stage', emoji: '', color: '#64748b' }])
   }
 
+  // BUG FIX: this used to delete the module's existing custom stages
+  // FIRST, then insert the new set. If the insert failed afterward
+  // (network drop, validation error, etc.) the module was left with
+  // ZERO custom stages — silently falling back to the 4 global
+  // defaults on next load, with the admin's real custom stages gone.
+  // A snapshot of the current rows is now taken before deleting, and
+  // restored if the insert fails, so a failed save can no longer
+  // destroy data that was already there.
   async function saveModuleStages() {
     if (!stageModuleId) return
     if (moduleStagesList.length === 0) return showMsg('❌ A module needs at least one exam stage')
     setStagesSaving(true)
+
+    const { data: existingRows } = await supabase
+      .from('module_exam_stages')
+      .select('*')
+      .eq('module_id', stageModuleId)
+
     await supabase.from('module_exam_stages').delete().eq('module_id', stageModuleId)
     const rows = moduleStagesList.map((s, i) => ({
       module_id: stageModuleId,
@@ -88,8 +102,18 @@ export default function StagesTab({ dark, modules }: StagesTabProps) {
       position: i
     }))
     const { error } = await supabase.from('module_exam_stages').insert(rows)
+
+    if (error) {
+      // Restore whatever was there before the delete, so the module
+      // isn't left with zero custom stages just because this save failed.
+      if (existingRows && existingRows.length > 0) {
+        await supabase.from('module_exam_stages').insert(existingRows)
+      }
+      setStagesSaving(false)
+      return showMsg('❌ ' + error.message)
+    }
+
     setStagesSaving(false)
-    if (error) return showMsg('❌ ' + error.message)
     invalidateModuleStagesCache()
     showMsg('✅ Stages saved for this module!')
     setStagesIsCustom(true)

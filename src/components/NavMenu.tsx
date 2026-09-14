@@ -233,6 +233,14 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
   const wrapperRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const triggerButtonRef = useRef<HTMLButtonElement>(null)
+  // BUG FIX: tracks whether this menu instance has actually been
+  // opened at least once. The focus-restoration effect below used to
+  // run on every value of `open`, including its initial `false` on
+  // mount — which meant the hamburger button silently stole keyboard
+  // focus the moment NavMenu rendered on ANY page load, not just when
+  // a person closed a menu they'd opened. Now focus is only restored
+  // when `open` transitions from true -> false.
+  const hasOpenedRef = useRef(false)
   const pt = getPulseTheme(dark)
   const transition = useSyncedTransition(open, reducedMotion)
 
@@ -253,9 +261,14 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
     }
   }, [open])
 
-  // Returns keyboard focus to the trigger button once the menu closes.
+  // Returns keyboard focus to the trigger button once the menu closes
+  // — but only if it was actually open before (see hasOpenedRef above).
   useEffect(() => {
-    if (!open) {
+    if (open) {
+      hasOpenedRef.current = true
+      return
+    }
+    if (hasOpenedRef.current) {
       triggerButtonRef.current?.focus()
     }
   }, [open])

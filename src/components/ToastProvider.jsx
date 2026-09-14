@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useRef } from 'react'
+import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 
 const ToastContext = createContext(() => {})
 
@@ -19,6 +19,14 @@ export default function ToastProvider({ children }) {
     clearTimeout(timeoutRef.current)
     setToast({ message, type })
     timeoutRef.current = setTimeout(() => setToast(null), 2500)
+  }, [])
+
+  // Safety net: clears any pending dismiss timer if this provider
+  // itself ever unmounts mid-toast, so it can't fire setState after
+  // unmount. In practice ToastProvider wraps the whole app for its
+  // entire lifetime, so this rarely matters — added for completeness.
+  useEffect(() => {
+    return () => clearTimeout(timeoutRef.current)
   }, [])
 
   return (
