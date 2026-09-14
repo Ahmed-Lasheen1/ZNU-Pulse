@@ -61,8 +61,6 @@ function isDueSoon(deadline: string | null) {
   return diff >= 0 && diff <= 2
 }
 
-// Human-relative deadline label ("Due today", "2 days overdue", etc.)
-// falling back to a short date once "in N days" stops being useful.
 function formatDeadlineLabel(deadline: string) {
   const diff = dayDiff(deadline)
   if (diff === 0) return 'Due today'
@@ -75,7 +73,6 @@ function formatDeadlineLabel(deadline: string) {
   return `Due ${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: sameYear ? undefined : 'numeric' })}`
 }
 
-// Urgency tier used to sort the active list: overdue, due-soon, later, none.
 function urgencyRank(task: ChecklistTask) {
   if (!task.deadline) return 3
   if (isOverdue(task.deadline)) return 0
@@ -105,6 +102,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
   const [tasks, setTasks] = useState<ChecklistTask[]>([])
   const [newTask, setNewTask] = useState('')
   const [newDeadline, setNewDeadline] = useState('')
+  const [addingTask, setAddingTask] = useState(false)
   // Collapsed by default so completed tasks don't compete visually.
   const [showCompleted, setShowCompleted] = useState(false)
 
@@ -124,12 +122,6 @@ export default function Checklist({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded])
 
-  // BUG FIX: previously called fetchTasks() with no cancellation
-  // guard, unlike the fetch effects elsewhere in the app. Switching
-  // module tabs quickly could let an older, slower request for module
-  // A resolve after a newer request for module B and overwrite
-  // `tasks` with the wrong module's list. `isIgnored()` is threaded
-  // through fetchTasks so a stale response's setTasks call is skipped.
   useEffect(() => {
     if (!activeModule) return
     let ignore = false
@@ -162,7 +154,8 @@ export default function Checklist({ dark }: { dark: boolean }) {
   }
 
   async function addTask() {
-    if (!newTask.trim()) return
+    if (!newTask.trim() || addingTask) return
+    setAddingTask(true)
     if (user) {
       const { data } = await supabase.from('user_checklist').insert([{
         user_id: user.id, module_id: activeModule,
@@ -175,12 +168,15 @@ export default function Checklist({ dark }: { dark: boolean }) {
         id: crypto.randomUUID(), text: newTask.trim(), done: false,
         module_id: activeModule as string, deadline: newDeadline || null
       }
-      const updated = [...tasks, task]
-      setTasks(updated)
-      localStorage.setItem(`checklist_${activeModule}`, JSON.stringify(updated))
+      setTasks(prev => {
+        const updated = [...prev, task]
+        localStorage.setItem(`checklist_${activeModule}`, JSON.stringify(updated))
+        return updated
+      })
     }
     setNewTask('')
     setNewDeadline('')
+    setAddingTask(false)
     showToast('✅ Task added')
   }
 
@@ -289,8 +285,6 @@ export default function Checklist({ dark }: { dark: boolean }) {
   return (
     <PageShell dark={dark} backFallback="/" maxWidth={900} containerClassName="pulse-wide checklist-page">
       <style>{`
-        /* Add-task row: input + button share a row on wider screens,
-           stack cleanly on narrow ones instead of squeezing. */
         .checklist-add-row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
         .checklist-add-row input { flex: 1 1 180px; min-width: 0; }
         .checklist-add-btn { flex: 0 0 auto; }
@@ -373,15 +367,17 @@ export default function Checklist({ dark }: { dark: boolean }) {
               style={inStyle} />
             <button
               onClick={addTask}
+              disabled={addingTask}
               className="checklist-add-btn"
               style={{
                 background: pt.cobalt, color: '#fff', border: 'none',
                 borderRadius: 999, padding: '0 22px', minHeight: 46,
-                cursor: 'pointer', fontWeight: 700, fontSize: 14,
+                cursor: addingTask ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 14,
+                opacity: addingTask ? 0.7 : 1,
                 fontFamily: pulseFonts.body
               }}
             >
-              + Add
+              {addingTask ? '...' : '+ Add'}
             </button>
           </div>
           <div className="checklist-deadline-row">

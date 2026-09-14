@@ -14,7 +14,7 @@ import LoadingText from '../components/pulse/LoadingText'
 import EmptyState from '../components/pulse/EmptyState'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
 import { fetchSubjectsForModule } from '../lib/subjects'
-import { getDriveOrRawUrl, getVideoEmbedUrl } from '../lib/embedUrl'
+import { getDriveOrRawUrl, getVideoEmbedUrl, isSafeExternalUrl } from '../lib/embedUrl'
 import { BookIcon, QuestionMarkIcon, VideoIcon, GraduationCapIcon, DocumentIcon, AudioIcon, FolderIcon, PlayIcon } from '../components/ui/tool-icons'
 
 interface FilesModule {
@@ -205,7 +205,7 @@ export default function FilesPage({ dark }: { dark: boolean }) {
         />
       )}
       {viewer && viewer.file_type === 'audio' && (
-        <AudioViewer url={viewer.url} name={viewer.name} onClose={() => setViewer(null)} dark={dark} />
+        <AudioViewer url={isSafeExternalUrl(viewer.url) ? viewer.url : ''} name={viewer.name} onClose={() => setViewer(null)} dark={dark} />
       )}
 
       <PageIntro

@@ -17,28 +17,12 @@ type AccountType = 'university' | 'personal'
 type AuthMode = 'signin' | 'signup'
 type AuthStep = 'form' | 'verify'
 
-// Minimum password length enforced client-side. Raised from 6 to 8:
-// Supabase's server-side "leaked password protection" (HaveIBeenPwned
-// check) requires the Pro plan, which this project isn't on — a
-// longer minimum is the cheapest available mitigation for weak/reused
-// passwords without that server-side check. Kept as one constant so
-// it's a one-line change if the plan is ever upgraded and this is
-// revisited.
+// Minimum password length enforced client-side for new/changed
+// passwords (Supabase's HaveIBeenPwned check needs the Pro plan).
 const MIN_PASSWORD_LENGTH = 8
 
-// AUDIT FIX: university-email validation used to be a plain
-// `email.includes('@med.znu.edu.eg')` check. `.includes()` only
-// confirms the substring appears SOMEWHERE in the string — an address
-// like "student@med.znu.edu.eg.attacker.com" also contains
-// "@med.znu.edu.eg", but the real domain (and the mail server that
-// actually receives Supabase's verification email) is attacker.com,
-// not ZNU's. Anyone who controls that domain could sign up, receive
-// and verify the OTP themselves, and end up with a "university"
-// account plus a university_code extracted from a spoofed address —
-// defeating the one thing this account type is supposed to guarantee.
-// Anchored to require the address to END in exactly this domain, the
-// same way the personal-Gmail regex a few lines below already does it
-// correctly.
+// Anchored so an address like "student@med.znu.edu.eg.attacker.com"
+// isn't accepted just because it contains the university domain.
 const UNIVERSITY_EMAIL_REGEX = /^[^\s@]+@med\.znu\.edu\.eg$/i
 
 function fireConfetti() {
@@ -47,8 +31,6 @@ function fireConfetti() {
   confetti({ ...defaults, particleCount: 50, origin: { x: 1, y: 1 }, angle: 120 })
 }
 
-// Standard multi-color "G" glyph — kept as a small inline SVG rather
-// than pulling in an icon-pack dependency just for one logo.
 function GoogleIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
@@ -60,10 +42,6 @@ function GoogleIcon({ size = 18 }: { size?: number }) {
   )
 }
 
-// Kept local to this file since it's currently only used here —
-// a plain "or" divider bracketed by two hairlines, matching the
-// glass shell's border color so it never looks like a hardcoded
-// gray line dropped into a themed page.
 function OrDivider({ pt }: { pt: ReturnType<typeof getPulseTheme> }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '2px 0' }}>
@@ -105,8 +83,6 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
     }
   }, [message])
 
-  // Drives which brand block shows (desktop side-panel vs. compact
-  // mobile header) without touching window.matchMedia during render.
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 1024px)')
     setIsDesktop(mq.matches)
@@ -119,12 +95,6 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
     setStep('form'); setName(''); setEmail(''); setPassword(''); setConfirmPassword(''); setOtp(''); setMessage('')
   }
 
-  // Google sign-in — same flow for both "Sign In" and "Create
-  // account" tabs, since Google itself already handles "does this
-  // person have an account or not" (Supabase creates the auth.users
-  // row on first login automatically). This is now the primary,
-  // default way to get into the app; the email/password form below
-  // remains for anyone who prefers it or doesn't use Google.
   async function handleGoogleSignIn() {
     setMessage('')
     setGoogleLoading(true)
@@ -138,16 +108,14 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
       setGoogleLoading(false)
       setMessage('❌ ' + error.message)
     }
-    // On success the browser navigates away to Google, then back to
-    // redirectTo — nothing further to do here.
   }
 
   async function handleSignInSubmit() {
     setMessage('')
     if (!email.trim()) return setMessage('❌ Please enter your email')
-    if (!password || password.length < MIN_PASSWORD_LENGTH) return setMessage(`❌ Password must be at least ${MIN_PASSWORD_LENGTH} characters`)
+    if (!password) return setMessage('❌ Please enter your password')
     setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
     setLoading(false)
     if (error) setMessage('❌ ' + error.message)
     else navigate('/')
@@ -155,27 +123,28 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
 
   async function handleSignupSubmit() {
     setMessage('')
+    const cleanEmail = email.trim()
     const valid = accountType === 'university'
-      ? UNIVERSITY_EMAIL_REGEX.test(email.trim())
-      : /^[^\s@]+@gmail\.com$/i.test(email.trim())
+      ? UNIVERSITY_EMAIL_REGEX.test(cleanEmail)
+      : /^[^\s@]+@gmail\.com$/i.test(cleanEmail)
     if (!valid) return setMessage(accountType === 'university' ? '❌ Please use your ZNU email (@med.znu.edu.eg)' : '❌ Please enter a valid Gmail address')
     if (!name.trim()) return setMessage('❌ Please enter your name')
     if (containsProfanity(name)) return setMessage('❌ Please choose an appropriate name')
-    if (containsProfanity(email.split('@')[0])) return setMessage('❌ The email contains inappropriate words')
+    if (containsProfanity(cleanEmail.split('@')[0])) return setMessage('❌ The email contains inappropriate words')
     if (!password || password.length < MIN_PASSWORD_LENGTH) return setMessage(`❌ Password must be at least ${MIN_PASSWORD_LENGTH} characters`)
     if (!confirmPassword || confirmPassword.length < MIN_PASSWORD_LENGTH) return setMessage('❌ Please confirm your password')
     if (password !== confirmPassword) return setMessage('❌ Passwords do not match')
 
     setLoading(true)
     const { data, error } = await supabase.auth.signUp({
-      email, password,
+      email: cleanEmail, password,
       options: { data: { name: name.trim(), account_type: accountType } }
     })
 
     if (error) { setLoading(false); return setMessage('❌ ' + error.message) }
 
     if (data?.user && data.user.identities && data.user.identities.length === 0) {
-      const { error: resendError } = await supabase.auth.resend({ type: 'signup', email })
+      const { error: resendError } = await supabase.auth.resend({ type: 'signup', email: cleanEmail })
       setLoading(false)
       if (resendError) return setMessage('❌ ' + resendError.message)
       setMessage('✅ This email was already pending verification — a fresh code was sent.')
@@ -190,7 +159,7 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
     if (!otp || otp.trim().length < 6) return setMessage('❌ Please enter the 6-digit code')
     setMessage('')
     setLoading(true)
-    const { error } = await supabase.auth.verifyOtp({ email, token: otp.trim(), type: 'signup' })
+    const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: otp.trim(), type: 'signup' })
     setLoading(false)
     if (error) return setMessage('❌ ' + error.message)
     setMessage('✅ Account verified! Welcome aboard.')
@@ -199,25 +168,22 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
 
   async function handleResend() {
     setLoading(true)
-    const { error } = await supabase.auth.resend({ type: 'signup', email })
+    const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim() })
     setLoading(false)
     setMessage(error ? '❌ ' + error.message : '✅ A new code was sent — check spam too.')
   }
 
   async function handleForgotPassword() {
-    if (!email) return setMessage('Please enter your email address first')
+    if (!email.trim()) return setMessage('Please enter your email address first')
     setLoading(true)
     setMessage('')
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` })
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/reset-password` })
     setLoading(false)
     setMessage(error ? '❌ ' + error.message : '✅ Check your email for a reset link (check spam too).')
   }
 
   const handleSubmit = mode === 'signin' ? handleSignInSubmit : handleSignupSubmit
 
-  // Shared "Continue with Google" button — a solid white pill (Google's
-  // own brand guidance) rather than another glass row, so it reads as
-  // the visually distinct, primary option above the email form.
   const googleButton = (
     <button
       type="button"

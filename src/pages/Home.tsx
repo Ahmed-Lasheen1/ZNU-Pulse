@@ -119,19 +119,12 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
 
   // Home announcement banner
   useEffect(() => {
-    supabase.from('site_settings').select('value').eq('key', 'home_announcement').single()
+    supabase.from('site_settings').select('value').eq('key', 'home_announcement').maybeSingle()
       .then(({ data }) => { if (data?.value) setAnnouncement(data.value) })
   }, [])
 
   // Streak + weekly accuracy summary — one exam_history fetch serves
   // both (streak needs full history; weekly summary filters it client-side).
-  //
-  // BUG FIX: previously had no cancellation guard, unlike the fetch
-  // effects elsewhere in the app (Checklist, Review, SubjectPage,
-  // etc.). If `user` changed quickly (e.g. sign-in immediately
-  // followed by sign-out), an older in-flight request could resolve
-  // after a newer one and overwrite streak/weeklySummary with stale
-  // data. `ignore` is checked before every state update below.
   useEffect(() => {
     let ignore = false
     async function loadStreakAndWeeklySummary() {
@@ -168,7 +161,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
 
       let topSubjectName: string | null = null
       if (topSubjectId) {
-        const { data: subData } = await supabase.from('subjects').select('name').eq('id', topSubjectId).single()
+        const { data: subData } = await supabase.from('subjects').select('name').eq('id', topSubjectId).maybeSingle()
         if (ignore) return
         topSubjectName = subData?.name || null
       }
@@ -181,10 +174,6 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
   }, [user])
 
   // Resume-exam card
-  //
-  // BUG FIX: same cancellation guard as above — without it, a stale
-  // loadSavedActiveExam(user) call for a previous `user` value could
-  // resolve after a newer one and overwrite `pausedExam` incorrectly.
   useEffect(() => {
     let ignore = false
     loadSavedActiveExam(user).then(saved => { if (!ignore) setPausedExam(saved) })

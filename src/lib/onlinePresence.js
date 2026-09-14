@@ -1,13 +1,13 @@
 import { supabase } from '../supabase'
 
 // "Who's online right now" for Admin Analytics, via Supabase Realtime
-// Presence — no table needed. Every function is wrapped in try/catch:
-// this is a nice-to-have stat, and nothing here should ever crash the
-// page it's shown on.
+// Presence — no table needed.
 const CHANNEL_NAME = 'znu-online-presence'
 
 let channel = null
 let refCount = 0
+let syncListeners = []
+let syncAttached = false
 
 function safeGetChannel() {
   try {
@@ -59,44 +59,43 @@ export function subscribeOnlinePresence() {
       if (refCount === 0 && channel) {
         supabase.removeChannel(channel)
         channel = null
+        syncListeners = []
+        syncAttached = false
       }
     } catch { /* noop */ }
   }
 }
 
 // Used by Admin Analytics to read the live count and get notified on
-// every join/leave. Every step is guarded — worst case reports 0.
-//
-// BUG FIX: the channel's 'presence' listener used to be attached with
-// no way to ever stop it — the returned cleanup was a bare `() => {}`.
-// Since the underlying channel is a module-level singleton shared
-// across mounts (see refCount above), every time AnalyticsTab mounted
-// (switching tabs, leaving, coming back) it registered ANOTHER
-// listener that kept calling `onCount` — a state setter belonging to
-// a component instance that may already be unmounted — forever. The
-// `cancelled` flag below is checked inside `report()` so a caller's
-// cleanup actually silences its own callback instead of leaking it.
+// every join/leave. Multiple callers share one real 'sync' subscription
+// on the channel; each caller just registers/unregisters its own
+// callback in syncListeners, so switching tabs repeatedly doesn't pile
+// up duplicate listeners on the shared channel.
 export function watchOnlineCount(onCount) {
   let cancelled = false
+
+  function report() {
+    if (cancelled) return
+    try {
+      const state = channel?.presenceState()
+      onCount(Object.keys(state || {}).length)
+    } catch {
+      if (!cancelled) onCount(0)
+    }
+  }
 
   try {
     const ch = safeGetChannel()
     if (!ch) { onCount(0); return () => {} }
 
-    function report() {
-      if (cancelled) return
+    syncListeners.push(report)
+    if (!syncAttached) {
+      syncAttached = true
       try {
-        const state = ch.presenceState()
-        onCount(Object.keys(state || {}).length)
-      } catch {
-        if (!cancelled) onCount(0)
+        ch.on('presence', { event: 'sync' }, () => syncListeners.forEach(fn => fn()))
+      } catch (e) {
+        console.warn('[onlinePresence] Could not attach presence listener:', e)
       }
-    }
-
-    try {
-      ch.on('presence', { event: 'sync' }, report)
-    } catch (e) {
-      console.warn('[onlinePresence] Could not attach presence listener:', e)
     }
 
     safeSubscribe(ch, report)
@@ -107,5 +106,8 @@ export function watchOnlineCount(onCount) {
     return () => {}
   }
 
-  return () => { cancelled = true }
+  return () => {
+    cancelled = true
+    syncListeners = syncListeners.filter(fn => fn !== report)
+  }
 }
