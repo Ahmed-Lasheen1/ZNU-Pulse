@@ -68,15 +68,8 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const quizStartedAtRef = useRef<number | null>(null)
   const [usingCache, setUsingCache] = useState(false)
   const gradingInFlightRef = useRef<Set<number>>(new Set())
-  // BUG FIX (perf): debounces the paused-exam autosave. This effect
-  // used to call persistActiveExam() — a Supabase write for signed-in
-  // users — on every single answer/navigation change, which meant up
-  // to ~36 writes during one mock exam. Debouncing to fire 1.5s after
-  // the last change cuts that dramatically with no visible behavior
-  // change: stopQuiz()/submitQuiz() already call clearActiveExam()
-  // directly on real exit paths, so this timer only ever governs the
-  // "resume where you left off" snapshot while a student is actively
-  // answering.
+  // Debounces the paused-exam autosave (Supabase write for signed-in users)
+  // so answering doesn't fire a write on every single change.
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
 
   // ── Initial data load ──────────────────────────────────────────────
@@ -101,14 +94,8 @@ export default function MCQ({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules])
 
-  // BUG FIX: fetchQuestionsForModule previously had no cancellation
-  // guard, unlike every other data-fetching effect in this app
-  // (StagePage, SubjectPage, ModulePage, FilesPage, LessonPage all use
-  // an `ignore` flag). If a student tapped between module tabs
-  // quickly, an older in-flight request for module A could resolve
-  // AFTER a newer request for module B and overwrite `questions` with
-  // the wrong module's data. `isIgnored()` is threaded through so any
-  // state update from a stale request is skipped.
+  // isIgnored() guard prevents a stale request (older module tab) from
+  // overwriting the current module's questions.
   useEffect(() => {
     if (!activeModule) return
     let ignore = false
@@ -171,11 +158,8 @@ export default function MCQ({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLeft])
 
-  // BUG FIX: previously had no cancellation guard. Switching modules
-  // quickly could let an older fetchModuleStages(A) resolve after a
-  // newer fetchModuleStages(B) and leave the stage tabs showing the
-  // wrong module's stages. Mirrors the ignore-guard already used a
-  // few effects above for fetchQuestionsForModule.
+  // isIgnored() guard so switching modules quickly can't leave stage
+  // tabs showing the wrong module's stages.
   useEffect(() => {
     let ignore = false
     fetchModuleStages(activeModule).then(result => { if (!ignore) setStages(result) })
@@ -238,14 +222,9 @@ export default function MCQ({ dark }: { dark: boolean }) {
     }
   }
 
-  // Answer key columns are excluded here — questions_public strips
-  // correct/explanation so a guest can never read them client-side.
-  //
-  // BUG FIX: accepts an optional isIgnored() check (defaults to
-  // "never ignored" so any other caller keeps working unchanged).
-  // The effect above supplies a real one, so a state update from a
-  // request for a module the student has already navigated away from
-  // is skipped instead of clobbering the newer module's data.
+  // questions_public strips correct/explanation so a guest can never
+  // read them client-side. isIgnored() defaults to "never ignored" so
+  // other callers are unaffected.
   async function fetchQuestionsForModule(moduleId: string, isIgnored: () => boolean = () => false) {
     const cacheKey = `mcq_questions_cache_${moduleId}`
     const cached = localStorage.getItem(cacheKey)
@@ -448,18 +427,12 @@ export default function MCQ({ dark }: { dark: boolean }) {
   }
 
   // ── Tutor Mode grading ───────────────────────────────────────────────
-  // Practice/retry reveal correct/incorrect + explanation immediately.
-  // This per-question feedback still goes through grade_mcq (unchanged);
-  // the recorded score/points/history come only from submit_quiz_attempt.
   const isTutorMode = quizMode === 'practice' || quizMode === 'retry'
 
   async function tutorGradeAnswer(qi: number, opt: string) {
     const q = quizQuestions[qi]
     if (!q) return
     const { data, error } = await supabase.rpc('grade_mcq', { p_answers: [{ id: q.id, answer: opt }] })
-    // BUG FIX: release the in-flight lock for this question regardless
-    // of success/failure so a genuinely failed grading attempt doesn't
-    // permanently block the student from retrying that question.
     gradingInFlightRef.current.delete(qi)
     if (!error && data && data[0]) {
       const r = data[0]
@@ -476,11 +449,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     if (submitted) return
     const q = quizQuestions[qi]
     if (isTutorMode && q && results[q.id]) return
-    // BUG FIX: while a grading request for this question is already
-    // in flight, ignore further taps rather than firing an
-    // overlapping second request whose response could land after the
-    // first and leave the displayed result out of sync with the
-    // currently selected option.
     if (isTutorMode && gradingInFlightRef.current.has(qi)) return
     setAnswers(prev => ({ ...prev, [qi]: opt }))
     if (isTutorMode) {
@@ -521,15 +489,13 @@ export default function MCQ({ dark }: { dark: boolean }) {
   }
 
   // ── Submitting a quiz ────────────────────────────────────────────────
-  // For signed-in users, submit_quiz_attempt() re-grades every answer
-  // server-side and is the only thing that writes
-  // answered_questions/exam_history/points — the client never sends a
-  // score or points amount. This keeps a signed-in student from being
-  // able to award themselves an arbitrary score/points from the console.
-  // Guests aren't persisted server-side at all, so grade_mcq + local
-  // (per-device) bookkeeping is the correct, lowest-risk path for them.
+  // Signed-in users: submit_quiz_attempt() re-grades server-side and is
+  // the only thing that writes answered_questions/exam_history/points.
+  // Guests aren't persisted server-side — grade_mcq + local bookkeeping.
   async function submitQuiz() {
     clearInterval(timerRef.current)
+    // Cancel any pending "save paused exam" write — the exam is done now.
+    if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current)
     setGrading(true)
 
     const payload = quizQuestions.map((q, i) => ({ id: q.id, answer: answers[i] || null }))

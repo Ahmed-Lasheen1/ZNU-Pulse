@@ -1,23 +1,15 @@
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 
-// See api/push/broadcast.js for why this now comes from the
-// environment instead of a hardcoded literal.
 const SUPABASE_URL = process.env.SUPABASE_URL
 
-// The `deadline` column only stores a DATE (no time of day was ever
-// collected from the student). To make "6 hours before the deadline"
-// meaningful, the deadline instant is treated as the end of that day
-// (23:59:59) in Egypt local time. Egypt observes daylight saving time,
-// so the offset must come from the IANA timezone rather than being
-// hard-coded. This service only serves one university, so Africa/Cairo
-// is the appropriate authoritative timezone.
+// `deadline` only stores a DATE, so "6 hours before" treats the
+// deadline as end-of-day (23:59:59) in Egypt local time. Egypt
+// observes DST, so the offset comes from the IANA timezone.
 const EGYPT_TIMEZONE = 'Africa/Cairo'
 const REMINDER_WINDOW_HOURS = 6
-// Safety cap: don't fire reminders for tasks that are ALREADY more
-// than this many hours overdue — protects against a backlog of very
-// old undone tasks all blowing up someone's phone the first time this
-// cron runs after being broken/paused for a while.
+// Safety cap: don't fire reminders for tasks already more than this
+// many hours overdue.
 const MAX_OVERDUE_HOURS = 24
 
 webpush.setVapidDetails(
@@ -57,15 +49,9 @@ function deadlineInstant(dateStr) {
   return new Date(timestamp)
 }
 
-// Triggered every hour by a GitHub Actions cron job (see
-// .github/workflows/checklist-reminders-push.yml). Sends a reminder
-// ONLY to the specific student who owns the task — never a broadcast —
-// by filtering push_subscriptions on that task's own user_id.
-//
-// Guest checklists (no account) live only in the browser's
-// localStorage and have no server-side row at all, so there is
-// nothing this cron can reach for them — this reminder only works for
-// signed-in accounts, which is an inherent limitation, not a bug.
+// Triggered hourly by GitHub Actions. Sends a reminder ONLY to the
+// specific task's owner, via that task's own user_id — never a
+// broadcast. Guest checklists (localStorage only) can't be reached here.
 export default async function handler(req, res) {
   if (req.headers['x-cron-secret'] !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' })
@@ -94,10 +80,23 @@ export default async function handler(req, res) {
   }
 
   const now = Date.now()
-  const due = tasks.filter((t) => {
+  const due = []
+  // Tasks more than MAX_OVERDUE_HOURS past due get marked reminder_sent
+  // (without counting as sent) so they stop being refetched every hour.
+  const staleIds = []
+
+  tasks.forEach((t) => {
     const hoursLeft = (deadlineInstant(t.deadline).getTime() - now) / (1000 * 60 * 60)
-    return hoursLeft <= REMINDER_WINDOW_HOURS && hoursLeft >= -MAX_OVERDUE_HOURS
+    if (hoursLeft <= REMINDER_WINDOW_HOURS && hoursLeft >= -MAX_OVERDUE_HOURS) {
+      due.push(t)
+    } else if (hoursLeft < -MAX_OVERDUE_HOURS) {
+      staleIds.push(t.id)
+    }
   })
+
+  if (staleIds.length > 0) {
+    await supabase.from('user_checklist').update({ reminder_sent: true }).in('id', staleIds)
+  }
 
   if (due.length === 0) {
     return res.status(200).json({ sent: 0, reason: 'nothing due within the reminder window' })
@@ -108,15 +107,13 @@ export default async function handler(req, res) {
   const expiredSubIds = []
 
   await Promise.all(due.map(async (task) => {
-    // Only THIS task's own owner — never every registered device.
     const { data: subs } = await supabase
       .from('push_subscriptions')
       .select('*')
       .eq('user_id', task.user_id)
 
     if (!subs || subs.length === 0) {
-      // No push device for this student — nothing to send, but still
-      // mark it reminded so we don't keep re-checking it every hour.
+      // No push device — mark reminded so it isn't re-checked every hour.
       remindedTaskIds.push(task.id)
       return
     }
@@ -137,9 +134,7 @@ export default async function handler(req, res) {
       }
     }))
 
-    // A temporary push-service/VAPID failure must leave the task
-    // eligible for the next hourly run. Once at least one of the
-    // student's devices receives it, the reminder has done its job.
+    // A temporary push failure leaves the task eligible for the next run.
     if (deliveredToAtLeastOne) {
       sent++
       remindedTaskIds.push(task.id)

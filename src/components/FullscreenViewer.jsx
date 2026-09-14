@@ -1,4 +1,5 @@
 // src/components/FullscreenViewer.jsx
+import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { previewKindFor } from '../lib/embedUrl'
 import { useBodyScrollLock } from '../lib/useBodyScrollLock'
@@ -6,15 +7,19 @@ import { getPulseTheme, pulseFonts } from '../premiumTheme'
 
 const OVERLAY_Z = 2100
 
-// Shared full-screen "back + preview" viewer used by both SummaryOverlay
-// and MediaOverlay — renders an image or an iframe (PDF/video/HTML/Drive)
-// behind a floating back button. Always portaled to document.body so its
-// fixed z-index competes globally against the site header, regardless of
-// whether the caller nests it inside a stacking-context ancestor.
+// Shared full-screen "back + preview" viewer used by SummaryOverlay and
+// MediaOverlay. Portaled to document.body so its z-index always
+// competes globally against the site header.
 export default function FullscreenViewer({ dark, onClose, src, title, fileType, allow, allowFullScreen }) {
   const pt = getPulseTheme(dark)
   const kind = previewKindFor(src, fileType)
   useBodyScrollLock(true)
+
+  useEffect(() => {
+    function onKeyDown(e) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
 
   return createPortal(
     <div style={{

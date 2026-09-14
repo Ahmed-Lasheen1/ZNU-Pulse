@@ -759,6 +759,8 @@ export function ModuleIcon({ value, color = 'currentColor', size = 24, fallbackE
       const { Icon } = entry
       return <Icon color={color} size={size} />
     }
+    // unknown/stale icon key — don't print "icon:xyz" as text
+    return <span style={{ fontSize: size, lineHeight: 1 }}>{fallbackEmoji}</span>
   }
   return <span style={{ fontSize: size, lineHeight: 1 }}>{value || fallbackEmoji}</span>
 }

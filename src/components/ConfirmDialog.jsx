@@ -1,17 +1,24 @@
+import { useEffect } from 'react'
 import { getPulseTheme, pulseFonts, pulseType } from '../premiumTheme'
 import LiquidGlassCard from './ui/liquid-glass-card'
 import { WarningIcon } from './ui/tool-icons'
 
-// Generic glass confirmation modal for any action worth pausing on
-// (sign out, delete, discard, etc). Renders nothing when `open` is
-// false. Clicking the dark backdrop counts as Cancel, same as
-// pressing outside any other overlay in this app.
+// Generic glass confirmation modal. Clicking the backdrop or pressing
+// Escape both count as Cancel.
 export default function ConfirmDialog({
   dark, open, title, message,
   confirmLabel = 'Confirm', cancelLabel = 'Cancel',
   confirmColor, onConfirm, onCancel
 }) {
   const pt = getPulseTheme(dark)
+
+  useEffect(() => {
+    if (!open) return
+    function onKeyDown(e) { if (e.key === 'Escape') onCancel() }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [open, onCancel])
+
   if (!open) return null
   const accent = confirmColor || pt.danger
 
