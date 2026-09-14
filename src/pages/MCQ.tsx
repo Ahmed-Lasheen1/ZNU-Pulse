@@ -71,6 +71,9 @@ export default function MCQ({ dark }: { dark: boolean }) {
   // Debounces the paused-exam autosave (Supabase write for signed-in users)
   // so answering doesn't fire a write on every single change.
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
+  // Guards submitQuiz against being fired twice at once (e.g. the mock
+  // timer hitting zero at the same instant the student taps SUBMIT).
+  const submittingRef = useRef(false)
 
   // ── Initial data load ──────────────────────────────────────────────
   useEffect(() => {
@@ -94,8 +97,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules])
 
-  // isIgnored() guard prevents a stale request (older module tab) from
-  // overwriting the current module's questions.
   useEffect(() => {
     if (!activeModule) return
     let ignore = false
@@ -222,9 +223,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     }
   }
 
-  // questions_public strips correct/explanation so a guest can never
-  // read them client-side. isIgnored() defaults to "never ignored" so
-  // other callers are unaffected.
   async function fetchQuestionsForModule(moduleId: string, isIgnored: () => boolean = () => false) {
     const cacheKey = `mcq_questions_cache_${moduleId}`
     const cached = localStorage.getItem(cacheKey)
@@ -291,19 +289,31 @@ export default function MCQ({ dark }: { dark: boolean }) {
     return new Set<string>(flags.filter((f: any) => ids.includes(f.question_id)).map((f: any) => f.question_id))
   }
 
+  // BUG FIX: this used to update flaggedIds (and show a success toast)
+  // regardless of whether the Supabase write actually succeeded, so a
+  // failed insert/delete could leave the UI showing a flag state that
+  // doesn't match the database. Local state now only changes after a
+  // confirmed success (or immediately for guests, who have no server
+  // round-trip to fail).
   async function toggleFlagFor(q: any) {
     if (!q) return
     const isFlagged = flaggedIds.has(q.id)
-    const next = new Set(flaggedIds)
+
     if (isFlagged) {
+      if (user) {
+        const { error } = await supabase.from('flagged_questions').delete().eq('user_id', user.id).eq('question_id', q.id)
+        if (error) { showToast('❌ Could not remove flag — try again', 'error'); return }
+      } else {
+        toggleGuestFlag({ question_id: q.id })
+      }
+      const next = new Set(flaggedIds)
       next.delete(q.id)
-      if (user) await supabase.from('flagged_questions').delete().eq('user_id', user.id).eq('question_id', q.id)
-      else toggleGuestFlag({ question_id: q.id })
+      setFlaggedIds(next)
       showToast('Flag removed')
     } else {
-      next.add(q.id)
       if (user) {
-        await supabase.from('flagged_questions').insert({ user_id: user.id, question_id: q.id, module_id: q.module_id })
+        const { error } = await supabase.from('flagged_questions').insert({ user_id: user.id, question_id: q.id, module_id: q.module_id })
+        if (error) { showToast('❌ Could not flag question — try again', 'error'); return }
       } else {
         toggleGuestFlag({
           question_id: q.id, question: q.question,
@@ -311,13 +321,14 @@ export default function MCQ({ dark }: { dark: boolean }) {
           module_id: q.module_id, source: q.source
         })
       }
+      const next = new Set(flaggedIds)
+      next.add(q.id)
+      setFlaggedIds(next)
       showToast('🚩 Question flagged')
     }
-    setFlaggedIds(next)
   }
 
   // ── Timer ────────────────────────────────────────────────────────────
-  // Counts down for mock exams, counts up for practice/retry.
   function startTimer(startedAt: number, mode: string) {
     clearInterval(timerRef.current)
     const tick = () => {
@@ -489,12 +500,15 @@ export default function MCQ({ dark }: { dark: boolean }) {
   }
 
   // ── Submitting a quiz ────────────────────────────────────────────────
-  // Signed-in users: submit_quiz_attempt() re-grades server-side and is
-  // the only thing that writes answered_questions/exam_history/points.
-  // Guests aren't persisted server-side — grade_mcq + local bookkeeping.
+  // BUG FIX: added a submittingRef guard so an in-flight submit can't
+  // be started twice (e.g. the mock-exam timer hitting zero at the
+  // same instant the student taps SUBMIT, which could otherwise fire
+  // two overlapping submissions/writes).
   async function submitQuiz() {
+    if (submittingRef.current) return
+    submittingRef.current = true
+
     clearInterval(timerRef.current)
-    // Cancel any pending "save paused exam" write — the exam is done now.
     if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current)
     setGrading(true)
 
@@ -527,6 +541,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
       if (error) {
         setGrading(false)
         showToast('⚠️ Could not submit — check your connection and try again', 'error')
+        submittingRef.current = false
         return
       }
 
@@ -548,6 +563,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
       if (error) {
         setGrading(false)
         showToast('⚠️ Could not submit — check your connection and try again', 'error')
+        submittingRef.current = false
         return
       }
 
@@ -603,6 +619,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     clearActiveExam(user)
 
     setFinishTimeSec(quizMode === 'mock' ? (timeSec as number) : elapsedSeconds)
+    submittingRef.current = false
   }
 
   // ── Render: exam mode (taking + results) ────────────────────────────

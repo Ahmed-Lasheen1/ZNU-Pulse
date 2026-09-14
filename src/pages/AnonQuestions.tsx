@@ -10,18 +10,15 @@ import PageIntro from '../components/pulse/PageIntro'
 import LoadingText from '../components/pulse/LoadingText'
 import EmptyState from '../components/pulse/EmptyState'
 import NotifyPermissionButton from '../components/NotifyPermissionButton'
+import { useToast } from '../components/ToastProvider'
 import { getMyAnonTokens, addMyAnonToken, getNotifiedTokens, markTokensNotified } from '../lib/anonTracking'
 import { AnonQAIcon, QuestionMarkIcon, ClockIcon, CheckCircleIcon, TrashIcon, LightbulbIcon, EmptyBoxIcon } from '../components/ui/tool-icons'
 import { Lock } from 'lucide-react'
 
 const QNA_ACCENT = '#a78bfa'
 
-// Caps the list so it stays fast as the table grows; unanswered-first
-// ordering means a pending question can never fall off the window.
 const RECENT_QUESTIONS_LIMIT = 300
 
-// Client-side courtesy cooldown between submissions — not real access
-// control, just friction against accidental/casual spamming through the UI.
 const SUBMIT_COOLDOWN_MS = 30_000
 const COOLDOWN_STORAGE_KEY = 'anon_q_last_submit_at'
 
@@ -38,6 +35,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
   const { user, profile } = useAuth() as { user: any; profile?: { role?: string } | null }
   const isAdmin = profile?.role === 'admin'
   const pt = getPulseTheme(dark)
+  const showToast = useToast() as (message: string, type?: 'success' | 'error') => void
 
   const [questions, setQuestions] = useState<AnonQuestion[]>([])
   const [myQuestions, setMyQuestions] = useState<AnonQuestion[]>([])
@@ -51,7 +49,6 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
 
   useEffect(() => { fetchQuestions(); fetchMyQuestions() }, [])
 
-  // Restores an in-progress cooldown across a page reload.
   useEffect(() => {
     updateCooldownRemaining()
     cooldownTimerRef.current = setInterval(updateCooldownRemaining, 1000)
@@ -119,6 +116,9 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
       fetchQuestions()
       fetchMyQuestions()
       setTimeout(() => setMsg(''), 3000)
+    } else {
+      setMsg('❌ Could not submit — check your connection and try again')
+      setTimeout(() => setMsg(''), 3000)
     }
   }
 
@@ -126,14 +126,14 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
     const reply = replyText[id]
     if (!reply?.trim()) return
     const { error } = await supabase.from('anonymous_questions').update({ answer: reply, answered: true }).eq('id', id)
-    if (!error) {
-      setReplyText(prev => ({ ...prev, [id]: '' }))
-      fetchQuestions()
-    }
+    if (error) { showToast('❌ Could not save reply — try again', 'error'); return }
+    setReplyText(prev => ({ ...prev, [id]: '' }))
+    fetchQuestions()
   }
 
   async function deleteQuestion(id: string) {
-    await supabase.from('anonymous_questions').delete().eq('id', id)
+    const { error } = await supabase.from('anonymous_questions').delete().eq('id', id)
+    if (error) { showToast('❌ Could not delete — try again', 'error'); return }
     fetchQuestions()
   }
 

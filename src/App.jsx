@@ -30,22 +30,7 @@ const NotFound = lazy(() => import('./pages/NotFound'))
 const Search = lazy(() => import('./pages/Search'))
 import Footer from './components/Footer'
 
-// ThemeContext/AuthContext/ModulesContext + useTheme/useAuth/useModules
-// used to be defined right here. They now live in src/contexts.js (a
-// file with zero dependents of its own) because Home.jsx importing
-// them FROM App.jsx — combined with App.jsx importing Home.jsx
-// directly (not lazily, since it's the landing route) — created a
-// real circular dependency: src/App.jsx -> src/pages/Home.jsx ->
-// src/App.jsx (confirmed by Rollup's circular-dependency warning).
-// Re-exported here so every other page's existing
-// `import { useAuth, useModules } from '../App'` keeps working
-// unchanged — only Home.jsx (and NotifyPermissionButton.jsx) were
-// updated to import directly from '../contexts' instead, since those
-// two were the actual source of the cycle.
 export { ThemeContext, AuthContext, ModulesContext, useTheme, useAuth, useModules } from './contexts'
-// NavMenu also used to be defined here, for the same reason — see
-// src/components/NavMenu.jsx. Re-exported so nothing else that
-// imports it from '../App' needs to change.
 export { default as NavMenu } from './components/NavMenu'
 
 function PageLoader({ dark }) {
@@ -65,37 +50,31 @@ function ScrollToTop() {
   return null
 }
 
-// Home renders its own fixed, full-bleed brand header + NavMenu
-// directly inline (its content scrolls behind a transparent overlay).
-// Every other route now gets the exact same treatment via
-// PulseOverlayHeader — a fixed, transparent, non-glass bar with no
-// scroll-triggered chrome — plus a spacer matching Home's own internal
-// spacer, so page content starts right below where the bar sits
-// instead of being hidden underneath it.
+// Every route except Home gets the same fixed transparent brand bar,
+// plus a spacer matching the header's REAL rendered height so page
+// content starts right below it instead of underneath it.
+//
+// BUG FIX: this used to be a flat `76px + env(safe-area-inset-top)` —
+// i.e. 16px PLUS the full safe-area inset, added together. But the
+// real header (PulseOverlayHeader.jsx) sets its top padding as
+// `max(16px, env(safe-area-inset-top))` — whichever is BIGGER, never
+// both (same formula BackButton.tsx and Home.tsx already use
+// correctly). On a phone with a notch/Dynamic Island the safe-area
+// inset is typically 47–59px, so the old formula double-counted that
+// extra 16px and left a visible gap under the header on every route
+// except Home. Corrected to the same `max(16px, safe-area) + 60px`
+// (header content row + bottom padding) used elsewhere.
 function SiteHeader({ dark, toggleTheme }) {
   const location = useLocation()
   if (location.pathname === '/') return null
   return (
     <>
       <PulseOverlayHeader dark={dark} toggleTheme={toggleTheme} />
-      <div style={{ height: 'calc(76px + env(safe-area-inset-top))' }} />
+      <div style={{ height: 'calc(max(16px, env(safe-area-inset-top)) + 60px)' }} />
     </>
   )
 }
 
-// BUG FIX: ErrorBoundary previously sat around the routes but was
-// never tied to the current URL, so it never got a fresh start when
-// navigating client-side. Once ANY page tripped a render error, the
-// boundary's `hasError` stayed true forever — every route visited
-// afterward kept showing the fallback screen until a full manual
-// reload. This small wrapper lives INSIDE <Router> so it can read the
-// current path via useLocation() and hand it to ErrorBoundary as
-// `resetKey` — ErrorBoundary clears its own error state whenever that
-// key changes (see componentDidUpdate in ErrorBoundary.jsx), so a
-// crash on one page no longer poisons every page after it.
-// `toggleTheme` is passed in as a prop (rather than closed over)
-// because this component, not App() itself, is what renders the Home
-// route.
 function RoutedContent({ dark, toggleTheme }) {
   const location = useLocation()
   return (
@@ -140,10 +119,6 @@ export default function App() {
 
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
-  // Tracks whether the initial Supabase session check has finished.
-  // Used by Admin.jsx to avoid flashing the 404 page for a moment on
-  // every visit (including the real admin's own) before we actually
-  // know if this person is signed in and what their role is.
   const [authLoaded, setAuthLoaded] = useState(false)
   const [modules, setModules] = useState([])
   const [modulesLoaded, setModulesLoaded] = useState(false)
@@ -158,10 +133,6 @@ export default function App() {
 
   useEffect(() => { loadModules() }, [])
 
-  // Marks this tab/device as "online" for the Admin Analytics tab's
-  // live counter (see src/lib/onlinePresence.js). Runs for every
-  // visitor — signed in or guest — since anyone using the site should
-  // count toward "online now".
   useEffect(() => {
     const unsubscribe = subscribeOnlinePresence()
     return unsubscribe
@@ -172,16 +143,6 @@ export default function App() {
     if (data) setProfile(data)
   }
 
-  // Safety net for Google sign-ins: the app's own email/password
-  // signup flow (see Auth.tsx) passes name/account_type into
-  // signUp()'s options, which whatever creates `profiles` rows today
-  // presumably reads. Google OAuth users never go through that
-  // signUp() call at all — Supabase creates their auth.users row
-  // directly on first Google login — so without this, a first-time
-  // Google sign-in could end up with no profile row at all (blank
-  // name everywhere, points that never persist). This checks once per
-  // sign-in and only inserts if nothing exists yet; existing users
-  // (including existing Google users on a later visit) are untouched.
   async function ensureProfile(user) {
     try {
       const { data: existing } = await supabase.from('profiles').select('id').eq('id', user.id).maybeSingle()
@@ -195,15 +156,6 @@ export default function App() {
     }
   }
 
-  // Strips a stray, now-meaningless "#" (or leftover OAuth hash
-  // fragment) from the address bar once Supabase has already consumed
-  // whatever it needed from it. With flowType: 'pkce' (see
-  // src/supabase.js) this rarely has anything to actually clean up —
-  // PKCE returns the session via a ?code=... query param instead of a
-  // #access_token=... hash — but this stays as a harmless safety net
-  // for any stray "#" left behind by a redirect either way. Uses
-  // replaceState (not navigate) so it never adds a history entry or
-  // triggers a route change.
   function cleanUpAuthHash() {
     if (window.location.hash && window.location.hash !== '#/') {
       window.history.replaceState(null, '', window.location.pathname + window.location.search)
@@ -214,22 +166,9 @@ export default function App() {
     async function initSession() {
       const { data: { session } } = await supabase.auth.getSession()
       setUser(session?.user ?? null)
-      // Wait for the profile (which carries the admin role) to resolve
-      // before marking auth as loaded, so authLoaded=true always means
-      // "we know, for sure, whether this person is an admin" — not
-      // just "we know if they're signed in".
       if (session?.user) {
         await ensureProfile(session.user)
         await fetchProfile(session.user.id)
-        // Covers the case where a guest practiced on this device,
-        // then signed in on a PREVIOUS visit and this is simply a
-        // later reload with an already-persisted session — Supabase
-        // doesn't reliably re-fire a distinct "just signed in" event
-        // in that case, so this call has to happen here too, not only
-        // in onAuthStateChange below. migrateGuestDataIfNeeded is a
-        // no-op (single localStorage read, no network) whenever there
-        // is nothing local left to migrate, so calling it on every
-        // session check costs nothing once it has run once.
         migrateGuestDataIfNeeded(session.user.id)
       }
       cleanUpAuthHash()
@@ -237,24 +176,6 @@ export default function App() {
     }
     initSession()
 
-    // AUDIT FIX (push-notification race for brand-new accounts): this
-    // used to be a plain (non-async) callback that called
-    // `setUser(session.user)` FIRST and only THEN kicked off
-    // `ensureProfile(session.user).then(...)` in the background,
-    // unawaited. That meant the app treated the person as "signed in"
-    // (Home's notification banner included) the instant sign-in/OTP-
-    // verification/Google-OAuth completed, while their `profiles` row
-    // might still be mid-insert. A brand-new user who tapped "Enable
-    // notifications" in that window had their push subscription saved
-    // against an account whose profile row didn't exist yet, and the
-    // save failed ("Could not save your subscription — try again
-    // later"). Existing users never hit this, since their profile row
-    // was created long ago on their original sign-up. This mirrors
-    // initSession() above (which already awaits ensureProfile before
-    // doing anything else) — now onAuthStateChange does the same:
-    // ensureProfile is awaited BEFORE setUser flips the app into
-    // "signed in", so by the time anything interactive renders, the
-    // profile row is guaranteed to already exist.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         await ensureProfile(session.user)
@@ -309,8 +230,6 @@ export default function App() {
   )
 }
 
-// Thin provider wrappers so the JSX above stays readable — same
-// contexts as before, just sourced from ./contexts now.
 function ThemeContextProvider({ dark, children }) {
   return <ThemeContext.Provider value={{ dark }}>{children}</ThemeContext.Provider>
 }

@@ -153,16 +153,26 @@ export default function Checklist({ dark }: { dark: boolean }) {
     }
   }
 
+  // BUG FIX: this used to clear the input and show "✅ Task added"
+  // even when the Supabase insert failed (data comes back null on
+  // error, but the error was never read) — the student saw a false
+  // success and their task silently vanished. Now the error is
+  // checked first; the input/toast only reflect what actually happened.
   async function addTask() {
     if (!newTask.trim() || addingTask) return
     setAddingTask(true)
     if (user) {
-      const { data } = await supabase.from('user_checklist').insert([{
+      const { data, error } = await supabase.from('user_checklist').insert([{
         user_id: user.id, module_id: activeModule,
         text: newTask.trim(), done: false,
         deadline: newDeadline || null
       }]).select().single()
-      if (data) setTasks(prev => [...prev, data as ChecklistTask])
+      setAddingTask(false)
+      if (error || !data) {
+        showToast('❌ Could not add task — try again', 'error')
+        return
+      }
+      setTasks(prev => [...prev, data as ChecklistTask])
     } else {
       const task: ChecklistTask = {
         id: crypto.randomUUID(), text: newTask.trim(), done: false,
@@ -173,10 +183,10 @@ export default function Checklist({ dark }: { dark: boolean }) {
         localStorage.setItem(`checklist_${activeModule}`, JSON.stringify(updated))
         return updated
       })
+      setAddingTask(false)
     }
     setNewTask('')
     setNewDeadline('')
-    setAddingTask(false)
     showToast('✅ Task added')
   }
 

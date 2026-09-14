@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { getPulseTheme, pulseFonts, pulseType } from '../premiumTheme'
 import LiquidGlassCard from './ui/liquid-glass-card'
 import { WarningIcon } from './ui/tool-icons'
@@ -11,11 +11,13 @@ export default function ConfirmDialog({
   confirmColor, onConfirm, onCancel
 }) {
   const pt = getPulseTheme(dark)
+  const cancelRef = useRef(null)
 
   useEffect(() => {
     if (!open) return
     function onKeyDown(e) { if (e.key === 'Escape') onCancel() }
     document.addEventListener('keydown', onKeyDown)
+    cancelRef.current?.focus()
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [open, onCancel])
 
@@ -32,7 +34,13 @@ export default function ConfirmDialog({
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
       }}
     >
-      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 360 }}>
+      <div
+        onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-dialog-title"
+        style={{ width: '100%', maxWidth: 360 }}
+      >
         <LiquidGlassCard dark={dark} delay={0} instant style={{ padding: '28px 24px', textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
             <div style={{
@@ -43,7 +51,7 @@ export default function ConfirmDialog({
               <WarningIcon color={accent} size={22} />
             </div>
           </div>
-          <h3 style={{ ...pulseType.sectionTitle, fontSize: 17, color: pt.textPrimary, marginBottom: 8, fontFamily: pulseFonts.display }}>
+          <h3 id="confirm-dialog-title" style={{ ...pulseType.sectionTitle, fontSize: 17, color: pt.textPrimary, marginBottom: 8, fontFamily: pulseFonts.display }}>
             {title}
           </h3>
           {message && (
@@ -52,7 +60,7 @@ export default function ConfirmDialog({
             </p>
           )}
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={onCancel} style={{
+            <button ref={cancelRef} onClick={onCancel} style={{
               flex: 1, padding: '12px', borderRadius: 999,
               background: 'transparent', border: `1px solid ${pt.border}`,
               color: pt.sub, cursor: 'pointer', fontWeight: 700, fontSize: 13, fontFamily: pulseFonts.body

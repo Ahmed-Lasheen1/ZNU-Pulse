@@ -7,6 +7,12 @@ import { getPulseTheme, pulseFonts } from '../premiumTheme'
 
 const OVERLAY_Z = 2100
 
+// Restricts what an embedded page can do (no top-level navigation,
+// no parent-frame access) while still allowing the scripts/forms that
+// Drive previews, YouTube embeds, and admin-published HTML summaries
+// need to function.
+const IFRAME_SANDBOX = 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation'
+
 // Shared full-screen "back + preview" viewer used by SummaryOverlay and
 // MediaOverlay. Portaled to document.body so its z-index always
 // competes globally against the site header.
@@ -58,6 +64,7 @@ export default function FullscreenViewer({ dark, onClose, src, title, fileType, 
             src={src}
             style={{ height: '100%', width: '100%', border: 'none', display: 'block' }}
             title={title}
+            sandbox={IFRAME_SANDBOX}
             allow={allow ?? (kind === 'video' ? 'autoplay; fullscreen' : undefined)}
             allowFullScreen={allowFullScreen ?? (kind === 'video' || undefined)}
           />

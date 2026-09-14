@@ -2,7 +2,7 @@
 'use client'
 
 import { Sun, Moon } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { getPulseTheme } from '../../premiumTheme'
 
@@ -24,6 +24,11 @@ export default function ThemeSwitch({ dark, onToggle, scale = 1, stretchX = 1 }:
   const [isAnimating, setIsAnimating] = useState(false)
   const isDark = dark
   const pt = getPulseTheme(dark)
+  const particleTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
+
+  useEffect(() => {
+    return () => { if (particleTimeoutRef.current) clearTimeout(particleTimeoutRef.current) }
+  }, [])
 
   const BASE_W = 104
   const BASE_H = 64
@@ -32,13 +37,6 @@ export default function ThemeSwitch({ dark, onToggle, scale = 1, stretchX = 1 }:
   const THUMB_SIZE = BASE_H - TRACK_PADDING * 2
 
   const trackW = BASE_W * stretchX
-  // AUDIT FIX: box-sizing:border-box (global, see index.css) means
-  // the track's specified width already includes its border — so the
-  // content box the thumb actually travels within is narrower than
-  // `trackW` by the border on both sides, not just the padding. This
-  // was previously only subtracting padding, which let the thumb
-  // overshoot toward the right edge when "on" (the left side looked
-  // fine since it only depends on padding, not this travel distance).
   const thumbTravel = trackW - THUMB_SIZE - TRACK_PADDING * 2 - BORDER_WIDTH * 2
 
   function generateParticles() {
@@ -49,7 +47,8 @@ export default function ThemeSwitch({ dark, onToggle, scale = 1, stretchX = 1 }:
     }
     setParticles(newParticles)
     setIsAnimating(true)
-    setTimeout(() => { setIsAnimating(false); setParticles([]) }, 1000)
+    if (particleTimeoutRef.current) clearTimeout(particleTimeoutRef.current)
+    particleTimeoutRef.current = setTimeout(() => { setIsAnimating(false); setParticles([]) }, 1000)
   }
 
   function handleToggle() {
