@@ -30,9 +30,6 @@ interface ReviewModule {
   color: string
 }
 
-// Snapshot of one wrong answer from a specific attempt, saved at
-// submit time so this page shows exactly what was missed in that
-// attempt, independent of what the question bank looks like later.
 interface IncorrectSnapshot {
   question_id: string
   question: string
@@ -96,12 +93,6 @@ export default function Review({ dark }: { dark: boolean }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [moduleFilter, setModuleFilter] = useState('all')
 
-  // BUG FIX: fetchTab previously had no cancellation guard. Switching
-  // between the History and Flagged tabs quickly (or toggling
-  // while a slow request from the PREVIOUS tab was still in flight)
-  // could let a stale response land after a newer one and briefly
-  // show the wrong tab's data. isIgnored() is threaded through
-  // fetchTab so a stale response's state updates are skipped.
   useEffect(() => {
     let ignore = false
     fetchTab(() => ignore)
@@ -134,7 +125,6 @@ export default function Review({ dark }: { dark: boolean }) {
       return
     }
 
-    // flagged
     if (user) {
       const { data, error } = await supabase.from('flagged_questions').select('question_id').eq('user_id', user.id)
       if (isIgnored()) return
@@ -157,9 +147,13 @@ export default function Review({ dark }: { dark: boolean }) {
     setLoading(false)
   }
 
+  // Only applies the local removal once the Supabase delete is confirmed
+  // (signed-in) — otherwise a failed request would show "Flag removed"
+  // while the row still exists server-side.
   async function unflag(questionId: string) {
     if (user) {
-      await supabase.from('flagged_questions').delete().eq('user_id', user.id).eq('question_id', questionId)
+      const { error } = await supabase.from('flagged_questions').delete().eq('user_id', user.id).eq('question_id', questionId)
+      if (error) { showToast('❌ Could not remove flag — try again', 'error'); return }
     } else {
       toggleGuestFlag({ question_id: questionId })
     }
@@ -195,8 +189,6 @@ export default function Review({ dark }: { dark: boolean }) {
   const hoverTint = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'
   const inStyle = { ...glassInput(pt, dark), padding: '13px 20px', marginBottom: 0 }
 
-  // Shared wrap rules so long unbroken tokens (drug names, dosages)
-  // always break onto a new line instead of overflowing the card.
   const wrapText: React.CSSProperties = { wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }
 
   const reviewTabs = [
@@ -206,8 +198,6 @@ export default function Review({ dark }: { dark: boolean }) {
 
   return (
     <PageShell dark={dark} backFallback="/mcq" maxWidth={900} containerClassName="review-wide">
-      {/* Narrower, centered content column than the default .pulse-wide,
-          which scales up to 1800px on large desktops. */}
       <style>{`
         .review-wide {
           width: 100%;
@@ -226,7 +216,6 @@ export default function Review({ dark }: { dark: boolean }) {
 
       <PageIntro dark={dark} emoji={<BookIcon color={ON_GRADIENT_TOP.primary} size={40} />} title="Review" subtitle="Your exam history, mistakes, and flagged questions" paddingBottom={16} />
 
-      {/* History / Flagged pills */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginBottom: SECTION_GAP }}>
         {reviewTabs.map(t => {
           const active = tab === t.id
@@ -263,7 +252,6 @@ export default function Review({ dark }: { dark: boolean }) {
 
       {loading && <LoadingText />}
 
-      {/* ── History tab — list of past attempts ──────────────── */}
       {tab === 'history' && !loading && !selectedHistory && (() => {
         const totalAttempted = history.reduce((a, h) => a + h.total, 0)
         const totalCorrect = history.reduce((a, h) => a + h.correct, 0)
@@ -289,14 +277,6 @@ export default function Review({ dark }: { dark: boolean }) {
             {history.map((h, i) => {
               const mod = moduleFor(h.module_id)
               const isLast = i === history.length - 1
-              // BUG FIX: guest history rows have no `id`, so this used
-              // to fall back to the array index alone as the React
-              // key. Combined with `completed_at` here as a fallback
-              // instead, so the key stays stable/unique per row even
-              // if the list order ever changes, avoiding subtle list
-              // reconciliation glitches (index-only keys can cause
-              // React to reuse/misattribute DOM nodes across
-              // reorders).
               const rowKey = h.id || `${h.completed_at}-${i}`
               return (
                 <div key={rowKey} style={{ marginBottom: isLast ? 0 : ITEM_GAP }}>
@@ -328,7 +308,6 @@ export default function Review({ dark }: { dark: boolean }) {
         )
       })()}
 
-      {/* ── History detail — incorrect questions from ONE attempt ── */}
       {tab === 'history' && !loading && selectedHistory && (() => {
         const mod = moduleFor(selectedHistory.module_id)
         const incorrectQs = selectedHistory.incorrect_questions || []
@@ -433,7 +412,6 @@ export default function Review({ dark }: { dark: boolean }) {
         )
       })()}
 
-      {/* ── Flagged tab ──────────────────────────────────────── */}
       {tab === 'flagged' && !loading && (
         <>
           {flaggedItems.length === 0 && (
@@ -449,6 +427,7 @@ export default function Review({ dark }: { dark: boolean }) {
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   placeholder="🔍 Search questions..."
+                  aria-label="Search flagged questions"
                   style={{ ...inStyle, flex: 1, minWidth: 160 }}
                 />
                 {showModuleFilter && (

@@ -45,12 +45,6 @@ export default function ResetPassword({ dark = true }: { dark?: boolean }) {
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
             <PulseBrand dark={dark} logoSize={56} fontSize={26} />
           </div>
-          {/* AUDIT FIX: this subtitle renders directly on
-              PulseBackground (no glass surface behind it), but used
-              to read Glass tokens (pt.sub) — a text color meant for
-              text on a tinted glass backdrop. Corrected to the
-              gradient-zone token for text on the light/top portion of
-              PULSE_BG. */}
           <p style={{ textAlign: 'center', fontSize: 12, color: ON_GRADIENT_TOP.secondary, marginBottom: 20, fontFamily: pulseFonts.body }}>
             Set a new password
           </p>
@@ -61,7 +55,7 @@ export default function ResetPassword({ dark = true }: { dark?: boolean }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <GlassField dark={dark}>
                 <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                  placeholder="New password (min 6 characters)" style={inputResetStyle(pt)} />
+                  placeholder="New password (min 8 characters)" style={inputResetStyle(pt)} />
               </GlassField>
               <GlassField dark={dark}>
                 <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)}

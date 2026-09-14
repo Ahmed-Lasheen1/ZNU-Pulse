@@ -103,7 +103,6 @@ export default function Checklist({ dark }: { dark: boolean }) {
   const [newTask, setNewTask] = useState('')
   const [newDeadline, setNewDeadline] = useState('')
   const [addingTask, setAddingTask] = useState(false)
-  // Collapsed by default so completed tasks don't compete visually.
   const [showCompleted, setShowCompleted] = useState(false)
 
   const activeModulesList = (modules as any[]).filter(m => m.status === 'active')
@@ -153,11 +152,6 @@ export default function Checklist({ dark }: { dark: boolean }) {
     }
   }
 
-  // BUG FIX: this used to clear the input and show "✅ Task added"
-  // even when the Supabase insert failed (data comes back null on
-  // error, but the error was never read) — the student saw a false
-  // success and their task silently vanished. Now the error is
-  // checked first; the input/toast only reflect what actually happened.
   async function addTask() {
     if (!newTask.trim() || addingTask) return
     setAddingTask(true)
@@ -190,9 +184,13 @@ export default function Checklist({ dark }: { dark: boolean }) {
     showToast('✅ Task added')
   }
 
+  // Only applies the local toggle once the Supabase write is confirmed
+  // (signed-in) — otherwise a failed request could leave the UI out of
+  // sync with the database.
   async function toggleTask(task: ChecklistTask) {
     if (user) {
-      await supabase.from('user_checklist').update({ done: !task.done }).eq('id', task.id)
+      const { error } = await supabase.from('user_checklist').update({ done: !task.done }).eq('id', task.id)
+      if (error) { showToast('❌ Could not update task — try again', 'error'); return }
     }
     const updated = tasks.map(t => t.id === task.id ? { ...t, done: !t.done } : t)
     setTasks(updated)
@@ -200,7 +198,10 @@ export default function Checklist({ dark }: { dark: boolean }) {
   }
 
   async function deleteTask(task: ChecklistTask) {
-    if (user) await supabase.from('user_checklist').delete().eq('id', task.id)
+    if (user) {
+      const { error } = await supabase.from('user_checklist').delete().eq('id', task.id)
+      if (error) { showToast('❌ Could not delete task — try again', 'error'); return }
+    }
     const updated = tasks.filter(t => t.id !== task.id)
     setTasks(updated)
     if (!user) localStorage.setItem(`checklist_${activeModule}`, JSON.stringify(updated))

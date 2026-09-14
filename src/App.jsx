@@ -33,6 +33,28 @@ import Footer from './components/Footer'
 export { ThemeContext, AuthContext, ModulesContext, useTheme, useAuth, useModules } from './contexts'
 export { default as NavMenu } from './components/NavMenu'
 
+// Tracks user ids currently being ensured, so initSession() and
+// onAuthStateChange() can't race to insert the same profile row twice
+// on the same page load.
+const ensureProfileInFlight = new Set()
+
+async function ensureProfile(user) {
+  if (ensureProfileInFlight.has(user.id)) return
+  ensureProfileInFlight.add(user.id)
+  try {
+    const { data: existing } = await supabase.from('profiles').select('id').eq('id', user.id).maybeSingle()
+    if (existing) return
+    const meta = user.user_metadata || {}
+    const fallbackName = meta.full_name || meta.name || (user.email ? user.email.split('@')[0] : 'Student')
+    const { error } = await supabase.from('profiles').insert([{ id: user.id, name: fallbackName, points: 0 }])
+    if (error) console.warn('[ensureProfile] Could not create profile row:', error.message)
+  } catch (e) {
+    console.warn('[ensureProfile] Unexpected error:', e)
+  } finally {
+    ensureProfileInFlight.delete(user.id)
+  }
+}
+
 function PageLoader({ dark }) {
   const pt = getPulseTheme(dark)
   return (
@@ -50,20 +72,6 @@ function ScrollToTop() {
   return null
 }
 
-// Every route except Home gets the same fixed transparent brand bar,
-// plus a spacer matching the header's REAL rendered height so page
-// content starts right below it instead of underneath it.
-//
-// BUG FIX: this used to be a flat `76px + env(safe-area-inset-top)` —
-// i.e. 16px PLUS the full safe-area inset, added together. But the
-// real header (PulseOverlayHeader.jsx) sets its top padding as
-// `max(16px, env(safe-area-inset-top))` — whichever is BIGGER, never
-// both (same formula BackButton.tsx and Home.tsx already use
-// correctly). On a phone with a notch/Dynamic Island the safe-area
-// inset is typically 47–59px, so the old formula double-counted that
-// extra 16px and left a visible gap under the header on every route
-// except Home. Corrected to the same `max(16px, safe-area) + 60px`
-// (header content row + bottom padding) used elsewhere.
 function SiteHeader({ dark, toggleTheme }) {
   const location = useLocation()
   if (location.pathname === '/') return null
@@ -110,7 +118,7 @@ export default function App() {
     const saved = localStorage.getItem('znu_theme')
     if (saved === 'light') return false
     if (saved === 'dark') return true
-    return true // default to dark for first-time visitors
+    return true
   })
 
   useEffect(() => {
@@ -141,19 +149,6 @@ export default function App() {
   async function fetchProfile(userId) {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
     if (data) setProfile(data)
-  }
-
-  async function ensureProfile(user) {
-    try {
-      const { data: existing } = await supabase.from('profiles').select('id').eq('id', user.id).maybeSingle()
-      if (existing) return
-      const meta = user.user_metadata || {}
-      const fallbackName = meta.full_name || meta.name || (user.email ? user.email.split('@')[0] : 'Student')
-      const { error } = await supabase.from('profiles').insert([{ id: user.id, name: fallbackName, points: 0 }])
-      if (error) console.warn('[ensureProfile] Could not create profile row:', error.message)
-    } catch (e) {
-      console.warn('[ensureProfile] Unexpected error:', e)
-    }
   }
 
   function cleanUpAuthHash() {

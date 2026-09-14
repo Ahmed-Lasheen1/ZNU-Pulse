@@ -14,6 +14,7 @@ import { TargetIcon, GearIcon, DotIcon, TrashIcon, CheckCircleIcon } from '../..
 import type { AdminModule } from './adminTypes'
 
 interface StageRow {
+  _key: string
   id: string | null
   value: string
   title: string
@@ -45,16 +46,14 @@ export default function StagesTab({ dark, modules }: StagesTabProps) {
     if (stageModuleId) loadModuleStagesForAdmin(stageModuleId)
   }, [stageModuleId])
 
-  // Loads this module's custom stages if it has any, otherwise falls
-  // back to the 4 global defaults.
   async function loadModuleStagesForAdmin(moduleId: string) {
     setStagesLoading(true)
     const { data } = await supabase.from('module_exam_stages').select('*').eq('module_id', moduleId).order('position')
     if (data && data.length > 0) {
-      setModuleStagesList(data.map((s: any) => ({ id: s.id, value: s.value, title: s.title, emoji: s.emoji, color: s.color })))
+      setModuleStagesList(data.map((s: any) => ({ _key: s.id, id: s.id, value: s.value, title: s.title, emoji: s.emoji, color: s.color })))
       setStagesIsCustom(true)
     } else {
-      setModuleStagesList(STAGE_META.map(s => ({ id: null, value: s.value, title: s.title, emoji: s.emoji, color: s.color })))
+      setModuleStagesList(STAGE_META.map(s => ({ _key: crypto.randomUUID(), id: null, value: s.value, title: s.title, emoji: s.emoji, color: s.color })))
       setStagesIsCustom(false)
     }
     setStagesLoading(false)
@@ -71,17 +70,9 @@ export default function StagesTab({ dark, modules }: StagesTabProps) {
     let value = 'new_stage'
     let suffix = 1
     while (existingValues.includes(value)) { value = `new_stage_${suffix}`; suffix++ }
-    setModuleStagesList(prev => [...prev, { id: null, value, title: 'New Stage', emoji: '', color: '#64748b' }])
+    setModuleStagesList(prev => [...prev, { _key: crypto.randomUUID(), id: null, value, title: 'New Stage', emoji: '', color: '#64748b' }])
   }
 
-  // BUG FIX: this used to delete the module's existing custom stages
-  // FIRST, then insert the new set. If the insert failed afterward
-  // (network drop, validation error, etc.) the module was left with
-  // ZERO custom stages — silently falling back to the 4 global
-  // defaults on next load, with the admin's real custom stages gone.
-  // A snapshot of the current rows is now taken before deleting, and
-  // restored if the insert fails, so a failed save can no longer
-  // destroy data that was already there.
   async function saveModuleStages() {
     if (!stageModuleId) return
     if (moduleStagesList.length === 0) return showMsg('❌ A module needs at least one exam stage')
@@ -104,8 +95,6 @@ export default function StagesTab({ dark, modules }: StagesTabProps) {
     const { error } = await supabase.from('module_exam_stages').insert(rows)
 
     if (error) {
-      // Restore whatever was there before the delete, so the module
-      // isn't left with zero custom stages just because this save failed.
       if (existingRows && existingRows.length > 0) {
         await supabase.from('module_exam_stages').insert(existingRows)
       }
@@ -131,7 +120,6 @@ export default function StagesTab({ dark, modules }: StagesTabProps) {
     loadModuleStagesForAdmin(stageModuleId)
   }
 
-  // Module picker
   const form = (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
       <h3 style={{ color: pt.cobalt, marginBottom: 8, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -146,7 +134,6 @@ export default function StagesTab({ dark, modules }: StagesTabProps) {
     </LiquidGlassCard>
   )
 
-  // Per-module stage editor
   const list = (
     <div>
       {!stageModuleId && (
@@ -171,7 +158,7 @@ export default function StagesTab({ dark, modules }: StagesTabProps) {
 
               <div className="admin-stage-grid">
                 {moduleStagesList.map((stage, i) => (
-                  <div key={i} style={{ marginBottom: 14 }}>
+                  <div key={stage._key} style={{ marginBottom: 14 }}>
                     <div style={{
                       display: 'grid', gridTemplateColumns: '50px 1fr 70px auto', gap: 8,
                       alignItems: 'center'

@@ -20,9 +20,6 @@ interface ScheduleRow {
   url: string
   type: 'study' | 'exam'
   module_id: string
-  // A schedule item can carry more than one exam date (e.g. a full
-  // staged exam schedule for a module) — stored as an array rather
-  // than a single date column.
   dates?: string[] | null
 }
 
@@ -43,8 +40,10 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
   const [schUrl, setSchUrl] = useState('')
   const [schType, setSchType] = useState<'study' | 'exam'>('study')
   const [schModuleId, setSchModuleId] = useState('')
-  // Always at least one date input row, even when empty.
   const [schDates, setSchDates] = useState<string[]>([''])
+  // Stable id per date row (not the array index) so React keys survive
+  // add/remove without losing focus on other rows.
+  const [schDateIds, setSchDateIds] = useState<string[]>([crypto.randomUUID()])
   const [moduleFilter, setModuleFilter] = useState('all')
   const [saving, setSaving] = useState(false)
 
@@ -60,10 +59,13 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
   function editSchedule(s: ScheduleRow) {
     setEditingScheduleId(s.id)
     setSchTitle(s.title); setSchUrl(s.url); setSchType(s.type); setSchModuleId(s.module_id)
-    setSchDates(s.dates && s.dates.length > 0 ? s.dates : [''])
+    const dates = s.dates && s.dates.length > 0 ? s.dates : ['']
+    setSchDates(dates)
+    setSchDateIds(dates.map(() => crypto.randomUUID()))
   }
   function resetScheduleForm() {
-    setEditingScheduleId(null); setSchTitle(''); setSchUrl(''); setSchDates([''])
+    setEditingScheduleId(null); setSchTitle(''); setSchUrl('')
+    setSchDates(['']); setSchDateIds([crypto.randomUUID()])
   }
 
   function updateDateAt(index: number, value: string) {
@@ -71,9 +73,11 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
   }
   function addDateRow() {
     setSchDates(prev => [...prev, ''])
+    setSchDateIds(prev => [...prev, crypto.randomUUID()])
   }
   function removeDateRow(index: number) {
     setSchDates(prev => (prev.length === 1 ? [''] : prev.filter((_, i) => i !== index)))
+    setSchDateIds(prev => (prev.length === 1 ? [crypto.randomUUID()] : prev.filter((_, i) => i !== index)))
   }
 
   async function saveSchedule() {
@@ -106,7 +110,6 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
 
   const visibleModules = moduleFilter === 'all' ? modules : modules.filter(m => m.id === moduleFilter)
 
-  // Create / edit form
   const form = (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
       <h3 style={{ color: pt.cobalt, marginBottom: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -123,7 +126,7 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
         <>
           <label style={fieldLabel(pt)}>Exam Date(s) (for reminder notifications)</label>
           {schDates.map((d, i) => (
-            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <div key={schDateIds[i]} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
               <input
                 type="date"
                 value={d}
@@ -156,7 +159,6 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
     </LiquidGlassCard>
   )
 
-  // Schedules grouped by module
   const list = (
     <div>
       <AdminModuleFilterSelect modules={modules} value={moduleFilter} onChange={setModuleFilter} totalCount={schedules.length} inStyle={inStyle} />

@@ -13,6 +13,7 @@ import PageIntro from '../components/pulse/PageIntro'
 import LoadingText from '../components/pulse/LoadingText'
 import EmptyState from '../components/pulse/EmptyState'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
+import { useBodyScrollLock } from '../lib/useBodyScrollLock'
 import { fetchSubjectsForModule } from '../lib/subjects'
 import { getDriveOrRawUrl, getVideoEmbedUrl, isSafeExternalUrl } from '../lib/embedUrl'
 import { BookIcon, QuestionMarkIcon, VideoIcon, GraduationCapIcon, DocumentIcon, AudioIcon, FolderIcon, PlayIcon } from '../components/ui/tool-icons'
@@ -43,7 +44,6 @@ interface FilesSubject {
 
 const FILE_ACCENT = '#38bdf8'
 
-// Fixed display order for the type tabs, matching the old per-type cards.
 const TYPE_ORDER = ['sharah', 'questions', 'lectures', 'courses'] as const
 
 function fileTypeIcon(type: string, color: string, size = 20) {
@@ -69,6 +69,14 @@ const TYPE_META: Record<string, { Icon: (p: { color?: string; size?: number }) =
 
 function AudioViewer({ url, name, onClose, dark }: { url: string; name: string; onClose: () => void; dark: boolean }) {
   const pt = getPulseTheme(dark)
+  useBodyScrollLock(true)
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -125,7 +133,6 @@ export default function FilesPage({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules, moduleParam])
 
-  // All of this module's files, every type at once.
   useEffect(() => {
     if (!activeModule) return
     let ignore = false
@@ -143,8 +150,6 @@ export default function FilesPage({ dark }: { dark: boolean }) {
 
   const availableTypes = TYPE_ORDER.filter(t => files.some(f => f.type === t))
 
-  // Honor `?type=` from a link if that type has files here, else default
-  // to the first type that does.
   useEffect(() => {
     if (loading) return
     if (typeParam && availableTypes.includes(typeParam as typeof availableTypes[number])) {
@@ -165,7 +170,6 @@ export default function FilesPage({ dark }: { dark: boolean }) {
     return () => { ignore = true }
   }, [activeModule])
 
-  // Opens the exact file a Search result pointed at, switching to its type tab.
   useEffect(() => {
     if (!fileParam || viewer) return
     const match = files.find(f => f.id === fileParam)

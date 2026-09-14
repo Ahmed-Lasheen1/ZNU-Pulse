@@ -166,7 +166,8 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
     return { questions: parsed, errors }
   }
 
-  async function bulkAddQuestions() {
+    async function bulkAddQuestions() {
+    if (bulkSaving) return
     if (!qModuleId) return showMsg('❌ Please select a module first')
     if (!bulkText.trim()) return showMsg('❌ Paste some questions first')
 

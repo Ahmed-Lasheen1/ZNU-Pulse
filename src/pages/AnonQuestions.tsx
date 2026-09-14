@@ -11,6 +11,7 @@ import LoadingText from '../components/pulse/LoadingText'
 import EmptyState from '../components/pulse/EmptyState'
 import NotifyPermissionButton from '../components/NotifyPermissionButton'
 import { useToast } from '../components/ToastProvider'
+import { containsProfanity } from '../lib/moderation'
 import { getMyAnonTokens, addMyAnonToken, getNotifiedTokens, markTokensNotified } from '../lib/anonTracking'
 import { AnonQAIcon, QuestionMarkIcon, ClockIcon, CheckCircleIcon, TrashIcon, LightbulbIcon, EmptyBoxIcon } from '../components/ui/tool-icons'
 import { Lock } from 'lucide-react'
@@ -46,6 +47,9 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
   const [replyText, setReplyText] = useState<Record<string, string>>({})
   const [cooldownRemaining, setCooldownRemaining] = useState(0)
   const cooldownTimerRef = useRef<ReturnType<typeof setInterval>>()
+  // Guards against a rapid double-click firing two inserts before
+  // cooldownRemaining state has re-rendered to block the second click.
+  const submittingRef = useRef(false)
 
   useEffect(() => { fetchQuestions(); fetchMyQuestions() }, [])
 
@@ -98,15 +102,22 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
   }
 
   async function submitQuestion() {
-    if (!newQ.trim()) return
+    if (!newQ.trim() || submittingRef.current) return
     if (cooldownRemaining > 0) {
       const seconds = Math.ceil(cooldownRemaining / 1000)
       setMsg(`❌ Please wait ${seconds}s before submitting another question`)
       setTimeout(() => setMsg(''), 3000)
       return
     }
+    if (containsProfanity(newQ)) {
+      setMsg('❌ Please remove inappropriate language from your question')
+      setTimeout(() => setMsg(''), 3000)
+      return
+    }
+    submittingRef.current = true
     const token = crypto.randomUUID()
     const { error } = await supabase.from('anonymous_questions').insert([{ question: newQ.trim(), tracking_token: token }])
+    submittingRef.current = false
     if (!error) {
       localStorage.setItem(COOLDOWN_STORAGE_KEY, String(Date.now()))
       updateCooldownRemaining()

@@ -35,8 +35,6 @@ interface ScheduleRow {
   id: string
   title: string
   week?: string | null
-  // A schedule item can carry more than one exam date (e.g. a full
-  // staged exam schedule for a module) instead of just one.
   dates?: string[] | null
   url: string
   type: 'study' | 'exam'
@@ -56,8 +54,6 @@ export default function Schedule({ dark }: { dark: boolean }) {
   const [schedules, setSchedules] = useState<ScheduleRow[]>([])
   const [activeModule, setActiveModule] = useState<string | null>(null)
 
-  // Search.tsx links here with `?module=<id>&type=<study|exam>&item=<id>`
-  // so a search result opens the exact matching item.
   const params = new URLSearchParams(location.search)
   const moduleParam = params.get('module')
   const typeParam = params.get('type')
@@ -72,14 +68,16 @@ export default function Schedule({ dark }: { dark: boolean }) {
 
   const activeModules = modules.filter(m => m.status === 'active')
 
-  // Resolve the default module: URL param first, else the first active one.
+  // Resolve the active module: a `?module=` param always wins and is
+  // re-applied whenever it changes (e.g. a Search result linking to a
+  // different module while already on this page); otherwise falls back
+  // to the first active module once modules have loaded.
   useEffect(() => {
-    if (activeModule) return
     if (moduleParam && modules.some(m => m.id === moduleParam)) {
-      setActiveModule(moduleParam)
+      if (activeModule !== moduleParam) setActiveModule(moduleParam)
       return
     }
-    if (modulesLoaded && activeModules.length > 0) {
+    if (!activeModule && modulesLoaded && activeModules.length > 0) {
       setActiveModule(activeModules[0].id)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -99,7 +97,6 @@ export default function Schedule({ dark }: { dark: boolean }) {
     return () => { ignore = true }
   }, [])
 
-  // Opens the exact item a Search result pointed at, once schedules load.
   useEffect(() => {
     if (!itemParam || viewer || schedules.length === 0) return
     const match = schedules.find(s => s.id === itemParam)
