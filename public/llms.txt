@@ -1,0 +1,12 @@
+# ZNU Pulse
+
+ZNU Pulse is an integrated medical study platform for students at the Faculty of Medicine, Zagazig National University. It brings together exam schedules, study checklists, an MCQ question bank, lecture files, and smart summaries in one place.
+
+## Key sections
+
+- [Home](https://znu-pulse.vercel.app/): Dashboard with weekly performance report, active modules, and quick tools.
+- [Schedule](https://znu-pulse.vercel.app/schedule): Study and exam schedules by module.
+- [Checklist](https://znu-pulse.vercel.app/checklist): Per-module study checklists with deadline reminders.
+- [MCQ Bank](https://znu-pulse.vercel.app/mcq): Practice questions and mock exams by module and subject.
+- [Anonymous Q&A](https://znu-pulse.vercel.app/anon-questions): Ask questions anonymously and browse answered questions.
+- [Search](https://znu-pulse.vercel.app/search): Search across modules, files, questions, summaries, and schedules.

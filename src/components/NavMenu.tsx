@@ -371,6 +371,7 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
           }}
           onBlur={handleContentBlur}
           aria-hidden={!open}
+          {...(!open ? { inert: '' as any } : {})}
           style={{
             position: 'relative', zIndex: 1, width: PANEL_WIDTH, padding: '8px 14px 16px',
             fontFamily: pulseFonts.body, display: 'flex', flexDirection: 'column', gap: 10,
