@@ -33,9 +33,6 @@ import Footer from './components/Footer'
 export { ThemeContext, AuthContext, ModulesContext, useTheme, useAuth, useModules } from './contexts'
 export { default as NavMenu } from './components/NavMenu'
 
-// Tracks user ids currently being ensured, so initSession() and
-// onAuthStateChange() can't race to insert the same profile row twice
-// on the same page load.
 const ensureProfileInFlight = new Set()
 
 async function ensureProfile(user) {
@@ -132,9 +129,6 @@ export default function App() {
   const [modulesLoaded, setModulesLoaded] = useState(false)
   const [modulesError, setModulesError] = useState(false)
 
-  // Guards against getSession() and onAuthStateChange's initial event
-  // both running ensureProfile/fetchProfile/migrateGuestData for the
-  // same sign-in.
   const lastHandledUserIdRef = useRef(null)
 
   async function loadModules() {
@@ -142,6 +136,9 @@ export default function App() {
     setModules(sorted)
     if (error) setModulesError(true)
     setModulesLoaded(true)
+    // Returned so callers (e.g. Admin) can reuse this fetch instead
+    // of querying modules again themselves.
+    return { modules: sorted, error }
   }
 
   useEffect(() => { loadModules() }, [])
@@ -220,10 +217,6 @@ export default function App() {
           }}>
             <ScrollToTop />
             <SiteHeader dark={dark} toggleTheme={toggleTheme} />
-            {/* SEO/a11y: PageSpeed flagged "Document does not have a
-                main landmark" — this was a plain <div>. Same flex:1
-                layout, same everything else, just a semantic <main>
-                wrapper for the routed page content. */}
             <main style={{ flex: 1 }}>
               <RoutedContent dark={dark} toggleTheme={toggleTheme} />
             </main>

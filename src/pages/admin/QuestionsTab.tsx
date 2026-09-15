@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../supabase'
 import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
+import ErrorBanner from '../../components/ErrorBanner'
 import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
 import AdminStatusCard from './AdminStatusCard'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import { btnStyle, miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
 import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
@@ -43,6 +45,7 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
 
   const [questions, setQuestions] = useState<QuestionRow[]>([])
   const [questionsLoading, setQuestionsLoading] = useState(true)
+  const [questionsError, setQuestionsError] = useState(false)
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null)
   const [qText, setQText] = useState('')
   const [qA, setQA] = useState('')
@@ -64,23 +67,23 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
   const [saving, setSaving] = useState(false)
   const [moduleFilter, setModuleFilter] = useState('all')
   const [search, setSearch] = useState('')
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   useEffect(() => { fetchQuestions() }, [])
   useEffect(() => {
     fetchModuleStages(qModuleId).then(list => setQStageOptions(list.map(s => ({ value: s.value, label: s.title }))))
   }, [qModuleId])
 
-  // List fetch — deliberately excludes answer-bearing columns
-  // (option_a-d, correct, explanation); those are only ever loaded
-  // per-question via the admin_get_question RPC when editing.
   async function fetchQuestions() {
     setQuestionsLoading(true)
-    const { data } = await supabase
+    setQuestionsError(false)
+    const { data, error } = await supabase
       .from('questions')
       .select('id, question, module_id, subject_id, lesson_id, exam_type, exam_stage, source, created_at')
       .order('created_at', { ascending: false })
       .limit(LIST_LIMIT)
     if (data) setQuestions(data as QuestionRow[])
+    if (error) setQuestionsError(true)
     setQuestionsLoading(false)
   }
 
@@ -127,7 +130,6 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
     }
   }
 
-  // Parses the plain-text bulk-add format (Q:/A)/B)/C)/D)/Correct:/Explanation: lines)
   function parseBulkQuestions(text: string) {
     const blocks = text.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean)
     const parsed: any[] = []
@@ -198,7 +200,6 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
   }
 
   async function deleteQuestion(id: string) {
-    if (!confirm('Delete this question? This cannot be undone.')) return
     if (editingQuestionId === id) resetQuestionForm()
     const { error } = await supabase.from('questions').delete().eq('id', id)
     showMsg(error ? '❌ ' + error.message : '✅ Question deleted')
@@ -211,7 +212,6 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
   const visibleModules = moduleFilter === 'all' ? modules : modules.filter(m => m.id === moduleFilter)
   const searchLower = search.trim().toLowerCase()
 
-  // Create / edit / bulk-add form
   const form = (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
@@ -342,9 +342,9 @@ Correct: A`}</pre>
     </LiquidGlassCard>
   )
 
-  // Questions grouped by module, filterable by module + search
   const list = (
     <div>
+      {questionsError && <ErrorBanner message="Couldn't load questions — check your connection." />}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
           <input
@@ -401,7 +401,7 @@ Correct: A`}</pre>
                       }}>{q.question}</p>
                       <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                         <button onClick={() => editQuestion(q)} aria-label={`Edit question: ${q.question}`} style={{ ...miniBtn(pt, pt.cobalt), display: 'inline-flex', alignItems: 'center' }}><EditIcon color={pt.cobalt} size={12} /></button>
-                        <button onClick={() => deleteQuestion(q.id)} aria-label={`Delete question: ${q.question}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
+                        <button onClick={() => setConfirmDeleteId(q.id)} aria-label={`Delete question: ${q.question}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
@@ -433,6 +433,16 @@ Correct: A`}</pre>
     <div>
       <InlineMessage message={msg} />
       <AdminSplitLayout formWidth={420} form={form} list={list} />
+      <ConfirmDialog
+        dark={dark}
+        open={!!confirmDeleteId}
+        title="Delete question?"
+        message="This cannot be undone."
+        confirmLabel="Delete"
+        confirmColor={pt.danger}
+        onCancel={() => setConfirmDeleteId(null)}
+        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) deleteQuestion(id) }}
+      />
     </div>
   )
 }

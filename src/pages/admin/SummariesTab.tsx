@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../supabase'
 import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
+import ErrorBanner from '../../components/ErrorBanner'
 import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
 import AdminStatusCard from './AdminStatusCard'
 import AdminModuleFilterSelect from './AdminModuleFilterSelect'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
 import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
@@ -35,10 +37,6 @@ interface SummariesTabProps {
   lessons: AdminLesson[]
 }
 
-// Two ways to get a summary's `url`: paste one directly, or upload an
-// HTML file (+ optional images) and let the backend publish it and
-// fill the URL in automatically. Upload is only available when adding
-// a NEW summary — editing always edits url/fields directly.
 type PublishMode = 'link' | 'upload'
 
 export default function SummariesTab({ dark, modules, subjects, lessons }: SummariesTabProps) {
@@ -48,6 +46,7 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
 
   const [summaries, setSummaries] = useState<SummaryRow[]>([])
   const [summariesLoading, setSummariesLoading] = useState(true)
+  const [summariesError, setSummariesError] = useState(false)
   const [editingSummaryId, setEditingSummaryId] = useState<string | null>(null)
   const [sumTitle, setSumTitle] = useState('')
   const [sumUrl, setSumUrl] = useState('')
@@ -58,9 +57,8 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
   const [sumStageOptions, setSumStageOptions] = useState(EXAM_STAGES)
   const [moduleFilter, setModuleFilter] = useState('all')
   const [saving, setSaving] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
-  // Publish-by-upload state — kept separate from the link-mode fields
-  // so switching modes never clobbers what's already typed.
   const [publishMode, setPublishMode] = useState<PublishMode>('link')
   const [htmlFile, setHtmlFile] = useState<File | null>(null)
   const [imageFiles, setImageFiles] = useState<File[]>([])
@@ -73,8 +71,10 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
 
   async function fetchSummaries() {
     setSummariesLoading(true)
-    const { data } = await supabase.from('summaries').select('*').order('created_at', { ascending: false }).limit(LIST_LIMIT)
+    setSummariesError(false)
+    const { data, error } = await supabase.from('summaries').select('*').order('created_at', { ascending: false }).limit(LIST_LIMIT)
     if (data) setSummaries(data as SummaryRow[])
+    if (error) setSummariesError(true)
     setSummariesLoading(false)
   }
 
@@ -141,7 +141,6 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
   }
 
   async function deleteSummary(id: string) {
-    if (!confirm('Delete this summary? This cannot be undone.')) return
     if (editingSummaryId === id) resetSummaryForm()
     const { error } = await supabase.from('summaries').delete().eq('id', id)
     showMsg(error ? '❌ ' + error.message : '✅ Summary deleted')
@@ -155,9 +154,8 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
   const isBusy = saving || publishing
   const totalUploadBytes = (htmlFile?.size || 0) + imageFiles.reduce((a, f) => a + f.size, 0)
   const totalUploadMb = (totalUploadBytes / (1024 * 1024)).toFixed(1)
-  const overSizeLimit = totalUploadBytes > 4 * 1024 * 1024 // soft warning only
+  const overSizeLimit = totalUploadBytes > 4 * 1024 * 1024
 
-  // Create / edit / publish-from-upload form
   const form = (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
       <h3 style={{ color: pt.cobalt, marginBottom: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -258,9 +256,9 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
     </LiquidGlassCard>
   )
 
-  // Summaries grouped by module
   const list = (
     <div>
+      {summariesError && <ErrorBanner message="Couldn't load summaries — check your connection." />}
       <AdminModuleFilterSelect modules={modules} value={moduleFilter} onChange={setModuleFilter} totalCount={summaries.length} inStyle={inStyle} />
 
       {summariesLoading && <AdminStatusCard dark={dark} message="Loading..." />}
@@ -284,7 +282,7 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
                   <span style={{ color: pt.text, fontWeight: 600 }}>{s.title}</span>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={() => editSummary(s)} aria-label={`Edit summary: ${s.title}`} style={{ ...miniBtn(pt, pt.cobalt), display: 'inline-flex', alignItems: 'center' }}><EditIcon color={pt.cobalt} size={12} /></button>
-                    <button onClick={() => deleteSummary(s.id)} aria-label={`Delete summary: ${s.title}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
+                    <button onClick={() => setConfirmDeleteId(s.id)} aria-label={`Delete summary: ${s.title}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
                   </div>
                 </LiquidGlassCard>
               ))}
@@ -299,6 +297,16 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
     <div>
       <InlineMessage message={msg} />
       <AdminSplitLayout form={form} list={list} />
+      <ConfirmDialog
+        dark={dark}
+        open={!!confirmDeleteId}
+        title="Delete summary?"
+        message="This cannot be undone."
+        confirmLabel="Delete"
+        confirmColor={pt.danger}
+        onCancel={() => setConfirmDeleteId(null)}
+        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) deleteSummary(id) }}
+      />
     </div>
   )
 }

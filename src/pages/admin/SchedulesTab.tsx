@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../supabase'
 import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
+import ErrorBanner from '../../components/ErrorBanner'
 import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
 import AdminStatusCard from './AdminStatusCard'
 import AdminModuleFilterSelect from './AdminModuleFilterSelect'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
@@ -35,24 +37,26 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
 
   const [schedules, setSchedules] = useState<ScheduleRow[]>([])
   const [schedulesLoading, setSchedulesLoading] = useState(true)
+  const [schedulesError, setSchedulesError] = useState(false)
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null)
   const [schTitle, setSchTitle] = useState('')
   const [schUrl, setSchUrl] = useState('')
   const [schType, setSchType] = useState<'study' | 'exam'>('study')
   const [schModuleId, setSchModuleId] = useState('')
   const [schDates, setSchDates] = useState<string[]>([''])
-  // Stable id per date row (not the array index) so React keys survive
-  // add/remove without losing focus on other rows.
   const [schDateIds, setSchDateIds] = useState<string[]>([crypto.randomUUID()])
   const [moduleFilter, setModuleFilter] = useState('all')
   const [saving, setSaving] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   useEffect(() => { fetchSchedules() }, [])
 
   async function fetchSchedules() {
     setSchedulesLoading(true)
-    const { data } = await supabase.from('schedules').select('*').order('created_at', { ascending: false }).limit(LIST_LIMIT)
+    setSchedulesError(false)
+    const { data, error } = await supabase.from('schedules').select('*').order('created_at', { ascending: false }).limit(LIST_LIMIT)
     if (data) setSchedules(data as ScheduleRow[])
+    if (error) setSchedulesError(true)
     setSchedulesLoading(false)
   }
 
@@ -101,7 +105,6 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
     }
   }
   async function deleteSchedule(id: string) {
-    if (!confirm('Delete this schedule? This cannot be undone.')) return
     if (editingScheduleId === id) resetScheduleForm()
     const { error } = await supabase.from('schedules').delete().eq('id', id)
     showMsg(error ? '❌ ' + error.message : '✅ Schedule deleted')
@@ -161,6 +164,7 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
 
   const list = (
     <div>
+      {schedulesError && <ErrorBanner message="Couldn't load schedules — check your connection." />}
       <AdminModuleFilterSelect modules={modules} value={moduleFilter} onChange={setModuleFilter} totalCount={schedules.length} inStyle={inStyle} />
 
       {schedulesLoading && <AdminStatusCard dark={dark} message="Loading..." />}
@@ -190,7 +194,7 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={() => editSchedule(s)} aria-label={`Edit schedule: ${s.title}`} style={{ ...miniBtn(pt, pt.cobalt), display: 'inline-flex', alignItems: 'center' }}><EditIcon color={pt.cobalt} size={12} /></button>
-                    <button onClick={() => deleteSchedule(s.id)} aria-label={`Delete schedule: ${s.title}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
+                    <button onClick={() => setConfirmDeleteId(s.id)} aria-label={`Delete schedule: ${s.title}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
                   </div>
                 </LiquidGlassCard>
               ))}
@@ -205,6 +209,16 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
     <div>
       <InlineMessage message={msg} />
       <AdminSplitLayout form={form} list={list} />
+      <ConfirmDialog
+        dark={dark}
+        open={!!confirmDeleteId}
+        title="Delete schedule?"
+        message="This cannot be undone."
+        confirmLabel="Delete"
+        confirmColor={pt.danger}
+        onCancel={() => setConfirmDeleteId(null)}
+        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) deleteSchedule(id) }}
+      />
     </div>
   )
 }

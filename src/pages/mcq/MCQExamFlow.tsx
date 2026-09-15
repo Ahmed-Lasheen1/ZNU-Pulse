@@ -1,13 +1,12 @@
 // src/pages/mcq/MCQExamFlow.tsx
-// Taking + Results + Review Answers — everything that renders while
-// quizMode is set. All derived values (score, subjectStats, timerColor,
-// etc.) are computed here from props.
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { getPulseTheme, pulseFonts, pulseType } from '../../premiumTheme'
 import QuestionRail from '../../components/QuestionRail'
 import QuestionSourceBadge from '../../components/QuestionSourceBadge'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PulseBackground from '../../components/pulse/PulseBackground'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import { FlagIcon, SearchIcon2, LightbulbIcon } from '../../components/ui/tool-icons'
 import { wrapText } from '../../lib/textStyles'
 import {
@@ -51,11 +50,6 @@ interface MCQExamFlowProps {
   goNext: () => void
 }
 
-// Two small local style helpers — the results/review screens repeat a
-// "glass pill" button (translucent navy fill, white border) and a
-// solid cobalt "DONE" button several times each with the same base
-// properties. Kept local to this file since nothing outside it uses
-// them.
 function glassPillBtn(overrides: React.CSSProperties = {}): React.CSSProperties {
   return {
     background: 'rgba(1,12,74,0.28)',
@@ -82,12 +76,12 @@ export default function MCQExamFlow({
 }: MCQExamFlowProps) {
   const pt = getPulseTheme(dark)
   const isTutorMode = quizMode === 'practice' || quizMode === 'retry'
+  const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false)
 
   function getScore() {
     return quizQuestions.filter(q => results[q.id]?.is_correct).length
   }
 
-  // Mock-exam timer: normal, then amber under ~28% remaining, then red under ~14%.
   function timerColor() {
     if (quizMode !== 'mock') return EXAM_TOP_TEXT
     const pctLeft = timeLeft / (MOCK_MINUTES * 60)
@@ -100,7 +94,6 @@ export default function MCQExamFlow({
   const total = quizQuestions.length
   const percent = total > 0 ? Math.round((score / total) * 100) : 0
 
-  // Same accuracy tiers as the Weekly Report card and weekly push notification.
   const resultColor = accuracyColor(percent, pt)
   const resultVerdict = {
     excellent: 'EXCELLENT.',
@@ -116,8 +109,8 @@ export default function MCQExamFlow({
   const currentQuestion = total > 0 ? quizQuestions[safeIndex] : null
   const answeredCount = Object.keys(answers).length
   const isLastQuestion = safeIndex === total - 1
+  const remainingUnanswered = total - answeredCount
 
-  // Per-subject breakdown from this session's own results only.
   const subjectStats = submitted ? (() => {
     const map: Record<string, { name: string; total: number; correct: number }> = {}
     quizQuestions.forEach(q => {
@@ -152,9 +145,6 @@ export default function MCQExamFlow({
         @media (hover: hover) and (pointer: fine) { .kbd-hint { display: block; } }
       `}</style>
 
-      {/* Short entrance — the real site header stays put; this is just
-          the page content. No BackButton in exam mode — ✕ EXIT is the
-          intended way out. */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -165,7 +155,6 @@ export default function MCQExamFlow({
           padding: '12px clamp(16px, 3vw, 36px) max(16px, env(safe-area-inset-bottom))', fontFamily: pulseFonts.body
         }}
       >
-        {/* Minimal status header — sits in the gradient's light top zone */}
         <div style={{ position: 'relative', textAlign: 'center', paddingBottom: 14 }}>
           <button onClick={stopQuiz} className="exam-btn" aria-label="Exit exam" style={{
             position: 'absolute', top: 0, right: 0,
@@ -228,7 +217,6 @@ export default function MCQExamFlow({
           <div style={{ textAlign: 'center', padding: 24, color: EXAM_LOW_TEXT, textShadow: EXAM_LOW_SHADOW, fontSize: 14 }}>Grading...</div>
         )}
 
-        {/* ── Active taking: single-question focus */}
         {!submitted && !grading && currentQuestion && (
           <>
             <div style={{ height: 1, background: EXAM_DIVIDER, marginBottom: 16 }} />
@@ -429,16 +417,7 @@ export default function MCQExamFlow({
                 }}>NEXT</button>
               ) : (
                 <button
-                  onClick={() => {
-                    const remaining = total - answeredCount
-                    if (remaining > 0) {
-                      const proceed = window.confirm(
-                        `${remaining} question${remaining === 1 ? '' : 's'} left unanswered — submit the exam anyway?`
-                      )
-                      if (!proceed) return
-                    }
-                    submitQuiz()
-                  }}
+                  onClick={() => { if (remainingUnanswered > 0) { setConfirmSubmitOpen(true); return } submitQuiz() }}
                   className="exam-btn"
                   style={{
                     background: 'transparent', border: 'none', cursor: 'pointer',
@@ -454,7 +433,6 @@ export default function MCQExamFlow({
           </>
         )}
 
-        {/* ── Results: analytical instrument ─────────────────────── */}
         {submitted && !grading && !showReview && (
           <div style={{ paddingBottom: 20 }}>
             <div style={{ height: 1, background: EXAM_DIVIDER, marginBottom: 18 }} />
@@ -534,7 +512,6 @@ export default function MCQExamFlow({
           </div>
         )}
 
-        {/* ── Review Answers: full scrollable per-question breakdown ── */}
         {submitted && !grading && showReview && (
           <div style={{ paddingBottom: 20 }}>
             <div style={{ height: 1, background: EXAM_DIVIDER, marginBottom: 16 }} />
@@ -623,6 +600,17 @@ export default function MCQExamFlow({
           </div>
         )}
       </motion.div>
+
+      <ConfirmDialog
+        dark={dark}
+        open={confirmSubmitOpen}
+        title="Submit exam?"
+        message={`${remainingUnanswered} question${remainingUnanswered === 1 ? '' : 's'} left unanswered — submit the exam anyway?`}
+        confirmLabel="Submit"
+        confirmColor={pt.cobalt}
+        onCancel={() => setConfirmSubmitOpen(false)}
+        onConfirm={() => { setConfirmSubmitOpen(false); submitQuiz() }}
+      />
     </div>
   )
 }

@@ -14,6 +14,7 @@ import { useToast } from '../components/ToastProvider'
 import { useModules } from '../contexts'
 import { fetchModuleStages, stageMetaFrom } from '../lib/moduleStages'
 import { fetchSubjectsForModule } from '../lib/subjects'
+import { fetchDriveUrl } from '../lib/siteSettings'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
 import { getPreviewUrl } from '../lib/embedUrl'
 import { ExamIcon, NotesIcon } from '../lib/medicalIcons'
@@ -52,8 +53,7 @@ export default function StagePage({ dark }: { dark: boolean }) {
 
   useEffect(() => {
     let ignore = false
-    supabase.from('site_settings').select('value').eq('key', 'drive_url').maybeSingle()
-      .then(({ data }) => { if (!ignore) setDriveUrl(data?.value || '') })
+    fetchDriveUrl().then(url => { if (!ignore) setDriveUrl(url) })
     return () => { ignore = true }
   }, [])
 

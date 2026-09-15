@@ -5,7 +5,7 @@ import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../premiu
 import PulseBackground from '../components/pulse/PulseBackground'
 import PulseGlassRow from '../components/pulse/PulseGlassRow'
 import BackButton from '../components/pulse/BackButton'
-import { fetchModulesSorted } from '../lib/modules'
+import ErrorBanner from '../components/ErrorBanner'
 import { invalidateSubjectsCache } from '../lib/subjects'
 import { invalidateLessonsCache } from '../lib/lessons'
 import NotFound from './NotFound'
@@ -22,10 +22,8 @@ import SummariesTab from './admin/SummariesTab'
 import StagesTab from './admin/StagesTab'
 import AnalyticsTab from './admin/AnalyticsTab'
 import SettingsTab from './admin/SettingsTab'
+import { LIST_LIMIT } from './admin/adminStyles'
 import type { AdminModule, AdminSubject, AdminLesson } from './admin/adminTypes'
-
-// Cap on the lessons list fetched here for cross-tab use.
-const LESSONS_LIST_LIMIT = 200
 
 const TABS = ['modules', 'subjects', 'lessons', 'files', 'schedules', 'questions', 'summaries', 'stages', 'analytics', 'settings'] as const
 type AdminTab = typeof TABS[number]
@@ -49,49 +47,47 @@ interface AdminProps {
 
 export default function Admin({ dark }: AdminProps) {
   const { profile, authLoaded } = useAuth() as { profile?: { role?: string } | null; authLoaded: boolean }
-  const { refreshModules } = useModules() as { refreshModules: () => void }
+  const { refreshModules } = useModules() as { refreshModules: () => Promise<{ modules: AdminModule[]; error?: any }> }
   const isAuth = profile?.role === 'admin'
   const pt = getPulseTheme(dark)
 
   const [activeTab, setActiveTab] = useState<AdminTab>('modules')
 
-  // Reference data shared by several tabs (ModuleSelect dropdowns,
-  // grouping lists by module/subject) — fetched once here.
   const [modules, setModules] = useState<AdminModule[]>([])
   const [subjects, setSubjects] = useState<AdminSubject[]>([])
   const [lessons, setLessons] = useState<AdminLesson[]>([])
 
-  // True only during the initial reference-data load, so tabs can
-  // show a neutral loading state instead of flashing an empty state.
   const [refDataLoading, setRefDataLoading] = useState(true)
+  const [refDataError, setRefDataError] = useState(false)
 
   useEffect(() => {
     if (isAuth) {
       setRefDataLoading(true)
+      setRefDataError(false)
       Promise.all([fetchModules(), fetchSubjects(), fetchLessons()]).finally(() => setRefDataLoading(false))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuth])
 
+  // Reuses ModulesContext's own fetch instead of querying modules twice.
   async function fetchModules() {
-    const { modules: sorted } = await fetchModulesSorted()
-    setModules(sorted as AdminModule[])
-    refreshModules()
+    const result = await refreshModules()
+    setModules((result?.modules || []) as AdminModule[])
+    if (result?.error) setRefDataError(true)
   }
   async function fetchSubjects() {
     invalidateSubjectsCache()
-    const { data } = await supabase.from('subjects').select('*').order('created_at')
+    const { data, error } = await supabase.from('subjects').select('*').order('created_at')
     if (data) setSubjects(data as AdminSubject[])
+    if (error) setRefDataError(true)
   }
   async function fetchLessons() {
     invalidateLessonsCache()
-    const { data } = await supabase.from('lessons').select('*').order('created_at', { ascending: false }).limit(LESSONS_LIST_LIMIT)
+    const { data, error } = await supabase.from('lessons').select('*').order('created_at', { ascending: false }).limit(LIST_LIMIT)
     if (data) setLessons(data as AdminLesson[])
+    if (error) setRefDataError(true)
   }
 
-  // Real access control is Supabase RLS — this only hides the panel
-  // from casual visitors. While auth is loading, show a blank state
-  // instead of flashing 404 before we know the person's role.
   if (!authLoaded) {
     return (
       <div style={{ position: 'relative', minHeight: '100vh' }}>
@@ -131,14 +127,18 @@ export default function Admin({ dark }: AdminProps) {
           <BackButton dark={dark} fallback="/" />
         </div>
 
-        {/* Icon wrapped in its own inline-flex span (lineHeight: 0) so
-            it aligns cleanly on the same axis as the heading text. */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '8px 0 16px' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', lineHeight: 0, position: 'relative', top: -10 }}>
             <GearIcon color={pt.text} size={24} />
           </span>
           <h1 style={{ ...pulseType.miniPageTitle, fontSize: 20, color: pt.text, lineHeight: '24px' }}>Admin Panel</h1>
         </div>
+
+        {refDataError && (
+          <div style={{ marginBottom: 16 }}>
+            <ErrorBanner message="Couldn't load some admin data — check your connection and try again." />
+          </div>
+        )}
 
         <div className="admin-tabs">
           {TABS.map(t => {

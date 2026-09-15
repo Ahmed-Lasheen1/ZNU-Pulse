@@ -3,17 +3,16 @@ import { supabase } from '../../supabase'
 import { getPulseTheme, pulseType } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import { btnStyle, inStyle as adminInStyle, fieldLabel } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
+import { invalidateDriveUrlCache } from '../../lib/siteSettings'
 import { MegaphoneIcon, SendIcon, LinkIcon } from '../../components/ui/tool-icons'
 
 interface SettingsTabProps {
   dark: boolean
 }
 
-// Capped to roughly match the real announcement card's width on Home
-// (the narrow desktop dashboard column, or full width on mobile), so
-// a line that wraps here also wraps on the real card.
 const ANNOUNCEMENT_PREVIEW_MAX_WIDTH = 380
 
 export default function SettingsTab({ dark }: SettingsTabProps) {
@@ -28,6 +27,7 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
   const [broadcastTitle, setBroadcastTitle] = useState('')
   const [broadcastBody, setBroadcastBody] = useState('')
   const [broadcastSending, setBroadcastSending] = useState(false)
+  const [confirmBroadcastOpen, setConfirmBroadcastOpen] = useState(false)
 
   useEffect(() => { fetchAnnouncement() }, [])
 
@@ -51,14 +51,19 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
     setDriveUrlSaving(true)
     const { error } = await supabase.from('site_settings').upsert({ key: 'drive_url', value: driveUrl.trim() })
     setDriveUrlSaving(false)
+    if (!error) invalidateDriveUrlCache()
     showMsg(error ? '❌ ' + error.message : '✅ Drive link updated!')
   }
 
+  function requestBroadcast() {
+    if (!broadcastTitle.trim() || !broadcastBody.trim()) return showMsg('❌ Please fill in both fields')
+    setConfirmBroadcastOpen(true)
+  }
+
   async function sendBroadcast() {
+    setConfirmBroadcastOpen(false)
     const title = broadcastTitle.trim()
     const body = broadcastBody.trim()
-    if (!title || !body) return showMsg('❌ Please fill in both fields')
-    if (!confirm(`Send "${title}" to every device with notifications enabled right now? This can't be undone once it's sent.`)) return
 
     setBroadcastSending(true)
     const { data: { session } } = await supabase.auth.getSession()
@@ -105,7 +110,7 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
           </p>
           <input placeholder="Title (e.g. New questions added!)" value={broadcastTitle} onChange={e => setBroadcastTitle(e.target.value)} style={inStyle} />
           <textarea placeholder="Message" value={broadcastBody} onChange={e => setBroadcastBody(e.target.value)} style={{ ...inStyle, minHeight: 70, resize: 'vertical', flex: 1 }} />
-          <button onClick={sendBroadcast} disabled={broadcastSending} style={{ ...btnStyle(pt, dark), width: '100%', marginTop: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+          <button onClick={requestBroadcast} disabled={broadcastSending} style={{ ...btnStyle(pt, dark), width: '100%', marginTop: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
             {broadcastSending ? 'Sending...' : <><SendIcon color="#fff" size={13} /> Send to Everyone</>}
           </button>
         </LiquidGlassCard>
@@ -159,6 +164,17 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
           {driveUrlSaving ? 'Saving...' : 'Save Drive Link'}
         </button>
       </LiquidGlassCard>
+
+      <ConfirmDialog
+        dark={dark}
+        open={confirmBroadcastOpen}
+        title="Send push notification?"
+        message={`Send "${broadcastTitle.trim()}" to every device with notifications enabled right now? This can't be undone once it's sent.`}
+        confirmLabel="Send"
+        confirmColor={pt.cobalt}
+        onCancel={() => setConfirmBroadcastOpen(false)}
+        onConfirm={sendBroadcast}
+      />
     </div>
   )
 }

@@ -13,6 +13,7 @@ import { useToast } from '../components/ToastProvider'
 import { useModules } from '../contexts'
 import { fetchModuleStages } from '../lib/moduleStages'
 import { fetchSubjectsForModule } from '../lib/subjects'
+import { fetchDriveUrl } from '../lib/siteSettings'
 import { ModuleIcon, ExamIcon, NotesIcon } from '../lib/medicalIcons'
 import { ExamStageIcon, SmartSummariesIcon, PracticeIcon } from '@/components/ui/tool-icons'
 
@@ -34,24 +35,14 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   const [loadError, setLoadError] = useState(false)
   const [driveUrl, setDriveUrl] = useState('')
   const [examStages, setExamStages] = useState<ExamStage[]>([])
-  // Only stages with at least one tagged file/question/summary are shown.
   const [stagesWithContent, setStagesWithContent] = useState<Set<string>>(new Set())
   const [subjects, setSubjects] = useState<PageSubject[]>([])
-  // null = not checked yet (never blocks a click); false = confirmed empty.
   const [hasModuleSummaries, setHasModuleSummaries] = useState<boolean | null>(null)
   const [hasModuleQuestions, setHasModuleQuestions] = useState<boolean | null>(null)
 
   useEffect(() => {
     let ignore = false
-    // BUG FIX: `.single()` treats zero matching rows as an error
-    // condition — but `drive_url` in site_settings may legitimately
-    // not exist yet (before an admin ever sets one), and the code
-    // below already handles a missing value gracefully via
-    // `data?.value`. `.maybeSingle()` is the correct call for a row
-    // that may or may not be present; it returns `data: null` instead
-    // of an error in that case.
-    supabase.from('site_settings').select('value').eq('key', 'drive_url').maybeSingle()
-      .then(({ data }) => { if (!ignore && data?.value) setDriveUrl(data.value) })
+    fetchDriveUrl().then(url => { if (!ignore && url) setDriveUrl(url) })
     return () => { ignore = true }
   }, [])
 
@@ -83,7 +74,6 @@ export default function ModulePage({ dark }: { dark: boolean }) {
         if (error) setLoadError(true)
       })
 
-    // Union of exam_stage values with at least one tagged file/question/summary.
     Promise.all([
       supabase.from('files').select('exam_stage').eq('module_id', moduleId).not('exam_stage', 'is', null),
       supabase.from('questions_public').select('exam_stage').eq('module_id', moduleId).not('exam_stage', 'is', null),
@@ -151,7 +141,6 @@ export default function ModulePage({ dark }: { dark: boolean }) {
         </div>
       </div>
 
-      {/* Exam Stage — hidden entirely when no stage has tagged content */}
       {visibleExamStages.length > 0 && (
         <div style={{ marginBottom: 32 }}>
           <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -167,7 +156,6 @@ export default function ModulePage({ dark }: { dark: boolean }) {
 
       <StudyMaterialsSection dark={dark} moduleId={moduleId as string} presentFileTypes={presentFileTypes} driveUrl={driveUrl} />
 
-      {/* Smart Summaries & Practice — each checks it has content before navigating */}
       <div className="summary-practice-row" style={{ marginBottom: 32 }}>
         <div>
           <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>

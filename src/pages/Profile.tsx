@@ -16,13 +16,8 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { LeaderboardIcon, ClockIcon } from '../components/ui/tool-icons'
 import { Lock, User, Star, ClipboardList, Pencil, Award } from 'lucide-react'
 
-// See src/pages/Auth.tsx for why this is 8, not 6 — same reasoning,
-// kept as the same-named constant in both places since there's no
-// shared "auth constants" module yet. If a shared validation module
-// is ever introduced, this is the value to hoist into it first.
 const MIN_PASSWORD_LENGTH = 8
 
-// Small helper so a missing/blank name never crashes the avatar badge.
 function initialOf(name?: string | null) {
   return name && name.trim() ? name.trim().charAt(0).toUpperCase() : '?'
 }
@@ -34,7 +29,7 @@ interface Profile {
 }
 
 function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
-  profile: Profile; dark: boolean; onUpdated: () => void; onProfileRefresh: () => void
+  profile: Profile; dark: boolean; onUpdated: (name: string) => void; onProfileRefresh: () => void
 }) {
   const pt = getPulseTheme(dark)
   const showToast = useToast() as (message: string, type?: 'success' | 'error') => void
@@ -58,7 +53,7 @@ function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
     if (error) { setMsg('❌ ' + error.message); return }
     setMsg('✅ Name updated!')
     showToast('✅ Name updated')
-    onUpdated()
+    onUpdated(name.trim())
     onProfileRefresh()
   }
 
@@ -138,13 +133,6 @@ export default function Profile({ dark }: { dark: boolean }) {
   const [editing, setEditing] = useState(false)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
 
-  // BUG FIX: fetchData previously had no cancellation guard, unlike
-  // the equivalent fetch effects in Review.tsx/Checklist.tsx/etc. If
-  // `user` changed quickly (e.g. sign-in immediately followed by
-  // sign-out, or two auth events in a row), an older in-flight
-  // request could resolve after a newer one and overwrite `profile`/
-  // `leaderboard` with stale data. `isIgnored()` is threaded through
-  // fetchData so a stale response's state updates are skipped.
   useEffect(() => {
     let ignore = false
     fetchData(() => ignore)
@@ -181,8 +169,6 @@ export default function Profile({ dark }: { dark: boolean }) {
           <BackButton dark={dark} fallback="/" />
         </div>
 
-        {/* Tabs — history now lives on the Review page (/review), so
-            it's no longer one of the tabs here. */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginBottom: 24 }}>
           {(['profile', 'leaderboard'] as const).map(t => {
             const active = tab === t
@@ -221,7 +207,6 @@ export default function Profile({ dark }: { dark: boolean }) {
               <p style={{ color: ON_GRADIENT_TOP.secondary, textAlign: 'center' }}>Loading...</p>
             ) : profile ? (
               <div>
-                {/* Profile Card */}
                 <div style={{ marginBottom: 16 }}>
                   <LiquidGlassCard dark={dark} delay={0} style={{ padding: '28px 24px', textAlign: 'center' }}>
                     <h2 style={{ ...pulseType.sectionTitle, color: pt.cobalt, fontSize: 30, marginBottom: 8 }}>
@@ -240,19 +225,10 @@ export default function Profile({ dark }: { dark: boolean }) {
                   </LiquidGlassCard>
                 </div>
 
-                {/* Notifications toggle — persistent on/off control,
-                    the counterpart to the one-shot "Enable
-                    notifications" banner elsewhere in the app.
-                    Sized up (size={1.5}) so it's easier to see and
-                    tap here on its dedicated Profile row than the
-                    default size used anywhere else this component
-                    might be reused. */}
                 <div style={{ marginBottom: 16 }}>
                   <NotificationToggle dark={dark} switchSize={1.5} />
                 </div>
 
-                {/* Link out to exam history & mistakes — now its own
-                    page (Review) instead of a tab here. */}
                 <div style={{ textAlign: 'center', marginBottom: 16 }}>
                   <PulseGlassRow dark={dark} radius={999} hoverTint={hoverTint} onClick={() => navigate('/review')}
                     role="button" tabIndex={0} style={{ display: 'inline-block' }}
@@ -263,7 +239,6 @@ export default function Profile({ dark }: { dark: boolean }) {
                   </PulseGlassRow>
                 </div>
 
-                {/* Info */}
                 <div style={{ marginBottom: 16 }}>
                   <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -297,7 +272,7 @@ export default function Profile({ dark }: { dark: boolean }) {
                   <EditProfileForm
                     profile={profile}
                     dark={dark}
-                    onUpdated={fetchData}
+                    onUpdated={(newName) => setProfile(prev => prev ? { ...prev, name: newName } : prev)}
                     onProfileRefresh={() => fetchProfile(user.id)}
                   />
                 )}

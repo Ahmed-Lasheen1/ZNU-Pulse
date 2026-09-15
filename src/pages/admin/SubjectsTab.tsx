@@ -8,6 +8,7 @@ import AdminStatusCard from './AdminStatusCard'
 import AdminModuleFilterSelect from './AdminModuleFilterSelect'
 import IconPicker from '../../components/admin/IconPicker'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
@@ -35,6 +36,7 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
   const [subColor, setSubColor] = useState('#34d399')
   const [moduleFilter, setModuleFilter] = useState('all')
   const [saving, setSaving] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   function editSubject(sub: AdminSubject) {
     setEditingSubjectId(sub.id)
@@ -71,7 +73,6 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
   }
 
   async function deleteSubject(id: string) {
-    if (!confirm('Delete this subject? Its files, lessons and questions will also be deleted. This cannot be undone.')) return
     if (editingSubjectId === id) resetSubjectForm()
     const { error } = await supabase.from('subjects').delete().eq('id', id)
     showMsg(error ? '❌ ' + error.message : '✅ Subject deleted')
@@ -81,7 +82,6 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
   const filteredSubjects = (moduleId: string) => subjects.filter(s => s.module_id === moduleId)
   const visibleModules = moduleFilter === 'all' ? modules : modules.filter(m => m.id === moduleFilter)
 
-  // Create / edit form
   const form = (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
       <h3 style={{ color: pt.cobalt, marginBottom: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -110,7 +110,6 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
     </LiquidGlassCard>
   )
 
-  // Subjects grouped by module
   const list = (
     <div>
       <AdminModuleFilterSelect modules={modules} value={moduleFilter} onChange={setModuleFilter} totalCount={subjects.length} inStyle={inStyle} />
@@ -143,7 +142,7 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={() => editSubject(sub)} aria-label={`Edit subject: ${sub.name}`} style={{ ...miniBtn(pt, pt.cobalt), display: 'inline-flex', alignItems: 'center' }}><EditIcon color={pt.cobalt} size={12} /></button>
-                    <button onClick={() => deleteSubject(sub.id)} aria-label={`Delete subject: ${sub.name}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
+                    <button onClick={() => setConfirmDeleteId(sub.id)} aria-label={`Delete subject: ${sub.name}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
                   </div>
                 </LiquidGlassCard>
               ))}
@@ -158,6 +157,16 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
     <div>
       <InlineMessage message={msg} />
       <AdminSplitLayout form={form} list={list} />
+      <ConfirmDialog
+        dark={dark}
+        open={!!confirmDeleteId}
+        title="Delete subject?"
+        message="Its files, lessons and questions will also be deleted. This cannot be undone."
+        confirmLabel="Delete"
+        confirmColor={pt.danger}
+        onCancel={() => setConfirmDeleteId(null)}
+        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) deleteSubject(id) }}
+      />
     </div>
   )
 }

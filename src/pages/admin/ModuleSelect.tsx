@@ -22,9 +22,6 @@ interface ModuleSelectProps {
   placeholder?: string
 }
 
-// Custom module dropdown. Rendered through a portal into document.body
-// so its floating option panel is never clipped by an ancestor's
-// overflow (e.g. AdminSplitLayout's sticky, scrollable form column).
 export default function ModuleSelect({ modules, value, onChange, dark, placeholder = 'Select Module' }: ModuleSelectProps) {
   const [open, setOpen] = useState(false)
   const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null)
@@ -58,7 +55,6 @@ export default function ModuleSelect({ modules, value, onChange, dark, placehold
     document.addEventListener('mousedown', onClickOutside)
     document.addEventListener('keydown', onEscape)
     window.addEventListener('resize', onReposition)
-    // capture: true catches scroll on any scrollable ancestor, not just window
     window.addEventListener('scroll', onReposition, true)
     return () => {
       document.removeEventListener('mousedown', onClickOutside)
@@ -73,7 +69,7 @@ export default function ModuleSelect({ modules, value, onChange, dark, placehold
   function row(m: SelectableModule) {
     const active = m.id === value
     return (
-      <button key={m.id} type="button" onClick={() => pick(m.id)} style={optionRow(pt, active)}>
+      <button key={m.id} type="button" role="option" aria-selected={active} onClick={() => pick(m.id)} style={optionRow(pt, active)}>
         <ModuleIcon value={m.icon} size={16} color={m.color || pt.cobalt} />
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</span>
       </button>

@@ -6,6 +6,7 @@ import IconPicker from '../../components/admin/IconPicker'
 import AdminSplitLayout from './AdminSplitLayout'
 import AdminStatusCard from './AdminStatusCard'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
@@ -16,9 +17,6 @@ interface ModulesTabProps {
   dark: boolean
   modules: AdminModule[]
   fetchModules: () => void
-  // True only during Admin's initial reference-data load — lets this
-  // tab show a neutral loading state instead of briefly flashing "No
-  // modules yet" before the real data has arrived.
   refDataLoading: boolean
 }
 
@@ -32,9 +30,8 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
   const [modColor, setModColor] = useState('#38bdf8')
   const [modIcon, setModIcon] = useState('📚')
   const [modStatus, setModStatus] = useState<'active' | 'completed'>('active')
-  // Prevents a fast double-click from firing two writes before the
-  // first one's response lands.
   const [saving, setSaving] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   function editModule(mod: AdminModule) {
     setEditingModuleId(mod.id)
@@ -70,7 +67,6 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
   }
 
   async function deleteModule(id: string) {
-    if (!confirm('Delete this module? This will also permanently delete all its subjects, files, schedules, questions and summaries. This cannot be undone.')) return
     if (editingModuleId === id) resetModuleForm()
     const { error } = await supabase.from('modules').delete().eq('id', id)
     showMsg(error ? '❌ ' + error.message : '✅ Module deleted')
@@ -92,13 +88,12 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => editModule(mod)} aria-label={`Edit module: ${mod.name}`} style={{ ...miniBtn(pt, pt.cobalt), display: 'inline-flex', alignItems: 'center', gap: 4 }}><EditIcon color={pt.cobalt} size={12} /></button>
           <button onClick={() => toggleModuleStatus(mod)} style={{ ...miniBtn(pt, toggleColor), display: 'inline-flex', alignItems: 'center', gap: 4 }}><ToggleIcon color={toggleColor} size={12} /> {toggleLabel}</button>
-          <button onClick={() => deleteModule(mod.id)} aria-label={`Delete module: ${mod.name}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center', gap: 4 }}><TrashIcon color={pt.danger} size={12} /></button>
+          <button onClick={() => setConfirmDeleteId(mod.id)} aria-label={`Delete module: ${mod.name}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center', gap: 4 }}><TrashIcon color={pt.danger} size={12} /></button>
         </div>
       </LiquidGlassCard>
     )
   }
 
-  // Create / edit form
   const form = (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
       <h3 style={{ color: pt.cobalt, marginBottom: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -130,7 +125,6 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
     </LiquidGlassCard>
   )
 
-  // Active / Completed module lists
   const list = (
     <div>
       {refDataLoading && <AdminStatusCard dark={dark} message="Loading..." />}
@@ -163,6 +157,16 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
     <div>
       <InlineMessage message={msg} />
       <AdminSplitLayout form={form} list={list} />
+      <ConfirmDialog
+        dark={dark}
+        open={!!confirmDeleteId}
+        title="Delete module?"
+        message="This will also permanently delete all its subjects, files, schedules, questions and summaries. This cannot be undone."
+        confirmLabel="Delete"
+        confirmColor={pt.danger}
+        onCancel={() => setConfirmDeleteId(null)}
+        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) deleteModule(id) }}
+      />
     </div>
   )
 }

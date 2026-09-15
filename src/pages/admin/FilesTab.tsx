@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../supabase'
 import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
+import ErrorBanner from '../../components/ErrorBanner'
 import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
 import AdminStatusCard from './AdminStatusCard'
 import AdminModuleFilterSelect from './AdminModuleFilterSelect'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
 import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
@@ -43,6 +45,7 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
 
   const [files, setFiles] = useState<FileRow[]>([])
   const [filesLoading, setFilesLoading] = useState(true)
+  const [filesError, setFilesError] = useState(false)
   const [editingFileId, setEditingFileId] = useState<string | null>(null)
   const [fileName, setFileName] = useState('')
   const [fileUrl, setFileUrl] = useState('')
@@ -55,6 +58,7 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
   const [fileStageOptions, setFileStageOptions] = useState(EXAM_STAGES)
   const [moduleFilter, setModuleFilter] = useState('all')
   const [saving, setSaving] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   useEffect(() => { fetchFiles() }, [])
   useEffect(() => {
@@ -63,8 +67,10 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
 
   async function fetchFiles() {
     setFilesLoading(true)
-    const { data } = await supabase.from('files').select('*').order('created_at', { ascending: false }).limit(LIST_LIMIT)
+    setFilesError(false)
+    const { data, error } = await supabase.from('files').select('*').order('created_at', { ascending: false }).limit(LIST_LIMIT)
     if (data) setFiles(data as FileRow[])
+    if (error) setFilesError(true)
     setFilesLoading(false)
   }
 
@@ -101,7 +107,6 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
     }
   }
   async function deleteFile(id: string) {
-    if (!confirm('Delete this file? This cannot be undone.')) return
     if (editingFileId === id) resetFileForm()
     const { error } = await supabase.from('files').delete().eq('id', id)
     showMsg(error ? '❌ ' + error.message : '✅ File deleted')
@@ -114,7 +119,6 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
   const FileTypeIcon = ({ t, color, size }: { t: string; color: string; size: number }) =>
     t === 'video' ? <VideoIcon color={color} size={size} /> : t === 'audio' ? <AudioIcon color={color} size={size} /> : <DocumentIcon color={color} size={size} />
 
-  // Create / edit form
   const form = (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
       <h3 style={{ color: pt.cobalt, marginBottom: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -177,9 +181,9 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
     </LiquidGlassCard>
   )
 
-  // Files grouped by module
   const list = (
     <div>
+      {filesError && <ErrorBanner message="Couldn't load files — check your connection." />}
       <AdminModuleFilterSelect modules={modules} value={moduleFilter} onChange={setModuleFilter} totalCount={files.length} inStyle={inStyle} />
 
       {filesLoading && <AdminStatusCard dark={dark} message="Loading..." />}
@@ -207,7 +211,7 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                     <button onClick={() => editFile(f)} aria-label={`Edit file: ${f.name}`} style={{ ...miniBtn(pt, pt.cobalt), display: 'inline-flex', alignItems: 'center' }}><EditIcon color={pt.cobalt} size={12} /></button>
-                    <button onClick={() => deleteFile(f.id)} aria-label={`Delete file: ${f.name}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
+                    <button onClick={() => setConfirmDeleteId(f.id)} aria-label={`Delete file: ${f.name}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
                   </div>
                 </LiquidGlassCard>
               ))}
@@ -222,6 +226,16 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
     <div>
       <InlineMessage message={msg} />
       <AdminSplitLayout form={form} list={list} />
+      <ConfirmDialog
+        dark={dark}
+        open={!!confirmDeleteId}
+        title="Delete file?"
+        message="This cannot be undone."
+        confirmLabel="Delete"
+        confirmColor={pt.danger}
+        onCancel={() => setConfirmDeleteId(null)}
+        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) deleteFile(id) }}
+      />
     </div>
   )
 }

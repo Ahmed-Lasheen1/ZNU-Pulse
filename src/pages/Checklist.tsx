@@ -38,7 +38,6 @@ function pruneOrphanedGuestChecklists(validModuleIds: Set<string>) {
   }
 }
 
-// ── Deadline helpers ────────────────────────────────────────────────
 function parseLocalDate(dateStr: string) {
   const [y, m, d] = dateStr.split('-').map(Number)
   return new Date(y, m - 1, d)
@@ -100,6 +99,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
 
   const [activeModule, setActiveModule] = useState<string | null>(null)
   const [tasks, setTasks] = useState<ChecklistTask[]>([])
+  const [tasksError, setTasksError] = useState(false)
   const [newTask, setNewTask] = useState('')
   const [newDeadline, setNewDeadline] = useState('')
   const [addingTask, setAddingTask] = useState(false)
@@ -140,11 +140,13 @@ export default function Checklist({ dark }: { dark: boolean }) {
   }, [user, showToast])
 
   async function fetchTasks(isIgnored: () => boolean = () => false) {
+    setTasksError(false)
     if (user) {
-      const { data } = await supabase.from('user_checklist')
+      const { data, error } = await supabase.from('user_checklist')
         .select('*').eq('user_id', user.id).eq('module_id', activeModule).order('created_at')
       if (isIgnored()) return
       if (data) setTasks(data as ChecklistTask[])
+      if (error) setTasksError(true)
     } else {
       const saved = JSON.parse(localStorage.getItem(`checklist_${activeModule}`) || '[]')
       if (isIgnored()) return
@@ -184,9 +186,6 @@ export default function Checklist({ dark }: { dark: boolean }) {
     showToast('✅ Task added')
   }
 
-  // Only applies the local toggle once the Supabase write is confirmed
-  // (signed-in) — otherwise a failed request could leave the UI out of
-  // sync with the database.
   async function toggleTask(task: ChecklistTask) {
     if (user) {
       const { error } = await supabase.from('user_checklist').update({ done: !task.done }).eq('id', task.id)
@@ -307,7 +306,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
         .checklist-deadline-row input[type="date"] { flex: 1 1 160px; min-width: 0; }
       `}</style>
 
-      {modulesError && <ErrorBanner />}
+      {(modulesError || tasksError) && <ErrorBanner />}
 
       <PageIntro dark={dark} emoji={<ChecklistIcon color={ON_GRADIENT_TOP.primary} size={40} />} title="Checklist" subtitle="Track what's left before exam day" />
 

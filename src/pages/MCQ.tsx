@@ -52,7 +52,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const [showReview, setShowReview] = useState(false)
   const [struckOut, setStruckOut] = useState<Record<number, Set<string>>>({})
 
-  // Adjustable question text size, persisted like the theme preference.
   const FONT_SCALES = [0.9, 1, 1.15, 1.3]
   const [fontScale, setFontScale] = useState<number>(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem('znu_mcq_font_scale') : null
@@ -68,13 +67,10 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const quizStartedAtRef = useRef<number | null>(null)
   const [usingCache, setUsingCache] = useState(false)
   const gradingInFlightRef = useRef<Set<number>>(new Set())
-  // Bumped on every quiz start/resume/stop so an in-flight grade_mcq
-  // response from a discarded session can't write into a new one.
   const sessionIdRef = useRef(0)
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
   const submittingRef = useRef(false)
 
-  // ── Initial data load ──────────────────────────────────────────────
   useEffect(() => {
     fetchSubjects()
     fetchLessons()
@@ -96,6 +92,23 @@ export default function MCQ({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules])
 
+  // Drops localStorage question caches for modules that no longer
+  // exist (renamed/deleted) — otherwise these grow unbounded.
+  useEffect(() => {
+    if (!modulesLoaded) return
+    try {
+      const validIds = new Set(modules.map((m: any) => m.id))
+      const prefix = 'mcq_questions_cache_'
+      const toRemove: string[] = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (!key || !key.startsWith(prefix)) continue
+        if (!validIds.has(key.slice(prefix.length))) toRemove.push(key)
+      }
+      toRemove.forEach(k => localStorage.removeItem(k))
+    } catch { /* ignore */ }
+  }, [modulesLoaded, modules])
+
   useEffect(() => {
     if (!activeModule) return
     let ignore = false
@@ -103,7 +116,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     return () => { ignore = true }
   }, [activeModule])
 
-  // ── Deep-link entry points (retry / lesson / subject) ──────────────
   useEffect(() => {
     if (location.state?.retryQuestions?.length) {
       startRetryQuiz(location.state.retryQuestions)
@@ -128,7 +140,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subjectFilter, lessonFilter, questions])
 
-  // ── Paused-exam persistence ─────────────────────────────────────────
   useEffect(() => {
     if (quizMode) return
     let cancelled = false
@@ -158,15 +169,12 @@ export default function MCQ({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLeft])
 
-  // isIgnored() guard so switching modules quickly can't leave stage
-  // tabs showing the wrong module's stages.
   useEffect(() => {
     let ignore = false
     fetchModuleStages(activeModule).then(result => { if (!ignore) setStages(result) })
     return () => { ignore = true }
   }, [activeModule])
 
-  // ── Keyboard shortcuts (desktop only — touch devices don't fire keydown) ──
   useEffect(() => {
     if (!quizMode || submitted || grading) return
     function handleKeyDown(e: KeyboardEvent) {
@@ -198,7 +206,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [quizMode, submitted, grading, currentIndex, quizQuestions, results])
 
-  // ── Data fetching ────────────────────────────────────────────────────
   async function fetchSubjects() {
     const { data, error } = await supabase.from('subjects').select('*').order('name')
     if (error) {
@@ -277,7 +284,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
   function shuffle<T>(arr: T[]): T[] { return [...arr].sort(() => Math.random() - 0.5) }
 
-  // ── Flags ────────────────────────────────────────────────────────────
   async function loadFlagsFor(ids: string[]) {
     if (ids.length === 0) return new Set<string>()
     if (user) {
@@ -321,7 +327,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     }
   }
 
-  // ── Timer ────────────────────────────────────────────────────────────
   function startTimer(startedAt: number, mode: string) {
     clearInterval(timerRef.current)
     const tick = () => {
@@ -333,7 +338,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     timerRef.current = setInterval(tick, 1000)
   }
 
-  // ── Starting a quiz ──────────────────────────────────────────────────
   function startQuiz(type: string, subjectId: string | null = null) {
     let qs = type === 'mock'
       ? shuffle(getFilteredQuestions('mock')).slice(0, 36)
@@ -434,7 +438,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     sessionIdRef.current++
   }
 
-  // ── Tutor Mode grading ───────────────────────────────────────────────
   const isTutorMode = quizMode === 'practice' || quizMode === 'retry'
 
   async function tutorGradeAnswer(qi: number, opt: string) {
@@ -443,7 +446,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     const sessionId = sessionIdRef.current
     const { data, error } = await supabase.rpc('grade_mcq', { p_answers: [{ id: q.id, answer: opt }] })
     gradingInFlightRef.current.delete(qi)
-    if (sessionId !== sessionIdRef.current) return // quiz was reset while this was in flight
+    if (sessionId !== sessionIdRef.current) return
     if (!error && data && data[0]) {
       const r = data[0]
       setResults(prev => ({
@@ -498,7 +501,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     startRetryQuiz(incorrectQs)
   }
 
-  // ── Submitting a quiz ────────────────────────────────────────────────
   async function submitQuiz() {
     if (submittingRef.current) return
     submittingRef.current = true
@@ -617,7 +619,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     submittingRef.current = false
   }
 
-  // ── Render: exam mode (taking + results) ────────────────────────────
   if (quizMode) {
     return (
       <MCQExamFlow
@@ -655,7 +656,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     )
   }
 
-  // ── Render: module / subject browsing view ──────────────────────────
   return (
     <MCQBrowse
       dark={dark}
