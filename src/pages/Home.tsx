@@ -31,7 +31,7 @@ interface HomeModule {
 const toolCards = [
   { Icon: ScheduleIcon, title: 'Schedules', sub: 'Plan your study time', to: '/schedule', accent: 'indigo' },
   { Icon: ChecklistIcon, title: 'Checklist', sub: 'Track your progress', to: '/checklist', accent: 'amber' },
-  { Icon: AnonQAIcon, title: 'Anonymous Q&A', sub: 'Ask. Learn.', to: '/anon-questions', accent: 'indigo' },
+  { Icon: AnonQAIcon, title: 'Anonymous Q&A', sub: 'Ask.Learn.Grow.', to: '/anon-questions', accent: 'indigo' },
   { Icon: LeaderboardIcon, title: 'Leaderboard', sub: 'See where you stand', to: '/profile?tab=leaderboard', accent: 'amber' },
 ] as const
 
