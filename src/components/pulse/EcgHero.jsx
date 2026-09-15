@@ -8,9 +8,9 @@ import { useEffect, useId, useState } from 'react'
 // static base line is filled from this pre-offset polygon instead,
 // which has one clean silhouette and no seam to speak of.
 //
-// PULSE_CENTERLINE is kept separately for the animated shadow and
-// traveling beam layers, since stroke-dasharray only works on strokes
-// — both of those layers are blurred anyway, which hides any seam.
+// PULSE_CENTERLINE is kept separately for the animated shadow and the
+// traveling comet-head beam, since both need a real stroke/path
+// (a filled outline can't be used for either).
 const PULSE_VIEWBOX = '118 173 821 563'
 
 const PULSE_CENTERLINE = `M134 536
@@ -40,38 +40,23 @@ const PULSE_CENTERLINE = `M134 536
   C832 523 843 534 853 536
   H909`
 
+// CSS `path()` (used for offset-path below) needs one flattened
+// path-data string — same geometry as PULSE_CENTERLINE above, just
+// collapsed onto one line.
+const PULSE_PATH_FOR_CSS = PULSE_CENTERLINE.replace(/\s+/g, ' ').trim()
+
 const PULSE_FILL_PATH = "M134 523.5 L131.56 523.74 L127.06 525.61 L123.61 529.06 L121.74 533.56 L121.5 536 L122.45 540.78 L125.16 544.84 L129.22 547.55 L134 548.5 L193 548.5 L200.43 548.08 L207.18 546.78 L212.38 545.01 L217.22 542.59 L222.52 538.92 L226.27 535.58 L230.65 530.9 L243.28 514.34 L247.55 510.11 L245.39 510.48 L242.79 509.46 L245.16 512.49 L248.37 518.59 L259.26 544.24 L263.56 553.45 L267.7 560.67 L272.66 567.27 L275.82 570.46 L279.32 573.26 L283.32 575.63 L287.79 577.4 L293.4 578.65 L297.97 579.06 L302.78 578.62 L307.08 577.41 L313.48 573.88 L316.57 571.25 L319.45 568.09 L324.77 559.89 L329.52 549.08 L334.1 535.13 L354.6 451.2 L356.57 445.34 L358.38 442.15 L356.63 443.25 L354.28 443.48 L351.88 442.84 L350.21 441.65 L353.16 447.24 L356.93 458.25 L371.28 511.58 L372.97 516.61 L374.76 520.51 L377.01 524.2 L379.78 527.61 L382.81 530.4 L386.43 532.88 L390.29 534.77 L395.23 536.37 L407.24 538.05 L409.23 539.08 L410.9 540.89 L412.88 544.45 L414.91 549.88 L440.02 629.98 L443.17 633.74 L445.23 635.09 L448.72 636.29 L453.63 636.22 L455.98 635.47 L459.11 633.51 L461.53 630.73 L463.31 626.16 L539.31 193.16 L514.65 192.9 L594.65 712.9 L595.76 716.48 L597.08 718.61 L598.8 720.43 L600.84 721.88 L603.14 722.89 L605.58 723.42 L609.33 723.28 L611.73 722.57 L614.95 720.65 L616.71 718.87 L618.61 715.63 L659.8 572.12 L661.01 569.54 L660 570.43 L658.59 570.81 L663.29 571.8 L677.95 577.09 L682.3 577.99 L686.9 578.29 L692.06 577.71 L697.27 576.02 L702.21 573.21 L706.03 569.77 L708.82 566.5 L711.99 561.77 L716.49 552.61 L720.59 541.23 L732.9 501.51 L735.84 494.47 L738.72 489.1 L741.15 485.76 L743.23 484.13 L741.89 484.5 L743.56 484.29 L741.75 484.07 L742.75 484.47 L741.78 484.03 L742.76 484.52 L741.9 484.05 L744.93 486.78 L749.03 492.92 L753.99 502.5 L763.53 522.99 L766.46 528.31 L769.77 533.26 L773.87 538 L777.9 541.47 L783.29 544.72 L788.42 546.7 L792.9 547.73 L796.45 548.05 L803.58 547.28 L809.11 545.43 L820.77 539.23 L824.88 537.93 L823.98 538.11 L826.25 538.15 L829.62 539.31 L844.68 546.53 L851.61 548.42 L909 548.5 L913.78 547.55 L917.84 544.84 L920.55 540.78 L921.5 536 L921.26 533.56 L919.39 529.06 L915.94 525.61 L911.44 523.74 L853 523.5 L855.76 523.81 L851.67 522.35 L839.2 516.22 L833.62 514.24 L828.46 513.2 L823.01 513.05 L816.73 514.17 L810.28 516.54 L798.65 522.71 L796.82 523.08 L797.59 523.04 L794.74 522.47 L791.33 520.11 L788.28 516.08 L785.19 510.42 L776.51 491.64 L771.46 481.8 L765.75 472.85 L760.74 467.12 L757.62 464.48 L754.14 462.26 L750.41 460.63 L746.3 459.61 L741.93 459.37 L737.96 459.82 L731.47 462.02 L726.77 465.07 L721.8 469.94 L717.64 475.66 L713.32 483.61 L707.5 498.37 L694.58 540.02 L690.65 548.73 L688.62 551.76 L686.77 553.59 L688.15 552.55 L686.62 553.37 L687.43 553.07 L686.51 553.37 L687.35 553.13 L686.43 553.36 L687.27 553.18 L684.71 553.02 L671.25 548.1 L665.01 546.42 L660.39 545.83 L655.93 545.97 L650.77 547.21 L646.02 549.71 L641.95 553.37 L638.63 558.21 L635.98 564.55 L594.98 707.55 L619.35 709.1 L539.35 189.1 L538.23 185.51 L536.91 183.38 L535.19 181.56 L532.01 179.55 L529.63 178.78 L527.13 178.5 L523.41 179.03 L521.09 179.98 L519.01 181.39 L516.52 184.19 L515.37 186.42 L514.69 188.84 L438.69 621.84 L462.94 620.29 L438.77 542.42 L434.77 532.29 L431.7 527.03 L428.68 523.19 L425.68 520.27 L421.54 517.27 L417.87 515.39 L412.8 513.66 L400.23 511.82 L398.51 510.97 L397.31 509.61 L395.38 504.93 L381.01 451.53 L375.96 436.96 L372.67 430.24 L368.95 425.07 L365.02 421.64 L360.14 419.28 L356.63 418.58 L352.27 418.69 L348.68 419.54 L345.12 421.14 L341.77 423.52 L338.98 426.36 L336.34 430.06 L334.12 434.28 L332 439.67 L330.17 445.79 L309.86 529.04 L306.67 538.78 L303.89 545.72 L300.22 552.12 L297.94 554.22 L298.82 553.68 L297.77 554.27 L298.75 553.78 L297.66 554.27 L298.73 553.85 L297.6 554.23 L298.74 553.9 L297.57 554.18 L298.75 553.96 L297.54 554.13 L298.73 554.02 L297.48 554.07 L298.63 554.08 L294.8 553.45 L295.85 553.68 L293.19 552.46 L290.54 549.7 L287.86 545.76 L282.93 535.98 L270.96 507.88 L267.86 501.8 L264.43 496.34 L261.04 492.28 L257.54 489.28 L253.43 487 L249.42 485.81 L244.85 485.53 L240.54 486.21 L236.01 487.94 L231.88 490.53 L228.68 493.27 L225.06 497.15 L214.25 511.47 L210.12 516.36 L205.85 520.2 L201.7 522.34 L198.14 523.17 L194.05 523.49 Z"
 
 const LINE_COLOR = '#F4FBFF'
 const BEAM_COLOR = '#5fd9ff'
 const STROKE_WIDTH = 25
 
-// Length of the traveling highlight as a FRACTION of the path's total
-// length (pathLength="1" on the animated paths makes this exact
-// regardless of on-screen geometry). Kept generous — too short reads
-// as a dot chasing the line instead of a moving piece of the line.
-const BEAM_FRACTION = 0.13
 const BEAM_DURATION = '7s'
-
-// Trailing "comet tail" behind the beam's head. Rather than painting a
-// gradient along the curved centerline (which would need the
-// gradient's own coordinates kept in sync with the animation every
-// frame via JS — real cost, and fiddly to align with a bendy path),
-// this reuses the SAME pulseHeroDash keyframe loop already driving
-// the head, just started `delay` seconds later. Because the loop is
-// infinite and every echo mounts at the same instant, a later start
-// means it always has that many fewer seconds of progress at any
-// given moment — i.e. it's permanently that far "behind" the head
-// along the path. Falling opacity (and a slightly thinner stroke) per
-// echo then reads as a fade-out tail. No extra blur filters, no extra
-// JS per frame — just a few cheap plain strokes riding the animation
-// that already exists.
-const BEAM_TAIL = [
-  { delay: 0.09, opacity: 0.5, widthScale: 0.88 },
-  { delay: 0.19, opacity: 0.28, widthScale: 0.76 },
-  { delay: 0.30, opacity: 0.14, widthScale: 0.64 },
-  { delay: 0.42, opacity: 0.06, widthScale: 0.5 },
-]
+// Length of the glowing "comet head" in the SAME real (user-space)
+// units as the path geometry above — NOT a fraction of total path
+// length. Tune this directly for a longer/shorter beam.
+const COMET_LENGTH = 300
+const COMET_THICKNESS = STROKE_WIDTH * 1.6
 
 function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(false)
@@ -88,27 +73,32 @@ function usePrefersReducedMotion() {
 export default function EcgHero({ height = 220 }) {
   const reduced = usePrefersReducedMotion()
   // Unique per mount so multiple instances (or hot-reload remounts)
-  // never collide on filter ids.
+  // never collide on filter/gradient/mask ids.
   const uid = useId()
   const shadowId = `ecgShadow-${uid}`
-  const haloId = `pulseBeamHalo-${uid}`
   const glowId = `pulseBeamGlow-${uid}`
+  const fadeId = `pulseCometFade-${uid}`
+  const softId = `pulseCometSoften-${uid}`
+  const maskId = `pulseCometMask-${uid}`
 
   return (
     <div style={{
       position: 'relative', width: '100%', height, maxHeight: '100%',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
-      <style>{`
-        @keyframes pulseHeroDash {
-          0%   { stroke-dashoffset: ${1 + BEAM_FRACTION}; }
-          100% { stroke-dashoffset: 0; }
-        }
-        .pulse-hero-beam {
-          stroke-dasharray: ${BEAM_FRACTION} 1;
-          animation: pulseHeroDash ${BEAM_DURATION} linear infinite;
-        }
-      `}</style>
+      {!reduced && (
+        <style>{`
+          @keyframes pulseHeroOffset {
+            from { offset-distance: 0%; }
+            to   { offset-distance: 100%; }
+          }
+          .pulse-hero-comet {
+            offset-path: path("${PULSE_PATH_FOR_CSS}");
+            offset-rotate: auto;
+            animation: pulseHeroOffset ${BEAM_DURATION} linear infinite;
+          }
+        `}</style>
+      )}
 
       <svg
         viewBox={PULSE_VIEWBOX}
@@ -134,9 +124,6 @@ export default function EcgHero({ height = 220 }) {
 
           {!reduced && (
             <>
-              <filter id={haloId} x="-60%" y="-60%" width="220%" height="220%">
-                <feGaussianBlur stdDeviation="6" />
-              </filter>
               <filter id={glowId} x="-40%" y="-40%" width="180%" height="180%">
                 <feGaussianBlur stdDeviation="2" result="blur" />
                 <feMerge>
@@ -144,6 +131,46 @@ export default function EcgHero({ height = 220 }) {
                   <feMergeNode in="SourceGraphic" />
                 </feMerge>
               </filter>
+
+              {/* Softens the mask shape's edges so the fade (and the
+                  beam's outline) reads as smooth/organic rather than
+                  a hard-edged cutout. Applied to one small shape only
+                  — cheap. */}
+              <filter id={softId} x="-60%" y="-60%" width="220%" height="220%">
+                <feGaussianBlur stdDeviation="6" />
+              </filter>
+
+              {/* The actual fade: fully transparent at the trailing
+                  edge (offset 0%, local -x) to fully opaque at the
+                  leading edge (offset 100%, local +x). This is a
+                  continuous per-pixel gradient — no discrete bands.
+                  If the beam ever reads backwards (dim front, bright
+                  tail), just swap these two stop-opacity values. */}
+              <linearGradient id={fadeId} gradientUnits="objectBoundingBox" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor={BEAM_COLOR} stopOpacity="0" />
+                <stop offset="45%" stopColor={BEAM_COLOR} stopOpacity="0.22" />
+                <stop offset="100%" stopColor={BEAM_COLOR} stopOpacity="1" />
+              </linearGradient>
+
+              {/* The comet head itself: a small gradient-filled shape
+                  that CSS motion path (offset-path, above) drags along
+                  the exact same centerline the ECG line follows —
+                  offset-rotate: auto keeps its long axis aligned with
+                  the direction of travel at every point, including
+                  through the zigzags. Used only as a MASK (never
+                  drawn directly), so its shape/gradient defines
+                  exactly what's visible on the real stroked lines
+                  below. */}
+              <mask id={maskId} maskUnits="userSpaceOnUse">
+                <ellipse
+                  className="pulse-hero-comet"
+                  cx="0" cy="0"
+                  rx={COMET_LENGTH / 2}
+                  ry={COMET_THICKNESS / 2}
+                  fill={`url(#${fadeId})`}
+                  filter={`url(#${softId})`}
+                />
+              </mask>
             </>
           )}
         </defs>
@@ -163,45 +190,23 @@ export default function EcgHero({ height = 220 }) {
             so no seam is possible. */}
         <path d={PULSE_FILL_PATH} fill={LINE_COLOR} fillRule="nonzero" />
 
-        {/* Traveling highlight — stroked (needs dasharray) but always
-            blurred, so any seam is invisible. Skipped under
+        {/* Traveling comet head — a soft wide halo and a brighter
+            core, both masked by the same moving gradient shape above,
+            so both fade together consistently. Skipped under
             prefers-reduced-motion. */}
         {!reduced && (
           <>
-            {/* Fading tail, painted first (behind) — plain strokes,
-                no filters, so this stays cheap. See BEAM_TAIL above. */}
-            {BEAM_TAIL.map((t) => (
-              <path
-                key={t.delay}
-                className="pulse-hero-beam"
-                pathLength="1"
-                d={PULSE_CENTERLINE}
-                fill="none"
-                stroke={BEAM_COLOR}
-                strokeWidth={STROKE_WIDTH * t.widthScale}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                opacity={t.opacity}
-                style={{ animationDelay: `${t.delay}s` }}
-              />
-            ))}
-
-            {/* Head — the original bright halo + glow, unchanged. */}
             <path
-              className="pulse-hero-beam"
-              pathLength="1"
               d={PULSE_CENTERLINE}
               fill="none"
               stroke={BEAM_COLOR}
-              strokeWidth={STROKE_WIDTH + 10}
+              strokeWidth={STROKE_WIDTH + 14}
               strokeLinecap="round"
               strokeLinejoin="round"
-              opacity="0.55"
-              filter={`url(#${haloId})`}
+              opacity="0.5"
+              mask={`url(#${maskId})`}
             />
             <path
-              className="pulse-hero-beam"
-              pathLength="1"
               d={PULSE_CENTERLINE}
               fill="none"
               stroke={BEAM_COLOR}
@@ -209,6 +214,7 @@ export default function EcgHero({ height = 220 }) {
               strokeLinecap="round"
               strokeLinejoin="round"
               filter={`url(#${glowId})`}
+              mask={`url(#${maskId})`}
             />
           </>
         )}
