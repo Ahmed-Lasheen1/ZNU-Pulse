@@ -53,6 +53,26 @@ const STROKE_WIDTH = 25
 const BEAM_FRACTION = 0.13
 const BEAM_DURATION = '7s'
 
+// Trailing "comet tail" behind the beam's head. Rather than painting a
+// gradient along the curved centerline (which would need the
+// gradient's own coordinates kept in sync with the animation every
+// frame via JS — real cost, and fiddly to align with a bendy path),
+// this reuses the SAME pulseHeroDash keyframe loop already driving
+// the head, just started `delay` seconds later. Because the loop is
+// infinite and every echo mounts at the same instant, a later start
+// means it always has that many fewer seconds of progress at any
+// given moment — i.e. it's permanently that far "behind" the head
+// along the path. Falling opacity (and a slightly thinner stroke) per
+// echo then reads as a fade-out tail. No extra blur filters, no extra
+// JS per frame — just a few cheap plain strokes riding the animation
+// that already exists.
+const BEAM_TAIL = [
+  { delay: 0.09, opacity: 0.5, widthScale: 0.88 },
+  { delay: 0.19, opacity: 0.28, widthScale: 0.76 },
+  { delay: 0.30, opacity: 0.14, widthScale: 0.64 },
+  { delay: 0.42, opacity: 0.06, widthScale: 0.5 },
+]
+
 function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(false)
   useEffect(() => {
@@ -148,6 +168,25 @@ export default function EcgHero({ height = 220 }) {
             prefers-reduced-motion. */}
         {!reduced && (
           <>
+            {/* Fading tail, painted first (behind) — plain strokes,
+                no filters, so this stays cheap. See BEAM_TAIL above. */}
+            {BEAM_TAIL.map((t) => (
+              <path
+                key={t.delay}
+                className="pulse-hero-beam"
+                pathLength="1"
+                d={PULSE_CENTERLINE}
+                fill="none"
+                stroke={BEAM_COLOR}
+                strokeWidth={STROKE_WIDTH * t.widthScale}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={t.opacity}
+                style={{ animationDelay: `${t.delay}s` }}
+              />
+            ))}
+
+            {/* Head — the original bright halo + glow, unchanged. */}
             <path
               className="pulse-hero-beam"
               pathLength="1"
