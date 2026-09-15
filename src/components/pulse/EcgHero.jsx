@@ -1,49 +1,16 @@
 import { useEffect, useId, useState } from 'react'
 
-// Vector ECG artwork — real vector, no raster PNG/WEBP + mask.
+// Vector ECG artwork (no raster image).
 //
-// AUDIT FIX (seam artifact): the STATIC base line below used to be drawn
-// with <path stroke=... />, i.e. the browser stroked the raw multi-curve
-// centerline live. With 20+ chained cubic-bezier segments meeting at
-// cusps (the ECG's own peaks/troughs), the browser's stroker tessellates
-// each segment's offset outline somewhat independently, and at those
-// joins the anti-aliased edges don't always weld pixel-perfectly — this
-// showed up as faint hairline "scratches" through the fill, as if it
-// wasn't fully opaque there. It's an artifact of live-stroking this
-// specific path shape, not a color/opacity bug.
+// PULSE_FILL_PATH is a precomputed, closed outline of the ECG stroke —
+// not the centerline. Live-stroking the centerline directly left faint
+// seams at the cusps where its chained bezier segments meet, so the
+// static base line is filled from this pre-offset polygon instead,
+// which has one clean silhouette and no seam to speak of.
 //
-// The fix: PULSE_FILL_PATH below is NOT the centerline — it's the
-// pre-computed, single, CLOSED outline of the stroke itself (the
-// centerline offset by +/-12.5 units with round joins/caps baked in as
-// real geometry), generated once from the exact uploaded path via a
-// small offset-polygon script (flatten each cubic bezier, offset every
-// edge by the half stroke-width along its normal, insert a round-join
-// arc at every convex turn beyond ~1 degree, cap both ends with a
-// semicircle). Rendered with `fill`, it's a single scanline-filled
-// region with only ONE anti-aliased boundary (the true outer silhouette)
-// — there's no second stroked segment to seam against, so the artifact
-// can't occur.
-//
-// UPDATED AGAIN: PULSE_CENTERLINE now traces Ahmed's latest hand-refined
-// tracing (ecg_pulse_refined.svg) — the Q and S troughs are now explicit
-// pointed line vertices (straight L segments into/out of the trough)
-// instead of the small S-curve pair the previous tracing used there.
-// PULSE_FILL_PATH was regenerated from scratch against this new
-// centerline using the exact offset-polygon method above (verified by
-// rendering the resulting polygon standalone — clean single silhouette,
-// no gaps or self-intersection artifacts at the sharp Q/R/S cusps).
-// PULSE_VIEWBOX is UNCHANGED: the new tracing's extreme points (start
-// 134, end 909 on x; R-peak 191 and S-trough 711 on y) are pixel-for-
-// pixel identical to the previous tracing's extremes, so the bounding
-// box — and therefore the existing left/right/top/bottom padding — is
-// identical too. No re-fit needed this time.
-//
-// The animated centerline (PULSE_CENTERLINE) is kept separately and
-// still used with `stroke`/`stroke-dasharray` for the shadow and the
-// traveling beam — dasharray only works on strokes, and both of those
-// layers go through a Gaussian blur anyway, which already hides any
-// seam completely. Only the crisp, fully-opaque, always-fully-visible
-// base line needed the fill treatment.
+// PULSE_CENTERLINE is kept separately for the animated shadow and
+// traveling beam layers, since stroke-dasharray only works on strokes
+// — both of those layers are blurred anyway, which hides any seam.
 const PULSE_VIEWBOX = '118 173 821 563'
 
 const PULSE_CENTERLINE = `M134 536
@@ -79,15 +46,10 @@ const LINE_COLOR = '#F4FBFF'
 const BEAM_COLOR = '#5fd9ff'
 const STROKE_WIDTH = 25
 
-// Length of the traveling highlight, as a FRACTION of the path's total
-// length. pathLength="1" (set on each animated <path> below) makes this
-// fraction exact regardless of the path's real on-screen geometry.
-//
-// Deliberately generous — a short fraction reads as a moving dot once
-// blurred, which is what made the previous version look like an "orb"
-// chasing the line instead of a highlight traveling ALONG it. At 0.13
-// the visible segment is long relative to the stroke width, so it
-// unambiguously reads as a moving piece of line.
+// Length of the traveling highlight as a FRACTION of the path's total
+// length (pathLength="1" on the animated paths makes this exact
+// regardless of on-screen geometry). Kept generous — too short reads
+// as a dot chasing the line instead of a moving piece of the line.
 const BEAM_FRACTION = 0.13
 const BEAM_DURATION = '7s'
 
@@ -105,8 +67,8 @@ function usePrefersReducedMotion() {
 
 export default function EcgHero({ height = 220 }) {
   const reduced = usePrefersReducedMotion()
-  // Unique per mount so multiple EcgHero instances on the same page (or
-  // hot-reload remounts) never collide on filter ids.
+  // Unique per mount so multiple instances (or hot-reload remounts)
+  // never collide on filter ids.
   const uid = useId()
   const shadowId = `ecgShadow-${uid}`
   const haloId = `pulseBeamHalo-${uid}`
@@ -166,10 +128,7 @@ export default function EcgHero({ height = 220 }) {
           )}
         </defs>
 
-        {/* Shadow — still a live stroke of the centerline: it's heavily
-            blurred (stdDeviation 13), which fully absorbs any seam, and
-            dasharray isn't needed here so there's no reason to use the
-            heavier fill path for it. */}
+        {/* Shadow — heavily blurred, so a live stroke is fine here. */}
         <path
           d={PULSE_CENTERLINE}
           fill="none"
@@ -180,14 +139,13 @@ export default function EcgHero({ height = 220 }) {
           filter={`url(#${shadowId})`}
         />
 
-        {/* Base line — pre-computed single filled outline (see comment at
-            top of file). No stroke at all, so there is no live-stroking
-            seam artifact possible. */}
+        {/* Base line — filled from the precomputed outline, no stroke,
+            so no seam is possible. */}
         <path d={PULSE_FILL_PATH} fill={LINE_COLOR} fillRule="nonzero" />
 
-        {/* Traveling highlight — kept as a stroked centerline (needs
-            dasharray) but always blurred, so any seam is invisible. Not
-            rendered under prefers-reduced-motion. */}
+        {/* Traveling highlight — stroked (needs dasharray) but always
+            blurred, so any seam is invisible. Skipped under
+            prefers-reduced-motion. */}
         {!reduced && (
           <>
             <path
