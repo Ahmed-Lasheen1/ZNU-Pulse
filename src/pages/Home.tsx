@@ -301,6 +301,19 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
           .pulse-hero-panel {
             min-height: clamp(150px, 36vw, 340px);
           }
+          /* Nudges the ECG art down slightly to balance it within its
+             own column on the 3-column desktop layout — a transform,
+             so it doesn't affect layout height. Below 1000px the grid
+             stacks to one column and the hero panel sits directly
+             above the Weekly Report card, so this offset would bleed
+             into it; disabled there. */
+          .pulse-hero-inner {
+            width: 100%;
+            transform: translateY(8%);
+          }
+          @media (max-width: 1000px) {
+            .pulse-hero-inner { transform: translateY(0); }
+          }
           @media (max-width: 640px) {
             .pulse-hero-panel { min-height: clamp(120px, 48vw, 230px); }
           }
@@ -417,7 +430,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                 transition={{ duration: 0.85, delay: HERO_DELAY }}
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
-                <div style={{ transform: 'translateY(8%)', width: '100%' }}>
+                <div className="pulse-hero-inner">
                   <EcgHero height={400} />
                 </div>
               </motion.div>
