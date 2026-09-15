@@ -30,7 +30,32 @@
          and the plain Segoe UI system font used elsewhere. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+    <!-- PERF: warms the connection to Supabase before the first API
+         call fires (Home's modules/site_settings queries showed up on
+         PageSpeed's critical path with a full cold DNS+TLS+TTFB cost).
+         Doesn't touch any query, table, or auth behavior — only opens
+         the connection earlier. -->
+    <link rel="preconnect" href="https://rbgfupgwmgvvrrzuawpo.supabase.co" crossorigin />
+    <link rel="dns-prefetch" href="https://rbgfupgwmgvvrrzuawpo.supabase.co" />
+
+    <!-- PERF: the Sora stylesheet used to block first paint (~750ms
+         per PageSpeed's render-blocking-requests audit). Standard
+         "loadCSS" pattern: media="print" fetches it at low priority
+         without blocking render, then onload flips it to media="all"
+         once it lands. Same font, same weights, same display=swap —
+         just no longer render-blocking. <noscript> keeps it working
+         with JS disabled. -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+      media="print"
+      onload="this.media='all'; this.onload=null;"
+    />
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    </noscript>
 
     <title>ZNU Pulse</title>
   </head>

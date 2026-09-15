@@ -220,9 +220,13 @@ export default function App() {
           }}>
             <ScrollToTop />
             <SiteHeader dark={dark} toggleTheme={toggleTheme} />
-            <div style={{ flex: 1 }}>
+            {/* SEO/a11y: PageSpeed flagged "Document does not have a
+                main landmark" — this was a plain <div>. Same flex:1
+                layout, same everything else, just a semantic <main>
+                wrapper for the routed page content. */}
+            <main style={{ flex: 1 }}>
               <RoutedContent dark={dark} toggleTheme={toggleTheme} />
-            </div>
+            </main>
             <Footer dark={dark} />
           </div>
         </Router>
