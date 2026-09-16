@@ -53,7 +53,7 @@ export default function Footer({ dark }) {
 
           <div style={{ marginTop: 2 }}>
             <PulseGlassRow dark={true} radius={999} hoverTint={HOVER_TINT}>
-              
+              <a
                 href={WHATSAPP_URL}
                 target="_blank"
                 rel="noopener noreferrer"
