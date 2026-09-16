@@ -20,28 +20,15 @@
   box-sizing: border-box;
 }
 
-/* Fallback canvas background for iOS Safari's safe-area strips
-   (notch, home-indicator) and rubber-band overscroll bounce: per the
-   CSS spec, those regions paint using the <html> element's own
-   background, not any position:fixed child div. Must be no-repeat +
-   sized to the full box, or it tiles — which itself looks like a
-   second, wrongly-colored header band (an earlier version of this
-   fix was missing this and had exactly that bug). Keep this in sync
-   with PULSE_BG in PulseBackground.tsx if that gradient ever changes. */
-html {
-  min-height: 100%;
-  background: linear-gradient(180deg,
-    #a6d2ef 0%, #97bcd7 15%, #81a6c3 30%, #6c8fad 45%,
-    #497194 60%, #274e79 75%, #042a59 90%, #010c4a 100%);
-  background-repeat: no-repeat;
-  background-size: 100% 100%;
-}
-
 body {
   font-family: 'Sora', 'Segoe UI', sans-serif;
-  background: transparent;
+  background: #0f172a;
   color: #e2e8f0;
   direction: ltr;
+}
+
+.app {
+  min-height: 100vh;
 }
 
 .page {

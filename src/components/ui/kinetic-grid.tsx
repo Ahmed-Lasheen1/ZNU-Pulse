@@ -392,7 +392,7 @@ export default function KineticGrid({
         ref={canvasRef}
         aria-hidden
         style={{ opacity }}
-        className={cn("fixed inset-0 pointer-events-none", className)}
+        className={cn("fixed inset-0 w-full h-full pointer-events-none", className)}
       />
     );
   }

@@ -42,7 +42,7 @@ export default function FullscreenViewer({ dark, onClose, src, title, fileType, 
 
   return createPortal(
     <div style={{
-      position: 'fixed', inset: 0,
+      position: 'fixed', inset: 0, height: '100dvh',
       background: pt.canvas, zIndex: OVERLAY_Z, overflowY: 'auto'
     }}>
       <button
