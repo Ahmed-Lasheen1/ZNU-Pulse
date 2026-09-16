@@ -211,7 +211,7 @@ export default function App() {
         <Router>
           <div style={{
             background: bg,
-            minHeight: '100vh', color: getPulseTheme(dark).text,
+            minHeight: '100dvh', color: getPulseTheme(dark).text,
             display: 'flex', flexDirection: 'column',
             fontFamily: "'Segoe UI', sans-serif"
           }}>

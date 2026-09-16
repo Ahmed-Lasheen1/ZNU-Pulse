@@ -3,9 +3,11 @@ import KineticGrid from '../ui/kinetic-grid'
 // Full-bleed background gradient shared by every ZNU Pulse page —
 // extracted verbatim from Home's original LOGO_BG constant so every
 // page uses the exact same gradient rather than redefining it.
-// 100dvh (not just inset:0) so iOS Safari's collapsing/expanding
-// address bar doesn't leave a gap at the bottom — same reasoning as
-// the original Home implementation.
+//
+// This exact gradient is duplicated as a CSS fallback on the <html>
+// element in src/index.css — that's what iOS Safari actually paints
+// behind the notch/home-indicator safe areas (see the comment there).
+// Keep the two in sync if this gradient is ever changed.
 export const PULSE_BG = [
   'linear-gradient(180deg,',
   '#a6d2ef 0%,',
@@ -30,8 +32,18 @@ export default function PulseBackground({ interactive = true }: { interactive?: 
     <div
       aria-hidden
       style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        height: '100dvh',
+        // AUDIT FIX (iOS Safari safe-area "cut out" bug): this used to
+        // also set `height: '100dvh'` alongside top/left/right/bottom:0.
+        // For a position:fixed element, an explicit height wins over
+        // the bottom:0 inset, so the real bottom edge was
+        // top(0) + height(100dvh) — not "the true current visual
+        // viewport bottom." Safari's dvh value can lag a frame behind
+        // its own toolbar/notch animation, leaving a gap at the top
+        // (notch) or bottom (home-indicator/bottom-bar) safe area
+        // where the gradient didn't reach, exposing a flat bar behind
+        // it. `inset: 0` alone stays correctly synced with the true
+        // visual viewport with no unit to fall out of sync.
+        position: 'fixed', inset: 0,
         zIndex: 0, pointerEvents: 'none',
         background: PULSE_BG,
         overflow: 'hidden',
