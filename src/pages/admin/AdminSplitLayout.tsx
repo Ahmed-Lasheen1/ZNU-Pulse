@@ -30,7 +30,7 @@ export default function AdminSplitLayout({ form, list, formWidth = 380 }: AdminS
           .admin-split-form {
             position: sticky;
             top: calc(max(16px, env(safe-area-inset-top)) + 12px);
-            max-height: calc(100vh - max(16px, env(safe-area-inset-top)) - 32px);
+            max-height: calc(100dvh - max(16px, env(safe-area-inset-top)) - 32px);
             overflow-y: auto;
             padding-bottom: 4px;
           }
