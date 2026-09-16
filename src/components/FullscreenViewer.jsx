@@ -49,7 +49,7 @@ export default function FullscreenViewer({ dark, onClose, src, title, fileType, 
         onClick={onClose}
         style={{
           position: 'fixed',
-          top: 'max(14px, env(safe-area-inset-top))', left: 16,
+          top: 14, left: 16,
           zIndex: 20,
           background: dark ? 'rgba(8,16,32,0.65)' : 'rgba(255,255,255,0.85)',
           backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
@@ -63,11 +63,7 @@ export default function FullscreenViewer({ dark, onClose, src, title, fileType, 
       {kind === 'image' ? (
         <div style={{
           minHeight: '100dvh',
-          // AUDIT FIX (iOS safe area): this is a scrollable container
-          // (overflowY: auto on the outer wrapper), so its own bottom
-          // padding is what keeps the image clear of a transparent
-          // bottom bar / home indicator, not the page behind it.
-          padding: '80px 20px calc(24px + env(safe-area-inset-bottom))',
+          padding: '80px 20px 24px',
           boxSizing: 'border-box',
           display: 'flex', alignItems: 'center', justifyContent: 'center'
         }}>

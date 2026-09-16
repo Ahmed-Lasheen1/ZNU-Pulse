@@ -238,7 +238,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
         pointerEvents: 'none',
       }}>
         <div className="pulse-wide" style={{
-          paddingTop: 'max(16px, env(safe-area-inset-top))',
+          paddingTop: 16,
           paddingBottom: 16,
           pointerEvents: 'auto'
         }}>
@@ -276,7 +276,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
             flex-direction: column;
             gap: clamp(16px, 3vh, 40px);
             padding: clamp(14px, 2.5vh, 28px) 0 clamp(24px, 4vh, 56px);
-            padding-bottom: max(clamp(24px, 4vh, 56px), env(safe-area-inset-bottom));
+            padding-bottom: clamp(24px, 4vh, 56px);
             box-sizing: border-box;
           }
 
@@ -331,8 +331,8 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
           }
         `}</style>
 
-        {/* Matches the header's real rendered height: max(16px, safe-area) + logo row + bottom padding */}
-        <div style={{ height: 'calc(max(16px, env(safe-area-inset-top)) + 60px)' }} />
+        {/* Matches the header's real rendered height: 16px + logo row + bottom padding */}
+        <div style={{ height: 76 }} />
 
         <div className="pulse-fold">
           {modulesError && <div className="pulse-wide"><ErrorBanner /></div>}
@@ -530,7 +530,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
 
         {/* Completed Modules — collapsible, muted card treatment */}
         {completedModules.length > 0 && (
-          <div className="pulse-wide" style={{ paddingBottom: 'max(40px, env(safe-area-inset-bottom))' }}>
+          <div className="pulse-wide" style={{ paddingBottom: 40 }}>
             <div style={{ maxWidth: 640, margin: '0 auto' }}>
               <motion.div
                 initial={playEntrance ? { opacity: 0, y: 20 } : false}

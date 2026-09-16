@@ -16,25 +16,10 @@ interface BackButtonProps {
 // moment the student scrolled down, and its resting position (before
 // any scrolling) depended on that page's own top padding.
 //
-// AUDIT FIX (root cause, not just the earlier buffer trim): this used
-// to assume the header's total height was a flat `76px +
-// env(safe-area-inset-top)` — i.e. a fixed 16px PLUS the full
-// safe-area inset, added together. But the real header
-// (PulseOverlayHeader.tsx) sets its own top padding as
-// `max(16px, env(safe-area-inset-top))` — it uses WHICHEVER is
-// bigger, never both. On a phone with a notch/Dynamic Island, the
-// safe-area inset is typically 47–59px, so the old formula was
-// double-counting that extra 16px and placing this button about 16px
-// lower than the header's actual bottom edge — which is exactly why
-// trimming the old "+24px" buffer down to "+0px" didn't fully close
-// the gap; the leftover 16px was baked into the base formula itself,
-// not the tunable buffer.
-//
-// Corrected to mirror the header's real math: `max(16px,
-// env(safe-area-inset-top))` for the top padding, `+ 44px` for the
-// logo/icon row height, `+ 16px` for the header's bottom padding —
-// i.e. the header's true rendered height — plus a small fixed gap so
-// the pill doesn't touch the header bar.
+// Positioned to sit just below the header's real rendered height:
+// 16px top padding + 44px logo/icon row height + 16px bottom padding
+// (see PulseOverlayHeader.jsx), plus a small fixed gap so the pill
+// doesn't touch the header bar.
 const HEADER_GAP = 0
 
 export default function BackButton({ dark, fallback = '/', onClick, style }: BackButtonProps) {
@@ -47,7 +32,7 @@ export default function BackButton({ dark, fallback = '/', onClick, style }: Bac
     <div
       style={{
         position: 'fixed',
-        top: `calc(max(16px, env(safe-area-inset-top)) + 60px + ${HEADER_GAP}px)`,
+        top: `calc(16px + 60px + ${HEADER_GAP}px)`,
         left: 'clamp(20px, 4vw, 64px)',
         zIndex: 400,
       }}

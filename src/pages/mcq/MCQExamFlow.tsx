@@ -152,7 +152,7 @@ export default function MCQExamFlow({
         style={{
           position: 'relative', zIndex: 1,
           maxWidth: 'min(1080px, 92vw)', margin: '0 auto',
-          padding: '12px clamp(16px, 3vw, 36px) max(16px, env(safe-area-inset-bottom))', fontFamily: pulseFonts.body
+          padding: '12px clamp(16px, 3vw, 36px) 16px', fontFamily: pulseFonts.body
         }}
       >
         <div style={{ position: 'relative', textAlign: 'center', paddingBottom: 14 }}>

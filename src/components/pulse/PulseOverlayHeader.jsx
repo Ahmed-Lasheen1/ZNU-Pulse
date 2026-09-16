@@ -21,7 +21,7 @@ export default function PulseOverlayHeader({ dark, toggleTheme }) {
       zIndex: 500, pointerEvents: 'none'
     }}>
       <div className="pulse-wide" style={{
-        paddingTop: 'max(16px, env(safe-area-inset-top))',
+        paddingTop: 16,
         paddingBottom: 16,
         pointerEvents: 'auto'
       }}>

@@ -109,11 +109,7 @@ export default function Admin({ dark }: AdminProps) {
       <PulseBackground />
       <div className="pulse-wide admin-shell" style={{
         position: 'relative', zIndex: 1,
-        // AUDIT FIX (iOS safe area): see PageShell.tsx for the same
-        // reasoning — Admin doesn't use PageShell, so its own bottom
-        // padding needs the same treatment to keep the last row of
-        // whichever tab is open clear of a transparent bottom bar.
-        padding: '4px 20px calc(100px + env(safe-area-inset-bottom))',
+        padding: '4px 20px 100px',
         fontFamily: pulseFonts.body, maxWidth: 1500, margin: '0 auto'
       }}>
         <style>{`

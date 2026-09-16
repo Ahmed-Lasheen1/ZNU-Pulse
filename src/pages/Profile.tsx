@@ -164,10 +164,7 @@ export default function Profile({ dark }: { dark: boolean }) {
       <PulseBackground />
       <div className="pulse-wide" style={{
         position: 'relative', zIndex: 1,
-        // AUDIT FIX (iOS safe area): same reasoning as PageShell —
-        // Profile renders its own shell instead of using PageShell,
-        // so it needs the same bottom-inset-aware padding.
-        padding: '24px 20px calc(100px + env(safe-area-inset-bottom))',
+        padding: '24px 20px 100px',
         fontFamily: pulseFonts.body, maxWidth: 820, margin: '0 auto'
       }}>
 

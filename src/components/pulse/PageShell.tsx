@@ -28,15 +28,7 @@ export default function PageShell({
         className={containerClassName}
         style={{
           position: 'relative', zIndex: 1,
-          // AUDIT FIX (iOS safe area): the bottom edge of this
-          // container is the actual scrollable content boundary on
-          // every page that uses PageShell. A bare 100px doesn't
-          // account for a transparent Safari bottom bar or the
-          // home-indicator inset on notched iPhones, so the last card
-          // could sit partly behind it. Adding the inset on top of
-          // the existing 100px preserves the current spacing
-          // everywhere the inset is 0 (desktop, older devices).
-          padding: '24px 20px calc(100px + env(safe-area-inset-bottom))',
+          padding: '24px 20px 100px',
           fontFamily: pulseFonts.body,
           ...(maxWidth ? { maxWidth, margin: '0 auto' } : {}),
           ...containerStyle,

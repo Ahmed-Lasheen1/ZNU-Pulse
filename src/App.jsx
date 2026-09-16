@@ -75,7 +75,7 @@ function SiteHeader({ dark, toggleTheme }) {
   return (
     <>
       <PulseOverlayHeader dark={dark} toggleTheme={toggleTheme} />
-      <div style={{ height: 'calc(max(16px, env(safe-area-inset-top)) + 60px)' }} />
+      <div style={{ height: 76 }} />
     </>
   )
 }
