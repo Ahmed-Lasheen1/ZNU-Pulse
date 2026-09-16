@@ -15,7 +15,10 @@ function readList(key) {
   try { return JSON.parse(localStorage.getItem(key) || '[]') } catch { return [] }
 }
 function writeList(key, list) {
-  localStorage.setItem(key, JSON.stringify(list))
+  try { localStorage.setItem(key, JSON.stringify(list)) } catch { /* storage unavailable */ }
+}
+function removeKey(key) {
+  try { localStorage.removeItem(key) } catch { /* storage unavailable */ }
 }
 
 // ── Flags ──────────────────────────────────────────────────────────
@@ -36,7 +39,7 @@ export function toggleGuestFlag(entry) {
 }
 
 export function clearGuestFlags() {
-  localStorage.removeItem(FLAGGED_KEY)
+  removeKey(FLAGGED_KEY)
 }
 
 // ── Incorrect questions ───────────────────────────────────────────
@@ -69,7 +72,7 @@ export function enrichGuestFlagsWithResults(resultMap) {
 }
 
 export function clearGuestIncorrect() {
-  localStorage.removeItem(INCORRECT_KEY)
+  removeKey(INCORRECT_KEY)
 }
 
 // ── Exam history ──────────────────────────────────────────────────
@@ -83,7 +86,7 @@ export function addGuestHistory(entry) {
 }
 
 export function clearGuestHistory() {
-  localStorage.removeItem(HISTORY_KEY)
+  removeKey(HISTORY_KEY)
 }
 
 // ── Active (in-progress) exam, for Resume ─────────────────────────
@@ -91,8 +94,8 @@ export function getGuestActiveExam() {
   try { return JSON.parse(localStorage.getItem(ACTIVE_EXAM_KEY) || 'null') } catch { return null }
 }
 export function saveGuestActiveExam(data) {
-  localStorage.setItem(ACTIVE_EXAM_KEY, JSON.stringify(data))
+  try { localStorage.setItem(ACTIVE_EXAM_KEY, JSON.stringify(data)) } catch { /* storage unavailable */ }
 }
 export function clearGuestActiveExam() {
-  localStorage.removeItem(ACTIVE_EXAM_KEY)
+  removeKey(ACTIVE_EXAM_KEY)
 }

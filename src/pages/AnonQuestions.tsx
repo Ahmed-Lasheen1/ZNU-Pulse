@@ -41,6 +41,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
   const [questions, setQuestions] = useState<AnonQuestion[]>([])
   const [myQuestions, setMyQuestions] = useState<AnonQuestion[]>([])
   const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [newQ, setNewQ] = useState('')
   const [loading, setLoading] = useState(true)
   const [msg, setMsg] = useState('')
@@ -51,7 +52,12 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
   // cooldownRemaining state has re-rendered to block the second click.
   const submittingRef = useRef(false)
 
-  useEffect(() => { fetchQuestions(); fetchMyQuestions() }, [])
+  useEffect(() => {
+    let ignore = false
+    fetchQuestions(() => ignore)
+    fetchMyQuestions(() => ignore)
+    return () => { ignore = true }
+  }, [])
 
   useEffect(() => {
     updateCooldownRemaining()
@@ -79,14 +85,15 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
     }
   }, [myQuestions])
 
-  async function fetchQuestions() {
+  async function fetchQuestions(isIgnored: () => boolean = () => false) {
     setLoading(true)
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('anonymous_questions')
       .select('id, question, answer, answered, created_at')
       .order('answered', { ascending: true })
       .order('created_at', { ascending: false })
-      .limit(RECENT_QUESTIONS_LIMIT)
+      .range(0, RECENT_QUESTIONS_LIMIT - 1)
+    if (isIgnored()) return
     if (data) {
       setQuestions(data)
       setHasMore(data.length === RECENT_QUESTIONS_LIMIT)
@@ -94,10 +101,27 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
     setLoading(false)
   }
 
-  async function fetchMyQuestions() {
+  async function loadMoreQuestions() {
+    if (loadingMore) return
+    setLoadingMore(true)
+    const { data, error } = await supabase
+      .from('anonymous_questions')
+      .select('id, question, answer, answered, created_at')
+      .order('answered', { ascending: true })
+      .order('created_at', { ascending: false })
+      .range(questions.length, questions.length + RECENT_QUESTIONS_LIMIT - 1)
+    setLoadingMore(false)
+    if (data) {
+      setQuestions(prev => [...prev, ...data])
+      setHasMore(data.length === RECENT_QUESTIONS_LIMIT)
+    }
+  }
+
+  async function fetchMyQuestions(isIgnored: () => boolean = () => false) {
     const myTokens = getMyAnonTokens()
-    if (myTokens.length === 0) { setMyQuestions([]); return }
+    if (myTokens.length === 0) { if (!isIgnored()) setMyQuestions([]); return }
     const { data } = await supabase.rpc('get_my_anon_questions', { p_tokens: myTokens })
+    if (isIgnored()) return
     if (data) setMyQuestions(data)
   }
 
@@ -312,9 +336,13 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
           )
         })}
         {!loading && hasMore && (
-          <p style={{ color: pt.sub, fontSize: 11, textAlign: 'center', marginTop: 12 }}>
-            Showing the {RECENT_QUESTIONS_LIMIT} most recent questions.
-          </p>
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <button onClick={loadMoreQuestions} disabled={loadingMore} style={{
+              background: 'transparent', border: `1px solid ${pt.border}`, borderRadius: 999,
+              padding: '8px 22px', color: pt.sub, cursor: loadingMore ? 'not-allowed' : 'pointer',
+              fontFamily: pulseFonts.body, fontSize: 12, fontWeight: 700
+            }}>{loadingMore ? 'Loading...' : 'Load more'}</button>
+          </div>
         )}
       </div>
     </PageShell>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../supabase'
 import { subscribeToPush } from './pushNotifications'
 
@@ -12,16 +12,22 @@ export function useNotificationStatus() {
   )
   const [enabled, setEnabled] = useState(false)
   const [checked, setChecked] = useState(false)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   const check = useCallback(async () => {
-    if (!supported) { setChecked(true); return }
+    if (!supported) { if (mountedRef.current) setChecked(true); return }
 
     const currentPermission = Notification.permission
+    if (!mountedRef.current) return
     setPermission(currentPermission)
 
     if (currentPermission !== 'granted') {
-      setEnabled(false)
-      setChecked(true)
+      if (mountedRef.current) { setEnabled(false); setChecked(true) }
       return
     }
 
@@ -30,31 +36,30 @@ export function useNotificationStatus() {
       const sub = await reg.pushManager.getSubscription()
 
       if (!sub) {
-        setEnabled(false)
-        setChecked(true)
+        if (mountedRef.current) { setEnabled(false); setChecked(true) }
         return
       }
 
       const { data: exists, error } = await supabase.rpc('push_subscription_exists', { p_endpoint: sub.endpoint })
+      if (!mountedRef.current) return
 
       if (!error && exists) {
         setEnabled(true)
       } else {
         const result = await subscribeToPush()
+        if (!mountedRef.current) return
         setEnabled(!!result.success)
       }
     } catch {
-      setEnabled(false)
+      if (mountedRef.current) setEnabled(false)
     }
-    setChecked(true)
+    if (mountedRef.current) setChecked(true)
   }, [supported])
 
   useEffect(() => {
     let cancelled = false
     check()
 
-    // visibilitychange and focus can both fire for the same "tab came
-    // back" event — this collapses a same-tick pair into one check().
     let pending = false
     function scheduleCheck() {
       if (pending || cancelled) return

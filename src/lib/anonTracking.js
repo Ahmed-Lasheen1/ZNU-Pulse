@@ -16,7 +16,7 @@ export function addMyAnonToken(token) {
   const list = getMyAnonTokens()
   list.push(token)
   if (list.length > MAX_STORED) list.splice(0, list.length - MAX_STORED)
-  localStorage.setItem(KEY, JSON.stringify(list))
+  try { localStorage.setItem(KEY, JSON.stringify(list)) } catch { /* storage unavailable */ }
 }
 
 export function getNotifiedTokens() {
@@ -27,5 +27,5 @@ export function markTokensNotified(tokens) {
   const existing = getNotifiedTokens()
   let merged = [...existing, ...tokens]
   if (merged.length > MAX_STORED) merged = merged.slice(merged.length - MAX_STORED)
-  localStorage.setItem(NOTIFIED_KEY, JSON.stringify(merged))
+  try { localStorage.setItem(NOTIFIED_KEY, JSON.stringify(merged)) } catch { /* storage unavailable */ }
 }
