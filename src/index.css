@@ -20,30 +20,9 @@
   box-sizing: border-box;
 }
 
-html {
-  height: 100%;
-}
-
 body {
-  height: 100%;
   font-family: 'Sora', 'Segoe UI', sans-serif;
-  /* Same gradient as PULSE_BG (PulseBackground.tsx). iOS Safari paints
-     the notch / home-indicator / overscroll-bounce strips using
-     html/body's own background, not any fixed child div — this has to
-     match or those strips render as a flat bar instead of the gradient. */
-  background: linear-gradient(
-    180deg,
-    #a6d2ef 0%,
-    #97bcd7 15%,
-    #81a6c3 30%,
-    #6c8fad 45%,
-    #497194 60%,
-    #274e79 75%,
-    #042a59 90%,
-    #010c4a 100%
-  );
-  background-attachment: fixed;
-  background-repeat: no-repeat;
+  background: #0f172a;
   color: #e2e8f0;
   direction: ltr;
 }
