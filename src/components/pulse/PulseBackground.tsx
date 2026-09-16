@@ -3,9 +3,10 @@ import KineticGrid from '../ui/kinetic-grid'
 // Full-bleed background gradient shared by every ZNU Pulse page —
 // extracted verbatim from Home's original LOGO_BG constant so every
 // page uses the exact same gradient rather than redefining it.
-// 100dvh (not just inset:0) so iOS Safari's collapsing/expanding
-// address bar doesn't leave a gap at the bottom — same reasoning as
-// the original Home implementation.
+// Also duplicated as the real html/body background in index.css —
+// iOS Safari paints the notch/home-indicator/overscroll strips using
+// html/body's own background, not this (or any) fixed child div, so
+// the two have to match or those strips show up as a flat bar.
 export const PULSE_BG = [
   'linear-gradient(180deg,',
   '#a6d2ef 0%,',
@@ -25,13 +26,16 @@ export const PULSE_BG = [
 // untouched. Defaults to on; pass `interactive={false}` on any page
 // where the extra canvas isn't wanted (e.g. if a specific page turns
 // out to feel too busy with it, or on very low-power devices).
+//
+// `inset: 0` (not an explicit height) so this tracks the true visible
+// viewport as Safari's toolbar shows/hides, instead of a `100dvh`
+// value that can fall short of the real viewport and leave a gap.
 export default function PulseBackground({ interactive = true }: { interactive?: boolean } = {}) {
   return (
     <div
       aria-hidden
       style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        height: '100dvh',
+        position: 'fixed', inset: 0,
         zIndex: 0, pointerEvents: 'none',
         background: PULSE_BG,
         overflow: 'hidden',
