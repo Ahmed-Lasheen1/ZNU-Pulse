@@ -1,3 +1,4 @@
+// src/pages/NotFound.jsx
 import { useNavigate, useLocation } from 'react-router-dom'
 import { getPulseTheme, pulseFonts } from '../premiumTheme'
 import PulseBackground from '../components/pulse/PulseBackground'
@@ -10,10 +11,10 @@ export default function NotFound({ dark }) {
   const location = useLocation()
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh' }}>
+    <div style={{ position: 'relative', minHeight: '100dvh' }}>
       <PulseBackground />
       <div style={{
-        position: 'relative', zIndex: 1, minHeight: '100vh',
+        position: 'relative', zIndex: 1, minHeight: '100dvh',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
       }}>
         <div style={{ width: '100%', maxWidth: 420 }}>

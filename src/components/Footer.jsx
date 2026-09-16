@@ -1,3 +1,4 @@
+// src/components/Footer.jsx
 import { getPulseTheme, pulseFonts, ON_GRADIENT_BOTTOM } from '../premiumTheme'
 import PulseGlassRow from './pulse/PulseGlassRow'
 import { WhatsAppIcon } from './ui/tool-icons'
@@ -21,6 +22,11 @@ export default function Footer({ dark }) {
       overflow: 'hidden',
       borderTop: `1px solid ${DIVIDER_COLOR}`,
       fontFamily: pulseFonts.body,
+      // AUDIT FIX (iOS safe area): the footer is the last thing in the
+      // document on every page. Without this, its final line (the
+      // copyright text) can sit under a transparent Safari bottom bar
+      // / the home-indicator area on notched iPhones.
+      paddingBottom: 'env(safe-area-inset-bottom)',
     }}>
       <style>{`
         .site-footer-wordmark {
@@ -52,7 +58,7 @@ export default function Footer({ dark }) {
 
           <div style={{ marginTop: 2 }}>
             <PulseGlassRow dark={true} radius={999} hoverTint={HOVER_TINT}>
-              <a
+              
                 href={WHATSAPP_URL}
                 target="_blank"
                 rel="noopener noreferrer"

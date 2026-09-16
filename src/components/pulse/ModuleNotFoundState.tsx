@@ -1,3 +1,4 @@
+// src/components/pulse/ModuleNotFoundState.tsx
 import PulseBackground from './PulseBackground'
 import ErrorBanner from '../ErrorBanner'
 import { ON_GRADIENT_TOP } from '../../premiumTheme'
@@ -17,7 +18,7 @@ export default function ModuleNotFoundState({
   errorMessage = "Couldn't load this — check your connection.",
 }: ModuleNotFoundStateProps) {
   return (
-    <div style={{ position: 'relative', minHeight: '100vh' }}>
+    <div style={{ position: 'relative', minHeight: '100dvh' }}>
       <PulseBackground />
       <div style={{ position: 'relative', zIndex: 1, padding: 24, textAlign: 'center', color: ON_GRADIENT_TOP.secondary }}>
         {hasError

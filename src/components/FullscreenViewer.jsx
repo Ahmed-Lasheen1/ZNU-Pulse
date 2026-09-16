@@ -62,7 +62,13 @@ export default function FullscreenViewer({ dark, onClose, src, title, fileType, 
 
       {kind === 'image' ? (
         <div style={{
-          minHeight: '100dvh', padding: '80px 20px 24px', boxSizing: 'border-box',
+          minHeight: '100dvh',
+          // AUDIT FIX (iOS safe area): this is a scrollable container
+          // (overflowY: auto on the outer wrapper), so its own bottom
+          // padding is what keeps the image clear of a transparent
+          // bottom bar / home indicator, not the page behind it.
+          padding: '80px 20px calc(24px + env(safe-area-inset-bottom))',
+          boxSizing: 'border-box',
           display: 'flex', alignItems: 'center', justifyContent: 'center'
         }}>
           <img

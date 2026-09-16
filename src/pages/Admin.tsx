@@ -1,3 +1,4 @@
+// src/pages/Admin.tsx
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import { useAuth, useModules } from '../contexts'
@@ -90,9 +91,9 @@ export default function Admin({ dark }: AdminProps) {
 
   if (!authLoaded) {
     return (
-      <div style={{ position: 'relative', minHeight: '100vh' }}>
+      <div style={{ position: 'relative', minHeight: '100dvh' }}>
         <PulseBackground />
-        <div style={{ position: 'relative', zIndex: 1, height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ position: 'relative', zIndex: 1, height: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ color: ON_GRADIENT_TOP.secondary, fontSize: 14, fontWeight: 600 }}>Loading...</div>
         </div>
       </div>
@@ -104,9 +105,17 @@ export default function Admin({ dark }: AdminProps) {
   const tabProps = { dark, modules, subjects, lessons, fetchModules, fetchSubjects, fetchLessons, refDataLoading }
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh' }}>
+    <div style={{ position: 'relative', minHeight: '100dvh' }}>
       <PulseBackground />
-      <div className="pulse-wide admin-shell" style={{ position: 'relative', zIndex: 1, padding: '4px 20px 100px', fontFamily: pulseFonts.body, maxWidth: 1500, margin: '0 auto' }}>
+      <div className="pulse-wide admin-shell" style={{
+        position: 'relative', zIndex: 1,
+        // AUDIT FIX (iOS safe area): see PageShell.tsx for the same
+        // reasoning — Admin doesn't use PageShell, so its own bottom
+        // padding needs the same treatment to keep the last row of
+        // whichever tab is open clear of a transparent bottom bar.
+        padding: '4px 20px calc(100px + env(safe-area-inset-bottom))',
+        fontFamily: pulseFonts.body, maxWidth: 1500, margin: '0 auto'
+      }}>
         <style>{`
           .admin-tabs {
             display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px;

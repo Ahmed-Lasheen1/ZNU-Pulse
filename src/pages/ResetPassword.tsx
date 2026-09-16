@@ -35,10 +35,10 @@ export default function ResetPassword({ dark = true }: { dark?: boolean }) {
   }
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh' }}>
+    <div style={{ position: 'relative', minHeight: '100dvh' }}>
       <PulseBackground />
       <div style={{
-        position: 'relative', zIndex: 1, minHeight: '100vh',
+        position: 'relative', zIndex: 1, minHeight: '100dvh',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24
       }}>
         <div style={{ width: '100%', maxWidth: 400 }}>

@@ -1,3 +1,4 @@
+// src/components/ToastProvider.jsx
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 
 const ToastContext = createContext(() => {})
@@ -34,7 +35,15 @@ export default function ToastProvider({ children }) {
       {children}
       {toast && (
         <div style={{
-          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          position: 'fixed',
+          // AUDIT FIX (iOS safe area): a bare `bottom: 24` sits under a
+          // transparent Safari bottom bar / the home-indicator gesture
+          // area on notched iPhones. Adding the inset on top of the
+          // existing 24px keeps the same visual gap above the bar on
+          // devices with no inset (desktop, older phones) while
+          // pushing the toast clear of the bar where one exists.
+          bottom: 'calc(24px + env(safe-area-inset-bottom))',
+          left: '50%', transform: 'translateX(-50%)',
           background: toast.type === 'error' ? '#ef4444' : '#1e293b',
           color: '#fff', padding: '10px 20px', borderRadius: 12,
           fontSize: 13, fontWeight: 700, zIndex: 3000,

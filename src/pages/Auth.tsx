@@ -209,7 +209,7 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
   )
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh' }}>
+    <div style={{ position: 'relative', minHeight: '100dvh' }}>
       <PulseBackground />
       <style>{`
         .auth-grid { display: flex; align-items: center; justify-content: center; gap: 60px; max-width: 1100px; margin: 0 auto; padding: 40px 24px; }
@@ -220,7 +220,7 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
         .auth-form-panel { width: 100%; max-width: 420px; }
       `}</style>
 
-      <div style={{ position: 'relative', zIndex: 1, minHeight: '100vh', display: 'flex', alignItems: 'center' }}>
+      <div style={{ position: 'relative', zIndex: 1, minHeight: '100dvh', display: 'flex', alignItems: 'center' }}>
         <div className="auth-grid">
           <div className="auth-brand-panel">
             <PulseBrand dark={dark} logoSize={72} fontSize={40} />

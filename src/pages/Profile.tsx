@@ -160,9 +160,16 @@ export default function Profile({ dark }: { dark: boolean }) {
   const hoverTint = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh' }}>
+    <div style={{ position: 'relative', minHeight: '100dvh' }}>
       <PulseBackground />
-      <div className="pulse-wide" style={{ position: 'relative', zIndex: 1, padding: '24px 20px 100px', fontFamily: pulseFonts.body, maxWidth: 820, margin: '0 auto' }}>
+      <div className="pulse-wide" style={{
+        position: 'relative', zIndex: 1,
+        // AUDIT FIX (iOS safe area): same reasoning as PageShell —
+        // Profile renders its own shell instead of using PageShell,
+        // so it needs the same bottom-inset-aware padding.
+        padding: '24px 20px calc(100px + env(safe-area-inset-bottom))',
+        fontFamily: pulseFonts.body, maxWidth: 820, margin: '0 auto'
+      }}>
 
         <div style={{ marginBottom: 8 }}>
           <BackButton dark={dark} fallback="/" />
