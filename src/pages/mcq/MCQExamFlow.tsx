@@ -347,6 +347,7 @@ export default function MCQExamFlow({
                                 aria-pressed={isStruck}
                                 aria-label={`Eliminate option ${label.toUpperCase()}`}
                                 className="exam-btn"
+                                tabIndex={-1}
                                 style={{
                                   flexShrink: 0, width: 26, height: 26, borderRadius: '50%',
                                   background: isStruck ? (dark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.10)') : 'transparent',

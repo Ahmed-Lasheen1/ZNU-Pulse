@@ -10,6 +10,7 @@ const GITHUB_BRANCH = process.env.SUMMARIES_GITHUB_BRANCH || 'main'
 
 const ALLOWED_EXTENSIONS = ['html', 'htm', 'png', 'jpg', 'jpeg', 'svg', 'gif', 'webp']
 const MAX_FILES = 30
+const UPLOAD_BATCH_SIZE = 5
 
 function slugify(text) {
   return (text || '')
@@ -45,6 +46,15 @@ async function githubPutFile(path, base64Content, message) {
     throw new Error(`GitHub commit failed for ${path}: ${res.status} ${text}`)
   }
   return res.json()
+}
+
+// Runs `fn` over `items` with at most `batchSize` in flight at once —
+// faster than fully sequential for many small images, without hammering
+// GitHub's API with everything at once.
+async function runInBatches(items, batchSize, fn) {
+  for (let i = 0; i < items.length; i += batchSize) {
+    await Promise.all(items.slice(i, i + batchSize).map(fn))
+  }
 }
 
 // NOTE: jsdelivr was the original plan here, but jsdelivr deliberately
@@ -127,10 +137,10 @@ export default async function handler(req, res) {
 
   try {
     await githubPutFile(`${basePath}/index.html`, html.content, `Publish summary: ${title}`)
-    for (const img of imageList) {
+    await runInBatches(imageList, UPLOAD_BATCH_SIZE, async (img) => {
       const safeName = img.name.replace(/[^a-zA-Z0-9._-]/g, '_')
       await githubPutFile(`${basePath}/${safeName}`, img.content, `Add image for summary: ${title}`)
-    }
+    })
   } catch (err) {
     console.error('[publish-summary] GitHub commit failed:', err)
     return res.status(500).json({ error: 'Could not publish files to GitHub — ' + err.message })

@@ -12,13 +12,10 @@ interface LiquidGlassCardProps {
   delay?: number
   className?: string
   style?: CSSProperties
-  // When true, skips the entrance animation entirely and renders
-  // straight into its final (opacity:1, y:0) state — used by Home.tsx
-  // via useOncePerSession so the staggered reveal only plays once per
-  // browser tab session, not on every navigation back to Home. This
-  // was previously passed from Home.tsx but silently ignored here
-  // since it was never declared or read, so every card replayed its
-  // full entrance animation on every single mount regardless.
+  // Only Home opts out of this (instant={!playEntrance}) to play its
+  // staggered reveal once per tab session. Every other page renders
+  // straight into its final state by default — no reason to pay the
+  // Home-only entrance pause on ordinary navigations.
   instant?: boolean
 }
 
@@ -29,7 +26,7 @@ export default function LiquidGlassCard({
   delay = 0,
   className,
   style = {},
-  instant = false,
+  instant = true,
 }: LiquidGlassCardProps) {
   const interactive = !!onClick
   const [hovered, setHovered] = useState(false)
@@ -59,12 +56,6 @@ export default function LiquidGlassCard({
       onMouseLeave={() => interactive && setHovered(false)}
       className={rootClassName}
       style={{ position: 'relative', cursor: interactive ? 'pointer' : 'default', borderRadius }}
-      // `initial={false}` when `instant` is set skips Framer Motion's
-      // "from" state entirely and renders directly into whatever
-      // `animate` resolves to — the same pattern PulseBrand.tsx and
-      // NavMenu.jsx already use for exactly this purpose. Real
-      // open/entrance transitions (instant=false, the default) are
-      // completely unaffected.
       initial={instant ? false : { opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={instant ? { duration: 0 } : { duration: 0.75, delay: entranceDelay, ease: [0.34, 1.56, 0.64, 1] }}

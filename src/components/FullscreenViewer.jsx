@@ -7,11 +7,19 @@ import { getPulseTheme, pulseFonts } from '../premiumTheme'
 
 const OVERLAY_Z = 2100
 
-// Restricts what an embedded page can do (no top-level navigation,
-// no parent-frame access) while still allowing the scripts/forms that
-// Drive previews, YouTube embeds, and admin-published HTML summaries
-// need to function.
-const IFRAME_SANDBOX = 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation'
+// allow-same-origin is only granted to hosts we actually trust (Drive
+// previews, YouTube embeds, our own GitHub Pages summaries) — combined
+// with allow-scripts it would otherwise let any admin-pasted URL
+// escape the sandbox entirely.
+const TRUSTED_EMBED_HOSTS = /(^|\.)google\.com$|(^|\.)youtube\.com$|(^|\.)github\.io$/
+
+function isTrustedEmbedHost(url) {
+  try {
+    return TRUSTED_EMBED_HOSTS.test(new URL(url, window.location.origin).hostname)
+  } catch {
+    return false
+  }
+}
 
 // Shared full-screen "back + preview" viewer used by SummaryOverlay and
 // MediaOverlay. Portaled to document.body so its z-index always
@@ -20,6 +28,11 @@ export default function FullscreenViewer({ dark, onClose, src, title, fileType, 
   const pt = getPulseTheme(dark)
   const kind = previewKindFor(src, fileType)
   useBodyScrollLock(true)
+
+  const trustedHost = isTrustedEmbedHost(src)
+  const sandbox = trustedHost
+    ? 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation'
+    : 'allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation'
 
   useEffect(() => {
     function onKeyDown(e) { if (e.key === 'Escape') onClose() }
@@ -64,7 +77,7 @@ export default function FullscreenViewer({ dark, onClose, src, title, fileType, 
             src={src}
             style={{ height: '100%', width: '100%', border: 'none', display: 'block' }}
             title={title}
-            sandbox={IFRAME_SANDBOX}
+            sandbox={sandbox}
             allow={allow ?? (kind === 'video' ? 'autoplay; fullscreen' : undefined)}
             allowFullScreen={allowFullScreen ?? (kind === 'video' || undefined)}
           />

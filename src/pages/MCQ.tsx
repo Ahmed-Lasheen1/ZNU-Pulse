@@ -25,7 +25,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const [subjects, setSubjects] = useState<any[]>([])
   const [lessons, setLessons] = useState<any[]>([])
   const [questions, setQuestions] = useState<any[]>([])
-  const [answeredIds, setAnsweredIds] = useState<Set<string>>(new Set())
   const [activeModule, setActiveModule] = useState<string | null>(null)
   const [activeStage, setActiveStage] = useState(() => {
     const params = new URLSearchParams(location.search)
@@ -69,6 +68,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const gradingInFlightRef = useRef<Set<number>>(new Set())
   const sessionIdRef = useRef(0)
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
+  const pendingPersistRef = useRef<any>(null)
   const submittingRef = useRef(false)
 
   useEffect(() => {
@@ -77,8 +77,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     return () => clearInterval(timerRef.current)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  useEffect(() => { if (user) fetchAnsweredIds() }, [user])
 
   useEffect(() => {
     if (modulesLoaded && modules.length > 0 && !activeModule) {
@@ -147,19 +145,32 @@ export default function MCQ({ dark }: { dark: boolean }) {
     return () => { cancelled = true }
   }, [user, quizMode])
 
-    useEffect(() => {
-    if (!quizMode || submitted || quizMode === 'retry') return
+  // Debounced save of in-progress exam state (for Resume). The
+  // pending snapshot is kept in a ref so a real unmount (see the
+  // effect below) can flush it instead of silently dropping it.
+  useEffect(() => {
+    if (!quizMode || submitted || quizMode === 'retry') { pendingPersistRef.current = null; return }
     if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current)
+    const payload = { activeModule, quizMode, quizQuestions, answers, startedAt: quizStartedAtRef.current }
+    pendingPersistRef.current = payload
     persistTimeoutRef.current = setTimeout(() => {
-      persistActiveExam(user, {
-        activeModule, quizMode, quizQuestions, answers, startedAt: quizStartedAtRef.current
-      })
+      persistActiveExam(user, payload)
+      pendingPersistRef.current = null
     }, 1500)
     return () => {
       if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quizMode, quizQuestions, answers, submitted])
+
+  // Flushes a still-pending save only when MCQ itself unmounts (e.g.
+  // navigating away mid-quiz) — not on every dependency change above.
+  useEffect(() => {
+    return () => {
+      if (pendingPersistRef.current) persistActiveExam(user, pendingPersistRef.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (quizMode === 'mock' && !submitted && !grading && timeLeft === 0 && quizQuestions.length > 0) {
@@ -260,11 +271,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
       localStorage.setItem(cacheKey, JSON.stringify(data))
     }
     setLoading(false)
-  }
-
-  async function fetchAnsweredIds() {
-    const { data } = await supabase.from('answered_questions').select('question_id').eq('user_id', user.id)
-    if (data) setAnsweredIds(new Set(data.map((d: any) => d.question_id)))
   }
 
   const moduleSubjects = subjects.filter(s => s.module_id === activeModule)
@@ -553,7 +559,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
       }
 
       fetchProfile(user.id)
-      fetchAnsweredIds()
     } else {
       const { data: graded, error } = await supabase.rpc('grade_mcq', { p_answers: payload })
 

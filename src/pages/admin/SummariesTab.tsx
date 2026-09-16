@@ -155,6 +155,7 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
   const totalUploadBytes = (htmlFile?.size || 0) + imageFiles.reduce((a, f) => a + f.size, 0)
   const totalUploadMb = (totalUploadBytes / (1024 * 1024)).toFixed(1)
   const overSizeLimit = totalUploadBytes > 4 * 1024 * 1024
+  const publishBlocked = isBusy || overSizeLimit
 
   const form = (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
@@ -245,10 +246,10 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
           )}
           {(htmlFile || imageFiles.length > 0) && (
             <div style={{ color: overSizeLimit ? pt.danger : pt.textMuted, fontSize: 11, marginBottom: 12 }}>
-              Total: {totalUploadMb} MB{overSizeLimit ? ' — likely too large; compress images and keep the total under ~4 MB' : ''}
+              Total: {totalUploadMb} MB{overSizeLimit ? ' — too large to publish; compress images and keep the total under ~4 MB' : ''}
             </div>
           )}
-          <button onClick={publishSummaryFromFile} disabled={isBusy} style={{ ...btnStyle(pt, dark), width: '100%', opacity: isBusy ? 0.7 : 1, cursor: isBusy ? 'not-allowed' : 'pointer' }}>
+          <button onClick={publishSummaryFromFile} disabled={publishBlocked} style={{ ...btnStyle(pt, dark), width: '100%', opacity: publishBlocked ? 0.7 : 1, cursor: publishBlocked ? 'not-allowed' : 'pointer' }}>
             {publishing ? 'Publishing...' : 'Publish Summary'}
           </button>
         </>
@@ -260,6 +261,10 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
     <div>
       {summariesError && <ErrorBanner message="Couldn't load summaries — check your connection." />}
       <AdminModuleFilterSelect modules={modules} value={moduleFilter} onChange={setModuleFilter} totalCount={summaries.length} inStyle={inStyle} />
+
+      {summaries.length === LIST_LIMIT && (
+        <p style={{ color: pt.textMuted, fontSize: 11, marginBottom: 12 }}>Showing the most recent {LIST_LIMIT} — older summaries aren't listed here.</p>
+      )}
 
       {summariesLoading && <AdminStatusCard dark={dark} message="Loading..." />}
 

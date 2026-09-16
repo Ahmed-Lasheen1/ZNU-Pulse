@@ -8,17 +8,6 @@ type PulseTheme = ReturnType<typeof getPulseTheme>
 // Shared shell for every full-screen auth-style page (Auth, Reset
 // Password): a pill-shaped glass field, a solid gradient primary
 // button, a glass ghost button, and a plain text link.
-//
-// AUDIT FIX: GlassField, GhostButton, and AccountToggle used to each
-// hand-roll their own "wrapper + backdrop layer + shadow layer + tint
-// layer" div stack — a byte-for-byte repeat of the exact structure
-// PulseGlassRow.tsx already implements once (the same duplication
-// NavMenu.jsx's old local GlassRow had, before that was fixed to
-// import PulseGlassRow directly). All three now delegate to
-// PulseGlassRow instead of reimplementing it, so any future "make the
-// glass more transparent" / "increase the blur" change only ever
-// needs to happen in src/lib/liquidGlass.js — nothing here duplicates
-// that recipe anymore.
 
 export function GlassField({ dark, children }: { dark: boolean; children: ReactNode }) {
   return (
@@ -30,10 +19,6 @@ export function GlassField({ dark, children }: { dark: boolean; children: ReactN
   )
 }
 
-// Same `cobalt → indigo` gradient NavMenu already uses for its own
-// "Sign In →" row — reused, not a new button treatment. This one is a
-// solid gradient fill, not glass, so it's intentionally NOT built on
-// PulseGlassRow (which always renders a translucent tint underneath).
 export function PrimaryButton({ pt, disabled, onClick, children }: {
   pt: PulseTheme; disabled?: boolean; onClick?: () => void; children: ReactNode
 }) {
@@ -41,30 +26,25 @@ export function PrimaryButton({ pt, disabled, onClick, children }: {
     <button onClick={onClick} disabled={disabled} style={{
       width: '100%', padding: '15px', borderRadius: 999, border: 'none',
       background: disabled ? 'rgba(255,255,255,0.15)' : `linear-gradient(135deg, ${pt.cobalt}cc, ${pt.indigo}cc)`,
-      color: '#fff', fontWeight: 800, fontSize: 14, fontFamily: pulseFonts.body,
+      color: disabled ? pt.sub : '#fff', fontWeight: 800, fontSize: 14, fontFamily: pulseFonts.body,
       cursor: disabled ? 'not-allowed' : 'pointer',
       boxShadow: disabled ? 'none' : `0 8px 28px ${pt.cobalt}35`
     }}>{children}</button>
   )
 }
 
-export function GhostButton({ dark, onClick, children }: { dark: boolean; onClick?: () => void; children: ReactNode }) {
-  // AUDIT FIX: this used to hardcode `dark ? '#FFFFFF' : '#10243A'`
-  // inline instead of referencing PremiumTheme. The literal values
-  // happened to numerically match pt.text in both themes, but
-  // duplicating an approved token's value inline — rather than
-  // reading it from the theme — is exactly the kind of drift this
-  // audit exists to catch (a later change to the Dark/Light Glass
-  // primary text token would silently NOT apply here). Now sources
-  // `pt.text` directly, so this button always tracks the single
-  // source of truth in premiumTheme.js.
+export function GhostButton({ dark, onClick, disabled, children }: {
+  dark: boolean; onClick?: () => void; disabled?: boolean; children: ReactNode
+}) {
   const pt = getPulseTheme(dark)
+  const handleClick = disabled ? undefined : onClick
   return (
     <PulseGlassRow
-      dark={dark} radius={999} onClick={onClick}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      onKeyDown={onClick ? (e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }) : undefined}
+      dark={dark} radius={999} onClick={handleClick}
+      role={handleClick ? 'button' : undefined}
+      tabIndex={handleClick ? 0 : undefined}
+      onKeyDown={handleClick ? (e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick() } }) : undefined}
+      style={disabled ? { opacity: 0.6, pointerEvents: 'none' } : undefined}
     >
       <div style={{ padding: '11px', textAlign: 'center', fontSize: 13, fontWeight: 700, color: pt.text, fontFamily: pulseFonts.body }}>
         {children}
@@ -73,14 +53,14 @@ export function GhostButton({ dark, onClick, children }: { dark: boolean; onClic
   )
 }
 
-export function TextLink({ pt, onClick, muted, children }: {
-  pt: PulseTheme; onClick?: () => void; muted?: boolean; children: ReactNode
+export function TextLink({ pt, onClick, muted, disabled, children }: {
+  pt: PulseTheme; onClick?: () => void; muted?: boolean; disabled?: boolean; children: ReactNode
 }) {
   return (
-    <button type="button" onClick={onClick} style={{
-      background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+    <button type="button" onClick={onClick} disabled={disabled} style={{
+      background: 'none', border: 'none', padding: 0, cursor: disabled ? 'not-allowed' : 'pointer',
       fontFamily: pulseFonts.body, fontSize: 12, fontWeight: 600,
-      color: muted ? pt.textMuted : pt.cobalt
+      color: muted ? pt.textMuted : pt.cobalt, opacity: disabled ? 0.6 : 1
     }}>{children}</button>
   )
 }

@@ -362,6 +362,10 @@ Correct: A`}</pre>
         </select>
       </div>
 
+      {questions.length === LIST_LIMIT && (
+        <p style={{ color: pt.textMuted, fontSize: 11, marginBottom: 12 }}>Showing the most recent {LIST_LIMIT} — older questions aren't listed here.</p>
+      )}
+
       {questionsLoading && <AdminStatusCard dark={dark} message="Loading..." />}
 
       {!questionsLoading && questions.length === 0 && (

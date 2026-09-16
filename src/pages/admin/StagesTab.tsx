@@ -6,6 +6,7 @@ import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
 import AdminStatusCard from './AdminStatusCard'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle } from './adminStyles'
 import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
 import { invalidateModuleStagesCache } from '../../lib/moduleStages'
@@ -41,6 +42,7 @@ export default function StagesTab({ dark, modules }: StagesTabProps) {
   const [stagesIsCustom, setStagesIsCustom] = useState(false)
   const [stagesLoading, setStagesLoading] = useState(false)
   const [stagesSaving, setStagesSaving] = useState(false)
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false)
 
   useEffect(() => {
     if (stageModuleId) loadModuleStagesForAdmin(stageModuleId)
@@ -109,9 +111,13 @@ export default function StagesTab({ dark, modules }: StagesTabProps) {
     loadModuleStagesForAdmin(stageModuleId)
   }
 
-  async function resetModuleStages() {
+  function requestResetModuleStages() {
     if (!stageModuleId) return
-    if (!confirm("Reset this module to the 4 default exam stages? Custom stages you added will be removed — anything already tagged with a removed stage keeps that tag, it just won't have a matching button anymore.")) return
+    setConfirmResetOpen(true)
+  }
+
+  async function resetModuleStages() {
+    setConfirmResetOpen(false)
     setStagesSaving(true)
     await supabase.from('module_exam_stages').delete().eq('module_id', stageModuleId)
     setStagesSaving(false)
@@ -189,7 +195,7 @@ export default function StagesTab({ dark, modules }: StagesTabProps) {
                   {stagesSaving ? 'Saving...' : <><CheckCircleIcon color="#fff" size={13} /> Save Stages</>}
                 </button>
                 {stagesIsCustom && (
-                  <button onClick={resetModuleStages} disabled={stagesSaving} style={cancelBtnStyle(pt, dark)}>
+                  <button onClick={requestResetModuleStages} disabled={stagesSaving} style={cancelBtnStyle(pt, dark)}>
                     Reset to Default
                   </button>
                 )}
@@ -210,6 +216,16 @@ export default function StagesTab({ dark, modules }: StagesTabProps) {
         }
       `}</style>
       <AdminSplitLayout formWidth={340} form={form} list={list} />
+      <ConfirmDialog
+        dark={dark}
+        open={confirmResetOpen}
+        title="Reset to default stages?"
+        message="Custom stages you added will be removed — anything already tagged with a removed stage keeps that tag, it just won't have a matching button anymore."
+        confirmLabel="Reset"
+        confirmColor={pt.danger}
+        onCancel={() => setConfirmResetOpen(false)}
+        onConfirm={resetModuleStages}
+      />
     </div>
   )
 }

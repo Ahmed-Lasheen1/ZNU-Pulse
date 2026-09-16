@@ -44,7 +44,7 @@ export function getVideoEmbedUrl(url) {
   try {
     if (url.includes('youtube.com/watch')) {
       const id = new URL(url).searchParams.get('v')
-      return `https://www.youtube.com/embed/${id}`
+      return id ? `https://www.youtube.com/embed/${id}` : url
     }
     if (url.includes('youtu.be/')) {
       const id = url.split('youtu.be/')[1].split('?')[0]

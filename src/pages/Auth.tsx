@@ -166,7 +166,10 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
     setTimeout(() => navigate('/'), 900)
   }
 
+  // Guarded against loading so a rapid double-click can't fire two
+  // resend requests at once.
   async function handleResend() {
+    if (loading) return
     setLoading(true)
     const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim() })
     setLoading(false)
@@ -174,6 +177,7 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
   }
 
   async function handleForgotPassword() {
+    if (loading) return
     if (!email.trim()) return setMessage('Please enter your email address first')
     setLoading(true)
     setMessage('')
@@ -247,7 +251,7 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
                     style={inputResetStyle(pt, { textAlign: 'center', fontSize: 22, fontWeight: 800, letterSpacing: 8 })} />
                 </GlassField>
                 <PrimaryButton pt={pt} disabled={loading} onClick={handleVerify}>{loading ? 'Verifying...' : 'Verify & Continue'}</PrimaryButton>
-                <GhostButton dark={dark} onClick={handleResend}>Resend code</GhostButton>
+                <GhostButton dark={dark} onClick={handleResend} disabled={loading}>Resend code</GhostButton>
                 <div style={{ textAlign: 'center' }}>
                   <TextLink pt={pt} muted onClick={() => setStep('form')}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><ArrowLeft size={13} /> Go back</span>
@@ -281,7 +285,7 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
                 </GlassField>
 
                 <div style={{ textAlign: 'right' }}>
-                  <TextLink pt={pt} onClick={handleForgotPassword}>Forgot password?</TextLink>
+                  <TextLink pt={pt} onClick={handleForgotPassword} disabled={loading}>Forgot password?</TextLink>
                 </div>
 
                 <PrimaryButton pt={pt} disabled={loading} onClick={handleSubmit}>{loading ? 'Signing in...' : 'Sign In'}</PrimaryButton>

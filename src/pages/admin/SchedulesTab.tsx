@@ -167,6 +167,10 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
       {schedulesError && <ErrorBanner message="Couldn't load schedules — check your connection." />}
       <AdminModuleFilterSelect modules={modules} value={moduleFilter} onChange={setModuleFilter} totalCount={schedules.length} inStyle={inStyle} />
 
+      {schedules.length === LIST_LIMIT && (
+        <p style={{ color: pt.textMuted, fontSize: 11, marginBottom: 12 }}>Showing the most recent {LIST_LIMIT} — older schedules aren't listed here.</p>
+      )}
+
       {schedulesLoading && <AdminStatusCard dark={dark} message="Loading..." />}
 
       {!schedulesLoading && schedules.length === 0 && (

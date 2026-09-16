@@ -38,6 +38,12 @@ const typeMeta: Record<SearchResult['type'], { Icon: (p: { color?: string; size?
   schedule: { Icon: CalendarDays, label: 'Schedule', color: '#a78bfa' },
 }
 
+// Escapes ilike wildcard/escape characters in user-typed text so a
+// literal "%" or "_" in a search doesn't act as a SQL wildcard.
+function escapeLikePattern(value: string) {
+  return value.replace(/[%_\\]/g, '\\$&')
+}
+
 export default function Search({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const navigate = useNavigate()
@@ -70,7 +76,7 @@ export default function Search({ dark }: { dark: boolean }) {
     const requestId = ++searchIdRef.current
     setLoading(true)
     setError(false)
-    const like = `%${q}%`
+    const like = `%${escapeLikePattern(q)}%`
     const [fileRes, questionRes, summaryRes, scheduleRes] = await Promise.all([
       supabase.from('files').select('*').ilike('name', like).limit(20),
       supabase.from('questions_public').select('id, question, option_a, option_b, option_c, option_d, module_id, subject_id, exam_type, exam_stage, created_at').ilike('question', like).limit(20),

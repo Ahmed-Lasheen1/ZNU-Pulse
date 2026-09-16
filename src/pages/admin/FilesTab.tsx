@@ -186,6 +186,10 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
       {filesError && <ErrorBanner message="Couldn't load files — check your connection." />}
       <AdminModuleFilterSelect modules={modules} value={moduleFilter} onChange={setModuleFilter} totalCount={files.length} inStyle={inStyle} />
 
+      {files.length === LIST_LIMIT && (
+        <p style={{ color: pt.textMuted, fontSize: 11, marginBottom: 12 }}>Showing the most recent {LIST_LIMIT} — older files aren't listed here.</p>
+      )}
+
       {filesLoading && <AdminStatusCard dark={dark} message="Loading..." />}
 
       {!filesLoading && files.length === 0 && (

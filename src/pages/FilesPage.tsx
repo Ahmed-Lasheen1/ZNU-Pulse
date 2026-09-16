@@ -1,5 +1,5 @@
 // src/pages/FilesPage.tsx
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
 import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
@@ -124,9 +124,17 @@ export default function FilesPage({ dark }: { dark: boolean }) {
 
   const activeModules = modules.filter(m => m.status === 'active')
 
+  // Tracks the moduleParam value already applied, so a later
+  // reference change to `modules` (context re-render) can't silently
+  // revert a tab the user has since switched away from manually.
+  const appliedModuleParamRef = useRef<string | null>(null)
+
   useEffect(() => {
     if (moduleParam) {
-      setActiveModule(moduleParam)
+      if (appliedModuleParamRef.current !== moduleParam) {
+        appliedModuleParamRef.current = moduleParam
+        setActiveModule(moduleParam)
+      }
     } else if (modulesLoaded && activeModules.length > 0 && !activeModule) {
       setActiveModule(activeModules[0].id)
     }

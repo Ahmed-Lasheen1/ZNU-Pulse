@@ -78,6 +78,14 @@ export default function KineticGrid({
   const sizeRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
   const reducedMotionRef = usePrefersReducedMotion();
 
+  // Reused across frames — only reallocated when the grid's col/row
+  // count actually changes (e.g. on resize), not on every tick.
+  const gridRef = useRef<{ cols: number; rows: number; pts: Point[][]; prox: number[][] }>({
+    cols: 0, rows: 0, pts: [], prox: [],
+  });
+
+  // Mutates `outPt` in place and returns proximity, instead of
+  // allocating a new {x,y} object on every cell every frame.
   const getWarpedPoint = useCallback(
     (
       gx: number,
@@ -88,7 +96,8 @@ export default function KineticGrid({
       ripples: Ripple[],
       cols: number,
       rows: number,
-    ): { pt: Point; proximity: number } => {
+      outPt: Point,
+    ): number => {
       const edgeMargin = 1.5;
       const colPin = Math.min(col / edgeMargin, (cols - 1 - col) / edgeMargin, 1);
       const rowPin = Math.min(row / edgeMargin, (rows - 1 - row) / edgeMargin, 1);
@@ -121,13 +130,14 @@ export default function KineticGrid({
         const eased = t < 0.01 ? 0 : (1 - t) * (1 - t) * Math.min(1, dist / 60);
         const warpAmt = eased * MAX_WARP * pinFactor;
         const angle = Math.atan2(dy, dx);
-        return {
-          pt: { x: gx - Math.cos(angle) * warpAmt + rx, y: gy - Math.sin(angle) * warpAmt + ry },
-          proximity,
-        };
+        outPt.x = gx - Math.cos(angle) * warpAmt + rx;
+        outPt.y = gy - Math.sin(angle) * warpAmt + ry;
+        return proximity;
       }
 
-      return { pt: { x: gx + rx, y: gy + ry }, proximity };
+      outPt.x = gx + rx;
+      outPt.y = gy + ry;
+      return proximity;
     },
     [],
   );
@@ -191,16 +201,19 @@ export default function KineticGrid({
       const cellW = W / (cols - 1);
       const cellH = H / (rows - 1);
 
-      const pts: Point[][] = [];
-      const prox: number[][] = [];
+      const grid = gridRef.current;
+      if (grid.cols !== cols || grid.rows !== rows) {
+        grid.pts = Array.from({ length: rows }, () => Array.from({ length: cols }, () => ({ x: 0, y: 0 })));
+        grid.prox = Array.from({ length: rows }, () => new Array(cols).fill(0));
+        grid.cols = cols;
+        grid.rows = rows;
+      }
+      const pts = grid.pts;
+      const prox = grid.prox;
 
       for (let row = 0; row < rows; row++) {
-        pts[row] = [];
-        prox[row] = [];
         for (let col = 0; col < cols; col++) {
-          const { pt, proximity } = getWarpedPoint(col * cellW, row * cellH, col, row, mouse, ripples, cols, rows);
-          pts[row][col] = pt;
-          prox[row][col] = proximity;
+          prox[row][col] = getWarpedPoint(col * cellW, row * cellH, col, row, mouse, ripples, cols, rows, pts[row][col]);
         }
       }
 
