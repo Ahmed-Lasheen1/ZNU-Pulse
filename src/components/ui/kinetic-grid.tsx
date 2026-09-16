@@ -56,6 +56,18 @@ function usePrefersReducedMotion() {
 // mode skips the solid background + dot texture and renders only the
 // warping grid lines/nodes at reduced opacity, to sit on top of
 // PulseBackground.tsx instead of replacing it.
+//
+// Input is handled entirely through the Pointer Events API
+// (pointermove/pointerdown/pointerup/pointercancel) rather than
+// separate mouse/touch listeners — this unifies mouse, touch, and pen
+// into one code path and is the standard approach for canvas effects
+// that need to work on touch devices. All listeners are passive
+// (nothing here ever calls preventDefault), so page scrolling and
+// pinch-zoom are never affected — same as before. A touch has no
+// resting "hover" position the way a mouse cursor does, so on
+// pointerup/pointercancel for a touch pointer we relax the tracked
+// position back off-canvas; otherwise the grid would stay warped
+// toward wherever a finger last touched, forever, once lifted.
 export default function KineticGrid({
   children,
   className,
@@ -322,11 +334,24 @@ export default function KineticGrid({
       };
     }
 
-    const onMouseMove = (e: MouseEvent) => {
+    // Pointer Events unify mouse, touch, and pen into one stream — the
+    // grid follows whatever pointer is active, whether that's a mouse
+    // moving or a finger dragging across the screen.
+    const onPointerMove = (e: PointerEvent) => {
       targetMouseRef.current = { x: e.clientX, y: e.clientY };
     };
-    const onClick = (e: MouseEvent) => {
+    const onPointerDown = (e: PointerEvent) => {
       ripplesRef.current.push({ x: e.clientX, y: e.clientY, radius: 0, opacity: 1, born: performance.now() });
+    };
+    // A touch has no resting "hover" position the way a mouse cursor
+    // does — once the finger lifts, relax the tracked point back
+    // off-canvas so the warp eases away instead of freezing at the
+    // last touch location. Mouse pointers are left alone here since a
+    // mouse's position stays meaningful even without further movement.
+    const onPointerEnd = (e: PointerEvent) => {
+      if (e.pointerType === "touch") {
+        targetMouseRef.current = { x: -9999, y: -9999 };
+      }
     };
 
     // Stops the rAF loop while the tab is backgrounded — no reason to
@@ -339,16 +364,22 @@ export default function KineticGrid({
       }
     };
 
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("click", onClick);
+    // Passive: none of these ever call preventDefault, so normal page
+    // scrolling and pinch-zoom are untouched — same as before.
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    window.addEventListener("pointerdown", onPointerDown, { passive: true });
+    window.addEventListener("pointerup", onPointerEnd, { passive: true });
+    window.addEventListener("pointercancel", onPointerEnd, { passive: true });
     document.addEventListener("visibilitychange", onVisibilityChange);
     if (!document.hidden) rafRef.current = requestAnimationFrame(animate);
 
     return () => {
       clearTimeout(resizeTimeout);
       window.removeEventListener("resize", debouncedSetSize);
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("click", onClick);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("pointerup", onPointerEnd);
+      window.removeEventListener("pointercancel", onPointerEnd);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
