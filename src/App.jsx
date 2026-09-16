@@ -9,8 +9,6 @@ import { migrateGuestDataIfNeeded } from './lib/migrateGuestData'
 import ErrorBoundary from './components/ErrorBoundary'
 import ToastProvider from './components/ToastProvider'
 import PulseOverlayHeader from './components/pulse/PulseOverlayHeader'
-import StatusBarBlur from './components/pulse/StatusBarBlur'
-import BottomBarBlur from './components/pulse/BottomBarBlur'
 import { ThemeContext, AuthContext, ModulesContext } from './contexts'
 import Home from './pages/Home'
 const Checklist = lazy(() => import('./pages/Checklist'))
@@ -217,8 +215,6 @@ export default function App() {
             display: 'flex', flexDirection: 'column',
             fontFamily: "'Segoe UI', sans-serif"
           }}>
-            <StatusBarBlur />
-            <BottomBarBlur />
             <ScrollToTop />
             <SiteHeader dark={dark} toggleTheme={toggleTheme} />
             <main style={{ flex: 1 }}>
