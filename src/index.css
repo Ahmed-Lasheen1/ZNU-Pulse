@@ -20,39 +20,21 @@
   box-sizing: border-box;
 }
 
-/* AUDIT FIX (iOS Safari safe-area "cut out" bug): with
-   viewport-fit=cover (see index.html), iOS Safari paints the
-   safe-area strips — the notch cutout at the top and the
-   home-indicator/bottom-bar strip — using the <html> element's own
-   background, not any position:fixed child div, and not <body>'s
-   background if <html> already has one set. <html> had no
-   background here, so those strips fell back to a mismatched solid
-   color, which is exactly the "cut out" bar breaking the gradient.
-   Painting the same gradient PulseBackground renders (see
-   src/components/pulse/PulseBackground.tsx) directly on <html>,
-   pinned with `background-attachment: fixed` so it doesn't stretch
-   across a tall scrollable page, makes those strips always show a
-   continuation of the same gradient instead of a solid color. Keep
-   this in sync with PULSE_BG if that gradient ever changes. */
+/* Fallback canvas background for iOS Safari's safe-area strips
+   (notch, home-indicator) and rubber-band overscroll bounce: per the
+   CSS spec, those regions paint using the <html> element's own
+   background, not any position:fixed child div. Must be no-repeat +
+   sized to the full box, or it tiles — which itself looks like a
+   second, wrongly-colored header band (an earlier version of this
+   fix was missing this and had exactly that bug). Keep this in sync
+   with PULSE_BG in PulseBackground.tsx if that gradient ever changes. */
 html {
-  height: 100%;
+  min-height: 100%;
   background: linear-gradient(180deg,
-    #a6d2ef 0%,
-    #97bcd7 15%,
-    #81a6c3 30%,
-    #6c8fad 45%,
-    #497194 60%,
-    #274e79 75%,
-    #042a59 90%,
-    #010c4a 100%);
-  background-attachment: fixed;
-}
-
-/* Stops Safari's elastic bounce-scroll (rubber-banding) past the top
-   or bottom of the page from momentarily revealing anything behind
-   the fixed-position layers (PulseBackground, headers, etc.). */
-html, body {
-  overscroll-behavior-y: none;
+    #a6d2ef 0%, #97bcd7 15%, #81a6c3 30%, #6c8fad 45%,
+    #497194 60%, #274e79 75%, #042a59 90%, #010c4a 100%);
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
 }
 
 body {
