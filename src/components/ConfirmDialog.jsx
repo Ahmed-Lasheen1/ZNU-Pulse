@@ -4,7 +4,7 @@ import LiquidGlassCard from './ui/liquid-glass-card'
 import { WarningIcon } from './ui/tool-icons'
 
 // Generic glass confirmation modal. Clicking the backdrop or pressing
-// Escape both count as Cancel.
+// Escape both count as Cancel. Tab is trapped inside the dialog while open.
 export default function ConfirmDialog({
   dark, open, title, message,
   confirmLabel = 'Confirm', cancelLabel = 'Cancel',
@@ -12,10 +12,27 @@ export default function ConfirmDialog({
 }) {
   const pt = getPulseTheme(dark)
   const cancelRef = useRef(null)
+  const dialogRef = useRef(null)
 
   useEffect(() => {
     if (!open) return
-    function onKeyDown(e) { if (e.key === 'Escape') onCancel() }
+
+    function onKeyDown(e) {
+      if (e.key === 'Escape') { onCancel(); return }
+      if (e.key !== 'Tab' || !dialogRef.current) return
+      const focusable = dialogRef.current.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      )
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus()
+      }
+    }
+
     document.addEventListener('keydown', onKeyDown)
     cancelRef.current?.focus()
     return () => document.removeEventListener('keydown', onKeyDown)
@@ -35,6 +52,7 @@ export default function ConfirmDialog({
       }}
     >
       <div
+        ref={dialogRef}
         onClick={e => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

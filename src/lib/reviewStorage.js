@@ -23,6 +23,7 @@ function removeKey(key) {
 
 // ── Flags ──────────────────────────────────────────────────────────
 export function getGuestFlags() { return readList(FLAGGED_KEY) }
+export function setGuestFlags(list) { writeList(FLAGGED_KEY, list) }
 
 export function toggleGuestFlag(entry) {
   const list = readList(FLAGGED_KEY)
@@ -44,6 +45,7 @@ export function clearGuestFlags() {
 
 // ── Incorrect questions ───────────────────────────────────────────
 export function getGuestIncorrect() { return readList(INCORRECT_KEY) }
+export function setGuestIncorrect(list) { writeList(INCORRECT_KEY, list) }
 
 export function saveGuestIncorrect(entry) {
   const list = readList(INCORRECT_KEY)
@@ -77,6 +79,7 @@ export function clearGuestIncorrect() {
 
 // ── Exam history ──────────────────────────────────────────────────
 export function getGuestHistory() { return readList(HISTORY_KEY) }
+export function setGuestHistory(list) { writeList(HISTORY_KEY, list) }
 
 export function addGuestHistory(entry) {
   const list = readList(HISTORY_KEY)

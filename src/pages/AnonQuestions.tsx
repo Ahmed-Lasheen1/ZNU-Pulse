@@ -11,6 +11,7 @@ import LoadingText from '../components/pulse/LoadingText'
 import EmptyState from '../components/pulse/EmptyState'
 import NotifyPermissionButton from '../components/NotifyPermissionButton'
 import { useToast } from '../components/ToastProvider'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { containsProfanity } from '../lib/moderation'
 import { getMyAnonTokens, addMyAnonToken, getNotifiedTokens, markTokensNotified } from '../lib/anonTracking'
 import { AnonQAIcon, QuestionMarkIcon, ClockIcon, CheckCircleIcon, TrashIcon, LightbulbIcon, EmptyBoxIcon } from '../components/ui/tool-icons'
@@ -47,6 +48,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
   const [msg, setMsg] = useState('')
   const [replyText, setReplyText] = useState<Record<string, string>>({})
   const [cooldownRemaining, setCooldownRemaining] = useState(0)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const cooldownTimerRef = useRef<ReturnType<typeof setInterval>>()
   // Guards against a rapid double-click firing two inserts before
   // cooldownRemaining state has re-rendered to block the second click.
@@ -283,7 +285,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
                       fontWeight: 700, color: '#fff', fontFamily: pulseFonts.body,
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
                     }}><CheckCircleIcon color="#fff" size={14} /> Answer</button>
-                    <button onClick={() => deleteQuestion(q.id)} aria-label="Delete question" style={{
+                    <button onClick={() => setConfirmDeleteId(q.id)} aria-label="Delete question" style={{
                       padding: '10px 16px', background: 'rgba(239,107,87,0.14)',
                       border: '1px solid rgba(239,107,87,0.35)', borderRadius: 999, cursor: 'pointer',
                       color: pt.danger, fontFamily: pulseFonts.body, fontWeight: 700,
@@ -323,7 +325,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
                   <p style={{ color: pt.textPrimary, fontSize: 14 }}>{q.answer}</p>
                 </div>
                 {isAdmin && (
-                  <button onClick={() => deleteQuestion(q.id)} style={{
+                  <button onClick={() => setConfirmDeleteId(q.id)} style={{
                     marginTop: 8, padding: '6px 12px',
                     background: 'rgba(239,107,87,0.14)', border: '1px solid rgba(239,107,87,0.35)',
                     borderRadius: 8, cursor: 'pointer',
@@ -345,6 +347,17 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        dark={dark}
+        open={!!confirmDeleteId}
+        title="Delete this question?"
+        message="This cannot be undone."
+        confirmLabel="Delete"
+        confirmColor={pt.danger}
+        onCancel={() => setConfirmDeleteId(null)}
+        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) deleteQuestion(id) }}
+      />
     </PageShell>
   )
 }

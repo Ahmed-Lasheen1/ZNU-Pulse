@@ -41,6 +41,10 @@ const toolCards = [
 const ACTIVE_MODULES_ACCENT = getPulseTheme(false).cobalt
 const FOOTER_LINE_COLOR = getPulseTheme(true).border
 
+// Caps how much exam history Home pulls just to compute a streak and
+// weekly summary — mirrors the same cap Review.tsx already uses.
+const HOME_HISTORY_LIMIT = 200
+
 const MODULE_BLURBS: Record<string, string> = {
   neuro: 'Explore the wonders of the nervous system',
   cardio: 'Understand the heart and blood vessels',
@@ -124,7 +128,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
   }, [])
 
   // Streak + weekly accuracy summary — one exam_history fetch serves
-  // both (streak needs full history; weekly summary filters it client-side).
+  // both (streak needs recent history; weekly summary filters it client-side).
   useEffect(() => {
     let ignore = false
     async function loadStreakAndWeeklySummary() {
@@ -136,6 +140,8 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
           .from('exam_history')
           .select('completed_at, total, correct, subject_id')
           .eq('user_id', user.id)
+          .order('completed_at', { ascending: false })
+          .limit(HOME_HISTORY_LIMIT)
         rows = data || []
       } else {
         rows = getGuestHistory()

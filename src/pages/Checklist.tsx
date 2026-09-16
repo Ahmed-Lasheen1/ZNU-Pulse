@@ -148,7 +148,12 @@ export default function Checklist({ dark }: { dark: boolean }) {
       if (data) setTasks(data as ChecklistTask[])
       if (error) setTasksError(true)
     } else {
-      const saved = JSON.parse(localStorage.getItem(`checklist_${activeModule}`) || '[]')
+      let saved: ChecklistTask[] = []
+      try {
+        saved = JSON.parse(localStorage.getItem(`checklist_${activeModule}`) || '[]')
+      } catch {
+        saved = []
+      }
       if (isIgnored()) return
       setTasks(saved)
     }
@@ -372,6 +377,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
           <div className="checklist-add-row">
             <input
               placeholder="Add a topic to study..."
+              aria-label="Add a topic to study"
               value={newTask} onChange={e => setNewTask(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addTask()}
               style={inStyle} />
@@ -394,7 +400,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
             <span style={{ color: pt.faint, fontSize: 12, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
               <CalendarDotIcon color={pt.faint} size={13} /> Deadline (optional):
             </span>
-            <input type="date" value={newDeadline} onChange={e => setNewDeadline(e.target.value)} style={{ ...inStyle }} />
+            <input type="date" aria-label="Deadline (optional)" value={newDeadline} onChange={e => setNewDeadline(e.target.value)} style={{ ...inStyle }} />
           </div>
         </LiquidGlassCard>
       </div>

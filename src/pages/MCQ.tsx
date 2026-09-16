@@ -70,6 +70,16 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
   const pendingPersistRef = useRef<any>(null)
   const submittingRef = useRef(false)
+  // Guards the auto-start effects below so they fire at most once per
+  // mount, even if `questions` refetches later while browsing.
+  const autoStartedLessonRef = useRef(false)
+  const autoStartedSubjectRef = useRef(false)
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => { isMountedRef.current = false }
+  }, [])
 
   useEffect(() => {
     fetchSubjects()
@@ -123,7 +133,8 @@ export default function MCQ({ dark }: { dark: boolean }) {
   }, [location.state])
 
   useEffect(() => {
-    if (lessonFilter && !quizMode && questions.length > 0) {
+    if (lessonFilter && !quizMode && questions.length > 0 && !autoStartedLessonRef.current) {
+      autoStartedLessonRef.current = true
       const lessonQs = questions.filter(q => q.lesson_id === lessonFilter)
       startRetryQuiz(lessonQs)
     }
@@ -131,7 +142,8 @@ export default function MCQ({ dark }: { dark: boolean }) {
   }, [lessonFilter, questions])
 
   useEffect(() => {
-    if (subjectFilter && !lessonFilter && !quizMode && questions.length > 0) {
+    if (subjectFilter && !lessonFilter && !quizMode && questions.length > 0 && !autoStartedSubjectRef.current) {
+      autoStartedSubjectRef.current = true
       const subjectQs = questions.filter(q => q.subject_id === subjectFilter)
       startRetryQuiz(subjectQs)
     }
@@ -220,9 +232,11 @@ export default function MCQ({ dark }: { dark: boolean }) {
   async function fetchSubjects() {
     const { data, error } = await supabase.from('subjects').select('*').order('name')
     if (error) {
-      const cached = localStorage.getItem('mcq_subjects_cache')
-      if (cached) setSubjects(JSON.parse(cached))
-      else setLoadError(true)
+      try {
+        const cached = localStorage.getItem('mcq_subjects_cache')
+        if (cached) setSubjects(JSON.parse(cached))
+        else setLoadError(true)
+      } catch { setLoadError(true) }
     } else if (data) {
       setSubjects(data)
       localStorage.setItem('mcq_subjects_cache', JSON.stringify(data))
@@ -232,8 +246,10 @@ export default function MCQ({ dark }: { dark: boolean }) {
   async function fetchLessons() {
     const { data, error } = await supabase.from('lessons').select('id, title, subject_id')
     if (error) {
-      const cached = localStorage.getItem('mcq_lessons_cache')
-      if (cached) setLessons(JSON.parse(cached))
+      try {
+        const cached = localStorage.getItem('mcq_lessons_cache')
+        if (cached) setLessons(JSON.parse(cached))
+      } catch { /* ignore corrupt cache */ }
     } else if (data) {
       setLessons(data)
       localStorage.setItem('mcq_lessons_cache', JSON.stringify(data))
@@ -452,7 +468,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     const sessionId = sessionIdRef.current
     const { data, error } = await supabase.rpc('grade_mcq', { p_answers: [{ id: q.id, answer: opt }] })
     gradingInFlightRef.current.delete(qi)
-    if (sessionId !== sessionIdRef.current) return
+    if (!isMountedRef.current || sessionId !== sessionIdRef.current) return
     if (!error && data && data[0]) {
       const r = data[0]
       setResults(prev => ({
@@ -541,6 +557,8 @@ export default function MCQ({ dark }: { dark: boolean }) {
         p_time_sec: timeSec
       })
 
+      if (!isMountedRef.current) { submittingRef.current = false; return }
+
       if (error) {
         setGrading(false)
         showToast('⚠️ Could not submit — check your connection and try again', 'error')
@@ -561,6 +579,8 @@ export default function MCQ({ dark }: { dark: boolean }) {
       fetchProfile(user.id)
     } else {
       const { data: graded, error } = await supabase.rpc('grade_mcq', { p_answers: payload })
+
+      if (!isMountedRef.current) { submittingRef.current = false; return }
 
       if (error) {
         setGrading(false)
@@ -612,6 +632,8 @@ export default function MCQ({ dark }: { dark: boolean }) {
         incorrect_questions: incorrectSnapshots
       })
     }
+
+    if (!isMountedRef.current) { submittingRef.current = false; return }
 
     setResults(resultMap)
     setGrading(false)

@@ -142,18 +142,17 @@ export default function Profile({ dark }: { dark: boolean }) {
 
   async function fetchData(isIgnored: () => boolean = () => false) {
     setLoading(true)
-    if (user) {
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-      if (isIgnored()) return
-      if (data) setProfile(data)
-    }
-    const { data: lb } = await supabase
-      .from('profiles')
-      .select('name, points')
-      .order('points', { ascending: false })
-      .limit(10)
+    // Both queries are independent — run in parallel instead of
+    // awaiting the profile fetch before starting the leaderboard one.
+    const [profileRes, lbRes] = await Promise.all([
+      user
+        ? supabase.from('profiles').select('*').eq('id', user.id).single()
+        : Promise.resolve({ data: null }),
+      supabase.from('profiles').select('name, points').order('points', { ascending: false }).limit(10),
+    ])
     if (isIgnored()) return
-    if (lb) setLeaderboard(lb as Profile[])
+    if (profileRes.data) setProfile(profileRes.data as Profile)
+    if (lbRes.data) setLeaderboard(lbRes.data as Profile[])
     setLoading(false)
   }
 
