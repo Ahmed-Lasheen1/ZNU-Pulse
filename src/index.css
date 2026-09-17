@@ -24,7 +24,7 @@ html, body {
   right: 0;
   bottom: 0;
   pointer-events: none;
-  background: linear-gradient(180deg,
+  background: linear-gradient(360deg,
     #a6d2ef 0%,
     #97bcd7 15%,
     #81a6c3 30%,
