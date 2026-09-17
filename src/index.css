@@ -4,35 +4,40 @@
   box-sizing: border-box;
 }
 
-/* App-wide gradient. A real fixed div (#app-bg in index.html, before
-   #root), not a body::before pseudo-element — forced onto its own
-   compositing layer so it repaints reliably through Safari/WebKit
-   toolbar show/hide and dynamic-viewport resizes. Sibling of #root,
-   never an ancestor, so it can't become any sticky/fixed descendant's
-   containing block. No z-index: stacks by DOM order, so it paints
-   behind everything that comes after it (e.g. KineticGrid's overlay
-   canvas) since it's body's first child. */
+/* Stops iOS/Android rubber-band overscroll from revealing whatever's
+   behind #app-bg at the top/bottom edges — that reveal is what showed
+   up as stray solid-color bars. */
+html, body {
+  overscroll-behavior-y: none;
+}
+
+/* App-wide gradient. Real fixed div (#app-bg in index.html, before
+   #root) — sibling of #root, never an ancestor, so it can't become
+   any sticky/fixed descendant's containing block. No z-index: stacks
+   by DOM order, so it paints behind everything after it in the tree
+   (e.g. KineticGrid's overlay canvas) since it's body's first child. */
 #app-bg {
   content: "";
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   pointer-events: none;
   background: linear-gradient(180deg,
-  #a6d2ef 0%,
-  #a6d2ef 6%,      /* hold the top color a bit longer */
-  #97bcd7 18%,
-  #81a6c3 32%,
-  #6c8fad 46%,
-  #497194 60%,
-  #274e79 75%,
-  #042a59 88%,
-  #010c4a 94%,
-  #010c4a 100%);   /* hold the bottom color a bit longer */
+    #a6d2ef 0%,
+    #97bcd7 15%,
+    #81a6c3 30%,
+    #6c8fad 45%,
+    #497194 60%,
+    #274e79 75%,
+    #042a59 90%,
+    #010c4a 100%);
 }
 
 /* Fallback paint matching the gradient's darkest stop, in case #app-bg
-   isn't painted yet on first frame. html only, not body — see #app-bg
-   note above for why body needs no background of its own. */
+   isn't painted yet on first frame. html only — see #app-bg note above
+   for why body needs no background of its own. */
 html {
   background: #010c4a
 }
