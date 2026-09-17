@@ -1,19 +1,3 @@
-/* NOTE: preflight is disabled in tailwind.config.js
-   (corePlugins.preflight: false), so @tailwind base injects almost
-   nothing here — it will not reset the hand-written styles below.
-   This block is what was missing: without it, PostCSS's Tailwind
-   plugin had nowhere to inject generated utility classes into the
-   stylesheet that's actually loaded on every page (main.jsx imports
-   this file globally). The only other file with these directives is
-   src/styles/shadcn-theme.css, which is only imported by the lazy
-   /auth and /reset-password routes — so every Tailwind class used
-   anywhere else in the app (curved-menu.tsx's `fixed`/`z-[2000]`/
-   `h-[100dvh]`/`w-screen`/`bg-white`, PulseCard's `cursor-pointer`/
-   `overflow-hidden`, etc.) silently compiled to nothing on every other
-   page, including Home. This is why the menu button worked in JS
-   (state toggled, the panel mounted) but was never actually visible —
-   it had no position/size/background CSS to render with. */
-
 * {
   margin: 0;
   padding: 0;
@@ -25,32 +9,32 @@
    `background` + `background-attachment: fixed` on html/body —
    `background-attachment: fixed` is not reliably supported on mobile
    Safari/Chrome (iOS in particular effectively never honors it; it
-   silently scrolls the background with the page instead), which is
-   why the gradient was scrolling and white bars appeared at the
-   top/bottom as the dynamic viewport resized.
+   silently scrolls the background with the page instead).
 
-   A real `position: fixed` element sidesteps that entirely — fixed
-   positioning IS reliably supported everywhere, including iOS. It's
-   pinned with `inset: 0`, so it's always sized to the exact current
-   viewport (not document height, not a vh/dvh calculation that can
-   lag behind the browser chrome animating), which is what removes
-   the white bars.
+   A real `position: fixed` element sidesteps that — fixed positioning
+   is reliably supported everywhere, including iOS. Pinned with
+   `inset: 0`, so it's always sized to the exact current viewport,
+   which removes any white bars from dynamic-viewport resizing.
 
-   This is safe for `position: sticky`/`fixed` elsewhere in the app
-   because it's a pseudo-element of `body`, not a wrapper around any
-   page content — it's a sibling of the React root (#root), never an
-   ancestor of anything sticky/fixed lives inside. Only ancestors can
-   affect sticky/fixed descendants, so this can't interfere no matter
-   what any page does.
+   Safe for `position: sticky`/`fixed` elsewhere in the app because
+   it's a pseudo-element of `body`, not a wrapper around any page
+   content — it's a sibling of the React root (#root), never an
+   ancestor of anything sticky/fixed lives inside.
 
-   z-index: -1 with no positioned ancestor above it in the stacking
-   order means normal-flow content (the #root div) paints above it
-   automatically — no z-index needed anywhere else. */
+   IMPORTANT: no z-index here, and body has no background-color of
+   its own (see below). z-index: -1 would put this pseudo-element
+   BELOW the painting layer that in-flow, non-positioned element
+   backgrounds live in — including body's own background-color, if it
+   had one — which is exactly what silently hid the gradient behind a
+   solid navy fill. With z-index left at its default (auto), stacking
+   falls back to DOM order: since this is body's first child, it
+   paints behind every other fixed/positioned element that comes
+   after it in the tree (like KineticGrid's overlay canvas), which is
+   all the ordering it actually needs. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: -1;
   pointer-events: none;
   background: linear-gradient(180deg,
     #a6d2ef 0%,
@@ -65,8 +49,10 @@ body::before {
 
 /* Fallback paint (matches the gradient's darkest stop) in case the
    pseudo-element above is ever unavailable for a split second before
-   first paint — avoids a flash of true white. */
-html, body {
+   first paint — avoids a flash of true white. Deliberately only on
+   html, not body — see the note on body::before above for why
+   setting it on both broke the gradient entirely. */
+html {
   background-color: #010c4a;
 }
 
@@ -178,22 +164,6 @@ h1, h2, h3 {
   .card-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
 }
 
-/* AUDIT FIX: these two rules used to size each grid track with a bare
-   `1fr`. CSS Grid gives a bare `1fr` track an implicit MINIMUM width
-   equal to its content's natural (min-content) size — so a single
-   long, unwrapped module/card title in one cell forces that column
-   wider than its fair 1fr share, which in turn (a) makes sibling
-   cards in other columns a different width than it (the "cards aren't
-   the same size" symptom) and (b) can push the whole row past the
-   container's right edge, forcing horizontal scroll to see the
-   remaining cards. `minmax(0, 1fr)` removes that implicit minimum —
-   every column now genuinely shares the row equally regardless of
-   what's inside it, and long text wraps/truncates within its own cell
-   instead of stealing space from the rest of the row. This affects
-   every page that renders an `.auto-grid` (Summaries' module list,
-   Home's completed modules, ModulePage's exam-stage/lesson grids,
-   StagePage, SubjectPage's lesson grid) since they all share this one
-   class. */
 .auto-grid {
   display: grid;
   gap: 14px;
@@ -211,26 +181,12 @@ h1, h2, h3 {
   .auto-grid { gap: 20px; }
 }
 
-/* Centers a single card rather than letting it stretch across a
-   whole grid row's width just because it happens to be alone —
-   ModulePage/StagePage's Study Materials section uses this when only
-   one file-type card is present, and always for the University
-   Google Drive link card, since there's only ever exactly one of
-   those. width:100% + max-width means it's still full-width on
-   narrow phones and only actually caps/centers once there's room to
-   spare. */
 .auto-grid-single {
   width: 100%;
   max-width: 420px;
   margin: 0 auto;
 }
 
-/* "Smart Summaries" + "Practice" pairing on ModulePage and StagePage
-   (and anywhere else that wants the same two-card layout). Stacked on
-   phones — each card still gets its own full-width row, same as
-   before — and sits side by side on one row from tablet width up, so
-   the pairing doesn't waste all the extra horizontal space on a
-   tablet/desktop viewport the way two full-width stacked cards would. */
 .summary-practice-row {
   display: grid;
   grid-template-columns: 1fr;
@@ -263,16 +219,6 @@ h1, h2, h3 {
   will-change: transform;
 }
 
-/* Keyboard-only focus ring for glass rows/cards (starting with
-   NavMenu's GlassRow, reusable anywhere else that needs it).
-   Deliberately NOT tied to :hover — hover never fires from Tab
-   navigation, so without this a keyboard user gets zero indication of
-   where they are on a glass surface. :focus-visible (not plain
-   :focus) means mouse clicks still don't show a ring — only real
-   keyboard/assistive-tech focus does. White halo + accent ring is
-   background-agnostic on purpose: it needs to read on light glass,
-   dark glass, and busier backdrops alike, which a single-color ring
-   can't guarantee on its own. */
 .glass-focus-ring:focus-visible {
   outline: none;
   box-shadow:
