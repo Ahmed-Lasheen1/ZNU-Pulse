@@ -4,56 +4,9 @@
   box-sizing: border-box;
 }
 
-/* Stops iOS/Android rubber-band overscroll from revealing whatever's
-   behind #app-bg at the top/bottom edges — that reveal is what showed
-   up as stray solid-color bars. */
-html, body {
-  overscroll-behavior-y: none;
-  min-height: 100%;
-}
-
-body {
-  position: relative;
-}
-
-#app-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  min-height: 100%; 
-
-  background-image: linear-gradient(180deg,
-    #a6d2ef 0%,
-    #97bcd7 15%,
-    #81a6c3 30%,
-    #6c8fad 45%,
-    #497194 60%,
-    #274e79 75%,
-    #042a59 90%,
-    #010c4a 100%);
-  background-size: 100% 100dvh; 
-  background-repeat: repeat-y;
-}
-
-@keyframes scroll-gradient {
-  from {
-    background-position: top center;
-  }
-  to {
-    background-position: bottom center;
-  }
-}
-
-/* Fallback paint matching the gradient's darkest stop, in case #app-bg
-   isn't painted yet on first frame. html only — see #app-bg note above
-   for why body needs no background of its own. */
-html {
-  background: #010c4a
-}
-
 body {
   font-family: 'Sora', 'Segoe UI', sans-serif;
+  background: #010c4a;
   color: #e2e8f0;
   direction: ltr;
 }
