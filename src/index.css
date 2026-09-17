@@ -28,7 +28,7 @@ body {
      gap, without a flat-color mismatch against the real gradient. */
   background: linear-gradient(180deg, #a6d2ef 0%, #010c4a 100%);
   background-attachment: fixed;
-  color: #e2e8f0;
+  color: #a6d2ef;
   direction: ltr;
 }
 
