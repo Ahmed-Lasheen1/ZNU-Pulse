@@ -91,7 +91,7 @@ export default function Admin({ dark }: AdminProps) {
 
   if (!authLoaded) {
     return (
-      <div style={{ position: 'relative', minHeight: '100dvh' }}>
+      <div style={{ position: 'relative' }}>
         <PulseBackground />
         <div style={{ position: 'relative', zIndex: 1, height: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ color: ON_GRADIENT_TOP.secondary, fontSize: 14, fontWeight: 600 }}>Loading...</div>
@@ -105,7 +105,7 @@ export default function Admin({ dark }: AdminProps) {
   const tabProps = { dark, modules, subjects, lessons, fetchModules, fetchSubjects, fetchLessons, refDataLoading }
 
   return (
-    <div style={{ position: 'relative', minHeight: '100dvh' }}>
+    <div style={{ position: 'relative' }}>
       <PulseBackground />
       <div className="pulse-wide admin-shell" style={{
         position: 'relative', zIndex: 1,

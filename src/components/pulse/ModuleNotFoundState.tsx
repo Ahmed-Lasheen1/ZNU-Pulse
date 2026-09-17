@@ -18,7 +18,7 @@ export default function ModuleNotFoundState({
   errorMessage = "Couldn't load this — check your connection.",
 }: ModuleNotFoundStateProps) {
   return (
-    <div style={{ position: 'relative', minHeight: '100dvh' }}>
+    <div style={{ position: 'relative' }}>
       <PulseBackground />
       <div style={{ position: 'relative', zIndex: 1, padding: 24, textAlign: 'center', color: ON_GRADIENT_TOP.secondary }}>
         {hasError

@@ -11,7 +11,7 @@ export default function NotFound({ dark }) {
   const location = useLocation()
 
   return (
-    <div style={{ position: 'relative', minHeight: '100dvh' }}>
+    <div style={{ position: 'relative' }}>
       <PulseBackground />
       <div style={{
         position: 'relative', zIndex: 1, minHeight: '100dvh',

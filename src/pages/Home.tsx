@@ -226,7 +226,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
   const tickerBaseDelay = NOTIFY_DELAY
 
   return (
-    <div style={{ position: 'relative', minHeight: '100dvh', overflowX: 'hidden' }}>
+    <div style={{ position: 'relative', overflowX: 'hidden' }}>
       <PulseBackground />
 
       <div style={{

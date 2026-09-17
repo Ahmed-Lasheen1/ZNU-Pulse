@@ -160,7 +160,7 @@ export default function Profile({ dark }: { dark: boolean }) {
   const hoverTint = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'
 
   return (
-    <div style={{ position: 'relative', minHeight: '100dvh' }}>
+    <div style={{ position: 'relative' }}>
       <PulseBackground />
       <div className="pulse-wide" style={{
         position: 'relative', zIndex: 1,

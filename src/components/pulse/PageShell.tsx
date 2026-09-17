@@ -22,7 +22,7 @@ export default function PageShell({
   maxWidth, containerClassName = 'pulse-wide', containerStyle = {},
 }: PageShellProps) {
   return (
-    <div style={{ position: 'relative', minHeight: '100dvh' }}>
+    <div style={{ position: 'relative' }}>
       <PulseBackground />
       <div
         className={containerClassName}
