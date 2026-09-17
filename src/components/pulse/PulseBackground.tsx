@@ -14,5 +14,5 @@ import KineticGrid from '../ui/kinetic-grid'
 // either.
 export default function PulseBackground({ interactive = true }: { interactive?: boolean } = {}) {
   if (!interactive) return null
-  return <KineticGrid overlay opacity={0.75} />
+  return <KineticGrid overlay={true} opacity={0.75} />
 }

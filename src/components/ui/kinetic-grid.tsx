@@ -386,13 +386,13 @@ export default function KineticGrid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animate, draw]);
 
-  if (overlay) {
+  if (overlay || !children) {
     return (
       <canvas
         ref={canvasRef}
         aria-hidden
         style={{ opacity }}
-        className={cn("fixed inset-0 w-full h-full pointer-events-none", className)}
+        className={cn("fixed inset-0 w-full h-full pointer-events-none z-0", className)}
       />
     );
   }
