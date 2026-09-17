@@ -16,9 +16,7 @@
   content: "";
   position: fixed;
   inset: 0;
-  height: 100dvh;
   pointer-events: none;
-  transform: translateZ(0);
   background: linear-gradient(180deg,
     #a6d2ef 0%,
     #97bcd7 15%,
