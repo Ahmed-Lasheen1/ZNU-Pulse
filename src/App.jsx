@@ -9,6 +9,7 @@ import { migrateGuestDataIfNeeded } from './lib/migrateGuestData'
 import ErrorBoundary from './components/ErrorBoundary'
 import ToastProvider from './components/ToastProvider'
 import PulseOverlayHeader from './components/pulse/PulseOverlayHeader'
+import PulseBackground from './components/pulse/PulseBackground'
 import { ThemeContext, AuthContext, ModulesContext } from './contexts'
 import Home from './pages/Home'
 const Checklist = lazy(() => import('./pages/Checklist'))
@@ -202,10 +203,6 @@ export default function App() {
     setProfile(null)
   }
 
-  const bg = dark
-    ? 'linear-gradient(135deg, #0a0f1e 0%, #0d1a2e 50%, #0a1628 100%)'
-    : 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0f9ff 100%)'
-
   const toggleTheme = () => setDark(prev => !prev)
 
   return (
@@ -215,17 +212,33 @@ export default function App() {
         <ToastProvider>
         <Router>
           <div style={{
-            background: bg,
             minHeight: '100dvh', color: getPulseTheme(dark).text,
             display: 'flex', flexDirection: 'column',
             fontFamily: "'Segoe UI', sans-serif"
           }}>
+            {/* Mounted once, here, instead of per-page. Sticky (see
+                PulseBackground.tsx) so it isn't `fixed` — that's what
+                was letting the mobile toolbar's collapse/expand cut
+                into the gradient — and isn't plain `absolute` either,
+                which stretched the gradient across the whole page's
+                scroll height instead of one real screen. */}
+            <PulseBackground />
             <ScrollToTop />
             <SiteHeader dark={dark} toggleTheme={toggleTheme} />
-            <main style={{ flex: 1 }}>
-              <RoutedContent dark={dark} toggleTheme={toggleTheme} />
-            </main>
-            <Footer dark={dark} />
+            {/* This wrapper is what makes <main> and <Footer> paint
+                ABOVE the sticky background above: it's explicitly
+                positioned with a z-index higher than the background's
+                (0), so it forms its own layer in the stacking order
+                regardless of DOM order. Without this, the footer (a
+                plain static element) would paint BEHIND the
+                background per normal CSS stacking rules and disappear
+                entirely. */}
+            <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1 }}>
+              <main style={{ flex: 1 }}>
+                <RoutedContent dark={dark} toggleTheme={toggleTheme} />
+              </main>
+              <Footer dark={dark} />
+            </div>
           </div>
         </Router>
         </ToastProvider>
