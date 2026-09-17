@@ -5,7 +5,6 @@ import { getPulseTheme, pulseFonts, pulseType } from '../../premiumTheme'
 import QuestionRail from '../../components/QuestionRail'
 import QuestionSourceBadge from '../../components/QuestionSourceBadge'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
-import PulseBackground from '../../components/pulse/PulseBackground'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { FlagIcon, SearchIcon2, LightbulbIcon } from '../../components/ui/tool-icons'
 import { wrapText } from '../../lib/textStyles'
@@ -133,7 +132,6 @@ export default function MCQExamFlow({
 
   return (
     <div style={{ position: 'relative', minHeight: '100dvh' }}>
-      <PulseBackground />
       <style>{`
         .exam-option { transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease; }
         .exam-option:hover { background: var(--opt-hover-bg); }

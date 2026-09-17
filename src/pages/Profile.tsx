@@ -8,7 +8,6 @@ import { glassInput, glassPrimaryBtn, glassGhostBtn } from '../components/pulse/
 import { containsProfanity } from '../lib/moderation'
 import { useToast } from '../components/ToastProvider'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
-import PulseBackground from '../components/pulse/PulseBackground'
 import BackButton from '../components/pulse/BackButton'
 import PulseGlassRow from '../components/pulse/PulseGlassRow'
 import NotificationToggle from '../components/pulse/NotificationToggle'
@@ -161,7 +160,6 @@ export default function Profile({ dark }: { dark: boolean }) {
 
   return (
     <div style={{ position: 'relative' }}>
-      <PulseBackground />
       <div className="pulse-wide" style={{
         position: 'relative', zIndex: 1,
         padding: '24px 20px 100px',
