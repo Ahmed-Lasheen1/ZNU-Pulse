@@ -18,14 +18,16 @@
   inset: 0;
   pointer-events: none;
   background: linear-gradient(180deg,
-    #a6d2ef 0%,
-    #97bcd7 15%,
-    #81a6c3 30%,
-    #6c8fad 45%,
-    #497194 60%,
-    #274e79 75%,
-    #042a59 90%,
-    #010c4a 100%);
+  #a6d2ef 0%,
+  #a6d2ef 6%,      /* hold the top color a bit longer */
+  #97bcd7 18%,
+  #81a6c3 32%,
+  #6c8fad 46%,
+  #497194 60%,
+  #274e79 75%,
+  #042a59 88%,
+  #010c4a 94%,
+  #010c4a 100%);   /* hold the bottom color a bit longer */
 }
 
 /* Fallback paint matching the gradient's darkest stop, in case #app-bg
