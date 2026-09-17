@@ -12,14 +12,7 @@ html, body {
   min-height: 100vh;
 }
 
-/* App-wide gradient. Floating div that scrolls naturally with the page content. */
-#app-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  pointer-events: none;
+body {
   background-image: linear-gradient(180deg,
     #a6d2ef 0%,
     #97bcd7 15%,
