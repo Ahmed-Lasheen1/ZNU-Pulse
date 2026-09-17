@@ -226,9 +226,15 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
   const tickerBaseDelay = NOTIFY_DELAY
 
   return (
-    <div style={{ position: 'relative', overflowX: 'hidden' }}>
+    <div style={{ position: 'relative' }}>
       <PulseBackground />
 
+      {/* Fixed nav header — kept as a sibling of the scrolling content
+          below, not nested inside it. An `overflow` ancestor clips
+          `position: fixed` descendants to its own (scrolling) box, so
+          this and PulseBackground must sit outside that ancestor or
+          they'd get clipped away as the page scrolls — see the note
+          on the wrapper below. */}
       <div style={{
         position: 'fixed',
         top: 0,
@@ -274,269 +280,281 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
         </div>
       </div>
 
-      <div style={{
-        position: 'relative', zIndex: 1,
-        fontFamily: pulseFonts.body
-      }}>
-        <style>{`
-          .pulse-fold {
-            display: flex;
-            flex-direction: column;
-            gap: clamp(16px, 3vh, 40px);
-            padding: clamp(14px, 2.5vh, 28px) 0 clamp(24px, 4vh, 56px);
-            padding-bottom: clamp(24px, 4vh, 56px);
-            box-sizing: border-box;
-          }
+      {/* Scrolling content only. overflow-x:hidden lives here — not on
+          the outer wrapper above — because clipping a fixed-position
+          ancestor's box also clips any `position: fixed` descendant
+          rendered inside it. With it on the outer wrapper, the fixed
+          PulseBackground was clipped to this box's (scrolling) extent:
+          it thinned to nothing as the page scrolled and never covered
+          the site Footer at all, since the Footer renders outside this
+          tree entirely (see App.jsx). Scoping it to just this content
+          wrapper keeps the same horizontal-overflow protection without
+          clipping anything that needs to stay fixed to the viewport. */}
+      <div style={{ position: 'relative', overflowX: 'hidden' }}>
+        <div style={{
+          position: 'relative', zIndex: 1,
+          fontFamily: pulseFonts.body
+        }}>
+          <style>{`
+            .pulse-fold {
+              display: flex;
+              flex-direction: column;
+              gap: clamp(16px, 3vh, 40px);
+              padding: clamp(14px, 2.5vh, 28px) 0 clamp(24px, 4vh, 56px);
+              padding-bottom: clamp(24px, 4vh, 56px);
+              box-sizing: border-box;
+            }
 
-          .pulse-dash-grid {
-            display: grid;
-            grid-template-columns: 1fr 1.3fr 1fr;
-            gap: clamp(14px, 1.6vw, 28px);
-            align-items: stretch;
-          }
-          @media (max-width: 1000px) {
-            .pulse-dash-grid { grid-template-columns: 1fr; }
-            /* Mobile stacking order: hero, then report column, then modules */
-            .pulse-hero-panel { order: 1; }
-            .pulse-dash-report { order: 2; }
-            .pulse-dash-modules { order: 3; }
-          }
+            .pulse-dash-grid {
+              display: grid;
+              grid-template-columns: 1fr 1.3fr 1fr;
+              gap: clamp(14px, 1.6vw, 28px);
+              align-items: stretch;
+            }
+            @media (max-width: 1000px) {
+              .pulse-dash-grid { grid-template-columns: 1fr; }
+              /* Mobile stacking order: hero, then report column, then modules */
+              .pulse-hero-panel { order: 1; }
+              .pulse-dash-report { order: 2; }
+              .pulse-dash-modules { order: 3; }
+            }
 
-          .pulse-report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-          .pulse-tools-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: clamp(10px, 1.2vw, 18px);
-          }
-          @media (max-width: 720px) {
-            .pulse-tools-grid { grid-template-columns: repeat(2, 1fr); }
-          }
+            .pulse-report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+            .pulse-tools-grid {
+              display: grid;
+              grid-template-columns: repeat(4, 1fr);
+              gap: clamp(10px, 1.2vw, 18px);
+            }
+            @media (max-width: 720px) {
+              .pulse-tools-grid { grid-template-columns: repeat(2, 1fr); }
+            }
 
-          .pulse-hero-panel {
-            min-height: clamp(150px, 36vw, 340px);
-          }
-          /* Nudges the ECG art down slightly to balance it within its
-             own column on the 3-column desktop layout — a transform,
-             so it doesn't affect layout height. Below 1000px the grid
-             stacks to one column and the hero panel sits directly
-             above the Weekly Report card, so this offset would bleed
-             into it; disabled there. */
-          .pulse-hero-inner {
-            width: 100%;
-            transform: translateY(8%);
-          }
-          @media (max-width: 1000px) {
-            .pulse-hero-inner { transform: translateY(0); }
-          }
-          @media (max-width: 640px) {
-            .pulse-hero-panel { min-height: clamp(120px, 48vw, 230px); }
-          }
+            .pulse-hero-panel {
+              min-height: clamp(150px, 36vw, 340px);
+            }
+            /* Nudges the ECG art down slightly to balance it within its
+               own column on the 3-column desktop layout — a transform,
+               so it doesn't affect layout height. Below 1000px the grid
+               stacks to one column and the hero panel sits directly
+               above the Weekly Report card, so this offset would bleed
+               into it; disabled there. */
+            .pulse-hero-inner {
+              width: 100%;
+              transform: translateY(8%);
+            }
+            @media (max-width: 1000px) {
+              .pulse-hero-inner { transform: translateY(0); }
+            }
+            @media (max-width: 640px) {
+              .pulse-hero-panel { min-height: clamp(120px, 48vw, 230px); }
+            }
 
-          @media (max-width: 640px) {
-            .pulse-fold { gap: 12px; padding-top: 0; }
-            .pulse-report-grid { gap: 8px; }
-            .pulse-hero-panel { margin-top: -30px; min-height: clamp(90px, 38vw, 190px); }
-          }
-        `}</style>
+            @media (max-width: 640px) {
+              .pulse-fold { gap: 12px; padding-top: 0; }
+              .pulse-report-grid { gap: 8px; }
+              .pulse-hero-panel { margin-top: -30px; min-height: clamp(90px, 38vw, 190px); }
+            }
+          `}</style>
 
-        {/* Matches the header's real rendered height (76px), plus the
-            env(safe-area-inset-top) padding added to the header above
-            now that index.html sets viewport-fit=cover. Falls back to
-            0px where there's no safe area. */}
-        <div style={{ height: 'calc(76px + env(safe-area-inset-top, 0px))' }} />
+          {/* Matches the header's real rendered height (76px), plus the
+              env(safe-area-inset-top) padding added to the header above
+              now that index.html sets viewport-fit=cover. Falls back to
+              0px where there's no safe area. */}
+          <div style={{ height: 'calc(76px + env(safe-area-inset-top, 0px))' }} />
 
-        <div className="pulse-fold">
-          {modulesError && <div className="pulse-wide"><ErrorBanner /></div>}
+          <div className="pulse-fold">
+            {modulesError && <div className="pulse-wide"><ErrorBanner /></div>}
 
-          <motion.div className="pulse-wide"
-            initial={playEntrance ? { opacity: 0, y: 16 } : false}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: NOTIFY_DELAY }}
-          >
-            <NotifyPermissionButton dark={dark} label="Enable exam & deadline reminders" />
-            <GuestSignInButton dark={dark} />
-          </motion.div>
+            <motion.div className="pulse-wide"
+              initial={playEntrance ? { opacity: 0, y: 16 } : false}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: NOTIFY_DELAY }}
+            >
+              <NotifyPermissionButton dark={dark} label="Enable exam & deadline reminders" />
+              <GuestSignInButton dark={dark} />
+            </motion.div>
 
-          <div className="pulse-wide">
-            <div className="pulse-dash-grid">
-              <div className="pulse-dash-report" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <LiquidGlassCard dark={dark} delay={msFor(WEEKLY_REPORT_START)} instant={!playEntrance} style={{ padding: '18px 20px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                    <WeeklyReportIcon color={pt.text} size={16} />
-                    <div style={{ ...pulseType.sectionLabel, fontSize: 16, color: pt.text }}>
-                      Weekly Report
+            <div className="pulse-wide">
+              <div className="pulse-dash-grid">
+                <div className="pulse-dash-report" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <LiquidGlassCard dark={dark} delay={msFor(WEEKLY_REPORT_START)} instant={!playEntrance} style={{ padding: '18px 20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                      <WeeklyReportIcon color={pt.text} size={16} />
+                      <div style={{ ...pulseType.sectionLabel, fontSize: 16, color: pt.text }}>
+                        Weekly Report
+                      </div>
                     </div>
-                  </div>
-                  <div className="pulse-report-grid">
-                    <div>
-                      <div style={{
-                        ...statNumStyle,
-                        color: weeklyFeedback ? weeklyFeedback.color : pt.textPrimary
-                      }}>
-                        {weeklySummary ? (
-                          <>
-                            {playEntrance
-                              ? <NumberTicker value={weeklySummary.accuracy} delay={tickerBaseDelay} />
-                              : weeklySummary.accuracy}%
-                          </>
-                        ) : '—'}
-                      </div>
-                      <div style={{ ...pulseType.small, color: pt.textSecondary, marginTop: 4 }}>
-                        {weeklySummary ? 'Accuracy this week' : 'No questions logged this week'}
-                      </div>
-                      {weeklyFeedback && (
+                    <div className="pulse-report-grid">
+                      <div>
                         <div style={{
-                          display: 'inline-block', marginTop: 6,
-                          background: `${weeklyFeedback.color}18`, border: `1px solid ${weeklyFeedback.color}40`,
-                          color: weeklyFeedback.color, borderRadius: 999, padding: '2px 10px',
-                          fontSize: 11, fontWeight: 700
-                        }}>{weeklyFeedback.label}</div>
-                      )}
-                    </div>
-                    <div>
-                      <div style={{ ...statNumStyle, color: pt.textPrimary }}>
-                        {playEntrance
-                          ? <NumberTicker value={weeklySummary ? weeklySummary.totalAttempted : 0} delay={tickerBaseDelay + 0.15} />
-                          : (weeklySummary ? weeklySummary.totalAttempted : 0)}
+                          ...statNumStyle,
+                          color: weeklyFeedback ? weeklyFeedback.color : pt.textPrimary
+                        }}>
+                          {weeklySummary ? (
+                            <>
+                              {playEntrance
+                                ? <NumberTicker value={weeklySummary.accuracy} delay={tickerBaseDelay} />
+                                : weeklySummary.accuracy}%
+                            </>
+                          ) : '—'}
+                        </div>
+                        <div style={{ ...pulseType.small, color: pt.textSecondary, marginTop: 4 }}>
+                          {weeklySummary ? 'Accuracy this week' : 'No questions logged this week'}
+                        </div>
+                        {weeklyFeedback && (
+                          <div style={{
+                            display: 'inline-block', marginTop: 6,
+                            background: `${weeklyFeedback.color}18`, border: `1px solid ${weeklyFeedback.color}40`,
+                            color: weeklyFeedback.color, borderRadius: 999, padding: '2px 10px',
+                            fontSize: 11, fontWeight: 700
+                          }}>{weeklyFeedback.label}</div>
+                        )}
                       </div>
-                      <div style={{ ...pulseType.small, color: pt.textSecondary, marginTop: 4 }}>Questions attempted</div>
-                    </div>
-                    <div>
-                      <div style={{ ...pulseType.cardTitle, fontSize: 15, color: pt.indigo }}>
-                        {weeklySummary?.topSubjectName || '—'}
-                      </div>
-                      <div style={{ ...pulseType.small, fontSize: 11, color: pt.textMuted, marginTop: 4 }}>Most practiced</div>
-                    </div>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, color: pt.terracotta }}>
-                        <StreakFlameIcon size={16} />
-                        <span style={{ ...pulseType.display, fontSize: 22, lineHeight: 1 }}>
+                      <div>
+                        <div style={{ ...statNumStyle, color: pt.textPrimary }}>
                           {playEntrance
-                            ? <NumberTicker value={streak} delay={tickerBaseDelay + 0.3} />
-                            : streak}
-                        </span>
+                            ? <NumberTicker value={weeklySummary ? weeklySummary.totalAttempted : 0} delay={tickerBaseDelay + 0.15} />
+                            : (weeklySummary ? weeklySummary.totalAttempted : 0)}
+                        </div>
+                        <div style={{ ...pulseType.small, color: pt.textSecondary, marginTop: 4 }}>Questions attempted</div>
                       </div>
-                      <div style={{ ...pulseType.small, fontSize: 11, color: pt.textMuted, marginTop: 4 }}>Day streak</div>
+                      <div>
+                        <div style={{ ...pulseType.cardTitle, fontSize: 15, color: pt.indigo }}>
+                          {weeklySummary?.topSubjectName || '—'}
+                        </div>
+                        <div style={{ ...pulseType.small, fontSize: 11, color: pt.textMuted, marginTop: 4 }}>Most practiced</div>
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, color: pt.terracotta }}>
+                          <StreakFlameIcon size={16} />
+                          <span style={{ ...pulseType.display, fontSize: 22, lineHeight: 1 }}>
+                            {playEntrance
+                              ? <NumberTicker value={streak} delay={tickerBaseDelay + 0.3} />
+                              : streak}
+                          </span>
+                        </div>
+                        <div style={{ ...pulseType.small, fontSize: 11, color: pt.textMuted, marginTop: 4 }}>Day streak</div>
+                      </div>
                     </div>
-                  </div>
-                </LiquidGlassCard>
-
-                {(pausedExam || announcement) && (
-                  <LiquidGlassCard dark={dark} delay={msFor(WEEKLY_REPORT_START) + 200} instant={!playEntrance}
-                    onClick={pausedExam ? () => navigate('/mcq') : undefined}
-                    style={{ padding: '16px 20px' }}>
-                    {pausedExam ? (
-                      <div style={{ ...pulseType.cardTitle, fontSize: 14, color: pt.cobalt, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <PauseIcon color={pt.cobalt} size={13} /> Continue where you left off →
-                      </div>
-                    ) : (
-                      <div style={{
-                        ...pulseType.bodyEmphasis, fontSize: 13, color: pt.textPrimary,
-                        lineHeight: 1.5, whiteSpace: 'pre-line', wordBreak: 'break-word'
-                      }}>
-                        {announcement}
-                      </div>
-                    )}
                   </LiquidGlassCard>
-                )}
-              </div>
 
-              <motion.div className="pulse-hero-panel"
-                initial={playEntrance ? { opacity: 0, scale: 0.85 } : false}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.85, delay: HERO_DELAY }}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
-                <div className="pulse-hero-inner">
-                  <EcgHero height={400} />
-                </div>
-              </motion.div>
-
-              <div className="pulse-dash-modules">
-                <motion.div
-                  initial={playEntrance ? { opacity: 0, y: 16 } : false}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.7, delay: ACTIVE_MODULES_START }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, color: ACTIVE_MODULES_ACCENT, marginBottom: 14, ...pulseType.sectionLabel }}
-                >
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: ACTIVE_MODULES_ACCENT, display: 'inline-block' }} />
-                  Active Modules
-                </motion.div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {modulesLoaded && activeModules.length === 0 && (
-                    <motion.div
-                      initial={playEntrance ? { opacity: 0, y: 16 } : false}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.7, delay: ACTIVE_MODULES_START }}
-                      style={{ ...pulseType.body, color: pt.textSecondary }}
-                    >No active modules yet.</motion.div>
-                  )}
-                  {activeModules.map((mod, i) => (
-                    <LiquidGlassCard key={mod.id} dark={dark} delay={msFor(ACTIVE_MODULES_START) + i * 110} instant={!playEntrance}
-                      onClick={() => navigate(`/module/${mod.id}`)}
-                      style={{ borderRadius: 999, padding: '10px 18px 10px 10px', display: 'flex', alignItems: 'center', gap: 14 }}>
-                      <div style={{
-                        width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
-                        background: `${mod.color}22`, border: `1px solid ${mod.color}55`,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center'
-                      }}>
-                        <ModuleIcon value={mod.icon} size={20} color={mod.color} />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>{mod.name}</div>
-                        <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{moduleBlurb(mod.name)}</div>
-                      </div>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: mod.color, display: 'inline-block', flexShrink: 0 }} />
+                  {(pausedExam || announcement) && (
+                    <LiquidGlassCard dark={dark} delay={msFor(WEEKLY_REPORT_START) + 200} instant={!playEntrance}
+                      onClick={pausedExam ? () => navigate('/mcq') : undefined}
+                      style={{ padding: '16px 20px' }}>
+                      {pausedExam ? (
+                        <div style={{ ...pulseType.cardTitle, fontSize: 14, color: pt.cobalt, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <PauseIcon color={pt.cobalt} size={13} /> Continue where you left off →
+                        </div>
+                      ) : (
+                        <div style={{
+                          ...pulseType.bodyEmphasis, fontSize: 13, color: pt.textPrimary,
+                          lineHeight: 1.5, whiteSpace: 'pre-line', wordBreak: 'break-word'
+                        }}>
+                          {announcement}
+                        </div>
+                      )}
                     </LiquidGlassCard>
-                  ))}
+                  )}
+                </div>
+
+                <motion.div className="pulse-hero-panel"
+                  initial={playEntrance ? { opacity: 0, scale: 0.85 } : false}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.85, delay: HERO_DELAY }}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <div className="pulse-hero-inner">
+                    <EcgHero height={400} />
+                  </div>
+                </motion.div>
+
+                <div className="pulse-dash-modules">
+                  <motion.div
+                    initial={playEntrance ? { opacity: 0, y: 16 } : false}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.7, delay: ACTIVE_MODULES_START }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, color: ACTIVE_MODULES_ACCENT, marginBottom: 14, ...pulseType.sectionLabel }}
+                  >
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: ACTIVE_MODULES_ACCENT, display: 'inline-block' }} />
+                    Active Modules
+                  </motion.div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {modulesLoaded && activeModules.length === 0 && (
+                      <motion.div
+                        initial={playEntrance ? { opacity: 0, y: 16 } : false}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.7, delay: ACTIVE_MODULES_START }}
+                        style={{ ...pulseType.body, color: pt.textSecondary }}
+                      >No active modules yet.</motion.div>
+                    )}
+                    {activeModules.map((mod, i) => (
+                      <LiquidGlassCard key={mod.id} dark={dark} delay={msFor(ACTIVE_MODULES_START) + i * 110} instant={!playEntrance}
+                        onClick={() => navigate(`/module/${mod.id}`)}
+                        style={{ borderRadius: 999, padding: '10px 18px 10px 10px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                        <div style={{
+                          width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
+                          background: `${mod.color}22`, border: `1px solid ${mod.color}55`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}>
+                          <ModuleIcon value={mod.icon} size={20} color={mod.color} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>{mod.name}</div>
+                          <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{moduleBlurb(mod.name)}</div>
+                        </div>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: mod.color, display: 'inline-block', flexShrink: 0 }} />
+                      </LiquidGlassCard>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="pulse-wide" style={{ marginTop: 'clamp(8px, 2vh, 24px)' }}>
-            {sectionTitle('Tools', TOOLS_START, 'top', LightningIcon, true)}
-            <div className="pulse-tools-grid">
-              {toolCards.map((card, i) => {
-                const accentColor = card.accent === 'amber' ? pt.amber : pt.indigo
-                const Icon = card.Icon
-                return (
-                  <LiquidGlassCard key={i} dark={dark} delay={msFor(TOOLS_START) + i * 110} instant={!playEntrance}
-                    onClick={() => navigate(card.to)}
-                    style={{ borderRadius: 22, padding: '18px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-                      <div style={{
-                        width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
-                        background: `${accentColor}22`,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center'
-                      }}>
-                        <Icon color={accentColor} size={19} />
+            <div className="pulse-wide" style={{ marginTop: 'clamp(8px, 2vh, 24px)' }}>
+              {sectionTitle('Tools', TOOLS_START, 'top', LightningIcon, true)}
+              <div className="pulse-tools-grid">
+                {toolCards.map((card, i) => {
+                  const accentColor = card.accent === 'amber' ? pt.amber : pt.indigo
+                  const Icon = card.Icon
+                  return (
+                    <LiquidGlassCard key={i} dark={dark} delay={msFor(TOOLS_START) + i * 110} instant={!playEntrance}
+                      onClick={() => navigate(card.to)}
+                      style={{ borderRadius: 22, padding: '18px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                        <div style={{
+                          width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
+                          background: `${accentColor}22`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}>
+                          <Icon color={accentColor} size={19} />
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ ...pulseType.cardTitle, fontSize: 13, color: pt.textPrimary }}>{card.title}</div>
+                          <div style={{ ...pulseType.small, fontSize: 11, color: pt.textMuted, marginTop: 1 }}>{card.sub}</div>
+                        </div>
                       </div>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ ...pulseType.cardTitle, fontSize: 13, color: pt.textPrimary }}>{card.title}</div>
-                        <div style={{ ...pulseType.small, fontSize: 11, color: pt.textMuted, marginTop: 1 }}>{card.sub}</div>
-                      </div>
-                    </div>
-                    <div style={{ color: pt.textMuted, fontSize: 16, flexShrink: 0 }}>→</div>
-                  </LiquidGlassCard>
-                )
-              })}
+                      <div style={{ color: pt.textMuted, fontSize: 16, flexShrink: 0 }}>→</div>
+                    </LiquidGlassCard>
+                  )
+                })}
+              </div>
             </div>
-          </div>
 
-          <motion.div className="pulse-wide"
-            initial={playEntrance ? { opacity: 0 } : false}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.7, delay: FOOTER_DELAY }}
-            style={{ display: 'flex', alignItems: 'center', gap: 14, justifyContent: 'center' }}
-          >
-            <div style={{ height: 1, background: FOOTER_LINE_COLOR, flex: 1, maxWidth: 120 }} />
-            <div style={{ ...pulseType.small, display: 'flex', alignItems: 'center', gap: 8, color: ON_GRADIENT_BOTTOM.muted }}>
-              <img src="/icon-192.png" alt="" style={{ width: 18, height: 18, borderRadius: 4, objectFit: 'cover' }} />
-              Keep the pulse. Shape the future.
-            </div>
-            <div style={{ height: 1, background: FOOTER_LINE_COLOR, flex: 1, maxWidth: 120 }} />
-          </motion.div>
+            <motion.div className="pulse-wide"
+              initial={playEntrance ? { opacity: 0 } : false}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.7, delay: FOOTER_DELAY }}
+              style={{ display: 'flex', alignItems: 'center', gap: 14, justifyContent: 'center' }}
+            >
+              <div style={{ height: 1, background: FOOTER_LINE_COLOR, flex: 1, maxWidth: 120 }} />
+              <div style={{ ...pulseType.small, display: 'flex', alignItems: 'center', gap: 8, color: ON_GRADIENT_BOTTOM.muted }}>
+                <img src="/icon-192.png" alt="" style={{ width: 18, height: 18, borderRadius: 4, objectFit: 'cover' }} />
+                Keep the pulse. Shape the future.
+              </div>
+              <div style={{ height: 1, background: FOOTER_LINE_COLOR, flex: 1, maxWidth: 120 }} />
+            </motion.div>
+          </div>
         </div>
 
         {/* Completed Modules — collapsible, muted card treatment */}

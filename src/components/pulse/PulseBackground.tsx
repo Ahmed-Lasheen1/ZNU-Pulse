@@ -25,12 +25,22 @@ export const PULSE_BG = [
 // untouched. Defaults to on; pass `interactive={false}` on any page
 // where the extra canvas isn't wanted (e.g. if a specific page turns
 // out to feel too busy with it, or on very low-power devices).
+//
+// Must stay `position: fixed`, pinned to the viewport — not
+// `absolute`. An `absolute` background is sized by its positioned
+// ancestor and scrolls away with the page; `fixed` is what makes it
+// read as one continuous backdrop behind every page, including the
+// site Footer, at any scroll position. (See Home.tsx for the one
+// place this previously broke: an `overflow-x: hidden` ancestor
+// clips `fixed` descendants to its own box, which is exactly what
+// caused the gap/mismatched-footer bug — the background itself was
+// never the problem.)
 export default function PulseBackground({ interactive = true }: { interactive?: boolean } = {}) {
   return (
     <div
       aria-hidden
       style={{
-        position: 'absolute', inset: 0,
+        position: 'fixed', inset: 0,
         zIndex: 0, pointerEvents: 'none',
         background: PULSE_BG,
         overflow: 'hidden',
