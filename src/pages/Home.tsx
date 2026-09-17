@@ -238,7 +238,15 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
         pointerEvents: 'none',
       }}>
         <div className="pulse-wide" style={{
-          paddingTop: 16,
+          // index.html sets viewport-fit=cover so PulseBackground can
+          // bleed under the notch/status bar — this fixed header would
+          // otherwise bleed under it too, so top padding grows by
+          // env(safe-area-inset-top) to keep the brand/nav row clear of
+          // it. Falls back to 0px where there's no safe area, so this
+          // is pixel-identical to before there. Mirrors the same
+          // change in PulseOverlayHeader.jsx (the non-Home version of
+          // this same header).
+          paddingTop: 'calc(16px + env(safe-area-inset-top, 0px))',
           paddingBottom: 16,
           pointerEvents: 'auto'
         }}>
@@ -331,8 +339,11 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
           }
         `}</style>
 
-        {/* Matches the header's real rendered height: 16px + logo row + bottom padding */}
-        <div style={{ height: 76 }} />
+        {/* Matches the header's real rendered height (76px), plus the
+            env(safe-area-inset-top) padding added to the header above
+            now that index.html sets viewport-fit=cover. Falls back to
+            0px where there's no safe area. */}
+        <div style={{ height: 'calc(76px + env(safe-area-inset-top, 0px))' }} />
 
         <div className="pulse-fold">
           {modulesError && <div className="pulse-wide"><ErrorBanner /></div>}

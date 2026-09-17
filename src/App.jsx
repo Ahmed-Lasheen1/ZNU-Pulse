@@ -75,7 +75,12 @@ function SiteHeader({ dark, toggleTheme }) {
   return (
     <>
       <PulseOverlayHeader dark={dark} toggleTheme={toggleTheme} />
-      <div style={{ height: 76 }} />
+      {/* Matches PulseOverlayHeader's real rendered height (76px), plus
+          the env(safe-area-inset-top) padding added there now that
+          index.html sets viewport-fit=cover — otherwise page content
+          would sit partly underneath the fixed header on notched
+          devices. Falls back to 0px where there's no safe area. */}
+      <div style={{ height: 'calc(76px + env(safe-area-inset-top, 0px))' }} />
     </>
   )
 }

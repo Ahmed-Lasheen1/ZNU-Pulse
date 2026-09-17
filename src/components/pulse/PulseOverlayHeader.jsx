@@ -21,7 +21,13 @@ export default function PulseOverlayHeader({ dark, toggleTheme }) {
       zIndex: 500, pointerEvents: 'none'
     }}>
       <div className="pulse-wide" style={{
-        paddingTop: 16,
+        // index.html now sets viewport-fit=cover so PulseBackground can
+        // bleed under the notch/status bar — this fixed header would
+        // otherwise bleed under it too, so its top padding grows by
+        // env(safe-area-inset-top) to keep the brand/nav row clear of it.
+        // Falls back to 0px on devices/browsers with no safe area, so
+        // this is pixel-identical to before there.
+        paddingTop: 'calc(16px + env(safe-area-inset-top, 0px))',
         paddingBottom: 16,
         pointerEvents: 'auto'
       }}>

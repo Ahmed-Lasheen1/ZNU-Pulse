@@ -36,7 +36,13 @@ export default function ToastProvider({ children }) {
       {toast && (
         <div style={{
           position: 'fixed',
-          bottom: 24,
+          // + env(safe-area-inset-bottom) now that index.html sets
+          // viewport-fit=cover and PulseBackground bleeds under the
+          // home-indicator — keeps the toast clear of that swipe area
+          // instead of sitting under/near it. Falls back to 0px where
+          // there's no safe area, so this is pixel-identical to before
+          // there.
+          bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
           left: '50%', transform: 'translateX(-50%)',
           background: toast.type === 'error' ? '#ef4444' : '#1e293b',
           color: '#fff', padding: '10px 20px', borderRadius: 12,
