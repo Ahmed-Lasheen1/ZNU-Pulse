@@ -4,28 +4,38 @@
   box-sizing: border-box;
 }
 
-html {
-  isolation: isolate;
-  min-height: 100%;
-}
+/* Single source of truth for the ZNU Pulse background gradient.
+   Painted via a body::before pseudo-element rather than
+   `background` + `background-attachment: fixed` on html/body —
+   `background-attachment: fixed` is not reliably supported on mobile
+   Safari/Chrome (iOS in particular effectively never honors it; it
+   silently scrolls the background with the page instead).
 
+   A real `position: fixed` element sidesteps that — fixed positioning
+   is reliably supported everywhere, including iOS. Pinned with
+   `inset: 0`, so it's always sized to the exact current viewport,
+   which removes any white bars from dynamic-viewport resizing.
+
+   Safe for `position: sticky`/`fixed` elsewhere in the app because
+   it's a pseudo-element of `body`, not a wrapper around any page
+   content — it's a sibling of the React root (#root), never an
+   ancestor of anything sticky/fixed lives inside.
+
+   IMPORTANT: no z-index here, and body has no background-color of
+   its own (see below). z-index: -1 would put this pseudo-element
+   BELOW the painting layer that in-flow, non-positioned element
+   backgrounds live in — including body's own background-color, if it
+   had one — which is exactly what silently hid the gradient behind a
+   solid navy fill. With z-index left at its default (auto), stacking
+   falls back to DOM order: since this is body's first child, it
+   paints behind every other fixed/positioned element that comes
+   after it in the tree (like KineticGrid's overlay canvas), which is
+   all the ordering it actually needs. */
 body::before {
   content: "";
   position: fixed;
-  /* Extends beyond safe boundaries to cover the status bar completely */
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 100lvh; /* Uses Large Viewport Height to prevent dynamic URL/status bar gaps */
-  padding-top: env(safe-area-inset-top);
-  
-  z-index: -1;
+  inset: 0;
   pointer-events: none;
-
-  will-change: transform;
-  transform: translateZ(0);
-
   background: linear-gradient(180deg,
     #a6d2ef 0%,
     #97bcd7 15%,
@@ -43,7 +53,15 @@ body::before {
    html, not body — see the note on body::before above for why
    setting it on both broke the gradient entirely. */
 html {
-  background-color: #a6d2ef;
+  background: linear-gradient(180deg,
+    #a6d2ef 0%,
+    #97bcd7 15%,
+    #81a6c3 30%,
+    #6c8fad 45%,
+    #497194 60%,
+    #274e79 75%,
+    #042a59 90%,
+    #010c4a 100%);
 }
 
 body {
