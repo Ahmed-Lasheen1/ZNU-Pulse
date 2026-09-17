@@ -7,24 +7,17 @@
 /* Stops iOS/Android rubber-band overscroll from revealing whatever's
    behind #app-bg at the top/bottom edges — that reveal is what showed
    up as stray solid-color bars. */
-html {
-  min-height: 100%;
-}
-
-body {
-  position: relative;
-  min-height: 100dvh;
+html, body {
   overscroll-behavior-y: none;
+  min-height: 100dvh;
 }
 
 #app-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%; /* Stretches to match the full scrollable height of the body */
+  position: fixed;
+  inset: 0;
   pointer-events: none;
 
+  /* Render a tall background (1x viewport height) */
   background-image: linear-gradient(180deg,
     #a6d2ef 0%,
     #97bcd7 15%,
@@ -34,8 +27,21 @@ body {
     #274e79 75%,
     #042a59 90%,
     #010c4a 100%);
-  background-size: 100% 100%; /* Forces the entire gradient to stretch end-to-end */
-  background-repeat: no-repeat;
+  background-size: 100% 100dvh;
+  background-position: top center;
+
+  /* Link the background movement directly to the document scroll position */
+  animation: scroll-gradient linear sequence();
+  animation-timeline: scroll(root);
+}
+
+@keyframes scroll-gradient {
+  from {
+    background-position: top center;
+  }
+  to {
+    background-position: bottom center;
+  }
 }
 
 /* Fallback paint matching the gradient's darkest stop, in case #app-bg
