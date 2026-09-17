@@ -22,9 +22,19 @@
 
 body {
   font-family: 'Sora', 'Segoe UI', sans-serif;
-  background: #0f172a;
+  /* Rough two-stop preview of PULSE_BG (same 180deg direction, its
+     palest top stop and darkest bottom stop) — shows for the instant
+     before React/PulseBackground paints, and behind any transient
+     gap, without a flat-color mismatch against the real gradient. */
+  background: linear-gradient(180deg, #a6d2ef 0%, #010c4a 100%);
+  background-attachment: fixed;
   color: #e2e8f0;
   direction: ltr;
+}
+
+html, body {
+  height: 100%;
+  overflow-x: hidden; /* root-level only: doesn't clip position:fixed, just kills horizontal scroll/gaps */
 }
 
 .app {
