@@ -4,47 +4,17 @@
   box-sizing: border-box;
 }
 
-/* Single source of truth for the ZNU Pulse background gradient.
-   Painted via a body::before pseudo-element rather than
-   `background` + `background-attachment: fixed` on html/body —
-   `background-attachment: fixed` is not reliably supported on mobile
-   Safari/Chrome (iOS in particular effectively never honors it; it
-   silently scrolls the background with the page instead).
+html {
+  min-height: 100vh;
+}
 
-   A real `position: fixed` element sidesteps that — fixed positioning
-   is reliably supported everywhere, including iOS. Pinned with
-   `inset: 0`, so it's always sized to the exact current viewport,
-   which removes any white bars from dynamic-viewport resizing.
-
-   Safe for `position: sticky`/`fixed` elsewhere in the app because
-   it's a pseudo-element of `body`, not a wrapper around any page
-   content — it's a sibling of the React root (#root), never an
-   ancestor of anything sticky/fixed lives inside.
-
-   IMPORTANT: no z-index here, and body has no background-color of
-   its own (see below). z-index: -1 would put this pseudo-element
-   BELOW the painting layer that in-flow, non-positioned element
-   backgrounds live in — including body's own background-color, if it
-   had one — which is exactly what silently hid the gradient behind a
-   solid navy fill. With z-index left at its default (auto), stacking
-   falls back to DOM order: since this is body's first child, it
-   paints behind every other fixed/positioned element that comes
-   after it in the tree (like KineticGrid's overlay canvas), which is
-   all the ordering it actually needs. */
-body::before {
-  content: "";
-  position: sticky;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(180deg,
-    #a6d2ef 0%,
-    #97bcd7 15%,
-    #81a6c3 30%,
-    #6c8fad 45%,
-    #497194 60%,
-    #274e79 75%,
-    #042a59 90%,
-    #010c4a 100%);
+body {
+  min-height: 100vh;
+  background-color: #010c4a;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23a6d2ef'/%3E%3Cstop offset='15%25' stop-color='%2397bcd7'/%3E%3Cstop offset='30%25' stop-color='%2381a6c3'/%3E%3Cstop offset='45%25' stop-color='%236c8fad'/%3E%3Cstop offset='60%25' stop-color='%23497194'/%3E%3Cstop offset='75%25' stop-color='%23274e79'/%3E%3Cstop offset='90%25' stop-color='%23042a59'/%3E%3Cstop offset='100%25' stop-color='%23010c4a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 100% 100vh;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
 }
 
 /* Fallback paint (matches the gradient's darkest stop) in case the
