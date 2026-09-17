@@ -33,7 +33,7 @@
    all the ordering it actually needs. */
 body::before {
   content: "";
-  position: fixed;
+  position: absolute;
   inset: 0;
   pointer-events: none;
   background: linear-gradient(180deg,
@@ -53,7 +53,7 @@ body::before {
    html, not body — see the note on body::before above for why
    setting it on both broke the gradient entirely. */
 html {
-  background-color: #010c4a;
+  background-color: #a6d2ef;
 }
 
 body {
