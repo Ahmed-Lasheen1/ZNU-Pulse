@@ -391,8 +391,15 @@ export default function KineticGrid({
       <canvas
         ref={canvasRef}
         aria-hidden
-        style={{ opacity }}
-        className={cn("fixed inset-0 w-full h-full pointer-events-none", className)}
+        style={{
+          position: "fixed",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none",
+          opacity,
+        }}
+        className={cn(className)}
       />
     );
   }
@@ -405,7 +412,17 @@ export default function KineticGrid({
         className,
       )}
     >
-      <canvas ref={canvasRef} className="fixed inset-0 w-full h-full z-0 pointer-events-none" />
+      <canvas
+        ref={canvasRef}
+        style={{
+          position: "fixed",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          zIndex: 0,
+          pointerEvents: "none",
+        }}
+      />
       <div className="relative z-10 w-full h-full">{children}</div>
     </div>
   );
