@@ -132,7 +132,7 @@ export default function MCQExamFlow({
   const weakestSubject = subjectStats.find(s => s.incorrect > 0) || null
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh' }}>
+    <div style={{ position: 'relative', minHeight: '100dvh' }}>
       <PulseBackground />
       <style>{`
         .exam-option { transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease; }
