@@ -46,7 +46,7 @@ export default function PulseBackground({ interactive = true }: { interactive?: 
     <div
       aria-hidden
       style={{
-        position: 'sticky',
+        position: 'absolute',
         top: 0,
         height: '100dvh',
         marginBottom: '-100dvh',
