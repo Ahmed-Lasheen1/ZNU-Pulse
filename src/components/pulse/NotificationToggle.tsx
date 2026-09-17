@@ -7,23 +7,6 @@ import LiquidGlassCard from '../ui/liquid-glass-card'
 import PulseSwitch from '../ui/pulse-switch'
 import { BellIcon } from '../ui/tool-icons'
 
-// Persistent on/off control for push notifications, shown on the
-// Profile page — the counterpart to NotifyPermissionButton's one-shot
-// call-to-action banner (Home/Checklist/AnonQuestions). Both read the
-// same shared status (see useNotificationStatus) so they never
-// disagree about whether notifications are actually on.
-//
-// `switchSize` scales ONLY the PulseSwitch control itself (via its
-// own `size` prop) — the card, text, and icon around it stay at their
-// normal size. Defaults to 1 (PulseSwitch's own default), so every
-// other place this is used is unaffected; Profile.tsx passes a larger
-// value to make just the switch easier to see/tap there.
-//
-// A browser can only be un-blocked by the person themselves, from
-// their own browser's site settings — no page can do that
-// programmatically. When permission is 'denied', the switch renders
-// off and disabled; tapping it explains that via a toast instead of
-// silently doing nothing.
 export default function NotificationToggle({ dark, switchSize = 1 }: { dark: boolean; switchSize?: number }) {
   const pt = getPulseTheme(dark)
   const showToast = useToast() as (message: string, type?: 'success' | 'error') => void
@@ -34,14 +17,18 @@ export default function NotificationToggle({ dark, switchSize = 1 }: { dark: boo
 
   async function handleToggle() {
     if (busy) return
+    // Set immediately, before any other logic — a very fast double
+    // tap could otherwise slip past the `if (busy) return` check
+    // above before React re-renders with the new state.
+    setBusy(true)
 
     if (!supported) {
+      setBusy(false)
       showToast("🔕 Notifications aren't supported in this browser. On iPhone, add this site to your Home Screen first (Share → Add to Home Screen), then open it from there.", 'error')
       return
     }
 
     if (enabled) {
-      setBusy(true)
       const result = await unsubscribeFromPush()
       setBusy(false)
       await refresh()
@@ -50,11 +37,11 @@ export default function NotificationToggle({ dark, switchSize = 1 }: { dark: boo
     }
 
     if (permission === 'denied') {
+      setBusy(false)
       showToast("🔕 Notifications are blocked for this site. Enable them from your browser's site settings, then reload the page.", 'error')
       return
     }
 
-    setBusy(true)
     let perm = permission
     if (perm === 'default') perm = await Notification.requestPermission()
 

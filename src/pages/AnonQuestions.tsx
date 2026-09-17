@@ -9,10 +9,12 @@ import PageShell from '../components/pulse/PageShell'
 import PageIntro from '../components/pulse/PageIntro'
 import LoadingText from '../components/pulse/LoadingText'
 import EmptyState from '../components/pulse/EmptyState'
+import ErrorBanner from '../components/ErrorBanner'
 import NotifyPermissionButton from '../components/NotifyPermissionButton'
 import { useToast } from '../components/ToastProvider'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { containsProfanity } from '../lib/moderation'
+import { isSuccessMessage } from '../lib/messageStyle'
 import { getMyAnonTokens, addMyAnonToken, getNotifiedTokens, markTokensNotified } from '../lib/anonTracking'
 import { AnonQAIcon, QuestionMarkIcon, ClockIcon, CheckCircleIcon, TrashIcon, LightbulbIcon, EmptyBoxIcon } from '../components/ui/tool-icons'
 import { Lock } from 'lucide-react'
@@ -43,8 +45,10 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
   const [myQuestions, setMyQuestions] = useState<AnonQuestion[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [loadMoreError, setLoadMoreError] = useState(false)
   const [newQ, setNewQ] = useState('')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [msg, setMsg] = useState('')
   const [replyText, setReplyText] = useState<Record<string, string>>({})
   const [cooldownRemaining, setCooldownRemaining] = useState(0)
@@ -100,12 +104,14 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
       setQuestions(data)
       setHasMore(data.length === RECENT_QUESTIONS_LIMIT)
     }
+    if (error) setLoadError(true)
     setLoading(false)
   }
 
   async function loadMoreQuestions() {
     if (loadingMore) return
     setLoadingMore(true)
+    setLoadMoreError(false)
     const { data, error } = await supabase
       .from('anonymous_questions')
       .select('id, question, answer, answered, created_at')
@@ -117,14 +123,16 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
       setQuestions(prev => [...prev, ...data])
       setHasMore(data.length === RECENT_QUESTIONS_LIMIT)
     }
+    if (error) setLoadMoreError(true)
   }
 
   async function fetchMyQuestions(isIgnored: () => boolean = () => false) {
     const myTokens = getMyAnonTokens()
     if (myTokens.length === 0) { if (!isIgnored()) setMyQuestions([]); return }
-    const { data } = await supabase.rpc('get_my_anon_questions', { p_tokens: myTokens })
+    const { data, error } = await supabase.rpc('get_my_anon_questions', { p_tokens: myTokens })
     if (isIgnored()) return
     if (data) setMyQuestions(data)
+    if (error) setLoadError(true)
   }
 
   async function submitQuestion() {
@@ -177,7 +185,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
   const answeredQs = questions.filter(q => q.answered)
   const unansweredQs = questions.filter(q => !q.answered)
 
-  const isSuccess = msg.includes('✅')
+  const isSuccess = isSuccessMessage(msg)
   const inStyle = { ...glassInput(pt, dark), padding: '13px 20px' }
   const submitDisabled = cooldownRemaining > 0
   const cooldownSeconds = Math.ceil(cooldownRemaining / 1000)
@@ -185,6 +193,8 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
   return (
     <PageShell dark={dark} backFallback="/" maxWidth={900}>
       <PageIntro dark={dark} emoji={<AnonQAIcon color={ON_GRADIENT_TOP.primary} size={40} />} title="Anonymous Questions" subtitle="Ask anything anonymously — no one knows who you are!" paddingBottom={16} />
+
+      {loadError && <div style={{ marginBottom: 20 }}><ErrorBanner message="Couldn't load questions — check your connection." /></div>}
 
       <div style={{ marginBottom: 20 }}>
         <NotifyPermissionButton dark={dark} label="Notify me when my question is answered" />
@@ -304,7 +314,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
           <CheckCircleIcon color="#4ade80" size={14} /> Answered Questions ({answeredQs.length})
         </h3>
         {loading && <LoadingText />}
-        {!loading && answeredQs.length === 0 && (
+        {!loading && !loadError && answeredQs.length === 0 && (
           <EmptyState dark={dark} icon={<EmptyBoxIcon color={pt.sub} size={16} />} message="No answered questions yet" />
         )}
         {answeredQs.map((q, i) => {
@@ -337,6 +347,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
             </div>
           )
         })}
+        {loadMoreError && <div style={{ marginTop: 16 }}><ErrorBanner message="Couldn't load more questions — check your connection." /></div>}
         {!loading && hasMore && (
           <div style={{ textAlign: 'center', marginTop: 16 }}>
             <button onClick={loadMoreQuestions} disabled={loadingMore} style={{

@@ -9,6 +9,7 @@ import PageShell from '../components/pulse/PageShell'
 import ModuleNotFoundState from '../components/pulse/ModuleNotFoundState'
 import EntityPageHeader from '../components/pulse/EntityPageHeader'
 import SummaryOverlay from '../components/SummaryOverlay'
+import LoadingText from '../components/pulse/LoadingText'
 import { useModules } from '../contexts'
 import { fetchLessonById } from '../lib/lessons'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
@@ -70,7 +71,7 @@ export default function LessonPage({ dark }: { dark: boolean }) {
 
   return (
     <PageShell dark={dark} backFallback={`/module/${moduleId}/subject/${subjectId}`}>
-      {loading && <p style={{ color: ON_GRADIENT_TOP.secondary, textAlign: 'center' }}>Loading...</p>}
+      {loading && <LoadingText />}
       {loadError && <ErrorBanner />}
 
       {lesson && (

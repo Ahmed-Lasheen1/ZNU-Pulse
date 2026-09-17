@@ -8,6 +8,8 @@ import SummaryOverlay from '../components/SummaryOverlay'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PageShell from '../components/pulse/PageShell'
 import TabRow from '../components/TabRow'
+import LoadingText from '../components/pulse/LoadingText'
+import EmptyState from '../components/pulse/EmptyState'
 import { useModules } from '../contexts'
 import { fetchModuleStages } from '../lib/moduleStages'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
@@ -103,14 +105,10 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
         style={{ marginBottom: 20 }}
       />
 
-      {loading && <p style={{ color: ON_GRADIENT_TOP.secondary, textAlign: 'center' }}>Loading...</p>}
+      {loading && <LoadingText />}
 
       {!loading && filtered.length === 0 && (
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-          <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-            <ConstructionIcon color={pt.sub} size={14} /> No summaries here yet
-          </p>
-        </LiquidGlassCard>
+        <EmptyState dark={dark} icon={<ConstructionIcon color={pt.sub} size={14} />} message="No summaries here yet" />
       )}
 
       <div className="summaries-list-wide" style={{ display: 'grid', gap: 12 }}>

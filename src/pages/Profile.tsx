@@ -3,14 +3,16 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
 import { useAuth } from '../contexts'
-import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
+import { getPulseTheme, pulseFonts, pulseType } from '../premiumTheme'
 import { glassInput, glassPrimaryBtn, glassGhostBtn } from '../components/pulse/PulseUI'
 import { containsProfanity } from '../lib/moderation'
+import { isSuccessMessage } from '../lib/messageStyle'
 import { useToast } from '../components/ToastProvider'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import BackButton from '../components/pulse/BackButton'
 import PulseGlassRow from '../components/pulse/PulseGlassRow'
 import NotificationToggle from '../components/pulse/NotificationToggle'
+import LoadingText from '../components/pulse/LoadingText'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { LeaderboardIcon, ClockIcon } from '../components/ui/tool-icons'
 import { Lock, User, Star, ClipboardList, Pencil, Award } from 'lucide-react'
@@ -39,7 +41,7 @@ function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
 
-  const isSuccess = msg.includes('✅')
+  const isSuccess = isSuccessMessage(msg)
   const inStyle = { ...glassInput(pt, dark), padding: '13px 20px' }
 
   async function saveName() {
@@ -205,7 +207,7 @@ export default function Profile({ dark }: { dark: boolean }) {
                 </button>
               </LiquidGlassCard>
             ) : loading ? (
-              <p style={{ color: ON_GRADIENT_TOP.secondary, textAlign: 'center' }}>Loading...</p>
+              <LoadingText />
             ) : profile ? (
               <div>
                 <div style={{ marginBottom: 16 }}>

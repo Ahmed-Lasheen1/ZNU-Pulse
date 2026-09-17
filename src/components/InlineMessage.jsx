@@ -1,3 +1,5 @@
+import { isSuccessMessage } from '../lib/messageStyle'
+
 // Shared success/error banner. Used to be the same block of styles
 // copy-pasted in Auth, Profile and Admin. A message is treated as
 // "success" if it contains a ✅, otherwise it's shown as an error —
@@ -5,7 +7,7 @@
 // calls with '✅ ...' or '❌ ...').
 export default function InlineMessage({ message }) {
   if (!message) return null
-  const isSuccess = message.includes('✅')
+  const isSuccess = isSuccessMessage(message)
 
   return (
     <div style={{

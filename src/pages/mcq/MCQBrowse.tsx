@@ -9,6 +9,7 @@ import TabRow from '../../components/TabRow'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PageShell from '../../components/pulse/PageShell'
 import PulseGlassRow from '../../components/pulse/PulseGlassRow'
+import LoadingText from '../../components/pulse/LoadingText'
 import { ModuleIcon, ExamIcon } from '../../lib/medicalIcons'
 import { OfflineIcon, BookIcon, PauseIcon, PlayIcon, EmptyBoxIcon } from '../../components/ui/tool-icons'
 import { MCQ_ACCENT } from './mcqShared'
@@ -135,7 +136,7 @@ export default function MCQBrowse({
         style={{ marginBottom: 28 }}
       />
 
-      {loading && <p style={{ color: ON_GRADIENT_TOP.secondary, textAlign: 'center' }}>Loading...</p>}
+      {loading && <LoadingText />}
 
       {/* Mock Exam — hero banner */}
       <div style={{ marginBottom: 32 }}>

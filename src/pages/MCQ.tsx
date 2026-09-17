@@ -386,7 +386,13 @@ export default function MCQ({ dark }: { dark: boolean }) {
     setStruckOut({})
     gradingInFlightRef.current.clear()
     sessionIdRef.current++
-    loadFlagsFor(qs.map(q => q.id)).then(setFlaggedIds)
+    // Captured AFTER the increment above, so a flags response that
+    // resolves after the user has since started/exited a different
+    // quiz session is discarded instead of overwriting its flags.
+    const flagSession = sessionIdRef.current
+    loadFlagsFor(qs.map(q => q.id)).then(ids => {
+      if (sessionIdRef.current === flagSession) setFlaggedIds(ids)
+    })
 
     quizStartedAtRef.current = Date.now()
     startTimer(quizStartedAtRef.current, type)
@@ -413,7 +419,10 @@ export default function MCQ({ dark }: { dark: boolean }) {
     sessionIdRef.current++
     quizStartedAtRef.current = Date.now()
     startTimer(quizStartedAtRef.current, 'retry')
-    loadFlagsFor(list.map(q => q.id)).then(setFlaggedIds)
+    const flagSession = sessionIdRef.current
+    loadFlagsFor(list.map(q => q.id)).then(ids => {
+      if (sessionIdRef.current === flagSession) setFlaggedIds(ids)
+    })
     window.scrollTo({ top: 0 })
   }
 
@@ -431,7 +440,10 @@ export default function MCQ({ dark }: { dark: boolean }) {
     gradingInFlightRef.current.clear()
     sessionIdRef.current++
     quizStartedAtRef.current = resumeData.startedAt
-    loadFlagsFor((resumeData.quizQuestions || []).map((q: any) => q.id)).then(setFlaggedIds)
+    const flagSession = sessionIdRef.current
+    loadFlagsFor((resumeData.quizQuestions || []).map((q: any) => q.id)).then(ids => {
+      if (sessionIdRef.current === flagSession) setFlaggedIds(ids)
+    })
 
     startTimer(resumeData.startedAt, resumeData.quizMode)
     setResumeData(null)

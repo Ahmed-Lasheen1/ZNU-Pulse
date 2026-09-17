@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
-import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
+import { getPulseTheme, pulseType } from '../premiumTheme'
 import ErrorBanner from '../components/ErrorBanner'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PageShell from '../components/pulse/PageShell'
@@ -10,6 +10,8 @@ import ModuleNotFoundState from '../components/pulse/ModuleNotFoundState'
 import EntityPageHeader from '../components/pulse/EntityPageHeader'
 import AutoGrid from '../components/AutoGrid'
 import SummaryOverlay from '../components/SummaryOverlay'
+import LoadingText from '../components/pulse/LoadingText'
+import EmptyState from '../components/pulse/EmptyState'
 import { useToast } from '../components/ToastProvider'
 import { useModules } from '../contexts'
 import { fetchSubjectById } from '../lib/subjects'
@@ -159,16 +161,15 @@ export default function SubjectPage({ dark }: { dark: boolean }) {
         </div>
       )}
 
-      {loading && <p style={{ color: ON_GRADIENT_TOP.secondary, textAlign: 'center' }}>Loading...</p>}
+      {loading && <LoadingText />}
       {loadError && <ErrorBanner />}
 
       {!loading && visibleLessons.length === 0 && (
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-          <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-            <ConstructionIcon color={pt.sub} size={14} />
-            {stageParam ? 'No lessons tagged to this exam stage yet' : 'No lessons here yet'}
-          </p>
-        </LiquidGlassCard>
+        <EmptyState
+          dark={dark}
+          icon={<ConstructionIcon color={pt.sub} size={14} />}
+          message={stageParam ? 'No lessons tagged to this exam stage yet' : 'No lessons here yet'}
+        />
       )}
 
       {visibleLessons.length > 0 && (

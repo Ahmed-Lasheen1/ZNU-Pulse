@@ -1,23 +1,16 @@
 import type { ReactNode } from 'react'
-import { getPulseTheme } from '../../premiumTheme'
-import LiquidGlassCard from '@/components/ui/liquid-glass-card'
+import EmptyState from '../../components/pulse/EmptyState'
 
 interface AdminStatusCardProps {
   dark: boolean
   message: ReactNode
 }
 
-// Shared "Loading..." / "No X yet" card — every admin tab's list
-// column showed this exact same wrapper (LiquidGlassCard, 40px
-// padding, centered pt.sub text) for both its loading and empty
-// states, just with different inner content.
+// Thin wrapper over the shared EmptyState card — AdminStatusCard and
+// EmptyState rendered byte-for-byte identical markup (LiquidGlassCard,
+// 40px padding, centered pt.sub text row), just from two separate
+// files. Every admin tab's <AdminStatusCard dark={...} message={...} />
+// call site is unchanged — same padding, same layout.
 export default function AdminStatusCard({ dark, message }: AdminStatusCardProps) {
-  const pt = getPulseTheme(dark)
-  return (
-    <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-      <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-        {message}
-      </p>
-    </LiquidGlassCard>
-  )
+  return <EmptyState dark={dark} message={message} />
 }

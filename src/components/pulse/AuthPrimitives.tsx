@@ -1,6 +1,7 @@
 // src/components/pulse/AuthPrimitives.tsx
 import type { ReactNode, CSSProperties } from 'react'
 import { getPulseTheme, pulseFonts } from '../../premiumTheme'
+import { isSuccessMessage } from '../../lib/messageStyle'
 import PulseGlassRow from './PulseGlassRow'
 
 type PulseTheme = ReturnType<typeof getPulseTheme>
@@ -87,7 +88,7 @@ export function AccountToggle({ dark, pt, active, onClick, children }: {
 // Success/error message banner shown at the top of an auth form.
 export function AuthMessage({ dark, message }: { dark: boolean; message: string }) {
   if (!message) return null
-  const isSuccess = message.includes('✅')
+  const isSuccess = isSuccessMessage(message)
   const tint = isSuccess ? 'rgba(74,222,128,0.18)' : 'rgba(239,107,87,0.18)'
   return (
     <div style={{ marginBottom: 16 }}>
