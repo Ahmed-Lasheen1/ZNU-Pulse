@@ -20,9 +20,52 @@
   box-sizing: border-box;
 }
 
+/* Single source of truth for the ZNU Pulse background gradient —
+   previously every page painted its own copy of this via
+   <PulseBackground /> (see that file), sized to that page's own
+   content height. On any page shorter than the viewport this left
+   three problems: the Footer (a sibling of <main>, outside every
+   page's own background wrapper) never got the gradient at all; the
+   fixed header on non-Home pages showed App.jsx's own separate,
+   differently-colored gradient bleeding through underneath it; and
+   the bottom safe-area (below short content, down to the home
+   indicator) fell through to this file's old flat body background
+   instead of the gradient's dark end.
+   
+   Moving the gradient here and painting it on `html` fixes all three
+   at once — `html`'s background always covers the full viewport
+   height regardless of any page's content length, so the Footer, the
+   area behind fixed headers, and the bottom safe area all
+   automatically match, with no per-page sizing to get wrong.
+
+   `background-attachment: fixed` (NOT `position: fixed`) is what
+   makes it behave like a pinned backdrop — status bar always pale,
+   home-indicator area always dark, doesn't shift while scrolling.
+   Unlike `position: fixed`, this only changes how the background
+   LAYER is painted; it doesn't establish a new containing block, so
+   it has zero effect on any descendant's `position: fixed` or
+   `position: sticky` — nothing else in the app needs to change
+   because of it. Applied to `html` rather than `body` because that's
+   the standard workaround for `background-attachment: fixed` on iOS
+   Safari, and it's also what lets the color extend correctly into
+   the elastic-overscroll/safe-area regions. */
+html {
+  min-height: 100%;
+  background: linear-gradient(180deg,
+    #a6d2ef 0%,
+    #97bcd7 15%,
+    #81a6c3 30%,
+    #6c8fad 45%,
+    #497194 60%,
+    #274e79 75%,
+    #042a59 90%,
+    #010c4a 100%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
 body {
   font-family: 'Sora', 'Segoe UI', sans-serif;
-  background: #a6d2ef;
   color: #e2e8f0;
   direction: ltr;
 }

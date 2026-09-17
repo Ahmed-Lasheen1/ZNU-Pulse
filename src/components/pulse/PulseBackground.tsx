@@ -1,11 +1,18 @@
 import KineticGrid from '../ui/kinetic-grid'
 
-// Full-bleed background gradient shared by every ZNU Pulse page —
-// extracted verbatim from Home's original LOGO_BG constant so every
-// page uses the exact same gradient rather than redefining it.
-// 100dvh (not just inset:0) so iOS Safari's collapsing/expanding
-// address bar doesn't leave a gap at the bottom — same reasoning as
-// the original Home implementation.
+// The actual gradient now lives in src/index.css, painted on `html`
+// with `background-attachment: fixed` — that gives the same pinned,
+// full-viewport-height look this component used to paint itself
+// (see index.css for why), without a `position: fixed`/`absolute`
+// div in the page tree that could interfere with sticky/fixed
+// descendants. PULSE_BG stays exported here (not duplicated) so any
+// call site that still imports the raw gradient string for its own
+// purposes keeps working unchanged.
+//
+// All this component still does is optionally layer the interactive
+// kinetic-grid canvas on top — KineticGrid's `overlay` mode is
+// already `position: fixed` internally (see ui/kinetic-grid.tsx), so
+// it needs no wrapper here.
 export const PULSE_BG = [
   'linear-gradient(180deg,',
   '#a6d2ef 0%,',
@@ -18,25 +25,7 @@ export const PULSE_BG = [
   '#010c4a 100%)',
 ].join(' ')
 
-// `interactive` layers the kinetic grid (see components/ui/kinetic-grid.tsx)
-// on top of the gradient as a subtle, mouse-reactive texture — an
-// overlay, not a replacement, so every page's ON_GRADIENT_TOP /
-// ON_GRADIENT_BOTTOM text colors (tuned for this exact gradient) are
-// untouched. Defaults to on; pass `interactive={false}` on any page
-// where the extra canvas isn't wanted (e.g. if a specific page turns
-// out to feel too busy with it, or on very low-power devices).
 export default function PulseBackground({ interactive = true }: { interactive?: boolean } = {}) {
-  return (
-    <div
-      aria-hidden
-      style={{
-        position: 'absolute', inset: 0,
-        zIndex: 0, pointerEvents: 'none',
-        background: PULSE_BG,
-        overflow: 'hidden',
-      }}
-    >
-      {interactive && <KineticGrid overlay opacity={0.75} />}
-    </div>
-  )
+  if (!interactive) return null
+  return <KineticGrid overlay opacity={0.75} />
 }

@@ -202,10 +202,6 @@ export default function App() {
     setProfile(null)
   }
 
-  const bg = dark
-    ? 'linear-gradient(135deg, #0a0f1e 0%, #0d1a2e 50%, #0a1628 100%)'
-    : 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0f9ff 100%)'
-
   const toggleTheme = () => setDark(prev => !prev)
 
   return (
@@ -214,8 +210,15 @@ export default function App() {
         <ModulesContextProvider modules={modules} modulesLoaded={modulesLoaded} modulesError={modulesError} refreshModules={loadModules}>
         <ToastProvider>
         <Router>
+          {/* The gradient itself now lives in src/index.css on `html`
+              (background-attachment: fixed) — see PulseBackground.tsx
+              for why. This wrapper no longer paints its own
+              background; it previously carried a second, differently
+              themed gradient here that showed through behind the
+              fixed header on any page shorter than the viewport, and
+              never matched the Footer below <main>. minHeight keeps
+              layout behavior (flex column, sticky footer) unchanged. */}
           <div style={{
-            background: bg,
             minHeight: '100dvh', color: getPulseTheme(dark).text,
             display: 'flex', flexDirection: 'column',
             fontFamily: "'Segoe UI', sans-serif"
