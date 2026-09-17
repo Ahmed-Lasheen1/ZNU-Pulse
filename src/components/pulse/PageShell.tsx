@@ -1,5 +1,6 @@
 // src/components/pulse/PageShell.tsx
 import type { ReactNode, CSSProperties } from 'react'
+import PulseBackground from './PulseBackground'
 import BackButton from './BackButton'
 import { pulseFonts } from '../../premiumTheme'
 
@@ -13,30 +14,31 @@ interface PageShellProps {
   containerStyle?: CSSProperties
 }
 
-// Shared page container (+ "← Back" pill) used by Schedule, Checklist,
-// FilesPage, AnonQuestions, Search, and Review — pages only supply
-// their content. The background gradient itself is mounted once,
-// globally, in App.jsx (see PulseBackground.tsx) — this just needs to
-// paint above it, via position + z-index.
+// Shared full-page chrome (background + container + "← Back" pill)
+// used by Schedule, Checklist, FilesPage, AnonQuestions, Search, and
+// Review — pages only supply their content.
 export default function PageShell({
   dark, children, backFallback = '/', onBack,
   maxWidth, containerClassName = 'pulse-wide', containerStyle = {},
 }: PageShellProps) {
   return (
-    <div
-      className={containerClassName}
-      style={{
-        position: 'relative', zIndex: 1,
-        padding: '24px 20px 100px',
-        fontFamily: pulseFonts.body,
-        ...(maxWidth ? { maxWidth, margin: '0 auto' } : {}),
-        ...containerStyle,
-      }}
-    >
-      <div style={{ marginBottom: 8 }}>
-        <BackButton dark={dark} fallback={backFallback} onClick={onBack} />
+    <div style={{ position: 'relative' }}>
+      <PulseBackground />
+      <div
+        className={containerClassName}
+        style={{
+          position: 'relative', zIndex: 1,
+          padding: '24px 20px 100px',
+          fontFamily: pulseFonts.body,
+          ...(maxWidth ? { maxWidth, margin: '0 auto' } : {}),
+          ...containerStyle,
+        }}
+      >
+        <div style={{ marginBottom: 8 }}>
+          <BackButton dark={dark} fallback={backFallback} onClick={onBack} />
+        </div>
+        {children}
       </div>
-      {children}
     </div>
   )
 }

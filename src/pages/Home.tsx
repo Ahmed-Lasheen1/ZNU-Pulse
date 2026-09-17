@@ -17,6 +17,7 @@ import NotifyPermissionButton from '../components/NotifyPermissionButton'
 import GuestSignInButton from '../components/GuestSignInButton'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import EcgHero from '../components/pulse/EcgHero'
+import PulseBackground from '../components/pulse/PulseBackground'
 import PulseBrand from '../components/pulse/PulseBrand'
 import { ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, PauseIcon, LightningIcon, CheckCircleIcon, WeeklyReportIcon, StreakFlameIcon } from '@/components/ui/tool-icons'
 import { NumberTicker } from '@/components/ui/number-ticker'
@@ -226,6 +227,8 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
 
   return (
     <div style={{ position: 'relative', overflowX: 'hidden' }}>
+      <PulseBackground />
+
       <div style={{
         position: 'fixed',
         top: 0,
