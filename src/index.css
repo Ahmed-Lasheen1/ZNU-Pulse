@@ -6,8 +6,7 @@
 
 body {
   font-family: 'Sora', 'Segoe UI', sans-serif;
-  background: linear-gradient(180deg, #a6d2ef 0%, #010c4a 100%);
-  background-attachment: fixed; /* Keeps the gradient anchored to the viewport */
+  background: linear-gradient(180deg, #a6d2ef 50%, #010c4a 50%);
   color: #e2e8f0;
   direction: ltr;
   min-height: 100dvh;
