@@ -30,7 +30,7 @@ export default function PulseBackground({ interactive = true }: { interactive?: 
     <div
       aria-hidden
       style={{
-        position: 'fixed', inset: 0,
+        position: 'relative', inset: 0,
         zIndex: 0, pointerEvents: 'none',
         background: PULSE_BG,
         overflow: 'hidden',
