@@ -4,38 +4,21 @@
   box-sizing: border-box;
 }
 
-/* Single source of truth for the ZNU Pulse background gradient.
-   Painted via a body::before pseudo-element rather than
-   `background` + `background-attachment: fixed` on html/body —
-   `background-attachment: fixed` is not reliably supported on mobile
-   Safari/Chrome (iOS in particular effectively never honors it; it
-   silently scrolls the background with the page instead).
-
-   A real `position: fixed` element sidesteps that — fixed positioning
-   is reliably supported everywhere, including iOS. Pinned with
-   `inset: 0`, so it's always sized to the exact current viewport,
-   which removes any white bars from dynamic-viewport resizing.
-
-   Safe for `position: sticky`/`fixed` elsewhere in the app because
-   it's a pseudo-element of `body`, not a wrapper around any page
-   content — it's a sibling of the React root (#root), never an
-   ancestor of anything sticky/fixed lives inside.
-
-   IMPORTANT: no z-index here, and body has no background-color of
-   its own (see below). z-index: -1 would put this pseudo-element
-   BELOW the painting layer that in-flow, non-positioned element
-   backgrounds live in — including body's own background-color, if it
-   had one — which is exactly what silently hid the gradient behind a
-   solid navy fill. With z-index left at its default (auto), stacking
-   falls back to DOM order: since this is body's first child, it
-   paints behind every other fixed/positioned element that comes
-   after it in the tree (like KineticGrid's overlay canvas), which is
-   all the ordering it actually needs. */
-body::before {
+/* App-wide gradient. A real fixed div (#app-bg in index.html, before
+   #root), not a body::before pseudo-element — forced onto its own
+   compositing layer so it repaints reliably through Safari/WebKit
+   toolbar show/hide and dynamic-viewport resizes. Sibling of #root,
+   never an ancestor, so it can't become any sticky/fixed descendant's
+   containing block. No z-index: stacks by DOM order, so it paints
+   behind everything that comes after it (e.g. KineticGrid's overlay
+   canvas) since it's body's first child. */
+#app-bg {
   content: "";
   position: fixed;
   inset: 0;
+  height: 100dvh;
   pointer-events: none;
+  transform: translateZ(0);
   background: linear-gradient(180deg,
     #a6d2ef 0%,
     #97bcd7 15%,
@@ -47,11 +30,9 @@ body::before {
     #010c4a 100%);
 }
 
-/* Fallback paint (matches the gradient's darkest stop) in case the
-   pseudo-element above is ever unavailable for a split second before
-   first paint — avoids a flash of true white. Deliberately only on
-   html, not body — see the note on body::before above for why
-   setting it on both broke the gradient entirely. */
+/* Fallback paint matching the gradient's darkest stop, in case #app-bg
+   isn't painted yet on first frame. html only, not body — see #app-bg
+   note above for why body needs no background of its own. */
 html {
   background: #010c4a
 }
@@ -116,9 +97,7 @@ h1, h2, h3 {
   color: #60a5fa;
 }
 
-/* ============================================================
-   Responsive layout utilities.
-   ============================================================ */
+/* Responsive layout utilities */
 
 .page-container {
   max-width: 700px;

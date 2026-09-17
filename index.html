@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="ZNU Pulse" />
 
     <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2" />
@@ -23,28 +24,13 @@
     <meta name="twitter:title" content="ZNU Pulse" />
     <meta name="twitter:description" content="Your integrated medical study platform for ZNU medical students." />
 
-    <!-- Sora is now the app's single typeface (display + body) across
-         every page and both themes — replaces the previous Plus
-         Jakarta Sans + Inter combination used only on the Pulse pages,
-         and the plain Segoe UI system font used elsewhere. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
-    <!-- PERF: warms the connection to Supabase before the first API
-         call fires (Home's modules/site_settings queries showed up on
-         PageSpeed's critical path with a full cold DNS+TLS+TTFB cost).
-         Doesn't touch any query, table, or auth behavior — only opens
-         the connection earlier. -->
     <link rel="preconnect" href="https://rbgfupgwmgvvrrzuawpo.supabase.co" crossorigin />
     <link rel="dns-prefetch" href="https://rbgfupgwmgvvrrzuawpo.supabase.co" />
 
-    <!-- PERF: the Sora stylesheet used to block first paint (~750ms
-         per PageSpeed's render-blocking-requests audit). Standard
-         "loadCSS" pattern: media="print" fetches it at low priority
-         without blocking render, then onload flips it to media="all"
-         once it lands. Same font, same weights, same display=swap —
-         just no longer render-blocking. <noscript> keeps it working
-         with JS disabled. -->
+    <!-- loadCSS pattern: fetch non-blocking, swap to media=all once loaded -->
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" />
     <link
       href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap"
@@ -59,6 +45,7 @@
     <title>ZNU Pulse</title>
   </head>
   <body>
+    <div id="app-bg" aria-hidden="true"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

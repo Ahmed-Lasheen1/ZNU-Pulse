@@ -6,7 +6,7 @@
 // (وكانت متخزنة عنده نسخة قديمة من الأيقونات، أو من غير أيقونات خالص)
 // يجبر المتصفح إنه يمسح الكاش القديم ويجيب كل حاجة جديدة، من ضمنها
 // الأيقونات الجديدة.
-const CACHE_NAME = 'znu-shell-v5'
+const CACHE_NAME = 'znu-shell-v6'
 const SHELL_URLS = ['/', '/favicon.svg', '/icon-192.png', '/icon-512.png']
 
 self.addEventListener('install', (event) => {
