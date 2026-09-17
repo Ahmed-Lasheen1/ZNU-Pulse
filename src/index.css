@@ -20,6 +20,15 @@
   box-sizing: border-box;
 }
 
+html {
+  /* No overflow set here on purpose — any non-visible overflow on an
+     ancestor clips position:fixed descendants (e.g. PulseBackground)
+     to that ancestor's own box, regardless of the fixed element's own
+     positioning. height:100% alone is harmless since nothing clips
+     without a non-visible overflow value. */
+  height: 100%;
+}
+
 body {
   font-family: 'Sora', 'Segoe UI', sans-serif;
   /* Matches PULSE_BG's palest (top) stop — the page's viewport top is
@@ -29,11 +38,23 @@ body {
   background: #0f172a;
   color: #e2e8f0;
   direction: ltr;
+  /* Deliberately no explicit height here. overflow-x:hidden forces
+     overflow-y to compute as auto, and a *height-constrained* box
+     with non-visible overflow clips its position:fixed descendants to
+     its own box — previously `html, body { height: 100%; overflow-x:
+     hidden }` clipped PulseBackground to exactly one viewport tall,
+     which is why it stopped covering the page (and the footer showed
+     body's own flat background) below the first screen. With height
+     left at its natural auto/content-driven value, body's box is
+     always at least as tall as the full scrollable page, so nothing
+     gets clipped — this still blocks horizontal scroll/gaps, just
+     without pinning the box to one viewport.
+  */
+  overflow-x: hidden;
 }
 
 html, body {
-  height: 100%;
-  overflow-x: hidden; /* root-level only: doesn't clip position:fixed, just kills horizontal scroll/gaps */
+  overflow-x: hidden; /* keep horizontal-scroll prevention in one place — see comments above */
 }
 
 .app {
