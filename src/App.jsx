@@ -9,7 +9,6 @@ import { migrateGuestDataIfNeeded } from './lib/migrateGuestData'
 import ErrorBoundary from './components/ErrorBoundary'
 import ToastProvider from './components/ToastProvider'
 import PulseOverlayHeader from './components/pulse/PulseOverlayHeader'
-import PulseBackground from './components/pulse/PulseBackground'
 import { ThemeContext, AuthContext, ModulesContext } from './contexts'
 import Home from './pages/Home'
 const Checklist = lazy(() => import('./pages/Checklist'))
@@ -203,6 +202,10 @@ export default function App() {
     setProfile(null)
   }
 
+  const bg = dark
+    ? 'linear-gradient(135deg, #0a0f1e 0%, #0d1a2e 50%, #0a1628 100%)'
+    : 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0f9ff 100%)'
+
   const toggleTheme = () => setDark(prev => !prev)
 
   return (
@@ -211,16 +214,8 @@ export default function App() {
         <ModulesContextProvider modules={modules} modulesLoaded={modulesLoaded} modulesError={modulesError} refreshModules={loadModules}>
         <ToastProvider>
         <Router>
-          {/* Single, always-present fixed background layer. Rendered
-              here — outside Suspense/routing — so it exists on the very
-              first paint and through every route change, including
-              while a lazy page is still loading. This is also the only
-              background this wrapper paints: no competing `background`
-              style below, so there's never a different color for a gap
-              or the Footer to reveal. */}
-          <PulseBackground />
           <div style={{
-            position: 'relative', zIndex: 1,
+            background: bg,
             minHeight: '100dvh', color: getPulseTheme(dark).text,
             display: 'flex', flexDirection: 'column',
             fontFamily: "'Segoe UI', sans-serif"

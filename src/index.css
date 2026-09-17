@@ -22,18 +22,9 @@
 
 body {
   font-family: 'Sora', 'Segoe UI', sans-serif;
-  /* Matches PULSE_BG's palest (top) stop — the page's viewport top is
-     always the lightest part of the fixed gradient, so this is what
-     shows for the instant before React/PulseBackground paints, and
-     behind any transient gap, without a color mismatch. */
-  background: #0f172a;
+  background: #010c4a;
   color: #e2e8f0;
   direction: ltr;
-}
-
-html, body {
-  height: 100%;
-  overflow-x: hidden; /* root-level only: doesn't clip position:fixed, just kills horizontal scroll/gaps */
 }
 
 .app {
