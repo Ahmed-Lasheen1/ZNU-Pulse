@@ -9,15 +9,20 @@
    up as stray solid-color bars. */
 html, body {
   overscroll-behavior-y: none;
-  min-height: 100dvh;
+  min-height: 100%;
+}
+
+body {
+  position: relative;
 }
 
 #app-bg {
   position: absolute;
-  inset: 0;
-  pointer-events: none;
+  top: 0;
+  left: 0;
+  width: 100%;
+  min-height: 100%; 
 
-  /* Render a tall background (1x viewport height) */
   background-image: linear-gradient(180deg,
     #a6d2ef 0%,
     #97bcd7 15%,
@@ -27,12 +32,8 @@ html, body {
     #274e79 75%,
     #042a59 90%,
     #010c4a 100%);
-  background-size: 100% 100dvh;
-  background-position: top center;
-
-  /* Link the background movement directly to the document scroll position */
-  animation: scroll-gradient linear sequence();
-  animation-timeline: scroll(root);
+  background-size: 100% 100dvh; 
+  background-repeat: repeat-y;
 }
 
 @keyframes scroll-gradient {
