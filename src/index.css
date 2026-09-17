@@ -53,15 +53,7 @@ body::before {
    html, not body — see the note on body::before above for why
    setting it on both broke the gradient entirely. */
 html {
-  background: linear-gradient(180deg,
-    #a6d2ef 0%,
-    #97bcd7 15%,
-    #81a6c3 30%,
-    #6c8fad 45%,
-    #497194 60%,
-    #274e79 75%,
-    #042a59 90%,
-    #010c4a 100%);
+  background: #010c4a
 }
 
 body {
