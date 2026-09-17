@@ -18,7 +18,7 @@ html, body {
    (e.g. KineticGrid's overlay canvas) since it's body's first child. */
 #app-bg {
   content: "";
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
