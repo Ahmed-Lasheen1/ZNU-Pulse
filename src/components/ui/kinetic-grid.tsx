@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 interface Point {
@@ -387,7 +388,13 @@ export default function KineticGrid({
   }, [animate, draw]);
 
   if (overlay) {
-    return (
+    // Portaled straight to <body>, not returned in-place — makes this
+    // canvas a real DOM sibling of #root, same as the gradient's
+    // body::before. Otherwise any ancestor using transform/filter/
+    // backdrop-filter (glass cards, motion.div animations, etc.)
+    // can silently become this fixed element's containing block,
+    // which is what was clipping it under the safe area.
+    return createPortal(
       <canvas
         ref={canvasRef}
         aria-hidden
@@ -400,7 +407,8 @@ export default function KineticGrid({
           opacity,
         }}
         className={cn(className)}
-      />
+      />,
+      document.body,
     );
   }
 
