@@ -9,15 +9,11 @@
    up as stray solid-color bars. */
 html, body {
   overscroll-behavior-y: none;
+  min-height: 100vh;
 }
 
-/* App-wide gradient. Real fixed div (#app-bg in index.html, before
-   #root) — sibling of #root, never an ancestor, so it can't become
-   any sticky/fixed descendant's containing block. No z-index: stacks
-   by DOM order, so it paints behind everything after it in the tree
-   (e.g. KineticGrid's overlay canvas) since it's body's first child. */
+/* App-wide gradient. Floating div that scrolls naturally with the page content. */
 #app-bg {
-  content: "";
   position: absolute;
   top: 0;
   left: 0;
@@ -33,6 +29,8 @@ html, body {
     #274e79 75%,
     #042a59 90%,
     #010c4a 100%);
+  background-size: 100% 100vh;
+  background-repeat: repeat-y;
 }
 
 /* Fallback paint matching the gradient's darkest stop, in case #app-bg
