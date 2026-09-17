@@ -17,7 +17,6 @@ import NotifyPermissionButton from '../components/NotifyPermissionButton'
 import GuestSignInButton from '../components/GuestSignInButton'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import EcgHero from '../components/pulse/EcgHero'
-import PulseBackground from '../components/pulse/PulseBackground'
 import PulseBrand from '../components/pulse/PulseBrand'
 import { ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, PauseIcon, LightningIcon, CheckCircleIcon, WeeklyReportIcon, StreakFlameIcon } from '@/components/ui/tool-icons'
 import { NumberTicker } from '@/components/ui/number-ticker'
@@ -37,7 +36,7 @@ const toolCards = [
 
 // Fixed accents for marks rendered directly on PULSE_BG (not inside a
 // glass card) — these must not shift with the light/dark toggle since
-// the gradient itself doesn't.
+// the gradient itself doesn't change with the theme toggle.
 const ACTIVE_MODULES_ACCENT = getPulseTheme(false).cobalt
 const FOOTER_LINE_COLOR = getPulseTheme(true).border
 
@@ -227,8 +226,6 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
 
   return (
     <div style={{ position: 'relative', overflowX: 'hidden' }}>
-      <PulseBackground />
-
       <div style={{
         position: 'fixed',
         top: 0,

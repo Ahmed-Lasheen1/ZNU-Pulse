@@ -1,6 +1,5 @@
 // src/components/pulse/PageShell.tsx
 import type { ReactNode, CSSProperties } from 'react'
-import PulseBackground from './PulseBackground'
 import BackButton from './BackButton'
 import { pulseFonts } from '../../premiumTheme'
 
@@ -14,16 +13,15 @@ interface PageShellProps {
   containerStyle?: CSSProperties
 }
 
-// Shared full-page chrome (background + container + "← Back" pill)
-// used by Schedule, Checklist, FilesPage, AnonQuestions, Search, and
-// Review — pages only supply their content.
+// Shared full-page chrome (container + "← Back" pill) used by
+// Schedule, Checklist, FilesPage, AnonQuestions, Search, and Review —
+// pages only supply their content.
 export default function PageShell({
   dark, children, backFallback = '/', onBack,
   maxWidth, containerClassName = 'pulse-wide', containerStyle = {},
 }: PageShellProps) {
   return (
     <div style={{ position: 'relative' }}>
-      <PulseBackground />
       <div
         className={containerClassName}
         style={{

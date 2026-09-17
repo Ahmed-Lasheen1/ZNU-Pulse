@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import { useAuth, useModules } from '../contexts'
 import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
-import PulseBackground from '../components/pulse/PulseBackground'
 import PulseGlassRow from '../components/pulse/PulseGlassRow'
 import BackButton from '../components/pulse/BackButton'
 import ErrorBanner from '../components/ErrorBanner'
@@ -92,7 +91,6 @@ export default function Admin({ dark }: AdminProps) {
   if (!authLoaded) {
     return (
       <div style={{ position: 'relative' }}>
-        <PulseBackground />
         <div style={{ position: 'relative', zIndex: 1, height: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ color: ON_GRADIENT_TOP.secondary, fontSize: 14, fontWeight: 600 }}>Loading...</div>
         </div>
@@ -106,7 +104,6 @@ export default function Admin({ dark }: AdminProps) {
 
   return (
     <div style={{ position: 'relative' }}>
-      <PulseBackground />
       <div className="pulse-wide admin-shell" style={{
         position: 'relative', zIndex: 1,
         padding: '4px 20px 100px',

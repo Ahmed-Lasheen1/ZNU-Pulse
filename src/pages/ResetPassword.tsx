@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import { getPulseTheme, pulseFonts, ON_GRADIENT_TOP } from '../premiumTheme'
-import PulseBackground from '../components/pulse/PulseBackground'
 import PulseBrand from '../components/pulse/PulseBrand'
 import { GlassField, PrimaryButton, GhostButton, AuthMessage, inputResetStyle } from '../components/pulse/AuthPrimitives'
 
@@ -36,7 +35,6 @@ export default function ResetPassword({ dark = true }: { dark?: boolean }) {
 
   return (
     <div style={{ position: 'relative', minHeight: '100dvh' }}>
-      <PulseBackground />
       <div style={{
         position: 'relative', zIndex: 1, minHeight: '100dvh',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24

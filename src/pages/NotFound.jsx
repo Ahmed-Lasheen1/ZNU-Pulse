@@ -1,7 +1,6 @@
 // src/pages/NotFound.jsx
 import { useNavigate, useLocation } from 'react-router-dom'
 import { getPulseTheme, pulseFonts } from '../premiumTheme'
-import PulseBackground from '../components/pulse/PulseBackground'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import { CompassIcon } from '../components/ui/tool-icons'
 
@@ -12,7 +11,6 @@ export default function NotFound({ dark }) {
 
   return (
     <div style={{ position: 'relative' }}>
-      <PulseBackground />
       <div style={{
         position: 'relative', zIndex: 1, minHeight: '100dvh',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20

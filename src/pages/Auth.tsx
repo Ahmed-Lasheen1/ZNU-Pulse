@@ -7,7 +7,6 @@ import { Lock, Eye, EyeOff, ArrowLeft, GraduationCap, Mail } from 'lucide-react'
 import { supabase } from '../supabase'
 import { containsProfanity } from '../lib/moderation'
 import { getPulseTheme, pulseFonts, ON_GRADIENT_TOP } from '../premiumTheme'
-import PulseBackground from '../components/pulse/PulseBackground'
 import PulseBrand from '../components/pulse/PulseBrand'
 import {
   GlassField, PrimaryButton, GhostButton, TextLink, AccountToggle, AuthMessage, inputResetStyle
@@ -210,7 +209,6 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
 
   return (
     <div style={{ position: 'relative', minHeight: '100dvh' }}>
-      <PulseBackground />
       <style>{`
         .auth-grid { display: flex; align-items: center; justify-content: center; gap: 60px; max-width: 1100px; margin: 0 auto; padding: 40px 24px; }
         .auth-brand-panel { display: none; }
