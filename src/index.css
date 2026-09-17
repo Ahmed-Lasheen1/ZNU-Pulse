@@ -6,10 +6,9 @@
 
 body {
   font-family: 'Sora', 'Segoe UI', sans-serif;
-  background: linear-gradient(180deg, #a6d2ef 50%, #010c4a 50%);
+  background: #a6d2ef;
   color: #e2e8f0;
   direction: ltr;
-  min-height: 100dvh;
 }
 
 .app {
