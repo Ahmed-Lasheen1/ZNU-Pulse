@@ -20,37 +20,38 @@
   box-sizing: border-box;
 }
 
-/* Single source of truth for the ZNU Pulse background gradient —
-   previously every page painted its own copy of this via
-   <PulseBackground /> (see that file), sized to that page's own
-   content height. On any page shorter than the viewport this left
-   three problems: the Footer (a sibling of <main>, outside every
-   page's own background wrapper) never got the gradient at all; the
-   fixed header on non-Home pages showed App.jsx's own separate,
-   differently-colored gradient bleeding through underneath it; and
-   the bottom safe-area (below short content, down to the home
-   indicator) fell through to this file's old flat body background
-   instead of the gradient's dark end.
-   
-   Moving the gradient here and painting it on `html` fixes all three
-   at once — `html`'s background always covers the full viewport
-   height regardless of any page's content length, so the Footer, the
-   area behind fixed headers, and the bottom safe area all
-   automatically match, with no per-page sizing to get wrong.
+/* Single source of truth for the ZNU Pulse background gradient.
+   Painted via a body::before pseudo-element rather than
+   `background` + `background-attachment: fixed` on html/body —
+   `background-attachment: fixed` is not reliably supported on mobile
+   Safari/Chrome (iOS in particular effectively never honors it; it
+   silently scrolls the background with the page instead), which is
+   why the gradient was scrolling and white bars appeared at the
+   top/bottom as the dynamic viewport resized.
 
-   `background-attachment: fixed` (NOT `position: fixed`) is what
-   makes it behave like a pinned backdrop — status bar always pale,
-   home-indicator area always dark, doesn't shift while scrolling.
-   Unlike `position: fixed`, this only changes how the background
-   LAYER is painted; it doesn't establish a new containing block, so
-   it has zero effect on any descendant's `position: fixed` or
-   `position: sticky` — nothing else in the app needs to change
-   because of it. Applied to `html` rather than `body` because that's
-   the standard workaround for `background-attachment: fixed` on iOS
-   Safari, and it's also what lets the color extend correctly into
-   the elastic-overscroll/safe-area regions. */
-html {
-  min-height: 100%;
+   A real `position: fixed` element sidesteps that entirely — fixed
+   positioning IS reliably supported everywhere, including iOS. It's
+   pinned with `inset: 0`, so it's always sized to the exact current
+   viewport (not document height, not a vh/dvh calculation that can
+   lag behind the browser chrome animating), which is what removes
+   the white bars.
+
+   This is safe for `position: sticky`/`fixed` elsewhere in the app
+   because it's a pseudo-element of `body`, not a wrapper around any
+   page content — it's a sibling of the React root (#root), never an
+   ancestor of anything sticky/fixed lives inside. Only ancestors can
+   affect sticky/fixed descendants, so this can't interfere no matter
+   what any page does.
+
+   z-index: -1 with no positioned ancestor above it in the stacking
+   order means normal-flow content (the #root div) paints above it
+   automatically — no z-index needed anywhere else. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background: linear-gradient(180deg,
     #a6d2ef 0%,
     #97bcd7 15%,
@@ -60,8 +61,13 @@ html {
     #274e79 75%,
     #042a59 90%,
     #010c4a 100%);
-  background-attachment: fixed;
-  background-repeat: no-repeat;
+}
+
+/* Fallback paint (matches the gradient's darkest stop) in case the
+   pseudo-element above is ever unavailable for a split second before
+   first paint — avoids a flash of true white. */
+html, body {
+  background-color: #010c4a;
 }
 
 body {
