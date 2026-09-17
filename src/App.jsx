@@ -28,6 +28,7 @@ const AnonQuestions = lazy(() => import('./pages/AnonQuestions'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 const Search = lazy(() => import('./pages/Search'))
+import PulseBackground from './components/PulseBackground'
 import Footer from './components/Footer'
 
 export { ThemeContext, AuthContext, ModulesContext, useTheme, useAuth, useModules } from './contexts'
@@ -210,24 +211,26 @@ export default function App() {
         <ModulesContextProvider modules={modules} modulesLoaded={modulesLoaded} modulesError={modulesError} refreshModules={loadModules}>
         <ToastProvider>
         <Router>
-          {/* The gradient itself now lives in src/index.css on `html`
-              (background-attachment: fixed) — see PulseBackground.tsx
-              for why. This wrapper no longer paints its own
-              background; it previously carried a second, differently
-              themed gradient here that showed through behind the
-              fixed header on any page shorter than the viewport, and
-              never matched the Footer below <main>. minHeight keeps
-              layout behavior (flex column, sticky footer) unchanged. */}
+          {/* Main Layout Container */}
           <div style={{
-            minHeight: '100dvh', color: getPulseTheme(dark).text,
-            display: 'flex', flexDirection: 'column',
+            position: 'relative', /* Positions content context cleanly over background */
+            minHeight: '100dvh', 
+            color: getPulseTheme(dark).text,
+            display: 'flex', 
+            flexDirection: 'column',
             fontFamily: "'Segoe UI', sans-serif"
           }}>
+            {/* 1. Global Pulse Background Component */}
+            <PulseBackground />
+
+            {/* 2. Page Essentials & Content */}
             <ScrollToTop />
             <SiteHeader dark={dark} toggleTheme={toggleTheme} />
-            <main style={{ flex: 1 }}>
+            <main style={{ flex: 1, position: 'relative', zIndex: 1 }}>
               <RoutedContent dark={dark} toggleTheme={toggleTheme} />
             </main>
+            
+            {/* 3. Footer Layer */}
             <Footer dark={dark} />
           </div>
         </Router>
