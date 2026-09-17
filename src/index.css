@@ -6,9 +6,11 @@
 
 body {
   font-family: 'Sora', 'Segoe UI', sans-serif;
-  background: #010c4a;
+  background: linear-gradient(180deg, #a6d2ef 0%, #010c4a 100%);
+  background-attachment: fixed; /* Keeps the gradient anchored to the viewport */
   color: #e2e8f0;
   direction: ltr;
+  min-height: 100dvh;
 }
 
 .app {
