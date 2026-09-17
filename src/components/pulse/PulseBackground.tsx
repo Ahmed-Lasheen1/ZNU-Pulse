@@ -30,13 +30,13 @@ export default function PulseBackground({ interactive = true }: { interactive?: 
     <div
       aria-hidden
       style={{
-        position: 'fixed', inset: 0,
+        position: 'absolute', inset: 0,
         zIndex: 0, pointerEvents: 'none',
         background: PULSE_BG,
         overflow: 'hidden',
       }}
     >
-      {interactive && <KineticGrid overlay opacity={0.5} />}
+      {interactive && <KineticGrid overlay opacity={0.75} />}
     </div>
   )
 }
