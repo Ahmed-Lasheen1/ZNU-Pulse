@@ -140,12 +140,6 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('znu_theme', dark ? 'dark' : 'light')
-    // Keeps the mobile browser toolbar/status-bar color in sync with
-    // the active theme. index.html's <meta name="theme-color"> is
-    // otherwise a static value (the light-top-of-gradient color) that
-    // never reflects dark mode.
-    const meta = document.querySelector('meta[name="theme-color"]')
-    if (meta) meta.setAttribute('content', dark ? '#010c4a' : '#a6d2ef')
   }, [dark])
 
   const [user, setUser] = useState(null)
