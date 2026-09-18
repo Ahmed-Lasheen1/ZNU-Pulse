@@ -80,8 +80,8 @@ const NOTIFY_DELAY = LOGO_DELAY + 0.3
 const WEEKLY_REPORT_START = LOGO_DELAY + 0.6
 const ACTIVE_MODULES_START = WEEKLY_REPORT_START + 0.6
 const TOOLS_START = ACTIVE_MODULES_START + 0.6
-const FOOTER_DELAY = TOOLS_START + 0.5
 const COMPLETED_MODULES_START = TOOLS_START + 0.6
+export const FOOTER_DELAY = TOOLS_START + 0.6
 
 function msFor(targetSeconds: number) {
   return Math.round(((targetSeconds - ENTRANCE_PAUSE) / 1.5) * 1000)

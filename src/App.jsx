@@ -6,11 +6,12 @@ import { getPulseTheme } from './premiumTheme'
 import { fetchModulesSorted } from './lib/modules'
 import { subscribeOnlinePresence } from './lib/onlinePresence'
 import { migrateGuestDataIfNeeded } from './lib/migrateGuestData'
+import { useOncePerSession } from './lib/useOncePerSession'
 import ErrorBoundary from './components/ErrorBoundary'
 import ToastProvider from './components/ToastProvider'
 import PulseOverlayHeader from './components/pulse/PulseOverlayHeader'
 import { ThemeContext, AuthContext, ModulesContext } from './contexts'
-import Home from './pages/Home'
+import Home, { FOOTER_DELAY } from './pages/Home'
 const Checklist = lazy(() => import('./pages/Checklist'))
 const Schedule = lazy(() => import('./pages/Schedule'))
 const FilesPage = lazy(() => import('./pages/FilesPage'))
@@ -84,6 +85,20 @@ function SiteHeader({ dark, toggleTheme }) {
       <div style={{ height: 'calc(76px + env(safe-area-inset-top, 0px))' }} />
     </>
   )
+}
+
+// Renders the shared site Footer, but only plays its fade-up entrance
+// on the Home page, and only the first time Home loads in this tab
+// session — matching every other animated element on Home. Uses its
+// own useOncePerSession key (separate from Home's own
+// 'znu_home_entrance_played') so the two hook calls never race each
+// other for the same flag; FOOTER_DELAY is imported from Home so the
+// footer's fade-in timing lines up with the rest of Home's sequence.
+function SiteFooter({ dark }) {
+  const location = useLocation()
+  const isHome = location.pathname === '/'
+  const playEntrance = useOncePerSession('znu_home_footer_entrance_played')
+  return <Footer dark={dark} animate={isHome && playEntrance} delay={FOOTER_DELAY} />
 }
 
 function RoutedContent({ dark, toggleTheme }) {
@@ -231,7 +246,7 @@ export default function App() {
             </main>
             
             {/* 3. Footer Layer */}
-            <Footer dark={dark} />
+            <SiteFooter dark={dark} />
           </div>
         </Router>
         </ToastProvider>

@@ -1,4 +1,5 @@
 // src/components/Footer.jsx
+import { motion } from 'framer-motion'
 import { getPulseTheme, pulseFonts, ON_GRADIENT_BOTTOM } from '../premiumTheme'
 import PulseGlassRow from './pulse/PulseGlassRow'
 import { WhatsAppIcon } from './ui/tool-icons'
@@ -7,7 +8,12 @@ const DIVIDER_COLOR = getPulseTheme(true).border
 const HOVER_TINT = 'rgba(255,255,255,0.08)'
 const WHATSAPP_URL = 'https://wa.me/qr/AFP6XCVC2BJHO1'
 
-export default function Footer({ dark }) {
+// `animate` mirrors LiquidGlassCard's `instant` convention: when true,
+// the footer fades/slides up from below on mount (same easing/duration
+// as the rest of Home's staggered entrance); when false (default —
+// every other page, or a repeat Home visit this session), it renders
+// straight into its final state with no transition, exactly as before.
+export default function Footer({ dark, animate = false, delay = 0 }) {
   const pt = getPulseTheme(dark)
   const year = new Date().getFullYear()
 
@@ -16,13 +22,18 @@ export default function Footer({ dark }) {
   }
 
   return (
-    <footer style={{
-      position: 'relative',
-      zIndex: 1,
-      overflow: 'hidden',
-      borderTop: `1px solid ${DIVIDER_COLOR}`,
-      fontFamily: pulseFonts.body,
-    }}>
+    <motion.footer
+      initial={animate ? { opacity: 0, y: 24 } : false}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.7, delay: animate ? delay : 0, ease: [0.34, 1.56, 0.64, 1] }}
+      style={{
+        position: 'relative',
+        zIndex: 1,
+        overflow: 'hidden',
+        borderTop: `1px solid ${DIVIDER_COLOR}`,
+        fontFamily: pulseFonts.body,
+      }}
+    >
       <style>{`
         .site-footer-wordmark {
           font-size: clamp(36px, 10vw, 96px);
@@ -84,6 +95,6 @@ export default function Footer({ dark }) {
           </span>
         </div>
       </div>
-    </footer>
+    </motion.footer>
   )
 }
