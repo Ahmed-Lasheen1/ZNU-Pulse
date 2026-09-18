@@ -29,8 +29,10 @@ interface StatCardProps {
   loading: boolean
 }
 
-function StatCard({ label, Icon, value, color, dark, loading }: StatCardProps) {
-  const pt = getPulseTheme(dark)
+// FIX: this used to ignore the `pt` prop it was already handed and
+// recompute `getPulseTheme(dark)` locally instead — same result,
+// just wasted work on every render. Uses the passed prop now.
+function StatCard({ label, Icon, value, color, pt, dark, loading }: StatCardProps) {
   return (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '18px 20px', textAlign: 'center', flex: '1 1 140px' }}>
       <div style={{ color, fontWeight: 900, fontSize: 26 }}>

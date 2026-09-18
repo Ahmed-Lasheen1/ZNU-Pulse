@@ -75,6 +75,16 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const autoStartedLessonRef = useRef(false)
   const autoStartedSubjectRef = useRef(false)
   const isMountedRef = useRef(true)
+  // BUG FIX: the unmount-flush effect below has an empty dependency
+  // array (it must — it should only run once, on real unmount), so a
+  // `user` captured directly in its closure would be whatever `user`
+  // was at MOUNT time forever. If someone signs in partway through a
+  // guest quiz and then navigates away, the flush would persist to
+  // Supabase using a stale null `user` instead of the signed-in one
+  // (or vice versa). Keeping `user` in a ref that's updated every
+  // render means the unmount cleanup always reads the current value.
+  const userRef = useRef(user)
+  useEffect(() => { userRef.current = user }, [user])
 
   useEffect(() => {
     isMountedRef.current = true
@@ -102,8 +112,17 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
   // Drops localStorage question caches for modules that no longer
   // exist (renamed/deleted) — otherwise these grow unbounded.
+  //
+  // BUG FIX: same class of bug as Checklist.tsx's guest-checklist
+  // prune — App.jsx's loadModules() sets modulesLoaded=true even when
+  // the modules fetch fails (leaving `modules` empty). Without the
+  // modulesError guard, a transient network error would make
+  // validIds an empty set and wipe every mcq_questions_cache_* entry,
+  // destroying the exact offline fallback (usingCache) this cache
+  // exists to provide. Only prune once the fetch is confirmed to have
+  // actually succeeded.
   useEffect(() => {
-    if (!modulesLoaded) return
+    if (!modulesLoaded || modulesError) return
     try {
       const validIds = new Set(modules.map((m: any) => m.id))
       const prefix = 'mcq_questions_cache_'
@@ -115,7 +134,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
       }
       toRemove.forEach(k => localStorage.removeItem(k))
     } catch { /* ignore */ }
-  }, [modulesLoaded, modules])
+  }, [modulesLoaded, modulesError, modules])
 
   useEffect(() => {
     if (!activeModule) return
@@ -177,11 +196,12 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
   // Flushes a still-pending save only when MCQ itself unmounts (e.g.
   // navigating away mid-quiz) — not on every dependency change above.
+  // Reads userRef.current (not `user` directly) so it always uses the
+  // most recent auth state, not whatever `user` was when MCQ mounted.
   useEffect(() => {
     return () => {
-      if (pendingPersistRef.current) persistActiveExam(user, pendingPersistRef.current)
+      if (pendingPersistRef.current) persistActiveExam(userRef.current, pendingPersistRef.current)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {

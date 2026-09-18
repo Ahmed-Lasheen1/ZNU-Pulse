@@ -114,12 +114,19 @@ export default function Checklist({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules])
 
+  // BUG FIX: App.jsx's loadModules() sets modulesLoaded=true even when
+  // the fetch fails (modules ends up []). Without the modulesError
+  // guard here, a transient network error on the modules fetch would
+  // make validIds an empty set and this would delete EVERY guest's
+  // checklist_* localStorage key, mistaking "fetch failed" for
+  // "no modules exist". Only prune once we know the fetch actually
+  // succeeded.
   useEffect(() => {
-    if (!modulesLoaded) return
+    if (!modulesLoaded || modulesError) return
     const validIds = new Set((modules as any[]).map(m => m.id))
     pruneOrphanedGuestChecklists(validIds)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modulesLoaded])
+  }, [modulesLoaded, modulesError])
 
   useEffect(() => {
     if (!activeModule) return
