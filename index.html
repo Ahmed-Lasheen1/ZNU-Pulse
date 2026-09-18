@@ -12,6 +12,7 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#a6d2ef" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="description" content="ZNU Pulse — Your integrated medical study platform: schedules, checklists, question banks, lecture files, and smart summaries for ZNU medical students." />
 
     <meta property="og:type" content="website" />
@@ -22,6 +23,13 @@
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="ZNU Pulse" />
     <meta name="twitter:description" content="Your integrated medical study platform for ZNU medical students." />
+
+    <style>
+      html, body {
+        background-color: #010c4a; /* fallback for iOS overscroll/rubber-band, outside the fixed div below */
+        margin: 0;
+      }
+    </style>
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -44,7 +52,11 @@
     <title>ZNU Pulse</title>
   </head>
   <body>
-    <div id="app-bg" aria-hidden="true"></div>
+    <div
+      id="app-bg"
+      aria-hidden="true"
+      style="position:fixed;inset:0;z-index:0;pointer-events:none;background:linear-gradient(180deg,#a6d2ef 0%,#97bcd7 15%,#81a6c3 30%,#6c8fad 45%,#497194 60%,#274e79 75%,#042a59 90%,#010c4a 100%);"
+    ></div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
