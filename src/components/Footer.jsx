@@ -8,12 +8,22 @@ const DIVIDER_COLOR = getPulseTheme(true).border
 const HOVER_TINT = 'rgba(255,255,255,0.08)'
 const WHATSAPP_URL = 'https://wa.me/qr/AFP6XCVC2BJHO1'
 
-// `animate` mirrors LiquidGlassCard's `instant` convention: when true,
-// the footer fades/slides up from below on mount (same easing/duration
-// as the rest of Home's staggered entrance); when false (default —
-// every other page, or a repeat Home visit this session), it renders
-// straight into its final state with no transition, exactly as before.
-export default function Footer({ dark, animate = false, delay = 0 }) {
+// `animate` gates whether this plays an entrance at all (Home, first
+// visit this session only — same rule as every other animated piece
+// of Home; every other page, or a repeat Home visit, just renders
+// straight into place with no motion, as before).
+//
+// Unlike the rest of Home's cascade, the footer sits below the fold,
+// so a fixed delay-after-mount timer fires while it's off-screen and
+// nobody ever sees it move. `whileInView` instead triggers the first
+// time it's actually scrolled into view — `viewport={{ once: true }}`
+// means it still only ever plays once, it just waits for the moment
+// it's visible rather than a fixed clock. Motion values (opacity + a
+// 20px rise, 0.7s, default ease) match Home's own section-title
+// reveals (see `sectionTitle()` in Home.tsx) rather than the bouncier
+// overshoot curve LiquidGlassCard uses — that curve reads right for a
+// card popping in, not for a whole footer sliding up.
+export default function Footer({ dark, animate = false }) {
   const pt = getPulseTheme(dark)
   const year = new Date().getFullYear()
 
@@ -23,9 +33,11 @@ export default function Footer({ dark, animate = false, delay = 0 }) {
 
   return (
     <motion.footer
-      initial={animate ? { opacity: 0, y: 24 } : false}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.7, delay: animate ? delay : 0, ease: [0.34, 1.56, 0.64, 1] }}
+      initial={animate ? { opacity: 0, y: 20 } : false}
+      whileInView={animate ? { opacity: 1, y: 0 } : undefined}
+      animate={animate ? undefined : { opacity: 1, y: 0 }}
+      viewport={animate ? { once: true, amount: 0.2 } : undefined}
+      transition={{ duration: 0.7 }}
       style={{
         position: 'relative',
         zIndex: 1,
