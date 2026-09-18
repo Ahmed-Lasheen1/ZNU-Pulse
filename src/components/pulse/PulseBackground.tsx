@@ -3,9 +3,6 @@ import KineticGrid from '../ui/kinetic-grid'
 // Full-bleed background gradient shared by every ZNU Pulse page —
 // extracted verbatim from Home's original LOGO_BG constant so every
 // page uses the exact same gradient rather than redefining it.
-// 100dvh (not just inset:0) so iOS Safari's collapsing/expanding
-// address bar doesn't leave a gap at the bottom — same reasoning as
-// the original Home implementation.
 export const PULSE_BG = [
   'linear-gradient(180deg,',
   '#a6d2ef 0%,',
@@ -30,7 +27,19 @@ export default function PulseBackground({ interactive = true }: { interactive?: 
     <div
       aria-hidden
       style={{
-        position: 'fixed', inset: 0,
+        position: 'fixed', top: 0, left: 0, width: '100%',
+        // `inset: 0` sizes against the STATIC "large viewport" (as if
+        // mobile browser chrome were already hidden), which is why the
+        // gradient used to fall short of / get cut off by Android
+        // Chrome's address bar and bottom toolbar whenever they were
+        // actually showing. `dvh` (dynamic viewport height) live-tracks
+        // the real, currently-visible screen instead, so this always
+        // fills exactly what's visible with no gap. The plain `100vh`
+        // is a fallback for browsers that don't support `dvh` yet —
+        // it's overridden by the line after it wherever `dvh` works.
+        height: '100dvh',
+        // @ts-expect-error -- dvh isn't in the older CSSProperties height type yet; safe to ignore, same value shape as vh.
+        '--pulse-bg-h': '100dvh',
         zIndex: 0, pointerEvents: 'none',
         background: PULSE_BG,
         overflow: 'hidden',
