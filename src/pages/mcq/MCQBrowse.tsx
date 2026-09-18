@@ -152,7 +152,7 @@ export default function MCQBrowse({
             <div style={{ flex: 1, minWidth: 160 }}>
               <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: MCQ_ACCENT, marginBottom: 4 }}>Mock Exam</h3>
               <p style={{ color: pt.sub, fontSize: 13 }}>
-                {Math.min(0, getFilteredQuestions('mock').length)} questions · minutes
+                {Math.min(36, getFilteredQuestions('mock').length)} questions · 36 minutes
               </p>
             </div>
             <button onClick={() => onStartQuiz('mock')} style={{
