@@ -6,7 +6,16 @@
 
 body {
   font-family: 'Sora', 'Segoe UI', sans-serif;
-  background: #010c4a;
+  background: linear-gradient(180deg,
+    #a6d2ef 0%,
+    #97bcd7 15%,
+    #81a6c3 30%,
+    #6c8fad 45%,
+    #497194 60%,
+    #274e79 75%,
+    #042a59 90%,
+    #010c4a 100%);
+  background-attachment: fixed;
   color: #e2e8f0;
   direction: ltr;
 }
