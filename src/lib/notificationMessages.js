@@ -2,15 +2,15 @@
 // NotificationToggle (Profile) when notifications can't be turned on.
 // Not a failure, so it's shown as a calm 'info' toast, not a red error.
 //
-// One universal message for every device/browser: "unsupported" and
-// "blocked" share it, so no browser detection is needed. "Add to Home
-// Screen" isn't iPhone-only — it's in Android/Chrome's menu and
-// Safari's Share sheet — so the wording doesn't name a device.
-const CANT_ENABLE =
-  "Can't enable notifications here. Add the site to your Home Screen (browser menu or Share → Add to Home Screen)."
-
+// Two universal messages, no browser detection needed:
+//  - unsupported: the browser can't do push. "Add to Home Screen"
+//    isn't iPhone-only — it's in Android/Chrome's menu and Safari's
+//    Share sheet — so the wording doesn't name a device.
+//  - blocked: the person (or Chrome) already said no for this site.
+//    Adding to the Home Screen wouldn't undo that, so this one points
+//    at the site settings instead.
 export const NOTIFICATION_MESSAGES = {
-  unsupported: CANT_ENABLE,
-  blocked: CANT_ENABLE,
+  unsupported: "Can't enable notifications here. Add the site to your Home Screen (browser menu or Share → Add to Home Screen).",
+  blocked: "Notifications are blocked for this site. Allow them in your browser's site settings, then reload.",
   notGranted: 'No problem — you can turn notifications on any time later.',
 }
