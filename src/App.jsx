@@ -29,6 +29,7 @@ const AnonQuestions = lazy(() => import('./pages/AnonQuestions'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 const Search = lazy(() => import('./pages/Search'))
+import PulseBackground from './components/pulse/PulseBackground'
 import Footer from './components/Footer'
 
 export { ThemeContext, AuthContext, ModulesContext, useTheme, useAuth, useModules } from './contexts'
@@ -225,6 +226,9 @@ export default function App() {
             flexDirection: 'column',
             fontFamily: "'Segoe UI', sans-serif"
           }}>
+            {/* Global Pulse Background */}
+            <PulseBackground />
+
             {/* Page Essentials & Content */}
             <ScrollToTop />
             <SiteHeader dark={dark} toggleTheme={toggleTheme} />
