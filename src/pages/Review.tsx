@@ -18,8 +18,7 @@ import QuestionSourceBadge from '../components/QuestionSourceBadge'
 import { ModuleIcon } from '../lib/medicalIcons'
 import { wrapText } from '../lib/textStyles'
 import { BookIcon, ClockIcon, FlagIcon, LightbulbIcon, TargetIcon, EmptyBoxIcon, CelebrationIcon, RefreshIcon, SearchIcon2 } from '../components/ui/tool-icons'
-
-const REVIEW_ACCENT = '#e2725b'
+import { MCQ_ACCENT } from './mcq/mcqShared'
 
 const SECTION_GAP = 22
 const ITEM_GAP = 16
@@ -260,8 +259,8 @@ export default function Review({ dark }: { dark: boolean }) {
           <>
             {accuracy !== null && (
               <div style={{ textAlign: 'center', marginBottom: SECTION_GAP }}>
-                <span style={{ color: REVIEW_ACCENT, fontWeight: 900, fontSize: 20, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <TargetIcon color={REVIEW_ACCENT} size={18} /> {accuracy}%
+                <span style={{ color: MCQ_ACCENT, fontWeight: 900, fontSize: 20, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <TargetIcon color={MCQ_ACCENT} size={18} /> {accuracy}%
                 </span>
                 <span style={{ color: pt.sub, fontSize: 12, fontWeight: 600, marginLeft: 8 }}>
                   overall accuracy ({totalCorrect}/{totalAttempted})
@@ -323,7 +322,7 @@ export default function Review({ dark }: { dark: boolean }) {
             <div style={{ textAlign: 'center', marginBottom: SECTION_GAP }}>
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                 {mod && <ModuleIcon value={mod.icon} size={20} color={mod.color} />}
-                <span style={{ ...pulseType.sectionTitle, color: mod?.color || REVIEW_ACCENT, fontSize: 18 }}>{mod ? mod.name : 'Module'}</span>
+                <span style={{ ...pulseType.sectionTitle, color: mod?.color || MCQ_ACCENT, fontSize: 18 }}>{mod ? mod.name : 'Module'}</span>
               </div>
               <div style={{ color: pt.textMuted, fontSize: 13 }}>
                 {new Date(selectedHistory.completed_at).toLocaleDateString()} · {selectedHistory.correct}/{selectedHistory.total} correct · {selectedHistory.score}%
@@ -333,9 +332,9 @@ export default function Review({ dark }: { dark: boolean }) {
             {incorrectQs.length > 0 && (
               <div style={{ marginBottom: SECTION_GAP }}>
                 <button onClick={() => retryAll(incorrectQs)} style={{
-                  width: '100%', padding: '14px', background: REVIEW_ACCENT, color: '#0f172a',
+                  width: '100%', padding: '14px', background: MCQ_ACCENT, color: '#0f172a',
                   border: 'none', borderRadius: 999, cursor: 'pointer', fontWeight: 700,
-                  fontSize: 14, fontFamily: pulseFonts.body, boxShadow: `0 8px 28px ${REVIEW_ACCENT}35`,
+                  fontSize: 14, fontFamily: pulseFonts.body, boxShadow: `0 8px 28px ${MCQ_ACCENT}35`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
                 }}>
                   <RefreshIcon color="#0f172a" size={15} /> Retry These {incorrectQs.length} Incorrect Question{incorrectQs.length === 1 ? '' : 's'}
@@ -443,9 +442,9 @@ export default function Review({ dark }: { dark: boolean }) {
               {filteredFlagged.length > 0 && (
                 <div style={{ marginBottom: SECTION_GAP }}>
                   <button onClick={() => retryAll(filteredFlagged)} style={{
-                    width: '100%', padding: '14px', background: REVIEW_ACCENT, color: '#0f172a',
+                    width: '100%', padding: '14px', background: MCQ_ACCENT, color: '#0f172a',
                     border: 'none', borderRadius: 999, cursor: 'pointer', fontWeight: 700,
-                    fontSize: 14, fontFamily: pulseFonts.body, boxShadow: `0 8px 28px ${REVIEW_ACCENT}35`,
+                    fontSize: 14, fontFamily: pulseFonts.body, boxShadow: `0 8px 28px ${MCQ_ACCENT}35`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
                   }}>
                     <RefreshIcon color="#0f172a" size={15} /> Retry {filteredFlagged.length === flaggedItems.length ? 'All' : `These ${filteredFlagged.length}`} Flagged Questions

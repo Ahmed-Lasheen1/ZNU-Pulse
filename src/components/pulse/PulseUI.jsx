@@ -37,13 +37,3 @@ export function glassGhostBtn(pt, dark) {
     color: pt.sub, fontFamily: pulseFonts.body, fontSize: 13, fontWeight: 700
   }
 }
-
-export function glassTabBtn(pt, dark, active) {
-  return {
-    flex: 1, padding: '9px', borderRadius: 999, cursor: 'pointer',
-    border: `1.5px solid ${active ? pt.cobalt : pt.border}`,
-    background: active ? pt.cobaltSoft : liquidGlassTint(dark),
-    ...liquidGlassBackdrop(),
-    color: active ? pt.cobalt : pt.sub, fontWeight: 700, fontSize: 12, fontFamily: pulseFonts.body
-  }
-}
