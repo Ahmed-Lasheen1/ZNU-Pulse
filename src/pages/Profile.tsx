@@ -99,7 +99,7 @@ function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
           }}>Save</button>
         </div>
 
-        <label style={{ ...pulseType.small, color: pt.textMuted, display: 'block', marginBottom: 6 }}>Change Password</label>
+        <label style={{ ...pulseType.small, color: pt.textMuted, display: 'block', marginBottom: 6 }}>Set / Change Password</label>
         <input type="password" placeholder={`New password (min ${MIN_PASSWORD_LENGTH} characters)`}
           value={newPassword} onChange={e => setNewPassword(e.target.value)} style={inStyle} />
         <input type="password" placeholder="Confirm new password"
