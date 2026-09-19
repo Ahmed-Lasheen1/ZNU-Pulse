@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../supabase'
 import { subscribeToPush } from './pushNotifications'
 
-// Shared "is push actually working on this device right now" check —
-// used by NotifyPermissionButton and NotificationToggle so they never
-// disagree. `enabled` means a real, server-verified subscription.
+// "Is push actually on for this device" — shared by NotifyPermissionButton
+// and NotificationToggle so they never disagree. `enabled` means a real,
+// server-verified subscription.
 export function useNotificationStatus() {
   const supported = typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window
   const [permission, setPermission] = useState(() =>
@@ -43,7 +43,9 @@ export function useNotificationStatus() {
       const { data: exists, error } = await supabase.rpc('push_subscription_exists', { p_endpoint: sub.endpoint })
       if (!mountedRef.current) return
 
-      if (!error && exists) {
+      if (error) {
+        // RPC failed — don't assume "not found" and resubscribe on a transient error.
+      } else if (exists) {
         setEnabled(true)
       } else {
         const result = await subscribeToPush()

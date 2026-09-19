@@ -13,6 +13,7 @@ import BackButton from '../components/pulse/BackButton'
 import PulseGlassRow from '../components/pulse/PulseGlassRow'
 import NotificationToggle from '../components/pulse/NotificationToggle'
 import LoadingText from '../components/pulse/LoadingText'
+import ErrorBanner from '../components/ErrorBanner'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { LeaderboardIcon, ClockIcon } from '../components/ui/tool-icons'
 import { Lock, User, Star, ClipboardList, Pencil, Award } from 'lucide-react'
@@ -131,6 +132,7 @@ export default function Profile({ dark }: { dark: boolean }) {
     return t === 'leaderboard' ? t : 'profile'
   })
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [editing, setEditing] = useState(false)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
 
@@ -143,17 +145,17 @@ export default function Profile({ dark }: { dark: boolean }) {
 
   async function fetchData(isIgnored: () => boolean = () => false) {
     setLoading(true)
-    // Both queries are independent — run in parallel instead of
-    // awaiting the profile fetch before starting the leaderboard one.
+    setLoadError(false)
     const [profileRes, lbRes] = await Promise.all([
       user
         ? supabase.from('profiles').select('*').eq('id', user.id).single()
-        : Promise.resolve({ data: null }),
+        : Promise.resolve({ data: null, error: null }),
       supabase.from('profiles').select('name, points').order('points', { ascending: false }).limit(10),
     ])
     if (isIgnored()) return
     if (profileRes.data) setProfile(profileRes.data as Profile)
     if (lbRes.data) setLeaderboard(lbRes.data as Profile[])
+    if (profileRes.error || lbRes.error) setLoadError(true)
     setLoading(false)
   }
 
@@ -171,6 +173,8 @@ export default function Profile({ dark }: { dark: boolean }) {
         <div style={{ marginBottom: 8 }}>
           <BackButton dark={dark} fallback="/" />
         </div>
+
+        {loadError && <div style={{ marginBottom: 16 }}><ErrorBanner message="Couldn't load some data — check your connection." /></div>}
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginBottom: 24 }}>
           {(['profile', 'leaderboard'] as const).map(t => {

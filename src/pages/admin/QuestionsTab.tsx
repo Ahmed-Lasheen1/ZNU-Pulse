@@ -13,6 +13,7 @@ import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, field
 import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
 import { fetchModuleStages } from '../../lib/moduleStages'
 import { useAdminMessage } from './useAdminMessage'
+import { useAdminEntityCrud } from './useAdminEntityCrud'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon, ListIcon, SearchIcon2, RobotIcon, BookIcon, GraduationCapIcon } from '../../components/ui/tool-icons'
 import QuestionSourceBadge from '../../components/QuestionSourceBadge'
 import type { AdminModule, AdminSubject, AdminLesson } from './adminTypes'
@@ -64,7 +65,6 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
   const [bulkMode, setBulkMode] = useState(false)
   const [bulkText, setBulkText] = useState('')
   const [bulkSaving, setBulkSaving] = useState(false)
-  const [saving, setSaving] = useState(false)
   const [moduleFilter, setModuleFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
@@ -104,30 +104,28 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
     setQText(''); setQA(''); setQB(''); setQC(''); setQD(''); setQCorrect('a'); setQExplanation('')
     setQSubjectId(''); setQLessonId(''); setQExamStage('')
   }
-  async function saveQuestion() {
-    if (!qText || !qA || !qB || !qC || !qD || !qModuleId || saving) return
-    setSaving(true)
-    if (editingQuestionId) {
-      const { error } = await supabase.rpc('admin_update_question', {
-        p_id: editingQuestionId,
-        p_question: qText, p_option_a: qA, p_option_b: qB, p_option_c: qC, p_option_d: qD,
-        p_correct: qCorrect, p_explanation: qExplanation, p_exam_type: qExamType, p_exam_stage: qExamStage || null,
-        p_module_id: qModuleId, p_subject_id: qSubjectId || null, p_lesson_id: qLessonId || null, p_source: qSource || null
-      })
-      setSaving(false)
-      if (!error) { showMsg('✅ Question updated!'); resetQuestionForm(); fetchQuestions() }
-      else showMsg('❌ ' + error.message)
-    } else {
-      const { error } = await supabase.from('questions').insert([{
-        question: qText, option_a: qA, option_b: qB, option_c: qC, option_d: qD,
-        correct: qCorrect, explanation: qExplanation, exam_type: qExamType,
-        exam_stage: qExamStage || null, module_id: qModuleId, subject_id: qSubjectId || null,
-        lesson_id: qLessonId || null, source: qSource || null
-      }])
-      setSaving(false)
-      if (!error) { showMsg('✅ Question added!'); resetQuestionForm(); fetchQuestions() }
-      else showMsg('❌ ' + error.message)
-    }
+
+  const crud = useAdminEntityCrud({
+    table: 'questions', label: 'Question', editingId: editingQuestionId,
+    buildPayload: () => ({
+      question: qText, option_a: qA, option_b: qB, option_c: qC, option_d: qD,
+      correct: qCorrect, explanation: qExplanation, exam_type: qExamType,
+      exam_stage: qExamStage || null, module_id: qModuleId, subject_id: qSubjectId || null,
+      lesson_id: qLessonId || null, source: qSource || null
+    }),
+    resetForm: resetQuestionForm, refresh: fetchQuestions, showMessage: showMsg,
+    // Editing an existing question goes through an RPC (not a plain update).
+    updateFn: (id, p: any) => supabase.rpc('admin_update_question', {
+      p_id: id,
+      p_question: p.question, p_option_a: p.option_a, p_option_b: p.option_b, p_option_c: p.option_c, p_option_d: p.option_d,
+      p_correct: p.correct, p_explanation: p.explanation, p_exam_type: p.exam_type, p_exam_stage: p.exam_stage,
+      p_module_id: p.module_id, p_subject_id: p.subject_id, p_lesson_id: p.lesson_id, p_source: p.source
+    })
+  })
+
+  function saveQuestion() {
+    if (!qText || !qA || !qB || !qC || !qD || !qModuleId || crud.saving) return
+    crud.save()
   }
 
   function parseBulkQuestions(text: string) {
@@ -196,13 +194,6 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
     if (error) { showMsg('❌ ' + error.message); return }
     showMsg(`✅ ${rows.length} questions added!`)
     setBulkText('')
-    fetchQuestions()
-  }
-
-  async function deleteQuestion(id: string) {
-    if (editingQuestionId === id) resetQuestionForm()
-    const { error } = await supabase.from('questions').delete().eq('id', id)
-    showMsg(error ? '❌ ' + error.message : '✅ Question deleted')
     fetchQuestions()
   }
 
@@ -332,10 +323,10 @@ Correct: A`}</pre>
           </select>
           <textarea placeholder="Explanation (optional)" value={qExplanation} onChange={e => setQExplanation(e.target.value)} style={{ ...inStyle, minHeight: 60, resize: 'vertical' }} />
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={saveQuestion} disabled={saving} style={submitBtnStyle(pt, dark, saving)}>
-              {saving ? 'Saving...' : editingQuestionId ? 'Save Changes' : 'Add Question'}
+            <button onClick={saveQuestion} disabled={crud.saving} style={submitBtnStyle(pt, dark, crud.saving)}>
+              {crud.saving ? 'Saving...' : editingQuestionId ? 'Save Changes' : 'Add Question'}
             </button>
-            {editingQuestionId && <button onClick={resetQuestionForm} disabled={saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
+            {editingQuestionId && <button onClick={resetQuestionForm} disabled={crud.saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
           </div>
         </>
       )}
@@ -445,7 +436,7 @@ Correct: A`}</pre>
         confirmLabel="Delete"
         confirmColor={pt.danger}
         onCancel={() => setConfirmDeleteId(null)}
-        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) deleteQuestion(id) }}
+        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) crud.remove(id) }}
       />
     </div>
   )

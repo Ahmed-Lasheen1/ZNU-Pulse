@@ -12,6 +12,7 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
+import { useAdminEntityCrud } from './useAdminEntityCrud'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon, CalendarDotIcon } from '../../components/ui/tool-icons'
 import { ExamIcon } from '../../lib/medicalIcons'
 import type { AdminModule } from './adminTypes'
@@ -46,7 +47,6 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
   const [schDates, setSchDates] = useState<string[]>([''])
   const [schDateIds, setSchDateIds] = useState<string[]>([crypto.randomUUID()])
   const [moduleFilter, setModuleFilter] = useState('all')
-  const [saving, setSaving] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   useEffect(() => { fetchSchedules() }, [])
@@ -84,31 +84,21 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
     setSchDateIds(prev => (prev.length === 1 ? [crypto.randomUUID()] : prev.filter((_, i) => i !== index)))
   }
 
-  async function saveSchedule() {
-    if (!schTitle || !schUrl || !schModuleId || saving) return
-    const cleanedDates = schDates.map(d => d.trim()).filter(Boolean)
-    const payload = {
-      title: schTitle, url: schUrl, type: schType, module_id: schModuleId,
-      dates: schType === 'exam' && cleanedDates.length > 0 ? cleanedDates : null
-    }
-    setSaving(true)
-    if (editingScheduleId) {
-      const { error } = await supabase.from('schedules').update(payload).eq('id', editingScheduleId)
-      setSaving(false)
-      if (!error) { showMsg('✅ Schedule updated!'); resetScheduleForm(); fetchSchedules() }
-      else showMsg('❌ ' + error.message)
-    } else {
-      const { error } = await supabase.from('schedules').insert([payload])
-      setSaving(false)
-      if (!error) { showMsg('✅ Schedule added!'); resetScheduleForm(); fetchSchedules() }
-      else showMsg('❌ ' + error.message)
-    }
-  }
-  async function deleteSchedule(id: string) {
-    if (editingScheduleId === id) resetScheduleForm()
-    const { error } = await supabase.from('schedules').delete().eq('id', id)
-    showMsg(error ? '❌ ' + error.message : '✅ Schedule deleted')
-    fetchSchedules()
+  const crud = useAdminEntityCrud({
+    table: 'schedules', label: 'Schedule', editingId: editingScheduleId,
+    buildPayload: () => {
+      const cleanedDates = schDates.map(d => d.trim()).filter(Boolean)
+      return {
+        title: schTitle, url: schUrl, type: schType, module_id: schModuleId,
+        dates: schType === 'exam' && cleanedDates.length > 0 ? cleanedDates : null
+      }
+    },
+    resetForm: resetScheduleForm, refresh: fetchSchedules, showMessage: showMsg
+  })
+
+  function saveSchedule() {
+    if (!schTitle || !schUrl || !schModuleId || crud.saving) return
+    crud.save()
   }
 
   const visibleModules = moduleFilter === 'all' ? modules : modules.filter(m => m.id === moduleFilter)
@@ -154,10 +144,10 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
       <label style={fieldLabel(pt)}>Module</label>
       <ModuleSelect modules={modules} value={schModuleId} onChange={setSchModuleId} dark={dark} />
       <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={saveSchedule} disabled={saving} style={submitBtnStyle(pt, dark, saving)}>
-          {saving ? 'Saving...' : editingScheduleId ? 'Save Changes' : 'Add Schedule'}
+        <button onClick={saveSchedule} disabled={crud.saving} style={submitBtnStyle(pt, dark, crud.saving)}>
+          {crud.saving ? 'Saving...' : editingScheduleId ? 'Save Changes' : 'Add Schedule'}
         </button>
-        {editingScheduleId && <button onClick={resetScheduleForm} disabled={saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
+        {editingScheduleId && <button onClick={resetScheduleForm} disabled={crud.saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
       </div>
     </LiquidGlassCard>
   )
@@ -221,7 +211,7 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
         confirmLabel="Delete"
         confirmColor={pt.danger}
         onCancel={() => setConfirmDeleteId(null)}
-        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) deleteSchedule(id) }}
+        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) crud.remove(id) }}
       />
     </div>
   )

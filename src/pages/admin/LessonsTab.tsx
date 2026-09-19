@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { supabase } from '../../supabase'
 import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
 import ModuleSelect from './ModuleSelect'
@@ -12,6 +11,7 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
+import { useAdminEntityCrud } from './useAdminEntityCrud'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon } from '../../components/ui/tool-icons'
 import type { AdminModule, AdminSubject, AdminLesson } from './adminTypes'
 
@@ -35,7 +35,6 @@ export default function LessonsTab({ dark, modules, subjects, lessons, fetchLess
   const [lessonTitle, setLessonTitle] = useState('')
   const [lessonIcon, setLessonIcon] = useState('')
   const [moduleFilter, setModuleFilter] = useState('all')
-  const [saving, setSaving] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   function editLesson(l: AdminLesson) {
@@ -47,28 +46,15 @@ export default function LessonsTab({ dark, modules, subjects, lessons, fetchLess
     setEditingLessonId(null); setLessonTitle(''); setLessonIcon('')
   }
 
-  async function saveLesson() {
-    if (!lessonTitle || !lessonSubjectId || !lessonModuleId || saving) return showMsg('❌ Pick a module, subject, and title first')
-    const payload = { title: lessonTitle, subject_id: lessonSubjectId, module_id: lessonModuleId, icon: lessonIcon || null }
-    setSaving(true)
-    if (editingLessonId) {
-      const { error } = await supabase.from('lessons').update(payload).eq('id', editingLessonId)
-      setSaving(false)
-      if (!error) { showMsg('✅ Lesson updated!'); resetLessonForm(); fetchLessons() }
-      else showMsg('❌ ' + error.message)
-    } else {
-      const { error } = await supabase.from('lessons').insert([payload])
-      setSaving(false)
-      if (!error) { showMsg('✅ Lesson added!'); resetLessonForm(); fetchLessons() }
-      else showMsg('❌ ' + error.message)
-    }
-  }
+  const crud = useAdminEntityCrud({
+    table: 'lessons', label: 'Lesson', editingId: editingLessonId,
+    buildPayload: () => ({ title: lessonTitle, subject_id: lessonSubjectId, module_id: lessonModuleId, icon: lessonIcon || null }),
+    resetForm: resetLessonForm, refresh: fetchLessons, showMessage: showMsg
+  })
 
-  async function deleteLesson(id: string) {
-    if (editingLessonId === id) resetLessonForm()
-    const { error } = await supabase.from('lessons').delete().eq('id', id)
-    showMsg(error ? '❌ ' + error.message : '✅ Lesson deleted')
-    fetchLessons()
+  function saveLesson() {
+    if (!lessonTitle || !lessonSubjectId || !lessonModuleId || crud.saving) return showMsg('❌ Pick a module, subject, and title first')
+    crud.save()
   }
 
   const filteredSubjects = (moduleId: string) => subjects.filter(s => s.module_id === moduleId)
@@ -76,12 +62,11 @@ export default function LessonsTab({ dark, modules, subjects, lessons, fetchLess
 
   const form = (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
-      <h3 style={{ color: pt.cobalt, marginBottom: 8, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <h3 style={{ color: pt.cobalt, marginBottom: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
         {editingLessonId ? <><EditIcon color={pt.cobalt} size={16} /> Edit Lesson</> : <><PlusIcon color={pt.cobalt} size={16} /> Add Lesson</>}
       </h3>
       <p style={{ color: pt.textMuted, fontSize: 13, marginBottom: 16 }}>
-        A lesson lives under a subject and shows its own tagged question set (tag questions to a lesson from
-        the Questions tab). Add a summary for it from the Summaries tab.
+        A lesson lives under a subject. Tag questions to it from the Questions tab; add a summary from Summaries.
       </p>
       <label style={fieldLabel(pt)}>Module</label>
       <ModuleSelect modules={modules} value={lessonModuleId} onChange={id => { setLessonModuleId(id); setLessonSubjectId('') }} dark={dark} />
@@ -94,10 +79,10 @@ export default function LessonsTab({ dark, modules, subjects, lessons, fetchLess
       <input placeholder="Lesson title" value={lessonTitle} onChange={e => setLessonTitle(e.target.value)} style={inStyle} />
       <IconPicker value={lessonIcon} onChange={setLessonIcon} inStyle={inStyle} pt={pt} />
       <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={saveLesson} disabled={saving} style={submitBtnStyle(pt, dark, saving)}>
-          {saving ? 'Saving...' : editingLessonId ? 'Save Changes' : 'Add Lesson'}
+        <button onClick={saveLesson} disabled={crud.saving} style={submitBtnStyle(pt, dark, crud.saving)}>
+          {crud.saving ? 'Saving...' : editingLessonId ? 'Save Changes' : 'Add Lesson'}
         </button>
-        {editingLessonId && <button onClick={resetLessonForm} disabled={saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
+        {editingLessonId && <button onClick={resetLessonForm} disabled={crud.saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
       </div>
     </LiquidGlassCard>
   )
@@ -168,7 +153,7 @@ export default function LessonsTab({ dark, modules, subjects, lessons, fetchLess
         confirmLabel="Delete"
         confirmColor={pt.danger}
         onCancel={() => setConfirmDeleteId(null)}
-        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) deleteLesson(id) }}
+        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) crud.remove(id) }}
       />
     </div>
   )

@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { supabase } from '../../supabase'
 import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
 import ModuleSelect from './ModuleSelect'
@@ -12,6 +11,7 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
+import { useAdminEntityCrud } from './useAdminEntityCrud'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon } from '../../components/ui/tool-icons'
 import type { AdminModule, AdminSubject } from './adminTypes'
 
@@ -35,7 +35,6 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
   const [subIcon, setSubIcon] = useState('📖')
   const [subColor, setSubColor] = useState('#34d399')
   const [moduleFilter, setModuleFilter] = useState('all')
-  const [saving, setSaving] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   function editSubject(sub: AdminSubject) {
@@ -48,35 +47,22 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
     setSubIcon('📖'); setSubColor('#34d399')
   }
 
-  async function saveSubject() {
-    if (!subName || !subModuleId || saving) return
+  const crud = useAdminEntityCrud({
+    table: 'subjects', label: 'Subject', editingId: editingSubjectId,
+    buildPayload: () => ({
+      name: subName, module_id: subModuleId, type: subType,
+      icon: subIcon || '📖', color: subColor || '#34d399'
+    }),
+    resetForm: resetSubjectForm, refresh: fetchSubjects, showMessage: showMsg
+  })
+
+  function saveSubject() {
+    if (!subName || !subModuleId || crud.saving) return
     const existing = subjects.filter(s => s.module_id === subModuleId && s.id !== editingSubjectId)
     if (existing.some(s => s.name.trim().toLowerCase() === subName.trim().toLowerCase())) {
       return showMsg('❌ This subject already exists in that module')
     }
-    const payload = {
-      name: subName, module_id: subModuleId, type: subType,
-      icon: subIcon || '📖', color: subColor || '#34d399'
-    }
-    setSaving(true)
-    if (editingSubjectId) {
-      const { error } = await supabase.from('subjects').update(payload).eq('id', editingSubjectId)
-      setSaving(false)
-      if (!error) { showMsg('✅ Subject updated!'); resetSubjectForm(); fetchSubjects() }
-      else showMsg('❌ ' + error.message)
-    } else {
-      const { error } = await supabase.from('subjects').insert([payload])
-      setSaving(false)
-      if (!error) { showMsg('✅ Subject added!'); resetSubjectForm(); fetchSubjects() }
-      else showMsg('❌ ' + error.message)
-    }
-  }
-
-  async function deleteSubject(id: string) {
-    if (editingSubjectId === id) resetSubjectForm()
-    const { error } = await supabase.from('subjects').delete().eq('id', id)
-    showMsg(error ? '❌ ' + error.message : '✅ Subject deleted')
-    fetchSubjects()
+    crud.save()
   }
 
   const filteredSubjects = (moduleId: string) => subjects.filter(s => s.module_id === moduleId)
@@ -102,10 +88,10 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
         <option value="practical">Practical Only</option>
       </select>
       <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={saveSubject} disabled={saving} style={submitBtnStyle(pt, dark, saving)}>
-          {saving ? 'Saving...' : editingSubjectId ? 'Save Changes' : 'Add Subject'}
+        <button onClick={saveSubject} disabled={crud.saving} style={submitBtnStyle(pt, dark, crud.saving)}>
+          {crud.saving ? 'Saving...' : editingSubjectId ? 'Save Changes' : 'Add Subject'}
         </button>
-        {editingSubjectId && <button onClick={resetSubjectForm} disabled={saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
+        {editingSubjectId && <button onClick={resetSubjectForm} disabled={crud.saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
       </div>
     </LiquidGlassCard>
   )
@@ -165,7 +151,7 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
         confirmLabel="Delete"
         confirmColor={pt.danger}
         onCancel={() => setConfirmDeleteId(null)}
-        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) deleteSubject(id) }}
+        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) crud.remove(id) }}
       />
     </div>
   )

@@ -14,6 +14,7 @@ import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, field
 import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
 import { fetchModuleStages } from '../../lib/moduleStages'
 import { useAdminMessage } from './useAdminMessage'
+import { useAdminEntityCrud } from './useAdminEntityCrud'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon, VideoIcon, AudioIcon, DocumentIcon } from '../../components/ui/tool-icons'
 import type { AdminModule, AdminSubject, AdminLesson } from './adminTypes'
 
@@ -57,7 +58,6 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
   const [fileExamStage, setFileExamStage] = useState('')
   const [fileStageOptions, setFileStageOptions] = useState(EXAM_STAGES)
   const [moduleFilter, setModuleFilter] = useState('all')
-  const [saving, setSaving] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   useEffect(() => { fetchFiles() }, [])
@@ -84,33 +84,22 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
     setEditingFileId(null); setFileName(''); setFileUrl('')
     setFileSubjectId(''); setFileLessonId(''); setFileExamStage('')
   }
-  async function saveFile() {
-    if (!fileName || !fileUrl || !fileModuleId || saving) return
-    const payload = {
+
+  const crud = useAdminEntityCrud({
+    table: 'files', label: 'File', editingId: editingFileId,
+    buildPayload: () => ({
       name: fileName, url: fileUrl, type: fileType,
       file_type: fileFileType, module_id: fileModuleId,
       subject_id: fileSubjectId || null,
       lesson_id: fileLessonId || null,
       exam_stage: fileExamStage || null
-    }
-    setSaving(true)
-    if (editingFileId) {
-      const { error } = await supabase.from('files').update(payload).eq('id', editingFileId)
-      setSaving(false)
-      if (!error) { showMsg('✅ File updated!'); resetFileForm(); fetchFiles() }
-      else showMsg('❌ ' + error.message)
-    } else {
-      const { error } = await supabase.from('files').insert([payload])
-      setSaving(false)
-      if (!error) { showMsg('✅ File added!'); resetFileForm(); fetchFiles() }
-      else showMsg('❌ ' + error.message)
-    }
-  }
-  async function deleteFile(id: string) {
-    if (editingFileId === id) resetFileForm()
-    const { error } = await supabase.from('files').delete().eq('id', id)
-    showMsg(error ? '❌ ' + error.message : '✅ File deleted')
-    fetchFiles()
+    }),
+    resetForm: resetFileForm, refresh: fetchFiles, showMessage: showMsg
+  })
+
+  function saveFile() {
+    if (!fileName || !fileUrl || !fileModuleId || crud.saving) return
+    crud.save()
   }
 
   const filteredSubjects = (moduleId: string) => subjects.filter(s => s.module_id === moduleId)
@@ -173,10 +162,10 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
       </select>
 
       <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={saveFile} disabled={saving} style={submitBtnStyle(pt, dark, saving)}>
-          {saving ? 'Saving...' : editingFileId ? 'Save Changes' : 'Add File'}
+        <button onClick={saveFile} disabled={crud.saving} style={submitBtnStyle(pt, dark, crud.saving)}>
+          {crud.saving ? 'Saving...' : editingFileId ? 'Save Changes' : 'Add File'}
         </button>
-        {editingFileId && <button onClick={resetFileForm} disabled={saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
+        {editingFileId && <button onClick={resetFileForm} disabled={crud.saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
       </div>
     </LiquidGlassCard>
   )
@@ -238,7 +227,7 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
         confirmLabel="Delete"
         confirmColor={pt.danger}
         onCancel={() => setConfirmDeleteId(null)}
-        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) deleteFile(id) }}
+        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) crud.remove(id) }}
       />
     </div>
   )

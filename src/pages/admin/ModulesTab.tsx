@@ -10,6 +10,7 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
+import { useAdminEntityCrud } from './useAdminEntityCrud'
 import { EditIcon, PlusIcon, TrashIcon, PauseIcon, PlayIcon, DotIcon, CheckCircleIcon, ConstructionIcon } from '../../components/ui/tool-icons'
 import type { AdminModule } from './adminTypes'
 
@@ -30,7 +31,6 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
   const [modColor, setModColor] = useState('#38bdf8')
   const [modIcon, setModIcon] = useState('📚')
   const [modStatus, setModStatus] = useState<'active' | 'completed'>('active')
-  const [saving, setSaving] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   function editModule(mod: AdminModule) {
@@ -41,35 +41,23 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
     setEditingModuleId(null); setModName(''); setModColor('#38bdf8'); setModIcon('📚'); setModStatus('active')
   }
 
-  async function saveModule() {
-    if (!modName || saving) return
+  const crud = useAdminEntityCrud({
+    table: 'modules', label: 'Module', editingId: editingModuleId,
+    buildPayload: () => ({ name: modName, color: modColor, icon: modIcon, status: modStatus }),
+    resetForm: resetModuleForm, refresh: fetchModules, showMessage: showMsg
+  })
+
+  // Dup check needs the live module list, so it stays outside the hook.
+  function saveModule() {
+    if (!modName || crud.saving) return
     const dup = modules.some(m => m.name.trim().toLowerCase() === modName.trim().toLowerCase() && m.id !== editingModuleId)
     if (dup) return showMsg('❌ A module with this name already exists')
-
-    setSaving(true)
-    if (editingModuleId) {
-      const { error } = await supabase.from('modules').update({ name: modName, color: modColor, icon: modIcon, status: modStatus }).eq('id', editingModuleId)
-      setSaving(false)
-      if (!error) { showMsg('✅ Module updated!'); resetModuleForm(); fetchModules() }
-      else showMsg('❌ ' + error.message)
-    } else {
-      const { error } = await supabase.from('modules').insert([{ name: modName, color: modColor, icon: modIcon, status: modStatus }])
-      setSaving(false)
-      if (!error) { showMsg('✅ Module added!'); resetModuleForm(); fetchModules() }
-      else showMsg('❌ ' + error.message)
-    }
+    crud.save()
   }
 
   async function toggleModuleStatus(mod: AdminModule) {
     const newStatus = mod.status === 'active' ? 'completed' : 'active'
     await supabase.from('modules').update({ status: newStatus }).eq('id', mod.id)
-    fetchModules()
-  }
-
-  async function deleteModule(id: string) {
-    if (editingModuleId === id) resetModuleForm()
-    const { error } = await supabase.from('modules').delete().eq('id', id)
-    showMsg(error ? '❌ ' + error.message : '✅ Module deleted')
     fetchModules()
   }
 
@@ -117,10 +105,10 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
         </div>
       </div>
       <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-        <button onClick={saveModule} disabled={saving} style={submitBtnStyle(pt, dark, saving)}>
-          {saving ? 'Saving...' : editingModuleId ? 'Save Changes' : 'Add Module'}
+        <button onClick={saveModule} disabled={crud.saving} style={submitBtnStyle(pt, dark, crud.saving)}>
+          {crud.saving ? 'Saving...' : editingModuleId ? 'Save Changes' : 'Add Module'}
         </button>
-        {editingModuleId && <button onClick={resetModuleForm} disabled={saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
+        {editingModuleId && <button onClick={resetModuleForm} disabled={crud.saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
       </div>
     </LiquidGlassCard>
   )
@@ -165,7 +153,7 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
         confirmLabel="Delete"
         confirmColor={pt.danger}
         onCancel={() => setConfirmDeleteId(null)}
-        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) deleteModule(id) }}
+        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) crud.remove(id) }}
       />
     </div>
   )

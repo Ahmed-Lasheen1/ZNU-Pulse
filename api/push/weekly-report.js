@@ -1,8 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 
-// See api/push/broadcast.js for why this now comes from the
-// environment instead of a hardcoded literal.
 const SUPABASE_URL = process.env.SUPABASE_URL
 
 webpush.setVapidDetails(
@@ -11,10 +9,8 @@ webpush.setVapidDetails(
   process.env.VAPID_PRIVATE_KEY
 )
 
-// Triggered weekly by a GitHub Actions cron job (see
-// .github/workflows/weekly-report-push.yml). Only signed-in users get
-// a personalized report — guest devices have no server-side history
-// to summarize (their stats live only in their own browser).
+// Runs weekly via cron. Only signed-in users get a report — guest
+// stats live only in their own browser.
 export default async function handler(req, res) {
   if (req.headers['x-cron-secret'] !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' })
@@ -31,32 +27,35 @@ export default async function handler(req, res) {
   if (!subs || subs.length === 0) return res.status(200).json({ sent: 0 })
 
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+
+  // Group subs by user first — someone with two devices only gets one report.
+  const byUser = {}
+  subs.forEach((s) => { (byUser[s.user_id] ||= []).push(s) })
+  const userIds = Object.keys(byUser)
+
+  // One batched query for every user's history instead of one query per user.
+  const { data: allHistory } = await supabase
+    .from('exam_history')
+    .select('user_id, total, correct')
+    .in('user_id', userIds)
+    .gte('completed_at', weekAgo)
+
+  const historyByUser = {}
+  ;(allHistory || []).forEach(h => { (historyByUser[h.user_id] ||= []).push(h) })
+
   let sent = 0
   const expiredIds = []
 
-  // Group by user first — someone subscribed on two devices should
-  // only get their stats computed once.
-  const byUser = {}
-  subs.forEach((s) => { (byUser[s.user_id] ||= []).push(s) })
-
-  await Promise.all(Object.entries(byUser).map(async ([userId, userSubs]) => {
-    const { data: history } = await supabase
-      .from('exam_history')
-      .select('total, correct')
-      .eq('user_id', userId)
-      .gte('completed_at', weekAgo)
-
+  await Promise.all(userIds.map(async (userId) => {
+    const history = historyByUser[userId]
     if (!history || history.length === 0) return // nothing to report this week
 
+    const userSubs = byUser[userId]
     const totalAttempted = history.reduce((a, h) => a + h.total, 0)
     const totalCorrect = history.reduce((a, h) => a + h.correct, 0)
     const accuracy = totalAttempted > 0 ? Math.round((100 * totalCorrect) / totalAttempted) : 0
 
-    // Message tone scales with how the student actually did this
-    // week. Tiers (90/75/65/50) match the same breakpoints used by
-    // the in-app Weekly Report card on Home and the MCQ results
-    // screen — see accuracyTier() in src/pages/mcq/mcqShared.tsx —
-    // so the push notification and the app never disagree.
+    // Tiers match accuracyTier() in mcqShared.tsx, so the app and this push agree.
     const encouragement =
       accuracy >= 90 ? 'Outstanding work! 🌟' :
       accuracy >= 75 ? 'Great work! 👏' :

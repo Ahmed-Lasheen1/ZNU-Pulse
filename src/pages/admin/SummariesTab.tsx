@@ -14,6 +14,7 @@ import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle, fieldLabel,
 import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
 import { fetchModuleStages } from '../../lib/moduleStages'
 import { useAdminMessage } from './useAdminMessage'
+import { useAdminEntityCrud } from './useAdminEntityCrud'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon, LinkIcon, UploadIcon } from '../../components/ui/tool-icons'
 import { publishSummary } from '../../lib/publishSummary'
 import type { AdminModule, AdminSubject, AdminLesson } from './adminTypes'
@@ -56,7 +57,6 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
   const [sumExamStage, setSumExamStage] = useState('')
   const [sumStageOptions, setSumStageOptions] = useState(EXAM_STAGES)
   const [moduleFilter, setModuleFilter] = useState('all')
-  const [saving, setSaving] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const [publishMode, setPublishMode] = useState<PublishMode>('link')
@@ -90,26 +90,21 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
     setSumSubjectId(''); setSumLessonId(''); setSumExamStage('')
     setHtmlFile(null); setImageFiles([])
   }
-  async function saveSummary() {
-    if (!sumTitle || !sumUrl || !sumModuleId || saving) return
-    const payload = {
+
+  const crud = useAdminEntityCrud({
+    table: 'summaries', label: 'Summary', editingId: editingSummaryId,
+    buildPayload: () => ({
       title: sumTitle, url: sumUrl, module_id: sumModuleId,
       subject_id: sumSubjectId || null,
       lesson_id: sumLessonId || null,
       exam_stage: sumExamStage || null
-    }
-    setSaving(true)
-    if (editingSummaryId) {
-      const { error } = await supabase.from('summaries').update(payload).eq('id', editingSummaryId)
-      setSaving(false)
-      if (!error) { showMsg('✅ Summary updated!'); resetSummaryForm(); fetchSummaries() }
-      else showMsg('❌ ' + error.message)
-    } else {
-      const { error } = await supabase.from('summaries').insert([payload])
-      setSaving(false)
-      if (!error) { showMsg('✅ Summary added!'); resetSummaryForm(); fetchSummaries() }
-      else showMsg('❌ ' + error.message)
-    }
+    }),
+    resetForm: resetSummaryForm, refresh: fetchSummaries, showMessage: showMsg
+  })
+
+  function saveSummary() {
+    if (!sumTitle || !sumUrl || !sumModuleId || crud.saving) return
+    crud.save()
   }
 
   async function publishSummaryFromFile() {
@@ -140,18 +135,11 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
     setPublishing(false)
   }
 
-  async function deleteSummary(id: string) {
-    if (editingSummaryId === id) resetSummaryForm()
-    const { error } = await supabase.from('summaries').delete().eq('id', id)
-    showMsg(error ? '❌ ' + error.message : '✅ Summary deleted')
-    fetchSummaries()
-  }
-
   const filteredSubjects = (moduleId: string) => subjects.filter(s => s.module_id === moduleId)
   const filteredLessons = (subjectId: string) => lessons.filter(l => l.subject_id === subjectId)
   const visibleModules = moduleFilter === 'all' ? modules : modules.filter(m => m.id === moduleFilter)
 
-  const isBusy = saving || publishing
+  const isBusy = crud.saving || publishing
   const totalUploadBytes = (htmlFile?.size || 0) + imageFiles.reduce((a, f) => a + f.size, 0)
   const totalUploadMb = (totalUploadBytes / (1024 * 1024)).toFixed(1)
   const overSizeLimit = totalUploadBytes > 4 * 1024 * 1024
@@ -220,7 +208,7 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
           <input placeholder="Summary URL" value={sumUrl} onChange={e => setSumUrl(e.target.value)} style={inStyle} />
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={saveSummary} disabled={isBusy} style={{ ...btnStyle(pt, dark), flex: 1, opacity: isBusy ? 0.7 : 1, cursor: isBusy ? 'not-allowed' : 'pointer' }}>
-              {saving ? 'Saving...' : editingSummaryId ? 'Save Changes' : 'Add Summary'}
+              {crud.saving ? 'Saving...' : editingSummaryId ? 'Save Changes' : 'Add Summary'}
             </button>
             {editingSummaryId && <button onClick={resetSummaryForm} disabled={isBusy} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
           </div>
@@ -310,7 +298,7 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
         confirmLabel="Delete"
         confirmColor={pt.danger}
         onCancel={() => setConfirmDeleteId(null)}
-        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) deleteSummary(id) }}
+        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) crud.remove(id) }}
       />
     </div>
   )
