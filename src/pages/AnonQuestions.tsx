@@ -135,6 +135,10 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
     if (error) setLoadError(true)
   }
 
+  // Submission goes through the submit_anon_question RPC rather than
+  // a direct table insert — it re-checks the cooldown and a profanity
+  // filter server-side (this client-side pass is just fast feedback,
+  // not the real gate), and hands back the tracking token itself.
   async function submitQuestion() {
     if (!newQ.trim() || submittingRef.current) return
     if (cooldownRemaining > 0) {
@@ -149,10 +153,9 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
       return
     }
     submittingRef.current = true
-    const token = crypto.randomUUID()
-    const { error } = await supabase.from('anonymous_questions').insert([{ question: newQ.trim(), tracking_token: token }])
+    const { data: token, error } = await supabase.rpc('submit_anon_question', { p_question: newQ.trim() })
     submittingRef.current = false
-    if (!error) {
+    if (!error && token) {
       localStorage.setItem(COOLDOWN_STORAGE_KEY, String(Date.now()))
       updateCooldownRemaining()
       addMyAnonToken(token)

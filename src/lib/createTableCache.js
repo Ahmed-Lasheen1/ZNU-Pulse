@@ -1,24 +1,22 @@
 // src/lib/createTableCache.js
-// Generic "load once, cache in memory, invalidate on demand" pattern
-// shared by subjects.js, lessons.js, and moduleStages.js — each of
-// those tables changes rarely (only via Admin) but was being queried
-// fresh on every page navigation before this existed.
+// "Load once, cache in memory, invalidate on demand" — shared by
+// subjects.js, lessons.js, and moduleStages.js.
 export function createTableCache(fetcher) {
   let cache = null
   let inFlight = null
-  // BUG FIX: if invalidate() was called while a fetch was already in
-  // flight (e.g. an admin edit landing while another open tab is
-  // mid-request), the old in-flight promise would still resolve and
-  // silently repopulate `cache` with pre-edit data — undoing the
-  // invalidation until the next explicit invalidate or reload. Each
-  // fetch now captures the generation it started on, and only commits
-  // its result to `cache` if that generation is still current.
+  // Generation the CURRENT inFlight promise was started under — lets
+  // a new caller tell a stale in-flight fetch apart from a fresh one.
+  let inFlightGeneration = -1
   let generation = 0
 
   async function ensureLoaded() {
     if (cache) return { data: cache, error: null }
     const myGeneration = generation
-    if (!inFlight) {
+    // Only reuse inFlight if it started under the CURRENT generation.
+    // Otherwise invalidate() ran while it was mid-flight — reusing it
+    // would silently resurrect pre-invalidation data once it resolves.
+    if (!inFlight || inFlightGeneration !== myGeneration) {
+      inFlightGeneration = myGeneration
       inFlight = fetcher().then(res => {
         inFlight = null
         return res
@@ -27,9 +25,6 @@ export function createTableCache(fetcher) {
     const { data, error } = await inFlight
     if (error) return { data: [], error }
     if (myGeneration !== generation) {
-      // Invalidated while this request was in flight — don't
-      // resurrect stale data. Whatever is currently cached (possibly
-      // null) is returned as-is; the next call will re-fetch.
       return { data: cache || [], error: null }
     }
     cache = data || []

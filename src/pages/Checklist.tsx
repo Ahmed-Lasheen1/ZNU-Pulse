@@ -218,18 +218,24 @@ export default function Checklist({ dark }: { dark: boolean }) {
     if (!user) localStorage.setItem(`checklist_${activeModule}`, JSON.stringify(updated))
   }
 
+  // Per-module key: without it, whichever module's tab resolved first
+  // today would use up the single daily local-notification slot and
+  // silently suppress a different module's urgent items for the rest
+  // of the day. The server-side push cron (checklist-reminders.js) is
+  // unaffected either way — this only gates this in-tab popup.
   useEffect(() => {
     if (!('Notification' in window) || Notification.permission !== 'granted') return
     if (tasks.length === 0) return
+    const notifyKey = `znu_checklist_last_notify_${activeModule}`
     const todayStr = new Date().toDateString()
-    if (localStorage.getItem('znu_checklist_last_notify') === todayStr) return
+    if (localStorage.getItem(notifyKey) === todayStr) return
 
     const urgent = tasks.filter(t => !t.done && (isOverdue(t.deadline) || isDueSoon(t.deadline)))
     if (urgent.length > 0) {
       new Notification('ZNU Future Doctors', {
         body: `You have ${urgent.length} checklist item(s) due soon or overdue.`
       })
-      localStorage.setItem('znu_checklist_last_notify', todayStr)
+      localStorage.setItem(notifyKey, todayStr)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks])

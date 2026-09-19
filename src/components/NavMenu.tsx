@@ -9,6 +9,7 @@ import { HomeIcon, ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, Boo
 import { getPulseTheme, pulseFonts } from '../premiumTheme'
 import { glassInput } from './pulse/PulseUI'
 import { liquidGlassShadow, liquidGlassBackdrop, liquidGlassTint } from '../lib/liquidGlass'
+import { usePrefersReducedMotion } from '../lib/usePrefersReducedMotion'
 import PulseGlassRow from './pulse/PulseGlassRow'
 import ConfirmDialog from './ConfirmDialog'
 
@@ -63,19 +64,6 @@ const PANEL_MAX_HEIGHT = 'calc(100dvh - 140px)'
 const morphEase = [0.22, 1, 0.36, 1] as const
 const OPEN_DURATION = 0.6
 const CLOSE_DURATION = 0.55
-
-// ── Reduced-motion + shared transition hooks ────────────────────────
-function usePrefersReducedMotion() {
-  const [reduced, setReduced] = useState(false)
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-    setReduced(mq.matches)
-    const handler = (e: MediaQueryListEvent) => setReduced(e.matches)
-    mq.addEventListener?.('change', handler)
-    return () => mq.removeEventListener?.('change', handler)
-  }, [])
-  return reduced
-}
 
 // Single transition object shared by both the panel and content block's
 // animate() calls, so their scale/y and opacity move in exact lockstep.

@@ -48,12 +48,6 @@ export default function ModulePage({ dark }: { dark: boolean }) {
 
   useEffect(() => {
     let ignore = false
-    supabase.from('files').select('type').eq('module_id', moduleId)
-      .then(({ data, error }) => {
-        if (ignore) return
-        if (data) setPresentFileTypes(new Set(data.map((f: any) => f.type)))
-        if (error) setLoadError(true)
-      })
     fetchModuleStages(moduleId!).then(result => { if (!ignore) setExamStages(result) })
     fetchSubjectsForModule(moduleId!).then(({ subjects, error }) => {
       if (ignore) return
@@ -61,28 +55,28 @@ export default function ModulePage({ dark }: { dark: boolean }) {
       if (error) setLoadError(true)
     })
 
-    supabase.from('summaries').select('id', { count: 'exact', head: true }).eq('module_id', moduleId)
-      .then(({ count, error }) => {
-        if (ignore) return
-        setHasModuleSummaries((count || 0) > 0)
-        if (error) setLoadError(true)
-      })
-    supabase.from('questions_public').select('id', { count: 'exact', head: true }).eq('module_id', moduleId)
-      .then(({ count, error }) => {
-        if (ignore) return
-        setHasModuleQuestions((count || 0) > 0)
-        if (error) setLoadError(true)
-      })
-
+    // One select per table (type/id + exam_stage together) instead of
+    // a count query plus a separate exam_stage query for each table —
+    // both the "has any content" booleans and the stage-tag set are
+    // derived from the same three results.
     Promise.all([
-      supabase.from('files').select('exam_stage').eq('module_id', moduleId).not('exam_stage', 'is', null),
-      supabase.from('questions_public').select('exam_stage').eq('module_id', moduleId).not('exam_stage', 'is', null),
-      supabase.from('summaries').select('exam_stage').eq('module_id', moduleId).not('exam_stage', 'is', null),
+      supabase.from('files').select('type, exam_stage').eq('module_id', moduleId),
+      supabase.from('questions_public').select('id, exam_stage').eq('module_id', moduleId),
+      supabase.from('summaries').select('id, exam_stage').eq('module_id', moduleId),
     ]).then(([filesRes, questionsRes, summariesRes]) => {
       if (ignore) return
+
+      if (filesRes.data) setPresentFileTypes(new Set(filesRes.data.map((f: any) => f.type)))
+      if (filesRes.error) setLoadError(true)
+
+      if (questionsRes.data) setHasModuleQuestions(questionsRes.data.length > 0)
+      if (questionsRes.error) setLoadError(true)
+
+      if (summariesRes.data) setHasModuleSummaries(summariesRes.data.length > 0)
+      if (summariesRes.error) setLoadError(true)
+
       const stages = new Set<string>()
       ;[filesRes, questionsRes, summariesRes].forEach(res => {
-        if (res.error) { setLoadError(true); return }
         (res.data || []).forEach((row: any) => { if (row.exam_stage) stages.add(row.exam_stage) })
       })
       setStagesWithContent(stages)

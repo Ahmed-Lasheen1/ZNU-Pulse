@@ -16,6 +16,7 @@ import EmptyState from '../components/pulse/EmptyState'
 import { getGuestFlags, getGuestHistory, toggleGuestFlag } from '../lib/reviewStorage'
 import QuestionSourceBadge from '../components/QuestionSourceBadge'
 import { ModuleIcon } from '../lib/medicalIcons'
+import { wrapText } from '../lib/textStyles'
 import { BookIcon, ClockIcon, FlagIcon, LightbulbIcon, TargetIcon, EmptyBoxIcon, CelebrationIcon, RefreshIcon, SearchIcon2 } from '../components/ui/tool-icons'
 
 const REVIEW_ACCENT = '#e2725b'
@@ -188,8 +189,6 @@ export default function Review({ dark }: { dark: boolean }) {
 
   const hoverTint = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'
   const inStyle = { ...glassInput(pt, dark), padding: '13px 20px', marginBottom: 0 }
-
-  const wrapText: React.CSSProperties = { wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'normal' }
 
   const reviewTabs = [
     { id: 'history' as const, label: 'History', Icon: ClockIcon },
@@ -502,7 +501,7 @@ export default function Review({ dark }: { dark: boolean }) {
                       borderRadius: 10, padding: '10px 14px', marginTop: 8, color: pt.sub, fontSize: 12,
                       display: 'flex', alignItems: 'flex-start', gap: 8
                     }}>
-                      <LightbulbIcon color={pt.sub} size={14} style={{ flexShrink: 0, marginTop: 2 }} />
+                      <LightbulbIcon color={pt.sub} size={14} style={{ flexShrink: 0, marginTop: 1 }} />
                       <span style={wrapText}>{item.explanation}</span>
                     </div>
                   )}

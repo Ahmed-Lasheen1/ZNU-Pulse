@@ -1,4 +1,5 @@
-import { useEffect, useId, useState } from 'react'
+import { useId } from 'react'
+import { usePrefersReducedMotion } from '../../lib/usePrefersReducedMotion'
 
 // Vector ECG artwork (no raster image).
 //
@@ -52,18 +53,6 @@ const STROKE_WIDTH = 25
 // as a dot chasing the line instead of a moving piece of the line.
 const BEAM_FRACTION = 0.13
 const BEAM_DURATION = '7s'
-
-function usePrefersReducedMotion() {
-  const [reduced, setReduced] = useState(false)
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-    setReduced(mq.matches)
-    const handler = (e) => setReduced(e.matches)
-    mq.addEventListener?.('change', handler)
-    return () => mq.removeEventListener?.('change', handler)
-  }, [])
-  return reduced
-}
 
 export default function EcgHero({ height = 220 }) {
   const reduced = usePrefersReducedMotion()

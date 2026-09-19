@@ -304,7 +304,9 @@ export default function MCQ({ dark }: { dark: boolean }) {
     } else if (data) {
       setQuestions(data)
       setUsingCache(false)
-      localStorage.setItem(cacheKey, JSON.stringify(data))
+      // Best-effort — a full/quota-exceeded localStorage shouldn't
+      // throw and break the (already-succeeded) question fetch above.
+      try { localStorage.setItem(cacheKey, JSON.stringify(data)) } catch { /* cache write skipped */ }
     }
     setLoading(false)
   }
