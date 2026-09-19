@@ -16,6 +16,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { containsProfanity } from '../lib/moderation'
 import { isSuccessMessage } from '../lib/messageStyle'
 import { getMyAnonTokens, addMyAnonToken, getNotifiedTokens, markTokensNotified } from '../lib/anonTracking'
+import { showLocalNotification } from '../lib/localNotification'
 import { AnonQAIcon, QuestionMarkIcon, ClockIcon, CheckCircleIcon, TrashIcon, LightbulbIcon, EmptyBoxIcon } from '../components/ui/tool-icons'
 import { Lock } from 'lucide-react'
 
@@ -39,7 +40,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
   const { user, profile } = useAuth() as { user: any; profile?: { role?: string } | null }
   const isAdmin = profile?.role === 'admin'
   const pt = getPulseTheme(dark)
-  const showToast = useToast() as (message: string, type?: 'success' | 'error') => void
+  const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
 
   const [questions, setQuestions] = useState<AnonQuestion[]>([])
   const [myQuestions, setMyQuestions] = useState<AnonQuestion[]>([])
@@ -77,6 +78,12 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
     setCooldownRemaining(remaining)
   }
 
+  // BUG FIX: this used to call `new Notification(...)` directly, which
+  // throws on Chrome for Android (see lib/localNotification.js) and,
+  // being inside an effect, crashed the page into ErrorBoundary. It now
+  // goes through showLocalNotification(), which can't throw. Tokens are
+  // marked as notified first so a re-run can't announce them twice, and
+  // several newly answered questions collapse into one notification.
   useEffect(() => {
     if (!('Notification' in window) || Notification.permission !== 'granted') return
     const notified = getNotifiedTokens()
@@ -84,10 +91,13 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
       q.tracking_token && q.answered && !notified.includes(q.tracking_token)
     )
     if (newlyAnswered.length > 0) {
-      newlyAnswered.forEach(() => {
-        new Notification('💬 ZNU Future Doctors', { body: 'Your anonymous question has been answered!' })
-      })
       markTokensNotified(newlyAnswered.map(q => q.tracking_token as string))
+      showLocalNotification('💬 ZNU Future Doctors', {
+        body: newlyAnswered.length === 1
+          ? 'Your anonymous question has been answered!'
+          : `${newlyAnswered.length} of your anonymous questions have been answered!`,
+        data: { url: '/anon-questions' },
+      })
     }
   }, [myQuestions])
 

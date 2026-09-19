@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
 import { supabase } from '../supabase'
@@ -13,6 +13,7 @@ import ErrorBanner from '../components/ErrorBanner'
 import TabRow from '../components/TabRow'
 import NotifyPermissionButton from '../components/NotifyPermissionButton'
 import { useToast } from '../components/ToastProvider'
+import { showLocalNotification } from '../lib/localNotification'
 import { ChecklistIcon, LightbulbIcon, CalendarDotIcon, WarningIcon, ClockIcon, CelebrationIcon, TrashIcon, BookIcon, CheckCircleIcon } from '../components/ui/tool-icons'
 import type { ChecklistTask } from '../types/checklist'
 
@@ -93,7 +94,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
   const navigate = useNavigate()
   const { modules, modulesLoaded, modulesError } = useModules()
 
-  const showToast = useToast() as (message: string, type?: 'success' | 'error') => void
+  const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
 
   const pt = getPulseTheme(dark)
 
@@ -138,13 +139,9 @@ export default function Checklist({ dark }: { dark: boolean }) {
 
   useEffect(() => { setShowCompleted(false) }, [activeModule])
 
-  const notifiedSignedInRef = useRef(false)
-  useEffect(() => {
-    if (user && !notifiedSignedInRef.current) {
-      notifiedSignedInRef.current = true
-      showToast('✅ Signed in — checklist synced to your account')
-    }
-  }, [user, showToast])
+  // (Removed: a "✅ Signed in — checklist synced to your account" toast
+  // that fired every time a signed-in student opened this page, not
+  // just right after signing in. It was noise on every visit.)
 
   async function fetchTasks(isIgnored: () => boolean = () => false) {
     setTasksError(false)
@@ -223,6 +220,11 @@ export default function Checklist({ dark }: { dark: boolean }) {
   // silently suppress a different module's urgent items for the rest
   // of the day. The server-side push cron (checklist-reminders.js) is
   // unaffected either way — this only gates this in-tab popup.
+  //
+  // BUG FIX: this used to call `new Notification(...)` directly, which
+  // throws on Chrome for Android (see lib/localNotification.js) and,
+  // being inside an effect, crashed the whole page into ErrorBoundary.
+  // It now goes through showLocalNotification(), which can't throw.
   useEffect(() => {
     if (!('Notification' in window) || Notification.permission !== 'granted') return
     if (tasks.length === 0) return
@@ -232,10 +234,13 @@ export default function Checklist({ dark }: { dark: boolean }) {
 
     const urgent = tasks.filter(t => !t.done && (isOverdue(t.deadline) || isDueSoon(t.deadline)))
     if (urgent.length > 0) {
-      new Notification('ZNU Future Doctors', {
-        body: `You have ${urgent.length} checklist item(s) due soon or overdue.`
-      })
+      // Marked before the (async) send so a quick re-run of this effect
+      // can't fire the same popup twice.
       localStorage.setItem(notifyKey, todayStr)
+      showLocalNotification('ZNU Future Doctors', {
+        body: `You have ${urgent.length} checklist item(s) due soon or overdue.`,
+        data: { url: '/checklist' },
+      })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks])
