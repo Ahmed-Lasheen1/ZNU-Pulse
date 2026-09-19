@@ -29,7 +29,6 @@ const AnonQuestions = lazy(() => import('./pages/AnonQuestions'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 const Search = lazy(() => import('./pages/Search'))
-import PulseBackground from './components/pulse/PulseBackground'
 import Footer from './components/Footer'
 
 export { ThemeContext, AuthContext, ModulesContext, useTheme, useAuth, useModules } from './contexts'
@@ -77,22 +76,15 @@ function SiteHeader({ dark, toggleTheme }) {
   return (
     <>
       <PulseOverlayHeader dark={dark} toggleTheme={toggleTheme} />
-      {/* Matches PulseOverlayHeader's real rendered height (76px), plus
-          the env(safe-area-inset-top) padding added there now that
-          index.html sets viewport-fit=cover — otherwise page content
-          would sit partly underneath the fixed header on notched
-          devices. Falls back to 0px where there's no safe area. */}
+      {/* Matches PulseOverlayHeader's rendered height (76px + safe-area-inset-top) */}
       <div style={{ height: 'calc(76px + env(safe-area-inset-top, 0px))' }} />
     </>
   )
 }
 
-// Renders the shared site Footer, but only plays its scroll-triggered
-// entrance on the Home page, and only the first time Home loads in
-// this tab session — matching every other animated element on Home.
-// Its own useOncePerSession key (separate from Home's own
-// 'znu_home_entrance_played') means the two hook calls never race
-// each other for the same flag.
+// Renders the shared Footer, only animating its entrance on Home and
+// only once per tab session (own useOncePerSession key so it never
+// races Home's own entrance flag).
 function SiteFooter({ dark }) {
   const location = useLocation()
   const isHome = location.pathname === '/'
@@ -156,8 +148,7 @@ export default function App() {
     setModules(sorted)
     if (error) setModulesError(true)
     setModulesLoaded(true)
-    // Returned so callers (e.g. Admin) can reuse this fetch instead
-    // of querying modules again themselves.
+    // Returned so callers (e.g. Admin) can reuse this fetch instead of re-querying.
     return { modules: sorted, error }
   }
 
@@ -234,17 +225,14 @@ export default function App() {
             flexDirection: 'column',
             fontFamily: "'Segoe UI', sans-serif"
           }}>
-            {/* 1. Global Pulse Background Component */}
-            <PulseBackground />
-
-            {/* 2. Page Essentials & Content */}
+            {/* Page Essentials & Content */}
             <ScrollToTop />
             <SiteHeader dark={dark} toggleTheme={toggleTheme} />
             <main style={{ flex: 1, position: 'relative', zIndex: 1 }}>
               <RoutedContent dark={dark} toggleTheme={toggleTheme} />
             </main>
             
-            {/* 3. Footer Layer */}
+            {/* Footer Layer */}
             <SiteFooter dark={dark} />
           </div>
         </Router>
