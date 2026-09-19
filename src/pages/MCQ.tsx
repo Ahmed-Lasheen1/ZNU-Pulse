@@ -5,13 +5,9 @@ import { supabase } from '../supabase'
 import { useAuth, useModules } from '../contexts'
 import { useToast } from '../components/ToastProvider'
 import { fetchModuleStages } from '../lib/moduleStages'
-import {
-  getGuestFlags, toggleGuestFlag,
-  saveGuestIncorrect, enrichGuestFlagsWithResults,
-  addGuestHistory
-} from '../lib/reviewStorage'
+import { getGuestFlags, toggleGuestFlag, saveGuestIncorrect, enrichGuestFlagsWithResults, addGuestHistory } from '../lib/reviewStorage'
 import { loadSavedActiveExam, persistActiveExam, clearActiveExam } from '../lib/activeExam'
-import { MOCK_MINUTES, optionLabels } from './mcq/mcqShared'
+import { optionLabels } from './mcq/mcqShared'
 import MCQBrowse from './mcq/MCQBrowse'
 import MCQExamFlow from './mcq/MCQExamFlow'
 
@@ -42,7 +38,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const [results, setResults] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
-  const [timeLeft, setTimeLeft] = useState(0)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [finishTimeSec, setFinishTimeSec] = useState(0)
   const [flaggedIds, setFlaggedIds] = useState<Set<string>>(new Set())
@@ -70,19 +65,11 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
   const pendingPersistRef = useRef<any>(null)
   const submittingRef = useRef(false)
-  // Guards the auto-start effects below so they fire at most once per
-  // mount, even if `questions` refetches later while browsing.
   const autoStartedLessonRef = useRef(false)
   const autoStartedSubjectRef = useRef(false)
   const isMountedRef = useRef(true)
-  // BUG FIX: the unmount-flush effect below has an empty dependency
-  // array (it must — it should only run once, on real unmount), so a
-  // `user` captured directly in its closure would be whatever `user`
-  // was at MOUNT time forever. If someone signs in partway through a
-  // guest quiz and then navigates away, the flush would persist to
-  // Supabase using a stale null `user` instead of the signed-in one
-  // (or vice versa). Keeping `user` in a ref that's updated every
-  // render means the unmount cleanup always reads the current value.
+  // Kept in a ref (not read directly) so the unmount-flush effect below
+  // always sees the current user, not whoever was signed in at mount.
   const userRef = useRef(user)
   useEffect(() => { userRef.current = user }, [user])
 
@@ -110,17 +97,10 @@ export default function MCQ({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules])
 
-  // Drops localStorage question caches for modules that no longer
-  // exist (renamed/deleted) — otherwise these grow unbounded.
-  //
-  // BUG FIX: same class of bug as Checklist.tsx's guest-checklist
-  // prune — App.jsx's loadModules() sets modulesLoaded=true even when
-  // the modules fetch fails (leaving `modules` empty). Without the
-  // modulesError guard, a transient network error would make
-  // validIds an empty set and wipe every mcq_questions_cache_* entry,
-  // destroying the exact offline fallback (usingCache) this cache
-  // exists to provide. Only prune once the fetch is confirmed to have
-  // actually succeeded.
+  // Drops question caches for modules that no longer exist. Only prune
+  // once the modules fetch is confirmed to have actually succeeded —
+  // otherwise a transient error would wipe every cache instead of
+  // just stale ones.
   useEffect(() => {
     if (!modulesLoaded || modulesError) return
     try {
@@ -176,9 +156,8 @@ export default function MCQ({ dark }: { dark: boolean }) {
     return () => { cancelled = true }
   }, [user, quizMode])
 
-  // Debounced save of in-progress exam state (for Resume). The
-  // pending snapshot is kept in a ref so a real unmount (see the
-  // effect below) can flush it instead of silently dropping it.
+  // Debounced save of in-progress exam state (for Resume). Pending
+  // snapshot lives in a ref so a real unmount can flush it.
   useEffect(() => {
     if (!quizMode || submitted || quizMode === 'retry') { pendingPersistRef.current = null; return }
     if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current)
@@ -194,23 +173,13 @@ export default function MCQ({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quizMode, quizQuestions, answers, submitted])
 
-  // Flushes a still-pending save only when MCQ itself unmounts (e.g.
-  // navigating away mid-quiz) — not on every dependency change above.
-  // Reads userRef.current (not `user` directly) so it always uses the
-  // most recent auth state, not whatever `user` was when MCQ mounted.
+  // Flushes a still-pending save only on real unmount, using the
+  // latest auth state via userRef.
   useEffect(() => {
     return () => {
       if (pendingPersistRef.current) persistActiveExam(userRef.current, pendingPersistRef.current)
     }
   }, [])
-
-  useEffect(() => {
-    if (quizMode === 'mock' && !submitted && !grading && timeLeft === 0 && quizQuestions.length > 0) {
-      clearInterval(timerRef.current)
-      submitQuiz()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft])
 
   useEffect(() => {
     let ignore = false
@@ -304,8 +273,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     } else if (data) {
       setQuestions(data)
       setUsingCache(false)
-      // Best-effort — a full/quota-exceeded localStorage shouldn't
-      // throw and break the (already-succeeded) question fetch above.
       try { localStorage.setItem(cacheKey, JSON.stringify(data)) } catch { /* cache write skipped */ }
     }
     setLoading(false)
@@ -371,13 +338,11 @@ export default function MCQ({ dark }: { dark: boolean }) {
     }
   }
 
-  function startTimer(startedAt: number, mode: string) {
+  // Stopwatch — counts up from quiz start, same for every mode
+  // (mock/practice/retry). No limit, no auto-submit.
+  function startTimer(startedAt: number) {
     clearInterval(timerRef.current)
-    const tick = () => {
-      const elapsed = Math.floor((Date.now() - startedAt) / 1000)
-      if (mode === 'mock') setTimeLeft(Math.max(0, MOCK_MINUTES * 60 - elapsed))
-      else setElapsedSeconds(elapsed)
-    }
+    const tick = () => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000))
     tick()
     timerRef.current = setInterval(tick, 1000)
   }
@@ -408,16 +373,13 @@ export default function MCQ({ dark }: { dark: boolean }) {
     setStruckOut({})
     gradingInFlightRef.current.clear()
     sessionIdRef.current++
-    // Captured AFTER the increment above, so a flags response that
-    // resolves after the user has since started/exited a different
-    // quiz session is discarded instead of overwriting its flags.
     const flagSession = sessionIdRef.current
     loadFlagsFor(qs.map(q => q.id)).then(ids => {
       if (sessionIdRef.current === flagSession) setFlaggedIds(ids)
     })
 
     quizStartedAtRef.current = Date.now()
-    startTimer(quizStartedAtRef.current, type)
+    startTimer(quizStartedAtRef.current)
     window.scrollTo({ top: 0 })
   }
 
@@ -440,7 +402,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     gradingInFlightRef.current.clear()
     sessionIdRef.current++
     quizStartedAtRef.current = Date.now()
-    startTimer(quizStartedAtRef.current, 'retry')
+    startTimer(quizStartedAtRef.current)
     const flagSession = sessionIdRef.current
     loadFlagsFor(list.map(q => q.id)).then(ids => {
       if (sessionIdRef.current === flagSession) setFlaggedIds(ids)
@@ -467,7 +429,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
       if (sessionIdRef.current === flagSession) setFlaggedIds(ids)
     })
 
-    startTimer(resumeData.startedAt, resumeData.quizMode)
+    startTimer(resumeData.startedAt)
     setResumeData(null)
     window.scrollTo({ top: 0 })
   }
@@ -484,7 +446,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     setAnswers({})
     setResults({})
     setSubmitted(false)
-    setTimeLeft(0)
     setElapsedSeconds(0)
     setFlaggedIds(new Set())
     setCurrentIndex(0)
@@ -567,7 +528,8 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
     const payload = quizQuestions.map((q, i) => ({ id: q.id, answer: answers[i] || null }))
     const total = quizQuestions.length
-    const timeSec = quizMode === 'mock' ? Math.max(0, MOCK_MINUTES * 60 - timeLeft) : null
+    // No fixed duration in any mode anymore — time isn't tracked in history.
+    const timeSec = null
 
     const retryModuleIsUniform = quizMode === 'retry' && quizQuestions.every(q => q.module_id === quizQuestions[0]?.module_id)
     const retrySubjectIsUniform = quizMode === 'retry' && quizQuestions.every(q => q.subject_id === quizQuestions[0]?.subject_id)
@@ -676,7 +638,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
     clearActiveExam(user)
 
-    setFinishTimeSec(quizMode === 'mock' ? (timeSec as number) : elapsedSeconds)
+    setFinishTimeSec(elapsedSeconds)
     submittingRef.current = false
   }
 
@@ -694,7 +656,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
         struckOut={struckOut}
         currentIndex={currentIndex}
         setCurrentIndex={setCurrentIndex}
-        timeLeft={timeLeft}
         elapsedSeconds={elapsedSeconds}
         finishTimeSec={finishTimeSec}
         fontScale={fontScale}

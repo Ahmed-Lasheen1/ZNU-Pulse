@@ -8,13 +8,7 @@ import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { FlagIcon, SearchIcon2, LightbulbIcon } from '../../components/ui/tool-icons'
 import { wrapText } from '../../lib/textStyles'
-import {
-  MOCK_MINUTES, MCQ_ACCENT,
-  EXAM_TOP_TEXT, EXAM_TOP_TEXT_MUTED, EXAM_TOP_AMBER, EXAM_TOP_RED,
-  EXAM_LOW_TEXT, EXAM_LOW_SECONDARY, EXAM_LOW_TEXT_MUTED, EXAM_LOW_SHADOW, EXAM_DIVIDER,
-  optionLabels, optionTexts, formatTime, StatChip, InfoTag,
-  accuracyTier, accuracyColor
-} from './mcqShared'
+import { MCQ_ACCENT, EXAM_TOP_TEXT, EXAM_TOP_TEXT_MUTED, EXAM_LOW_TEXT, EXAM_LOW_SECONDARY, EXAM_LOW_TEXT_MUTED, EXAM_LOW_SHADOW, EXAM_DIVIDER, optionLabels, optionTexts, formatTime, StatChip, InfoTag, accuracyTier, accuracyColor } from './mcqShared'
 
 interface MCQExamFlowProps {
   dark: boolean
@@ -28,7 +22,6 @@ interface MCQExamFlowProps {
   struckOut: Record<number, Set<string>>
   currentIndex: number
   setCurrentIndex: (updater: number | ((i: number) => number)) => void
-  timeLeft: number
   elapsedSeconds: number
   finishTimeSec: number
   fontScale: number
@@ -68,7 +61,7 @@ function solidPillBtn(pt: ReturnType<typeof getPulseTheme>): React.CSSProperties
 export default function MCQExamFlow({
   dark, quizMode, submitted, grading, quizQuestions, answers, results,
   flaggedIds, struckOut, currentIndex, setCurrentIndex,
-  timeLeft, elapsedSeconds, finishTimeSec, fontScale, cycleFontScale,
+  elapsedSeconds, finishTimeSec, fontScale, cycleFontScale,
   showReview, setShowReview, subjects, lessons, lessonFilter,
   stopQuiz, submitQuiz, tryAgain, startTargetedPractice,
   selectAnswer, toggleStrike, toggleFlagFor, goPrev, goNext
@@ -79,14 +72,6 @@ export default function MCQExamFlow({
 
   function getScore() {
     return quizQuestions.filter(q => results[q.id]?.is_correct).length
-  }
-
-  function timerColor() {
-    if (quizMode !== 'mock') return EXAM_TOP_TEXT
-    const pctLeft = timeLeft / (MOCK_MINUTES * 60)
-    if (pctLeft <= 0.14) return EXAM_TOP_RED
-    if (pctLeft <= 0.28) return EXAM_TOP_AMBER
-    return EXAM_TOP_TEXT
   }
 
   const score = submitted ? getScore() : 0
@@ -179,22 +164,13 @@ export default function MCQExamFlow({
               <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1, color: EXAM_TOP_TEXT, marginTop: 8 }}>
                 QUESTION {safeIndex + 1} / {total}
               </div>
+              {/* Stopwatch — counts up, same for every mode, no limit/auto-submit. */}
               <div style={{
                 fontFamily: 'monospace', fontWeight: 800, fontSize: 24, marginTop: 8,
-                color: timerColor(), transition: 'color 0.5s ease'
+                color: EXAM_TOP_TEXT
               }}>
-                {quizMode === 'mock' ? formatTime(timeLeft) : formatTime(elapsedSeconds)}
+                {formatTime(elapsedSeconds)}
               </div>
-
-              {quizMode === 'mock' && (
-                <div style={{ width: '100%', maxWidth: 220, margin: '10px auto 0', height: 4, borderRadius: 999, background: 'rgba(10,31,61,0.12)', overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%', borderRadius: 999,
-                    width: `${(timeLeft / (MOCK_MINUTES * 60)) * 100}%`,
-                    background: timerColor(), transition: 'width 1s linear, background 0.5s ease'
-                  }} />
-                </div>
-              )}
             </>
           )}
           {grading && (

@@ -1,19 +1,11 @@
 // src/pages/mcq/mcqShared.tsx
-// Small constants, colors, and presentational atoms shared between
-// MCQ.tsx (state/logic container), MCQBrowse.tsx (module/subject
-// browsing view) and MCQExamFlow.tsx (taking + results + review).
+// Shared constants/colors/atoms used by MCQ.tsx, MCQBrowse.tsx, MCQExamFlow.tsx.
 import { pulseFonts, ON_GRADIENT_TOP, ON_GRADIENT_BOTTOM } from '../../premiumTheme'
 
-export const MOCK_MINUTES = 36
-// Existing functional accent for the MCQ/exam feature (same terracotta
-// used on Review.tsx) — reused, not invented.
+// Existing MCQ/exam accent color (same terracotta as Review.tsx).
 export const MCQ_ACCENT = '#e2725b'
 
-// ── Shared accuracy tiers ────────────────────────────────────────────
-// Single source of truth for score bands used across the app: the MCQ
-// results screen, per-subject accuracy bars, the Home page's Weekly
-// Report card, and the weekly push notification (which mirrors these
-// breakpoints server-side). Change the breakpoints only here.
+// ── Accuracy tiers — shared by results screen, Home's Weekly Report, and the weekly push notification ──
 export type AccuracyTier = 'excellent' | 'great' | 'good' | 'keep_practicing' | 'needs_work'
 
 export function accuracyTier(accuracy: number): AccuracyTier {
@@ -32,11 +24,9 @@ export function accuracyColor(accuracy: number, pt: { success: string; cobalt: s
   return pt.danger
 }
 
-// ── Gradient-aware text colors ──────────────────────────────────────
-// PulseBackground's gradient is fixed to the viewport (pale blue top,
-// dark navy bottom) in both themes. Anything rendered directly on it
-// (not inside a LiquidGlassCard) needs colors chosen for whichever
-// zone it sits in, not the theme's usual card-text colors.
+// ── Gradient-aware text colors ──
+// PulseBackground's gradient is fixed to the viewport; anything sitting
+// directly on it (not inside a glass card) needs zone-specific colors.
 export const EXAM_TOP_TEXT = ON_GRADIENT_TOP.primary
 export const EXAM_TOP_TEXT_MUTED = ON_GRADIENT_TOP.muted
 export const EXAM_TOP_AMBER = '#b45309'
@@ -52,7 +42,6 @@ export const optionTexts = (q: any) => [q.option_a, q.option_b, q.option_c, q.op
 export const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`
 
 // Small labeled number for the results screen ("CORRECT 28", "TIME 31:42").
-// Always in the lower/results zone, so it always carries the legibility shadow.
 export function StatChip({ label, value, color }: { label: string; value: string | number; color: string }) {
   return (
     <div style={{ textAlign: 'center' }}>
@@ -62,7 +51,7 @@ export function StatChip({ label, value, color }: { label: string; value: string
   )
 }
 
-// Generic subject/lesson context tag — same pill treatment as QuestionSourceBadge.
+// Generic subject/lesson context tag — same pill as QuestionSourceBadge.
 export function InfoTag({ label, color }: { label: string; color: string }) {
   return (
     <span style={{
