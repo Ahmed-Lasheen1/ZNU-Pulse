@@ -27,7 +27,7 @@ export default function PulseBackground({ interactive = true }: { interactive?: 
     <div
       aria-hidden
       style={{
-        position: 'fixed', top: 0, left: 0, width: '100%',
+        position: 'absolute', top: 0, left: 0, width: '100%',
         // `inset: 0` sizes against the STATIC "large viewport" (as if
         // mobile browser chrome were already hidden), which is why the
         // gradient used to fall short of / get cut off by Android
