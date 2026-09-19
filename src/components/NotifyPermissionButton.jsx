@@ -6,6 +6,7 @@ import { useNotificationStatus } from '../lib/useNotificationStatus'
 import { subscribeToPush } from '../lib/pushNotifications'
 import { useOncePerSession } from '../lib/useOncePerSession'
 import { useLimitedAppearance } from '../lib/useLimitedAppearance'
+import { NOTIFICATION_MESSAGES } from '../lib/notificationMessages'
 import { BellIcon } from './ui/tool-icons'
 
 // Max page loads this prompt shows before retiring permanently for this device.
@@ -38,21 +39,19 @@ export default function NotifyPermissionButton({ dark, label = 'Enable notificat
   const wouldShow = checked && supported && permission !== 'denied' && !enabled
   const allowedByBudget = useLimitedAppearance('znu_notif_prompt', wouldShow, MAX_PROMPT_SHOWS)
 
-  // "Not supported" and "blocked" states surface as a one-time toast per
-  // tab session rather than persistent inline text.
+  // "Not supported" and "blocked" states surface as a one-time, calm
+  // 'info' toast per tab session (not a red error — nothing failed,
+  // the browser just can't/won't do push) rather than persistent
+  // inline text.
   useEffect(() => {
     if (!checked || !canToastUnsupported) return
-    if (!supported) {
-      showToast("🔕 Notifications aren't supported in this browser. On iPhone, add this site to your Home Screen first (Share → Add to Home Screen), then open it from there.", 'error')
-    }
+    if (!supported) showToast(NOTIFICATION_MESSAGES.unsupported, 'info')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checked, supported])
 
   useEffect(() => {
     if (!checked || !canToastDenied) return
-    if (supported && permission === 'denied') {
-      showToast("🔕 Notifications are blocked for this site. Enable them from your browser's site settings, then reload the page.", 'error')
-    }
+    if (supported && permission === 'denied') showToast(NOTIFICATION_MESSAGES.blocked, 'info')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checked, supported, permission])
 
@@ -65,9 +64,7 @@ export default function NotifyPermissionButton({ dark, label = 'Enable notificat
 
     if (perm !== 'granted') {
       setBusy(false)
-      showToast(perm === 'denied'
-        ? "🔕 Notifications are blocked for this site. Enable them from your browser's site settings, then reload the page."
-        : '🔕 Notifications permission was not granted', 'error')
+      showToast(perm === 'denied' ? NOTIFICATION_MESSAGES.blocked : NOTIFICATION_MESSAGES.notGranted, 'info')
       await refresh()
       return
     }

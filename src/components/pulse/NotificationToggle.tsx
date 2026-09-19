@@ -3,13 +3,14 @@ import { getPulseTheme, pulseType } from '../../premiumTheme'
 import { useToast } from '../ToastProvider'
 import { useNotificationStatus } from '../../lib/useNotificationStatus'
 import { subscribeToPush, unsubscribeFromPush } from '../../lib/pushNotifications'
+import { NOTIFICATION_MESSAGES } from '../../lib/notificationMessages'
 import LiquidGlassCard from '../ui/liquid-glass-card'
 import PulseSwitch from '../ui/pulse-switch'
 import { BellIcon } from '../ui/tool-icons'
 
 export default function NotificationToggle({ dark, switchSize = 1 }: { dark: boolean; switchSize?: number }) {
   const pt = getPulseTheme(dark)
-  const showToast = useToast() as (message: string, type?: 'success' | 'error') => void
+  const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
   const { supported, permission, enabled, checked, refresh } = useNotificationStatus()
   const [busy, setBusy] = useState(false)
 
@@ -24,7 +25,7 @@ export default function NotificationToggle({ dark, switchSize = 1 }: { dark: boo
 
     if (!supported) {
       setBusy(false)
-      showToast("🔕 Notifications aren't supported in this browser. On iPhone, add this site to your Home Screen first (Share → Add to Home Screen), then open it from there.", 'error')
+      showToast(NOTIFICATION_MESSAGES.unsupported, 'info')
       return
     }
 
@@ -38,7 +39,7 @@ export default function NotificationToggle({ dark, switchSize = 1 }: { dark: boo
 
     if (permission === 'denied') {
       setBusy(false)
-      showToast("🔕 Notifications are blocked for this site. Enable them from your browser's site settings, then reload the page.", 'error')
+      showToast(NOTIFICATION_MESSAGES.blocked, 'info')
       return
     }
 
@@ -47,9 +48,7 @@ export default function NotificationToggle({ dark, switchSize = 1 }: { dark: boo
 
     if (perm !== 'granted') {
       setBusy(false)
-      showToast(perm === 'denied'
-        ? "🔕 Notifications are blocked for this site. Enable them from your browser's site settings, then reload the page."
-        : '🔕 Notifications permission was not granted', 'error')
+      showToast(perm === 'denied' ? NOTIFICATION_MESSAGES.blocked : NOTIFICATION_MESSAGES.notGranted, 'info')
       await refresh()
       return
     }

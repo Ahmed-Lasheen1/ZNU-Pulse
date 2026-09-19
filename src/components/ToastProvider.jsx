@@ -1,5 +1,6 @@
 // src/components/ToastProvider.jsx
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
+import { Info } from 'lucide-react'
 
 const ToastContext = createContext(() => {})
 
@@ -8,9 +9,22 @@ const ToastContext = createContext(() => {})
 // quick actions like flagging a question, saving profile changes, or
 // adding a checklist item, where a full inline banner would be
 // overkill but the student still deserves a "yep, that worked" cue.
+//
+// Three types:
+//   'success' (default) — dark pill, a quick confirmation.
+//   'error'             — red, reserved for real failures (a save or
+//                         request that didn't go through).
+//   'info'              — calm, compact, blue-accented. For neutral
+//                         "FYI" states that aren't anyone's fault
+//                         (e.g. the browser can't do push
+//                         notifications) — red would read as a threat
+//                         there. Stays on screen a little longer since
+//                         it's usually a full sentence.
 export function useToast() {
   return useContext(ToastContext)
 }
+
+const DURATIONS = { success: 2500, error: 2500, info: 6000 }
 
 export default function ToastProvider({ children }) {
   const [toast, setToast] = useState(null)
@@ -19,7 +33,7 @@ export default function ToastProvider({ children }) {
   const showToast = useCallback((message, type = 'success') => {
     clearTimeout(timeoutRef.current)
     setToast({ message, type })
-    timeoutRef.current = setTimeout(() => setToast(null), 2500)
+    timeoutRef.current = setTimeout(() => setToast(null), DURATIONS[type] ?? DURATIONS.success)
   }, [])
 
   // Safety net: clears any pending dismiss timer if this provider
@@ -30,28 +44,49 @@ export default function ToastProvider({ children }) {
     return () => clearTimeout(timeoutRef.current)
   }, [])
 
+  const isError = toast?.type === 'error'
+  const isInfo = toast?.type === 'info'
+
   return (
     <ToastContext.Provider value={showToast}>
       {children}
       {toast && (
-        <div style={{
-          position: 'fixed',
-          // + env(safe-area-inset-bottom) now that index.html sets
-          // viewport-fit=cover and PulseBackground bleeds under the
-          // home-indicator — keeps the toast clear of that swipe area
-          // instead of sitting under/near it. Falls back to 0px where
-          // there's no safe area, so this is pixel-identical to before
-          // there.
-          bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
-          left: '50%', transform: 'translateX(-50%)',
-          background: toast.type === 'error' ? '#ef4444' : '#1e293b',
-          color: '#fff', padding: '10px 20px', borderRadius: 12,
-          fontSize: 13, fontWeight: 700, zIndex: 3000,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
-          border: `1px solid ${toast.type === 'error' ? '#f8717140' : 'rgba(255,255,255,0.12)'}`,
-          maxWidth: '90%', textAlign: 'center', pointerEvents: 'none'
-        }}>
-          {toast.message}
+        <div
+          // Errors interrupt screen readers (alert); everything else
+          // is announced politely (status) so it never talks over
+          // what the person is doing.
+          role={isError ? 'alert' : 'status'}
+          aria-live={isError ? 'assertive' : 'polite'}
+          style={{
+            position: 'fixed',
+            // + env(safe-area-inset-bottom) now that index.html sets
+            // viewport-fit=cover and PulseBackground bleeds under the
+            // home-indicator — keeps the toast clear of that swipe area
+            // instead of sitting under/near it. Falls back to 0px where
+            // there's no safe area, so this is pixel-identical to before
+            // there.
+            bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
+            left: '50%', transform: 'translateX(-50%)',
+            background: isError ? '#ef4444' : isInfo ? 'rgba(16,36,58,0.94)' : '#1e293b',
+            color: '#fff',
+            padding: isInfo ? '8px 14px' : '10px 20px',
+            borderRadius: isInfo ? 14 : 12,
+            fontSize: isInfo ? 12.5 : 13, fontWeight: isInfo ? 600 : 700,
+            lineHeight: isInfo ? 1.35 : undefined,
+            zIndex: 3000,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+            border: `1px solid ${isError ? '#f8717140' : isInfo ? 'rgba(56,189,248,0.4)' : 'rgba(255,255,255,0.12)'}`,
+            maxWidth: isInfo ? 'min(94vw, 420px)' : '90%',
+            width: isInfo ? 'max-content' : undefined,
+            textAlign: isInfo ? 'left' : 'center',
+            display: isInfo ? 'flex' : undefined,
+            alignItems: isInfo ? 'center' : undefined,
+            gap: isInfo ? 8 : undefined,
+            pointerEvents: 'none'
+          }}
+        >
+          {isInfo && <Info size={15} color="#38bdf8" style={{ flexShrink: 0 }} aria-hidden />}
+          <span>{toast.message}</span>
         </div>
       )}
     </ToastContext.Provider>
