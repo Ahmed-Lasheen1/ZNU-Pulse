@@ -83,11 +83,14 @@ export default function Schedule({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules, moduleParam])
 
+  // Scoped to the active module — refetches on module switch instead
+  // of loading every schedule row up front.
   useEffect(() => {
+    if (!activeModule) return
     let ignore = false
     async function fetchData() {
       setLoading(true)
-      const { data, error } = await supabase.from('schedules').select('*').order('created_at')
+      const { data, error } = await supabase.from('schedules').select('*').eq('module_id', activeModule).order('created_at')
       if (ignore) return
       if (data) setSchedules(data as ScheduleRow[])
       if (error) setLoadError(true)
@@ -95,7 +98,7 @@ export default function Schedule({ dark }: { dark: boolean }) {
     }
     fetchData()
     return () => { ignore = true }
-  }, [])
+  }, [activeModule])
 
   useEffect(() => {
     if (!itemParam || viewer || schedules.length === 0) return
@@ -104,7 +107,7 @@ export default function Schedule({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemParam, schedules])
 
-  const filtered = schedules.filter(s => s.module_id === activeModule && s.type === activeType)
+  const filtered = schedules.filter(s => s.type === activeType)
   const hoverTint = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'
 
   return (

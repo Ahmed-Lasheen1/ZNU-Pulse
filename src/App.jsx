@@ -6,6 +6,7 @@ import { getPulseTheme } from './premiumTheme'
 import { fetchModulesSorted } from './lib/modules'
 import { subscribeOnlinePresence } from './lib/onlinePresence'
 import { migrateGuestDataIfNeeded } from './lib/migrateGuestData'
+import { unsubscribeFromPush } from './lib/pushNotifications'
 import { useOncePerSession } from './lib/useOncePerSession'
 import ErrorBoundary from './components/ErrorBoundary'
 import ToastProvider from './components/ToastProvider'
@@ -204,6 +205,11 @@ export default function App() {
   }, [])
 
   async function signOut() {
+    // Unsubscribe while still authenticated, so the DB row (scoped to
+    // this user's auth.uid()) actually gets released — otherwise a
+    // later sign-in with a different account on this device inherits
+    // a subscription still owned by this one.
+    await unsubscribeFromPush()
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
