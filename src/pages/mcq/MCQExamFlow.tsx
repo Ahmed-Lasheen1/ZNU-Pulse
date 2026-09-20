@@ -1,10 +1,13 @@
 // src/pages/mcq/MCQExamFlow.tsx
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { getPulseTheme, pulseFonts, pulseType } from '../../premiumTheme'
 import QuestionRail from '../../components/QuestionRail'
 import QuestionSourceBadge from '../../components/QuestionSourceBadge'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
+import PulseGlassRow from '../../components/pulse/PulseGlassRow'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { FlagIcon, SearchIcon2, LightbulbIcon } from '../../components/ui/tool-icons'
 import { wrapText } from '../../lib/textStyles'
@@ -58,6 +61,15 @@ function solidPillBtn(pt: ReturnType<typeof getPulseTheme>): React.CSSProperties
   }
 }
 
+const BAR_Z_INDEX = 450
+const BAR_TINT = 'rgba(1,12,74,0.55)'
+
+const barBtnBase: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+  minHeight: 46, minWidth: 46, borderRadius: 999, cursor: 'pointer',
+  fontFamily: pulseFonts.body, fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap',
+}
+
 export default function MCQExamFlow({
   dark, quizMode, submitted, grading, quizQuestions, answers, results,
   flaggedIds, struckOut, currentIndex, setCurrentIndex,
@@ -69,6 +81,8 @@ export default function MCQExamFlow({
   const pt = getPulseTheme(dark)
   const isTutorMode = quizMode === 'practice' || quizMode === 'retry'
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false)
+  const barRef = useRef<HTMLDivElement>(null)
+  const [barHeight, setBarHeight] = useState(96)
 
   function getScore() {
     return quizQuestions.filter(q => results[q.id]?.is_correct).length
@@ -94,6 +108,26 @@ export default function MCQExamFlow({
   const answeredCount = Object.keys(answers).length
   const isLastQuestion = safeIndex === total - 1
   const remainingUnanswered = total - answeredCount
+  const barVisible = !submitted && !grading && !!currentQuestion
+  const currentFlagged = !!currentQuestion && flaggedIds.has(currentQuestion.id)
+
+  useEffect(() => {
+    if (!barVisible) return
+    const el = barRef.current
+    if (!el) return
+    const update = () => {
+      const h = el.offsetHeight
+      setBarHeight(h)
+      document.documentElement.style.setProperty('--toast-bottom', `${h + 12}px`)
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => {
+      ro.disconnect()
+      document.documentElement.style.removeProperty('--toast-bottom')
+    }
+  }, [barVisible])
 
   const subjectStats = submitted ? (() => {
     const map: Record<string, { name: string; total: number; correct: number }> = {}
@@ -124,8 +158,11 @@ export default function MCQExamFlow({
         .exam-option:focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
         .exam-btn { transition: opacity 0.15s ease, transform 0.12s ease; }
         .exam-btn:active { transform: scale(0.97); }
+        .exam-btn:disabled:active { transform: none; }
         .kbd-hint { display: none; }
         @media (hover: hover) and (pointer: fine) { .kbd-hint { display: block; } }
+        .exam-bar-label { display: inline; }
+        @media (max-width: 460px) { .exam-bar-label { display: none; } }
       `}</style>
 
       <motion.div
@@ -135,7 +172,7 @@ export default function MCQExamFlow({
         style={{
           position: 'relative', zIndex: 1,
           maxWidth: 'min(1080px, 92vw)', margin: '0 auto',
-          padding: '12px clamp(16px, 3vw, 36px) 16px', fontFamily: pulseFonts.body
+          padding: `12px clamp(16px, 3vw, 36px) ${barVisible ? barHeight + 16 : 16}px`, fontFamily: pulseFonts.body
         }}
       >
         <div style={{ position: 'relative', textAlign: 'center', paddingBottom: 14 }}>
@@ -360,51 +397,6 @@ export default function MCQExamFlow({
                 )
               })()}
             </LiquidGlassCard>
-
-            <div style={{ height: 1, background: EXAM_DIVIDER, marginBottom: 12 }} />
-
-            <div style={{ textAlign: 'center', marginBottom: 10 }}>
-              <button onClick={() => toggleFlagFor(currentQuestion)} className="exam-btn" style={{
-                background: 'transparent', border: 'none', cursor: 'pointer',
-                color: flaggedIds.has(currentQuestion.id) ? pt.amber : EXAM_LOW_TEXT_MUTED,
-                textShadow: EXAM_LOW_SHADOW,
-                fontSize: 12, fontWeight: 700, letterSpacing: 1.5,
-                display: 'inline-flex', alignItems: 'center', gap: 6
-              }}>
-                <FlagIcon color={flaggedIds.has(currentQuestion.id) ? pt.amber : EXAM_LOW_TEXT_MUTED} size={13} />
-                {flaggedIds.has(currentQuestion.id) ? 'FLAGGED' : 'FLAG'}
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 12 }}>
-              <button onClick={goPrev} disabled={safeIndex === 0} className="exam-btn" style={{
-                background: 'transparent', border: 'none', cursor: safeIndex === 0 ? 'not-allowed' : 'pointer',
-                color: safeIndex === 0 ? 'rgba(245,250,255,0.35)' : EXAM_LOW_TEXT,
-                textShadow: EXAM_LOW_SHADOW, fontSize: 13, fontWeight: 700, letterSpacing: 1.5
-              }}>PREVIOUS</button>
-
-              <span style={{ color: EXAM_LOW_SECONDARY, textShadow: EXAM_LOW_SHADOW, fontSize: 11, fontWeight: 700 }}>{answeredCount}/{total}</span>
-
-              {!isLastQuestion ? (
-                <button onClick={goNext} className="exam-btn" style={{
-                  background: 'transparent', border: 'none', cursor: 'pointer',
-                  color: pt.cobalt, textShadow: EXAM_LOW_SHADOW, fontSize: 13, fontWeight: 700, letterSpacing: 1.5
-                }}>NEXT</button>
-              ) : (
-                <button
-                  onClick={() => { if (remainingUnanswered > 0) { setConfirmSubmitOpen(true); return } submitQuiz() }}
-                  className="exam-btn"
-                  style={{
-                    background: 'transparent', border: 'none', cursor: 'pointer',
-                    color: pt.cobalt, textShadow: EXAM_LOW_SHADOW, fontSize: 13, fontWeight: 800, letterSpacing: 1.5
-                  }}>SUBMIT</button>
-              )}
-            </div>
-
-            <div className="kbd-hint" style={{
-              textAlign: 'center', color: EXAM_LOW_TEXT_MUTED, textShadow: EXAM_LOW_SHADOW,
-              fontSize: 10, fontWeight: 600, letterSpacing: 0.3, paddingBottom: 4
-            }}>← → navigate · 1–4 select · F flag</div>
           </>
         )}
 
@@ -575,6 +567,117 @@ export default function MCQExamFlow({
           </div>
         )}
       </motion.div>
+
+      {barVisible && createPortal(
+        <div
+          ref={barRef}
+          style={{
+            position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: BAR_Z_INDEX,
+            display: 'flex', justifyContent: 'center', pointerEvents: 'none',
+            paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
+            fontFamily: pulseFonts.body,
+          }}
+        >
+          <div style={{
+            width: 'min(1080px, 92vw)', boxSizing: 'border-box',
+            padding: '0 clamp(16px, 3vw, 36px)', pointerEvents: 'auto',
+          }}>
+            <PulseGlassRow
+              dark={dark} radius={24} active activeTint={BAR_TINT}
+              role="toolbar" aria-label="Question navigation"
+            >
+              <div style={{ padding: '8px 10px' }}>
+                <div style={{
+                  display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
+                  alignItems: 'center', gap: 8,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                    <button
+                      onClick={goPrev}
+                      disabled={safeIndex === 0}
+                      className="exam-btn glass-focus-ring"
+                      aria-label="Previous question"
+                      title="Previous (←)"
+                      style={{
+                        ...barBtnBase, padding: '0 16px',
+                        background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.28)',
+                        color: EXAM_LOW_TEXT,
+                        opacity: safeIndex === 0 ? 0.4 : 1,
+                        cursor: safeIndex === 0 ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      <ChevronLeft size={18} aria-hidden />
+                      <span className="exam-bar-label">Previous</span>
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    <button
+                      onClick={() => toggleFlagFor(currentQuestion)}
+                      className="exam-btn glass-focus-ring"
+                      aria-pressed={currentFlagged}
+                      aria-label={currentFlagged ? 'Remove flag from this question' : 'Flag this question'}
+                      title="Flag (F)"
+                      style={{
+                        ...barBtnBase, padding: '0 14px',
+                        background: currentFlagged ? `${pt.amber}26` : 'transparent',
+                        border: `1px solid ${currentFlagged ? `${pt.amber}80` : 'rgba(255,255,255,0.22)'}`,
+                        color: currentFlagged ? pt.amber : EXAM_LOW_SECONDARY,
+                      }}
+                    >
+                      <FlagIcon color={currentFlagged ? pt.amber : EXAM_LOW_SECONDARY} size={15} />
+                      <span className="exam-bar-label">{currentFlagged ? 'Flagged' : 'Flag'}</span>
+                    </button>
+                    <span
+                      aria-label={`${answeredCount} of ${total} answered`}
+                      style={{
+                        color: EXAM_LOW_SECONDARY, fontSize: 12, fontWeight: 700,
+                        whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums',
+                      }}
+                    >{answeredCount}/{total}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    {!isLastQuestion ? (
+                      <button
+                        onClick={goNext}
+                        className="exam-btn glass-focus-ring"
+                        aria-label="Next question"
+                        title="Next (→)"
+                        style={{
+                          ...barBtnBase, padding: '0 20px',
+                          background: MCQ_ACCENT, border: 'none', color: '#0f172a',
+                          boxShadow: `0 6px 20px ${MCQ_ACCENT}40`,
+                        }}
+                      >
+                        <span className="exam-bar-label">Next</span>
+                        <ChevronRight size={18} aria-hidden />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => { if (remainingUnanswered > 0) { setConfirmSubmitOpen(true); return } submitQuiz() }}
+                        className="exam-btn glass-focus-ring"
+                        aria-label="Submit exam"
+                        style={{
+                          ...barBtnBase, padding: '0 22px',
+                          background: MCQ_ACCENT, border: 'none', color: '#0f172a',
+                          boxShadow: `0 6px 20px ${MCQ_ACCENT}40`,
+                        }}
+                      >Submit</button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="kbd-hint" style={{
+                  textAlign: 'center', color: EXAM_LOW_TEXT_MUTED,
+                  fontSize: 10, fontWeight: 600, letterSpacing: 0.3, marginTop: 4,
+                }}>← → navigate · 1–4 select · F flag</div>
+              </div>
+            </PulseGlassRow>
+          </div>
+        </div>,
+        document.body
+      )}
 
       <ConfirmDialog
         dark={dark}

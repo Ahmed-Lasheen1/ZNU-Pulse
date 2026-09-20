@@ -253,7 +253,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
       try {
         if (!isIgnored()) {
           setQuestions(JSON.parse(cached))
-          setUsingCache(true)
+          setUsingCache(false)
         }
         hadCache = true
       } catch { /* ignore corrupt cache */ }
@@ -269,7 +269,8 @@ export default function MCQ({ dark }: { dark: boolean }) {
     if (isIgnored()) return
 
     if (error) {
-      if (!hadCache) setLoadError(true)
+      if (hadCache) setUsingCache(true)
+      else setLoadError(true)
     } else if (data) {
       setQuestions(data)
       setUsingCache(false)

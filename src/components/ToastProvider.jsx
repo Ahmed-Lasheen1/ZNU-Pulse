@@ -59,13 +59,11 @@ export default function ToastProvider({ children }) {
           aria-live={isError ? 'assertive' : 'polite'}
           style={{
             position: 'fixed',
-            // + env(safe-area-inset-bottom) now that index.html sets
-            // viewport-fit=cover and PulseBackground bleeds under the
-            // home-indicator — keeps the toast clear of that swipe area
-            // instead of sitting under/near it. Falls back to 0px where
-            // there's no safe area, so this is pixel-identical to before
-            // there.
-            bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
+            // Default: 24px + env(safe-area-inset-bottom) now that index.html
+            // sets viewport-fit=cover and PulseBackground bleeds under the
+            // home-indicator. Pages with their own fixed bottom bar (the MCQ
+            // exam bar) set --toast-bottom so the toast sits above it.
+            bottom: 'var(--toast-bottom, calc(24px + env(safe-area-inset-bottom, 0px)))',
             left: '50%', transform: 'translateX(-50%)',
             background: isError ? '#ef4444' : isInfo ? 'rgba(16,36,58,0.94)' : '#1e293b',
             color: '#fff',
