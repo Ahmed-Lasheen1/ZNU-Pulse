@@ -16,6 +16,7 @@ import { useToast } from '../components/ToastProvider'
 import { useModules } from '../contexts'
 import { fetchSubjectById } from '../lib/subjects'
 import { fetchLessonsForSubject } from '../lib/lessons'
+import { fetchLessonStageMap, inStage } from '../lib/lessonStages'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
 import { getPreviewUrl } from '../lib/embedUrl'
 import { ModuleIcon, ExamIcon, NotesIcon } from '../lib/medicalIcons'
@@ -68,17 +69,21 @@ export default function SubjectPage({ dark }: { dark: boolean }) {
       if (subjectRes.error || lessonRes.error || summaryRes.error || questionCountRes.error) setLoadError(true)
 
       if (stageParam) {
-        // Union of lesson_ids with a file/question/summary tagged to this stage.
-        const [filesRes, questionsRes, stageSummaryRes] = await Promise.all([
-          supabase.from('files').select('lesson_id').eq('subject_id', subjectId).eq('exam_stage', stageParam).not('lesson_id', 'is', null),
-          supabase.from('questions_public').select('lesson_id').eq('subject_id', subjectId).eq('exam_stage', stageParam).not('lesson_id', 'is', null),
-          supabase.from('summaries').select('lesson_id').eq('subject_id', subjectId).eq('exam_stage', stageParam).not('lesson_id', 'is', null),
+        // Lessons with a file/question/summary that belongs to this stage,
+        // either by its own tag or through its lesson's assigned stages.
+        const [filesRes, questionsRes, stageSummaryRes, stageMapRes] = await Promise.all([
+          supabase.from('files').select('lesson_id, exam_stage').eq('subject_id', subjectId).not('lesson_id', 'is', null),
+          supabase.from('questions_public').select('lesson_id, exam_stage').eq('subject_id', subjectId).not('lesson_id', 'is', null),
+          supabase.from('summaries').select('lesson_id, exam_stage').eq('subject_id', subjectId).not('lesson_id', 'is', null),
+          fetchLessonStageMap(),
         ])
         if (ignore) return
         const ids = new Set<string>()
         ;[filesRes, questionsRes, stageSummaryRes].forEach(res => {
           if (res.error) { setLoadError(true); return }
-          (res.data || []).forEach((row: any) => { if (row.lesson_id) ids.add(row.lesson_id) })
+          (res.data || []).forEach((row: any) => {
+            if (row.lesson_id && inStage(row, stageParam, stageMapRes.map)) ids.add(row.lesson_id)
+          })
         })
         setStageLessonIds(ids)
       } else {

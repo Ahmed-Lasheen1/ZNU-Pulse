@@ -14,6 +14,7 @@ import { useModules } from '../contexts'
 import { fetchModuleStages } from '../lib/moduleStages'
 import { fetchSubjectsForModule } from '../lib/subjects'
 import { fetchDriveUrl } from '../lib/siteSettings'
+import { fetchLessonStageMap, stagesOf } from '../lib/lessonStages'
 import { ModuleIcon, ExamIcon, NotesIcon } from '../lib/medicalIcons'
 import { ExamStageIcon, SmartSummariesIcon, PracticeIcon } from '@/components/ui/tool-icons'
 
@@ -55,15 +56,16 @@ export default function ModulePage({ dark }: { dark: boolean }) {
       if (error) setLoadError(true)
     })
 
-    // One select per table (type/id + exam_stage together) instead of
-    // a count query plus a separate exam_stage query for each table —
-    // both the "has any content" booleans and the stage-tag set are
-    // derived from the same three results.
+    // One select per table (type/id + exam_stage + lesson_id together)
+    // instead of a count query plus a separate exam_stage query for each
+    // table — the "has any content" booleans and the stage set (own tag
+    // plus the item's lesson stages) all come from the same results.
     Promise.all([
-      supabase.from('files').select('type, exam_stage').eq('module_id', moduleId),
-      supabase.from('questions_public').select('id, exam_stage').eq('module_id', moduleId),
-      supabase.from('summaries').select('id, exam_stage').eq('module_id', moduleId),
-    ]).then(([filesRes, questionsRes, summariesRes]) => {
+      supabase.from('files').select('type, exam_stage, lesson_id').eq('module_id', moduleId),
+      supabase.from('questions_public').select('id, exam_stage, lesson_id').eq('module_id', moduleId),
+      supabase.from('summaries').select('id, exam_stage, lesson_id').eq('module_id', moduleId),
+      fetchLessonStageMap(),
+    ]).then(([filesRes, questionsRes, summariesRes, stageMapRes]) => {
       if (ignore) return
 
       if (filesRes.data) setPresentFileTypes(new Set(filesRes.data.map((f: any) => f.type)))
@@ -77,7 +79,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
 
       const stages = new Set<string>()
       ;[filesRes, questionsRes, summariesRes].forEach(res => {
-        (res.data || []).forEach((row: any) => { if (row.exam_stage) stages.add(row.exam_stage) })
+        (res.data || []).forEach((row: any) => { stagesOf(row, stageMapRes.map).forEach((s: string) => stages.add(s)) })
       })
       setStagesWithContent(stages)
     })

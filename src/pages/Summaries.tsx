@@ -13,6 +13,7 @@ import EmptyState from '../components/pulse/EmptyState'
 import { useModules } from '../contexts'
 import { fetchModuleStages } from '../lib/moduleStages'
 import { fetchSubjectsForModule } from '../lib/subjects'
+import { fetchLessonStageMap, stagesOf, inStage } from '../lib/lessonStages'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
 import { getPreviewUrl } from '../lib/embedUrl'
 import { ModuleIcon, NotesIcon } from '../lib/medicalIcons'
@@ -22,7 +23,7 @@ interface SummaryModule {
   id: string; name: string; icon?: string | null; color: string; status: 'active' | 'completed'
 }
 interface Summary {
-  id: string; title: string; url: string; module_id: string; subject_id?: string | null; exam_stage?: string | null
+  id: string; title: string; url: string; module_id: string; subject_id?: string | null; lesson_id?: string | null; exam_stage?: string | null
 }
 interface SummarySubject { id: string; module_id: string; name: string }
 interface ExamStage { value: string; title: string; emoji?: string; Icon?: (p: { color: string; size?: number }) => JSX.Element; color: string }
@@ -39,6 +40,7 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
   const [activeSubject, setActiveSubject] = useState('all')
   const [stages, setStages] = useState<ExamStage[]>([])
   const [subjects, setSubjects] = useState<SummarySubject[]>([])
+  const [lessonStageMap, setLessonStageMap] = useState<Record<string, string[]>>({})
 
   // Back button closes this open summary before falling through to a
   // real page navigation.
@@ -49,6 +51,12 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
     fetchModuleStages(mod.id).then(result => { if (!ignore) setStages(result) })
     return () => { ignore = true }
   }, [mod.id])
+
+  useEffect(() => {
+    let ignore = false
+    fetchLessonStageMap().then(({ map }) => { if (!ignore) setLessonStageMap(map) })
+    return () => { ignore = true }
+  }, [])
 
   useEffect(() => {
     let ignore = false
@@ -85,12 +93,13 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSummaryId, summaries])
 
-  // A stage tab only appears once this module has at least one summary tagged to it.
-  const stagesWithSummaries = new Set(summaries.map(s => s.exam_stage).filter(Boolean))
+  // A stage tab only appears once this module has at least one summary in it,
+  // by the summary's own stage tag or its lesson's stages.
+  const stagesWithSummaries = new Set(summaries.flatMap(s => stagesOf(s, lessonStageMap)))
   const visibleStages = stages.filter(s => stagesWithSummaries.has(s.value))
 
   const filtered = summaries.filter(s =>
-    (activeStage === 'all' || (s.exam_stage || 'general') === activeStage) &&
+    inStage(s, activeStage, lessonStageMap) &&
     (activeSubject === 'all' || s.subject_id === activeSubject)
   )
 

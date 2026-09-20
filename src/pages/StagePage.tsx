@@ -15,6 +15,7 @@ import { useModules } from '../contexts'
 import { fetchModuleStages, stageMetaFrom } from '../lib/moduleStages'
 import { fetchSubjectsForModule } from '../lib/subjects'
 import { fetchDriveUrl } from '../lib/siteSettings'
+import { fetchLessonStageMap, inStage } from '../lib/lessonStages'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
 import { getPreviewUrl } from '../lib/embedUrl'
 import { ExamIcon, NotesIcon } from '../lib/medicalIcons'
@@ -23,7 +24,7 @@ import { SmartSummariesIcon, PracticeIcon } from '@/components/ui/tool-icons'
 interface PageModule { id: string; name: string; icon?: string | null; color: string }
 interface PageSubject { id: string; module_id: string; name: string; icon?: string | null; color?: string | null }
 interface ExamStage { value: string; title: string; emoji?: string; Icon?: (p: { color: string; size?: number }) => JSX.Element; color: string }
-interface Summary { id: string; title: string; url: string }
+interface Summary { id: string; title: string; url: string; exam_stage?: string | null; lesson_id?: string | null }
 
 export default function StagePage({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
@@ -61,25 +62,29 @@ export default function StagePage({ dark }: { dark: boolean }) {
     let ignore = false
     setSummariesLoaded(false)
 
-    supabase.from('files').select('type').eq('module_id', moduleId).eq('exam_stage', stage)
-      .then(({ data, error }) => {
-        if (ignore) return
-        if (data) setPresentFileTypes(new Set(data.map((f: any) => f.type)))
-        if (error) setLoadError(true)
-      })
-    supabase.from('summaries').select('*').eq('module_id', moduleId).eq('exam_stage', stage).order('created_at')
-      .then(({ data, error }) => {
-        if (ignore) return
-        if (data) setSummaries(data)
-        if (error) setLoadError(true)
-        setSummariesLoaded(true)
-      })
-    supabase.from('questions_public').select('id', { count: 'exact', head: true }).eq('module_id', moduleId).eq('exam_stage', stage)
-      .then(({ count, error }) => {
-        if (ignore) return
-        setHasStageQuestions((count || 0) > 0)
-        if (error) setLoadError(true)
-      })
+    // Everything in the module is fetched once and narrowed to this
+    // stage in the browser: an item belongs here through its own stage
+    // tag OR its lesson's stages, and is counted once either way.
+    Promise.all([
+      supabase.from('files').select('type, exam_stage, lesson_id').eq('module_id', moduleId),
+      supabase.from('summaries').select('*').eq('module_id', moduleId).order('created_at'),
+      supabase.from('questions_public').select('id, exam_stage, lesson_id').eq('module_id', moduleId),
+      fetchLessonStageMap(),
+    ]).then(([filesRes, summariesRes, questionsRes, stageMapRes]) => {
+      if (ignore) return
+      const map = stageMapRes.map
+      const here = (row: any) => inStage(row, stage!, map)
+
+      if (filesRes.data) setPresentFileTypes(new Set(filesRes.data.filter(here).map((f: any) => f.type)))
+      if (filesRes.error) setLoadError(true)
+
+      if (summariesRes.data) setSummaries(summariesRes.data.filter(here))
+      if (summariesRes.error) setLoadError(true)
+      setSummariesLoaded(true)
+
+      if (questionsRes.data) setHasStageQuestions(questionsRes.data.filter(here).length > 0)
+      if (questionsRes.error) setLoadError(true)
+    })
     fetchSubjectsForModule(moduleId!).then(({ subjects, error }) => {
       if (ignore) return
       setSubjects(subjects)

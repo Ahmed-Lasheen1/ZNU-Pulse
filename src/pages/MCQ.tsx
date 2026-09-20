@@ -5,6 +5,7 @@ import { supabase } from '../supabase'
 import { useAuth, useModules } from '../contexts'
 import { useToast } from '../components/ToastProvider'
 import { fetchModuleStages } from '../lib/moduleStages'
+import { fetchLessonStageMap, inStage } from '../lib/lessonStages'
 import { getGuestFlags, toggleGuestFlag, saveGuestIncorrect, enrichGuestFlagsWithResults, addGuestHistory } from '../lib/reviewStorage'
 import { loadSavedActiveExam, persistActiveExam, clearActiveExam } from '../lib/activeExam'
 import { optionLabels } from './mcq/mcqShared'
@@ -28,6 +29,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   })
   const [activeSubject, setActiveSubject] = useState('all')
   const [stages, setStages] = useState<any[]>([])
+  const [lessonStageMap, setLessonStageMap] = useState<Record<string, string[]>>({})
   const [lessonFilter] = useState(() => new URLSearchParams(location.search).get('lesson') || null)
   const [subjectFilter] = useState(() => new URLSearchParams(location.search).get('subject') || null)
   const [quizMode, setQuizMode] = useState<string | null>(null)
@@ -76,6 +78,12 @@ export default function MCQ({ dark }: { dark: boolean }) {
   useEffect(() => {
     isMountedRef.current = true
     return () => { isMountedRef.current = false }
+  }, [])
+
+  useEffect(() => {
+    let ignore = false
+    fetchLessonStageMap().then(({ map }) => { if (!ignore) setLessonStageMap(map) })
+    return () => { ignore = true }
   }, [])
 
   useEffect(() => {
@@ -289,7 +297,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
         ? q.exam_type === 'mock' || q.exam_type === 'both'
         : q.exam_type === 'practice' || q.exam_type === 'both'
       const subMatch = activeSubject === 'all' || q.subject_id === activeSubject
-      const stageMatch = activeStage === 'all' || (q.exam_stage || 'general') === activeStage
+      const stageMatch = inStage(q, activeStage, lessonStageMap)
       return modMatch && typeMatch && subMatch && stageMatch
     })
   }
@@ -354,7 +362,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
       : shuffle(questions.filter(q =>
           q.subject_id === subjectId &&
           (q.exam_type === 'practice' || q.exam_type === 'both') &&
-          (activeStage === 'all' || (q.exam_stage || 'general') === activeStage)
+          inStage(q, activeStage, lessonStageMap)
         )).slice(0, 50)
 
     if (qs.length === 0) {
@@ -697,6 +705,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
       onSelectSubject={setActiveSubject}
       loading={loading}
       questions={questions}
+      lessonStageMap={lessonStageMap}
       getFilteredQuestions={getFilteredQuestions}
       onStartQuiz={startQuiz}
     />

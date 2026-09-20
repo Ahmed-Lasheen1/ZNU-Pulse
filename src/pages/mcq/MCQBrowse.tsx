@@ -14,6 +14,7 @@ import LoadingText from '../../components/pulse/LoadingText'
 import { ModuleIcon, ExamIcon } from '../../lib/medicalIcons'
 import { OfflineIcon, BookIcon, PauseIcon, PlayIcon, EmptyBoxIcon } from '../../components/ui/tool-icons'
 import { MCQ_ACCENT, EXAM_LOW_SHADOW } from './mcqShared'
+import { stagesOf, inStage } from '../../lib/lessonStages'
 
 interface MCQBrowseProps {
   dark: boolean
@@ -32,6 +33,7 @@ interface MCQBrowseProps {
   onSelectSubject: (v: string) => void
   loading: boolean
   questions: any[]
+  lessonStageMap: Record<string, string[]>
   getFilteredQuestions: (type: string) => any[]
   onStartQuiz: (type: string, subjectId?: string | null) => void
 }
@@ -53,7 +55,7 @@ export default function MCQBrowse({
   dark, modulesError, loadError, usingCache, resumeData, onResume, onDiscardResume,
   activeModuleObj, stages, activeStage, onSelectStage,
   moduleSubjects, activeSubject, onSelectSubject,
-  loading, questions, getFilteredQuestions, onStartQuiz
+  loading, questions, lessonStageMap, getFilteredQuestions, onStartQuiz
 }: MCQBrowseProps) {
   const pt = getPulseTheme(dark)
   const navigate = useNavigate()
@@ -62,8 +64,9 @@ export default function MCQBrowse({
   // Tab accent follows the current module's own color, matching Summaries.tsx.
   const tabAccentColor = activeModuleObj?.color || pt.cobalt
 
-  // A stage tab only appears once this module has at least one question tagged to it.
-  const stagesWithQuestions = new Set(questions.map(q => q.exam_stage).filter(Boolean))
+  // A stage tab only appears once this module has at least one question in it,
+  // by the question's own stage tag or its lesson's stages.
+  const stagesWithQuestions = new Set(questions.flatMap(q => stagesOf(q, lessonStageMap)))
   const visibleStages = stages.filter(s => stagesWithQuestions.has(s.value))
 
   return (
@@ -192,7 +195,7 @@ export default function MCQBrowse({
           const subQs = questions.filter(q =>
             q.subject_id === sub.id &&
             (q.exam_type === 'practice' || q.exam_type === 'both') &&
-            (activeStage === 'all' || (q.exam_stage || 'general') === activeStage)
+            inStage(q, activeStage, lessonStageMap)
           )
           return (
             <div key={sub.id} style={{ flex: '0 0 auto', width: 'clamp(150px, 40vw, 220px)', scrollSnapAlign: 'start' }}>
