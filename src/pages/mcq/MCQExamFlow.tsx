@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
-import { ChevronLeft, ChevronRight, Check } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Check, X } from 'lucide-react'
 import { getPulseTheme, pulseFonts, pulseType } from '../../premiumTheme'
 import QuestionRail from '../../components/QuestionRail'
 import QuestionSourceBadge from '../../components/QuestionSourceBadge'
@@ -70,6 +70,26 @@ const barBtnBase: React.CSSProperties = {
   fontFamily: pulseFonts.body, fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap',
 }
 
+function TopGlassButton({ dark, onClick, ariaLabel, style, children }: {
+  dark: boolean; onClick: () => void; ariaLabel: string; style?: React.CSSProperties; children: React.ReactNode
+}) {
+  const pt = getPulseTheme(dark)
+  const hoverTint = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'
+  return (
+    <PulseGlassRow
+      dark={dark} radius={999} hoverTint={hoverTint} onClick={onClick}
+      role="button" tabIndex={0} aria-label={ariaLabel} style={style}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
+    >
+      <div className="exam-top-btn" style={{
+        height: 44, minWidth: 44, boxSizing: 'border-box',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        fontFamily: pulseFonts.body, fontSize: 14, fontWeight: 700, color: pt.sub, whiteSpace: 'nowrap',
+      }}>{children}</div>
+    </PulseGlassRow>
+  )
+}
+
 export default function MCQExamFlow({
   dark, quizMode, submitted, grading, quizQuestions, answers, results,
   flaggedIds, struckOut, currentIndex, setCurrentIndex,
@@ -81,6 +101,7 @@ export default function MCQExamFlow({
   const pt = getPulseTheme(dark)
   const isTutorMode = quizMode === 'practice' || quizMode === 'retry'
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false)
+  const [confirmExitOpen, setConfirmExitOpen] = useState(false)
   const barRef = useRef<HTMLDivElement>(null)
   const [barHeight, setBarHeight] = useState(96)
 
@@ -110,6 +131,11 @@ export default function MCQExamFlow({
   const remainingUnanswered = total - answeredCount
   const barVisible = !submitted && !grading && !!currentQuestion
   const currentFlagged = !!currentQuestion && flaggedIds.has(currentQuestion.id)
+
+  function requestExit() {
+    if (!submitted && answeredCount > 0) setConfirmExitOpen(true)
+    else stopQuiz()
+  }
 
   useEffect(() => {
     if (!barVisible) return
@@ -161,11 +187,15 @@ export default function MCQExamFlow({
         .exam-btn:disabled:active { transform: none; }
         .kbd-hint { display: none; }
         @media (hover: hover) and (pointer: fine) { .kbd-hint { display: block; } }
+        .exam-top-btn { padding: 0 16px; }
+        .exam-top-label { display: inline; }
         .exam-bar-label { display: inline; }
         .exam-bar-nav { width: 124px; }
         .exam-bar-flag { width: 112px; }
         @media (max-width: 460px) {
           .exam-bar-label { display: none; }
+          .exam-top-label { display: none; }
+          .exam-top-btn { padding: 0 12px; }
           .exam-bar-nav, .exam-bar-flag { width: 46px; }
           .exam-bar-nav.exam-bar-wide { width: 96px; }
         }
@@ -182,22 +212,20 @@ export default function MCQExamFlow({
         }}
       >
         <div style={{ position: 'relative', textAlign: 'center', paddingBottom: 14 }}>
-          <button onClick={stopQuiz} className="exam-btn" aria-label="Exit exam" style={{
-            position: 'absolute', top: 0, right: 0,
-            background: 'transparent', border: 'none', cursor: 'pointer',
-            color: EXAM_TOP_TEXT_MUTED, fontSize: 11, fontWeight: 700, letterSpacing: 1
-          }}>✕ EXIT</button>
+          <TopGlassButton dark={dark} onClick={requestExit} ariaLabel="Exit exam" style={{ position: 'absolute', top: 0, right: 0 }}>
+            <X size={18} aria-hidden />
+            <span className="exam-top-label">Exit</span>
+          </TopGlassButton>
 
           {!submitted && !grading && (
-            <button
-              onClick={cycleFontScale}
-              className="exam-btn"
-              aria-label={`Adjust text size (currently ${Math.round(fontScale * 100)}%)`}
-              style={{
-                position: 'absolute', top: 0, left: 0,
-                background: 'transparent', border: 'none', cursor: 'pointer',
-                color: EXAM_TOP_TEXT_MUTED, fontSize: 13, fontWeight: 800, letterSpacing: 0.5
-              }}>Aa</button>
+            <TopGlassButton
+              dark={dark} onClick={cycleFontScale}
+              ariaLabel={`Adjust text size (currently ${Math.round(fontScale * 100)}%)`}
+              style={{ position: 'absolute', top: 0, left: 0 }}
+            >
+              <span style={{ fontSize: 17, fontWeight: 800 }}>Aa</span>
+              <span className="exam-top-label" style={{ fontSize: 12, opacity: 0.8 }}>{Math.round(fontScale * 100)}%</span>
+            </TopGlassButton>
           )}
 
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 3, color: EXAM_TOP_TEXT_MUTED }}>ZNU · EXAM MODE</div>
@@ -687,6 +715,18 @@ export default function MCQExamFlow({
         </div>,
         document.body
       )}
+
+      <ConfirmDialog
+        dark={dark}
+        open={confirmExitOpen}
+        title="Leave this exam?"
+        message={quizMode === 'retry' ? "Your answers in this retry won't be saved." : 'You can continue it later from the MCQ page.'}
+        confirmLabel="Leave"
+        cancelLabel="Keep going"
+        confirmColor={pt.danger}
+        onCancel={() => setConfirmExitOpen(false)}
+        onConfirm={() => { setConfirmExitOpen(false); stopQuiz() }}
+      />
 
       <ConfirmDialog
         dark={dark}
