@@ -29,8 +29,6 @@ export function accuracyColor(accuracy: number, pt: { success: string; cobalt: s
 // directly on it (not inside a glass card) needs zone-specific colors.
 export const EXAM_TOP_TEXT = ON_GRADIENT_TOP.primary
 export const EXAM_TOP_TEXT_MUTED = ON_GRADIENT_TOP.muted
-export const EXAM_TOP_AMBER = '#b45309'
-export const EXAM_TOP_RED = '#b91c1c'
 export const EXAM_LOW_TEXT = ON_GRADIENT_BOTTOM.primary
 export const EXAM_LOW_SECONDARY = ON_GRADIENT_BOTTOM.secondary
 export const EXAM_LOW_TEXT_MUTED = ON_GRADIENT_BOTTOM.muted
