@@ -62,6 +62,10 @@ export default function MCQBrowse({
   // Tab accent follows the current module's own color, matching Summaries.tsx.
   const tabAccentColor = activeModuleObj?.color || pt.cobalt
 
+  // A stage tab only appears once this module has at least one question tagged to it.
+  const stagesWithQuestions = new Set(questions.map(q => q.exam_stage).filter(Boolean))
+  const visibleStages = stages.filter(s => stagesWithQuestions.has(s.value))
+
   return (
     <PageShell dark={dark} backFallback="/">
       {(loadError || modulesError) && <ErrorBanner />}
@@ -125,21 +129,23 @@ export default function MCQBrowse({
         </div>
       )}
 
-      <TabRow
-        items={[
-          { value: 'all', label: 'All' },
-          ...stages.map(s => ({
-            value: s.value,
-            label: s.Icon ? s.title : `${s.emoji} ${s.title}`,
-            Icon: s.Icon,
-          })),
-        ]}
-        active={activeStage}
-        onSelect={onSelectStage}
-        dark={dark}
-        accentColor={tabAccentColor}
-        style={{ marginBottom: 16 }}
-      />
+      {visibleStages.length > 0 && (
+        <TabRow
+          items={[
+            { value: 'all', label: 'All' },
+            ...visibleStages.map(s => ({
+              value: s.value,
+              label: s.Icon ? s.title : `${s.emoji} ${s.title}`,
+              Icon: s.Icon,
+            })),
+          ]}
+          active={activeStage}
+          onSelect={onSelectStage}
+          dark={dark}
+          accentColor={tabAccentColor}
+          style={{ marginBottom: 16 }}
+        />
+      )}
 
       <TabRow
         items={[{ value: 'all', label: 'All' }, ...moduleSubjects.map(sub => ({ value: sub.id, label: sub.name }))]}

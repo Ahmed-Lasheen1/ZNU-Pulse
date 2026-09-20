@@ -12,6 +12,7 @@ import LoadingText from '../components/pulse/LoadingText'
 import EmptyState from '../components/pulse/EmptyState'
 import { useModules } from '../contexts'
 import { fetchModuleStages } from '../lib/moduleStages'
+import { fetchSubjectsForModule } from '../lib/subjects'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
 import { getPreviewUrl } from '../lib/embedUrl'
 import { ModuleIcon, NotesIcon } from '../lib/medicalIcons'
@@ -21,8 +22,9 @@ interface SummaryModule {
   id: string; name: string; icon?: string | null; color: string; status: 'active' | 'completed'
 }
 interface Summary {
-  id: string; title: string; url: string; module_id: string; exam_stage?: string | null
+  id: string; title: string; url: string; module_id: string; subject_id?: string | null; exam_stage?: string | null
 }
+interface SummarySubject { id: string; module_id: string; name: string }
 interface ExamStage { value: string; title: string; emoji?: string; Icon?: (p: { color: string; size?: number }) => JSX.Element; color: string }
 
 function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
@@ -34,22 +36,41 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [activeStage, setActiveStage] = useState(initialStage || 'all')
+  const [activeSubject, setActiveSubject] = useState('all')
   const [stages, setStages] = useState<ExamStage[]>([])
+  const [subjects, setSubjects] = useState<SummarySubject[]>([])
 
   // Back button closes this open summary before falling through to a
   // real page navigation.
   useHistoryOverlay(!!selected, () => setSelected(null))
 
-  useEffect(() => { fetchModuleStages(mod.id).then(setStages) }, [mod.id])
+  useEffect(() => {
+    let ignore = false
+    fetchModuleStages(mod.id).then(result => { if (!ignore) setStages(result) })
+    return () => { ignore = true }
+  }, [mod.id])
 
   useEffect(() => {
+    let ignore = false
+    fetchSubjectsForModule(mod.id).then(({ subjects: list, error }) => {
+      if (ignore) return
+      setSubjects(list)
+      if (error) setLoadError(true)
+    })
+    return () => { ignore = true }
+  }, [mod.id])
+
+  useEffect(() => {
+    let ignore = false
     setLoading(true)
     supabase.from('summaries').select('*').eq('module_id', mod.id).order('created_at')
       .then(({ data, error }) => {
+        if (ignore) return
         if (data) setSummaries(data)
         if (error) setLoadError(true)
         setLoading(false)
       })
+    return () => { ignore = true }
   }, [mod.id])
 
   // Arriving from a Search result for a specific summary opens it
@@ -64,7 +85,14 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSummaryId, summaries])
 
-  const filtered = summaries.filter(s => activeStage === 'all' || (s.exam_stage || 'general') === activeStage)
+  // A stage tab only appears once this module has at least one summary tagged to it.
+  const stagesWithSummaries = new Set(summaries.map(s => s.exam_stage).filter(Boolean))
+  const visibleStages = stages.filter(s => stagesWithSummaries.has(s.value))
+
+  const filtered = summaries.filter(s =>
+    (activeStage === 'all' || (s.exam_stage || 'general') === activeStage) &&
+    (activeSubject === 'all' || s.subject_id === activeSubject)
+  )
 
   if (selected) return (
     <SummaryOverlay dark={dark} onBack={() => setSelected(null)} title={selected.title} url={getPreviewUrl(selected.url)} />
@@ -89,21 +117,34 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
 
       {loadError && <ErrorBanner />}
 
-      <TabRow
-        items={[
-          { value: 'all', label: 'All' },
-          ...stages.map(s => ({
-            value: s.value,
-            label: s.Icon ? s.title : `${s.emoji} ${s.title}`,
-            Icon: s.Icon,
-          })),
-        ]}
-        active={activeStage}
-        onSelect={setActiveStage}
-        dark={dark}
-        accentColor={mod.color}
-        style={{ marginBottom: 20 }}
-      />
+      {visibleStages.length > 0 && (
+        <TabRow
+          items={[
+            { value: 'all', label: 'All' },
+            ...visibleStages.map(s => ({
+              value: s.value,
+              label: s.Icon ? s.title : `${s.emoji} ${s.title}`,
+              Icon: s.Icon,
+            })),
+          ]}
+          active={activeStage}
+          onSelect={setActiveStage}
+          dark={dark}
+          accentColor={mod.color}
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
+      {subjects.length > 0 && (
+        <TabRow
+          items={[{ value: 'all', label: 'All' }, ...subjects.map(sub => ({ value: sub.id, label: sub.name }))]}
+          active={activeSubject}
+          onSelect={setActiveSubject}
+          dark={dark}
+          accentColor={mod.color}
+          style={{ marginBottom: 20 }}
+        />
+      )}
 
       {loading && <LoadingText />}
 
