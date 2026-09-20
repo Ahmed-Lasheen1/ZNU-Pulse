@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import { getPulseTheme, pulseFonts, pulseType } from '../../premiumTheme'
 import QuestionRail from '../../components/QuestionRail'
 import QuestionSourceBadge from '../../components/QuestionSourceBadge'
@@ -66,7 +66,7 @@ const BAR_TINT = 'rgba(1,12,74,0.55)'
 
 const barBtnBase: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-  minHeight: 46, minWidth: 46, borderRadius: 999, cursor: 'pointer',
+  height: 46, padding: 0, boxSizing: 'border-box', borderRadius: 999, cursor: 'pointer',
   fontFamily: pulseFonts.body, fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap',
 }
 
@@ -162,7 +162,13 @@ export default function MCQExamFlow({
         .kbd-hint { display: none; }
         @media (hover: hover) and (pointer: fine) { .kbd-hint { display: block; } }
         .exam-bar-label { display: inline; }
-        @media (max-width: 460px) { .exam-bar-label { display: none; } }
+        .exam-bar-nav { width: 124px; }
+        .exam-bar-flag { width: 112px; }
+        @media (max-width: 460px) {
+          .exam-bar-label { display: none; }
+          .exam-bar-nav, .exam-bar-flag { width: 46px; }
+          .exam-bar-nav.exam-bar-wide { width: 96px; }
+        }
       `}</style>
 
       <motion.div
@@ -595,11 +601,11 @@ export default function MCQExamFlow({
                     <button
                       onClick={goPrev}
                       disabled={safeIndex === 0}
-                      className="exam-btn glass-focus-ring"
+                      className={`exam-btn exam-bar-nav glass-focus-ring${isLastQuestion ? ' exam-bar-wide' : ''}`}
                       aria-label="Previous question"
                       title="Previous (←)"
                       style={{
-                        ...barBtnBase, padding: '0 16px',
+                        ...barBtnBase,
                         background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.28)',
                         color: EXAM_LOW_TEXT,
                         opacity: safeIndex === 0 ? 0.4 : 1,
@@ -614,12 +620,12 @@ export default function MCQExamFlow({
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                     <button
                       onClick={() => toggleFlagFor(currentQuestion)}
-                      className="exam-btn glass-focus-ring"
+                      className="exam-btn exam-bar-flag glass-focus-ring"
                       aria-pressed={currentFlagged}
                       aria-label={currentFlagged ? 'Remove flag from this question' : 'Flag this question'}
                       title="Flag (F)"
                       style={{
-                        ...barBtnBase, padding: '0 14px',
+                        ...barBtnBase,
                         background: currentFlagged ? `${pt.amber}26` : 'transparent',
                         border: `1px solid ${currentFlagged ? `${pt.amber}80` : 'rgba(255,255,255,0.22)'}`,
                         color: currentFlagged ? pt.amber : EXAM_LOW_SECONDARY,
@@ -641,12 +647,12 @@ export default function MCQExamFlow({
                     {!isLastQuestion ? (
                       <button
                         onClick={goNext}
-                        className="exam-btn glass-focus-ring"
+                        className="exam-btn exam-bar-nav glass-focus-ring"
                         aria-label="Next question"
                         title="Next (→)"
                         style={{
-                          ...barBtnBase, padding: '0 20px',
-                          background: MCQ_ACCENT, border: 'none', color: '#0f172a',
+                          ...barBtnBase,
+                          background: MCQ_ACCENT, border: `1px solid ${MCQ_ACCENT}`, color: '#0f172a',
                           boxShadow: `0 6px 20px ${MCQ_ACCENT}40`,
                         }}
                       >
@@ -656,14 +662,17 @@ export default function MCQExamFlow({
                     ) : (
                       <button
                         onClick={() => { if (remainingUnanswered > 0) { setConfirmSubmitOpen(true); return } submitQuiz() }}
-                        className="exam-btn glass-focus-ring"
+                        className="exam-btn exam-bar-nav exam-bar-wide glass-focus-ring"
                         aria-label="Submit exam"
                         style={{
-                          ...barBtnBase, padding: '0 22px',
-                          background: MCQ_ACCENT, border: 'none', color: '#0f172a',
+                          ...barBtnBase,
+                          background: MCQ_ACCENT, border: `1px solid ${MCQ_ACCENT}`, color: '#0f172a',
                           boxShadow: `0 6px 20px ${MCQ_ACCENT}40`,
                         }}
-                      >Submit</button>
+                      >
+                        <span>Submit</span>
+                        <Check size={18} aria-hidden />
+                      </button>
                     )}
                   </div>
                 </div>
