@@ -71,18 +71,18 @@ const barBtnBase: React.CSSProperties = {
 }
 
 function TopGlassButton({ dark, onClick, ariaLabel, style, children }: {
-  dark: boolean; onClick: () => void; ariaLabel: string; style?: React.CSSProperties; children: React.ReactNode
+  dark: boolean; onClick: () => void; ariaLabel: string; children: React.ReactNode
 }) {
   const pt = getPulseTheme(dark)
   const hoverTint = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'
   return (
     <PulseGlassRow
       dark={dark} radius={999} hoverTint={hoverTint} onClick={onClick}
-      role="button" tabIndex={0} aria-label={ariaLabel} style={style}
+      role="button" tabIndex={0} aria-label={ariaLabel}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
     >
       <div className="exam-top-btn" style={{
-        height: 44, minWidth: 44, boxSizing: 'border-box',
+        height: 44, boxSizing: 'border-box',
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
         fontFamily: pulseFonts.body, fontSize: 14, fontWeight: 700, color: pt.sub, whiteSpace: 'nowrap',
       }}>{children}</div>
@@ -187,7 +187,7 @@ export default function MCQExamFlow({
         .exam-btn:disabled:active { transform: none; }
         .kbd-hint { display: none; }
         @media (hover: hover) and (pointer: fine) { .kbd-hint { display: block; } }
-        .exam-top-btn { padding: 0 16px; }
+        .exam-top-btn { width: 96px; }
         .exam-top-label { display: inline; }
         .exam-bar-label { display: inline; }
         .exam-bar-nav { width: 124px; }
@@ -195,7 +195,7 @@ export default function MCQExamFlow({
         @media (max-width: 460px) {
           .exam-bar-label { display: none; }
           .exam-top-label { display: none; }
-          .exam-top-btn { padding: 0 12px; }
+          .exam-top-btn { width: 44px; }
           .exam-bar-nav, .exam-bar-flag { width: 46px; }
           .exam-bar-nav.exam-bar-wide { width: 96px; }
         }
@@ -211,45 +211,53 @@ export default function MCQExamFlow({
           padding: `12px clamp(16px, 3vw, 36px) ${barVisible ? barHeight + 16 : 16}px`, fontFamily: pulseFonts.body
         }}
       >
-        <div style={{ position: 'relative', textAlign: 'center', paddingBottom: 14 }}>
-          <TopGlassButton dark={dark} onClick={requestExit} ariaLabel="Exit exam" style={{ position: 'absolute', top: 0, right: 0 }}>
-            <X size={18} aria-hidden />
-            <span className="exam-top-label">Exit</span>
-          </TopGlassButton>
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
+          alignItems: 'center', columnGap: 8, paddingBottom: 14,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+            {!submitted && !grading && (
+              <TopGlassButton
+                dark={dark} onClick={cycleFontScale}
+                ariaLabel={`Adjust text size (currently ${Math.round(fontScale * 100)}%)`}
+              >
+                <span style={{ fontSize: 17, fontWeight: 800 }}>Aa</span>
+                <span className="exam-top-label" style={{ fontSize: 12, opacity: 0.8 }}>{Math.round(fontScale * 100)}%</span>
+              </TopGlassButton>
+            )}
+          </div>
 
-          {!submitted && !grading && (
-            <TopGlassButton
-              dark={dark} onClick={cycleFontScale}
-              ariaLabel={`Adjust text size (currently ${Math.round(fontScale * 100)}%)`}
-              style={{ position: 'absolute', top: 0, left: 0 }}
-            >
-              <span style={{ fontSize: 17, fontWeight: 800 }}>Aa</span>
-              <span className="exam-top-label" style={{ fontSize: 12, opacity: 0.8 }}>{Math.round(fontScale * 100)}%</span>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 3, color: EXAM_TOP_TEXT_MUTED }}>ZNU · EXAM MODE</div>
+
+            {!submitted && !grading && total > 0 && (
+              <>
+                <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1, color: EXAM_TOP_TEXT, marginTop: 8 }}>
+                  QUESTION {safeIndex + 1} / {total}
+                </div>
+                {/* Stopwatch — counts up, same for every mode, no limit/auto-submit. */}
+                <div style={{
+                  fontFamily: 'monospace', fontWeight: 800, fontSize: 24, marginTop: 8,
+                  color: EXAM_TOP_TEXT
+                }}>
+                  {formatTime(elapsedSeconds)}
+                </div>
+              </>
+            )}
+            {grading && (
+              <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1, color: EXAM_TOP_TEXT, marginTop: 8 }}>GRADING…</div>
+            )}
+            {submitted && (
+              <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1, color: EXAM_TOP_TEXT, marginTop: 8 }}>RESULTS</div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <TopGlassButton dark={dark} onClick={requestExit} ariaLabel="Exit exam">
+              <X size={18} aria-hidden />
+              <span className="exam-top-label">Exit</span>
             </TopGlassButton>
-          )}
-
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 3, color: EXAM_TOP_TEXT_MUTED }}>ZNU · EXAM MODE</div>
-
-          {!submitted && !grading && total > 0 && (
-            <>
-              <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1, color: EXAM_TOP_TEXT, marginTop: 8 }}>
-                QUESTION {safeIndex + 1} / {total}
-              </div>
-              {/* Stopwatch — counts up, same for every mode, no limit/auto-submit. */}
-              <div style={{
-                fontFamily: 'monospace', fontWeight: 800, fontSize: 24, marginTop: 8,
-                color: EXAM_TOP_TEXT
-              }}>
-                {formatTime(elapsedSeconds)}
-              </div>
-            </>
-          )}
-          {grading && (
-            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1, color: EXAM_TOP_TEXT, marginTop: 8 }}>GRADING…</div>
-          )}
-          {submitted && (
-            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1, color: EXAM_TOP_TEXT, marginTop: 8 }}>RESULTS</div>
-          )}
+          </div>
         </div>
 
         {total === 0 && !submitted && (
