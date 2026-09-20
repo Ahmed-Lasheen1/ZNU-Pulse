@@ -76,8 +76,14 @@ export default function ToastProvider({ children }) {
             zIndex: 3000,
             boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
             border: `1px solid ${isError ? '#f8717140' : isInfo ? 'rgba(56,189,248,0.4)' : 'rgba(255,255,255,0.12)'}`,
-            maxWidth: isInfo ? 'min(94vw, 420px)' : '90%',
-            width: isInfo ? 'max-content' : undefined,
+            // Without an explicit width, a fixed element pinned at left:50%
+            // is only allowed to grow to the remaining 50% of the screen,
+            // so text wrapped into a narrow, TALL box on phones (a
+            // ~150-char message stacked into 6+ lines). max-content lets
+            // it use the room it actually has, capped just under the
+            // screen width.
+            width: 'max-content',
+            maxWidth: 'min(94vw, 420px)',
             textAlign: isInfo ? 'left' : 'center',
             display: isInfo ? 'flex' : undefined,
             alignItems: isInfo ? 'center' : undefined,

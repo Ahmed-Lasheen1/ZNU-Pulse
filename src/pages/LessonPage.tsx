@@ -1,5 +1,5 @@
 // src/pages/LessonPage.tsx
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
@@ -20,6 +20,12 @@ import { SmartSummariesIcon, PracticeIcon, ConstructionIcon } from '@/components
 interface PageModule { id: string; name: string; icon?: string | null; color: string }
 interface Lesson { id: string; title: string; icon?: string | null }
 interface Summary { id: string; title: string; url: string }
+
+// Shared by all four cards so Summary and Practice always match in size.
+const CARD_STYLE: CSSProperties = {
+  padding: 24, textAlign: 'center', minHeight: 130,
+  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+}
 
 export default function LessonPage({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
@@ -86,26 +92,26 @@ export default function LessonPage({ dark }: { dark: boolean }) {
             moduleName={module.name}
           />
 
-          {/* Summary & Practice — side by side from tablet width up */}
+          {/* Side by side from tablet width up */}
           <div className="summary-practice-row" style={{ marginBottom: 32 }}>
             <div>
               <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <SmartSummariesIcon color={ON_GRADIENT_TOP.muted} size={14} /> Summary
               </h2>
               {summaries.length > 0 ? (
-                <LiquidGlassCard dark={dark} delay={0} onClick={openSummary} style={{ padding: 24, textAlign: 'center' }}>
+                <LiquidGlassCard dark={dark} delay={0} onClick={openSummary} style={CARD_STYLE}>
                   <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
                     <NotesIcon color={pt.success} size={30} />
                   </div>
                   <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>
                     {summaries.length === 1 ? 'Open Lesson Summary' : 'Summaries'}
                   </div>
-                  {summaries.length > 1 && (
-                    <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>{summaries.length} available</div>
-                  )}
+                  <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>
+                    {summaries.length === 1 ? '1 summary' : `${summaries.length} summaries`}
+                  </div>
                 </LiquidGlassCard>
               ) : (
-                <LiquidGlassCard dark={dark} delay={0} style={{ padding: 32, textAlign: 'center' }}>
+                <LiquidGlassCard dark={dark} delay={0} style={CARD_STYLE}>
                   <p style={{ color: pt.sub, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                     <ConstructionIcon color={pt.sub} size={13} /> No summary added yet
                   </p>
@@ -130,7 +136,7 @@ export default function LessonPage({ dark }: { dark: boolean }) {
                 <PracticeIcon color={ON_GRADIENT_TOP.muted} size={14} /> Practice
               </h2>
               {questionCount > 0 ? (
-                <LiquidGlassCard dark={dark} delay={0} onClick={() => navigate(`/mcq?module=${moduleId}&lesson=${lessonId}`)} style={{ padding: 24, textAlign: 'center' }}>
+                <LiquidGlassCard dark={dark} delay={0} onClick={() => navigate(`/mcq?module=${moduleId}&lesson=${lessonId}`)} style={CARD_STYLE}>
                   <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
                     <ExamIcon color="#e2725b" size={30} />
                   </div>
@@ -138,7 +144,7 @@ export default function LessonPage({ dark }: { dark: boolean }) {
                   <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>{questionCount} question{questionCount === 1 ? '' : 's'}</div>
                 </LiquidGlassCard>
               ) : (
-                <LiquidGlassCard dark={dark} delay={0} style={{ padding: 32, textAlign: 'center' }}>
+                <LiquidGlassCard dark={dark} delay={0} style={CARD_STYLE}>
                   <p style={{ color: pt.sub, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                     <ConstructionIcon color={pt.sub} size={13} /> No questions tagged to this lesson yet
                   </p>
