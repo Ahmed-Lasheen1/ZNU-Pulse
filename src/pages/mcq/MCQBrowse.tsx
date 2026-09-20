@@ -13,7 +13,7 @@ import PulseGlassRow from '../../components/pulse/PulseGlassRow'
 import LoadingText from '../../components/pulse/LoadingText'
 import { ModuleIcon, ExamIcon } from '../../lib/medicalIcons'
 import { OfflineIcon, BookIcon, PauseIcon, PlayIcon, EmptyBoxIcon } from '../../components/ui/tool-icons'
-import { MCQ_ACCENT } from './mcqShared'
+import { MCQ_ACCENT, EXAM_LOW_SHADOW } from './mcqShared'
 
 interface MCQBrowseProps {
   dark: boolean
@@ -36,15 +36,13 @@ interface MCQBrowseProps {
   onStartQuiz: (type: string, subjectId?: string | null) => void
 }
 
-// Glass cards sit over a viewport-fixed gradient, so plain muted text
-// loses contrast depending on scroll position. The count carries its
-// own dark scrim so it reads the same everywhere.
-function CountPill({ children }: { children: ReactNode }) {
+// Plain text, no box. A soft shadow keeps it readable over the
+// viewport-fixed gradient wherever the card sits while scrolling.
+function CountText({ children }: { children: ReactNode }) {
   return (
     <span style={{
-      display: 'inline-block', padding: '3px 10px', borderRadius: 999,
-      background: 'rgba(1,12,74,0.55)', border: '1px solid rgba(255,255,255,0.2)',
-      color: '#fff', fontSize: 12, fontWeight: 700, fontFamily: pulseFonts.body, whiteSpace: 'nowrap',
+      display: 'inline-block', color: '#fff', fontSize: 12, fontWeight: 600,
+      fontFamily: pulseFonts.body, whiteSpace: 'nowrap', textShadow: EXAM_LOW_SHADOW,
     }}>{children}</span>
   )
 }
@@ -167,7 +165,7 @@ export default function MCQBrowse({
             </div>
             <div style={{ flex: 1, minWidth: 160 }}>
               <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: MCQ_ACCENT, marginBottom: 6 }}>Mock Exam</h3>
-              <CountPill>{loading ? '…' : countLabel(Math.min(36, getFilteredQuestions('mock').length))}</CountPill>
+              <CountText>{loading ? '…' : countLabel(Math.min(36, getFilteredQuestions('mock').length))}</CountText>
             </div>
             <button onClick={() => onStartQuiz('mock')} style={{
               background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '12px 24px',
@@ -197,7 +195,7 @@ export default function MCQBrowse({
                 style={{ padding: '20px 18px', height: '100%' }}>
                 <div style={{ color: pt.textPrimary, fontWeight: 700, marginBottom: 8, fontSize: 15 }}>{sub.name}</div>
                 <div style={{ marginBottom: 16 }}>
-                  <CountPill>{loading ? '…' : countLabel(subQs.length)}</CountPill>
+                  <CountText>{loading ? '…' : countLabel(subQs.length)}</CountText>
                 </div>
                 <div style={{
                   background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '7px 0',
