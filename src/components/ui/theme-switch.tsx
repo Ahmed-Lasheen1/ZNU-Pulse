@@ -62,27 +62,6 @@ export default function ThemeSwitch({ dark, onToggle, scale = 1, stretchX = 1 }:
       position: 'relative', display: 'inline-block'
     }}>
       <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-        <svg style={{ position: 'absolute', width: 0, height: 0 }}>
-          <defs>
-            <filter id="grain-light">
-              <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves={4} result="noise" />
-              <feColorMatrix in="noise" type="saturate" values="0" result="desaturatedNoise" />
-              <feComponentTransfer in="desaturatedNoise" result="lightGrain">
-                <feFuncA type="linear" slope="0.3" />
-              </feComponentTransfer>
-              <feBlend in="SourceGraphic" in2="lightGrain" mode="overlay" />
-            </filter>
-            <filter id="grain-dark">
-              <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves={4} result="noise" />
-              <feColorMatrix in="noise" type="saturate" values="0" result="desaturatedNoise" />
-              <feComponentTransfer in="desaturatedNoise" result="darkGrain">
-                <feFuncA type="linear" slope="0.5" />
-              </feComponentTransfer>
-              <feBlend in="SourceGraphic" in2="darkGrain" mode="overlay" />
-            </filter>
-          </defs>
-        </svg>
-
         <motion.button
           onClick={handleToggle}
           style={{

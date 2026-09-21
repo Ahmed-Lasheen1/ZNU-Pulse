@@ -13,7 +13,7 @@ import { containsProfanity } from './lib/moderation'
 import ErrorBoundary from './components/ErrorBoundary'
 import ToastProvider from './components/ToastProvider'
 import PulseOverlayHeader from './components/pulse/PulseOverlayHeader'
-import { ThemeContext, AuthContext, ModulesContext } from './contexts'
+import { AuthContext, ModulesContext } from './contexts'
 import Home from './pages/Home'
 const Checklist = lazy(() => import('./pages/Checklist'))
 const Schedule = lazy(() => import('./pages/Schedule'))
@@ -34,9 +34,6 @@ const NotFound = lazy(() => import('./pages/NotFound'))
 const Search = lazy(() => import('./pages/Search'))
 import PulseBackground from './components/pulse/PulseBackground'
 import Footer from './components/Footer'
-
-export { ThemeContext, AuthContext, ModulesContext, useTheme, useAuth, useModules } from './contexts'
-export { default as NavMenu } from './components/NavMenu'
 
 const ensureProfileInFlight = new Set()
 
@@ -213,40 +210,35 @@ export default function App() {
   const toggleTheme = () => setDark(prev => !prev)
 
   return (
-    <ThemeContextProvider dark={dark}>
-      <AuthContextProvider user={user} signOut={signOut} profile={profile} fetchProfile={fetchProfile} authLoaded={authLoaded}>
-        <ModulesContextProvider modules={modules} modulesLoaded={modulesLoaded} modulesError={modulesError} refreshModules={loadModules}>
-        <ToastProvider>
-        <Router>
-          <div style={{
-            position: 'relative',
-            minHeight: '100dvh',
-            color: getPulseTheme(dark).text,
-            display: 'flex',
-            flexDirection: 'column',
-            fontFamily: "'Segoe UI', sans-serif"
-          }}>
-            <PulseBackground />
+    <AuthContextProvider user={user} signOut={signOut} profile={profile} fetchProfile={fetchProfile} authLoaded={authLoaded}>
+      <ModulesContextProvider modules={modules} modulesLoaded={modulesLoaded} modulesError={modulesError} refreshModules={loadModules}>
+      <ToastProvider>
+      <Router>
+        <div style={{
+          position: 'relative',
+          minHeight: '100dvh',
+          color: getPulseTheme(dark).text,
+          display: 'flex',
+          flexDirection: 'column',
+          fontFamily: "'Segoe UI', sans-serif"
+        }}>
+          <PulseBackground />
 
-            <ScrollToTop />
-            <SiteHeader dark={dark} toggleTheme={toggleTheme} />
-            <main style={{ flex: 1, position: 'relative', zIndex: 1 }}>
-              <RoutedContent dark={dark} toggleTheme={toggleTheme} />
-            </main>
+          <ScrollToTop />
+          <SiteHeader dark={dark} toggleTheme={toggleTheme} />
+          <main style={{ flex: 1, position: 'relative', zIndex: 1 }}>
+            <RoutedContent dark={dark} toggleTheme={toggleTheme} />
+          </main>
 
-            <SiteFooter dark={dark} />
-          </div>
-        </Router>
-        </ToastProvider>
-        </ModulesContextProvider>
-      </AuthContextProvider>
-    </ThemeContextProvider>
+          <SiteFooter dark={dark} />
+        </div>
+      </Router>
+      </ToastProvider>
+      </ModulesContextProvider>
+    </AuthContextProvider>
   )
 }
 
-function ThemeContextProvider({ dark, children }) {
-  return <ThemeContext.Provider value={{ dark }}>{children}</ThemeContext.Provider>
-}
 function AuthContextProvider({ user, signOut, profile, fetchProfile, authLoaded, children }) {
   return <AuthContext.Provider value={{ user, signOut, profile, fetchProfile, authLoaded }}>{children}</AuthContext.Provider>
 }
