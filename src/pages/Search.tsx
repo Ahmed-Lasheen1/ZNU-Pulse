@@ -38,8 +38,7 @@ const typeMeta: Record<SearchResult['type'], { Icon: (p: { color?: string; size?
   schedule: { Icon: CalendarDays, label: 'Schedule', color: '#a78bfa' },
 }
 
-// Escapes ilike wildcard/escape characters in user-typed text so a
-// literal "%" or "_" in a search doesn't act as a SQL wildcard.
+// Escapes ilike wildcards so a literal "%" or "_" isn't treated as a pattern.
 function escapeLikePattern(value: string) {
   return value.replace(/[%_\\]/g, '\\$&')
 }
@@ -62,7 +61,13 @@ export default function Search({ dark }: { dark: boolean }) {
   useEffect(() => {
     clearTimeout(debounceRef.current)
     const q = query.trim()
-    if (q.length < 2) { setResults(null); return }
+    if (q.length < 2) {
+      // Invalidates any in-flight request so its results can't reappear.
+      searchIdRef.current++
+      setResults(null)
+      setLoading(false)
+      return
+    }
     debounceRef.current = setTimeout(() => runSearch(q), 350)
     return () => clearTimeout(debounceRef.current)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -103,9 +108,7 @@ export default function Search({ dark }: { dark: boolean }) {
     setLoading(false)
   }
 
-  // Opens the exact item a search result points at rather than just
-  // its parent module — file/question/summary/schedule each resolve
-  // to a deep link that pre-selects and opens the exact match.
+  // Each result deep-links to the exact item, not just its module.
   function openResult(r: SearchResult) {
     if (r.type === 'module') return navigate(`/module/${r.id}`)
     if (r.type === 'file') return navigate(`/files?type=${r.raw.type}&module=${r.raw.module_id}&file=${r.raw.id}`)

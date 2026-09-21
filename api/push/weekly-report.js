@@ -1,15 +1,17 @@
 // api/push/weekly-report.js
-import { getAdminClient, sendToSubscriptions, requireCronSecret } from '../_lib/webpush'
+import { getAdminClient, sendToSubscriptions, requireCronSecret, fetchAllRows } from '../_lib/webpush'
 
-// Weekly cron. Only signed-in users get a report — guest stats live
-// only in their own browser.
+// Weekly cron. Only signed-in users get a report (guest stats live in their browser).
 export default async function handler(req, res) {
   if (!requireCronSecret(req, res)) return
 
   const supabase = getAdminClient('weekly-report')
   if (!supabase) return res.status(500).json({ error: 'Server misconfiguration (missing SUPABASE_URL)' })
 
-  const { data: subs } = await supabase.from('push_subscriptions').select('*').not('user_id', 'is', null)
+  const { data: subs, error: subsError } = await fetchAllRows(() =>
+    supabase.from('push_subscriptions').select('*').not('user_id', 'is', null).order('id')
+  )
+  if (subsError) return res.status(500).json({ error: subsError.message })
   if (!subs || subs.length === 0) return res.status(200).json({ sent: 0 })
 
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
@@ -18,14 +20,16 @@ export default async function handler(req, res) {
   subs.forEach((s) => { (byUser[s.user_id] ||= []).push(s) })
   const userIds = Object.keys(byUser)
 
-  const { data: allHistory } = await supabase
-    .from('exam_history')
-    .select('user_id, total, correct')
-    .in('user_id', userIds)
-    .gte('completed_at', weekAgo)
+  // Filtered per user in memory: a huge .in() list would overflow the URL length.
+  const { data: allHistory, error: historyError } = await fetchAllRows(() =>
+    supabase.from('exam_history').select('id, user_id, total, correct').gte('completed_at', weekAgo).order('id')
+  )
+  if (historyError) return res.status(500).json({ error: historyError.message })
 
   const historyByUser = {}
-  ;(allHistory || []).forEach(h => { (historyByUser[h.user_id] ||= []).push(h) })
+  ;(allHistory || []).forEach(h => {
+    if (byUser[h.user_id]) (historyByUser[h.user_id] ||= []).push(h)
+  })
 
   let sent = 0
 

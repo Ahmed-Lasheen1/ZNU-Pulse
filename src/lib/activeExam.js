@@ -1,16 +1,23 @@
 import { supabase } from '../supabase'
 import { getGuestActiveExam, saveGuestActiveExam, clearGuestActiveExam } from './reviewStorage'
 
-// Shared paused-exam persistence (Supabase for signed-in users,
-// localStorage for guests). Used by MCQ.jsx to save/resume a
-// mid-quiz, and by Home.jsx to show a "continue where you left off"
-// card without duplicating this logic in two places.
+// Paused-exam persistence: Supabase for signed-in users, localStorage for guests.
 export async function loadSavedActiveExam(user) {
   if (user) {
     const { data } = await supabase.from('active_exams').select('exam_data').eq('user_id', user.id).maybeSingle()
     return data?.exam_data || null
   }
   return getGuestActiveExam()
+}
+
+// Existence only (Home's "continue" card) — avoids downloading the whole exam.
+export async function hasSavedActiveExam(user) {
+  if (!user) return !!getGuestActiveExam()
+  const { count } = await supabase
+    .from('active_exams')
+    .select('user_id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+  return (count || 0) > 0
 }
 
 export async function persistActiveExam(user, payload) {

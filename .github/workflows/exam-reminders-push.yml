@@ -2,7 +2,7 @@ name: Exam Reminders Push
 
 on:
   schedule:
-    - cron: '0 8 * * *'   # every day at 08:00 UTC
+    - cron: '0 8 * * *'   # daily 08:00 UTC
   workflow_dispatch:
 
 jobs:
@@ -11,7 +11,7 @@ jobs:
     steps:
       - name: Trigger exam reminder check
         run: |
-          curl -s -X POST \
+          curl -sS -f --retry 2 --retry-delay 10 -X POST \
             -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.SITE_URL }}/api/push/exam-reminders"
             

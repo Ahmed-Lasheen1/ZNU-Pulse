@@ -6,8 +6,10 @@ import { useAuth, useModules } from '../contexts'
 import { useToast } from '../components/ToastProvider'
 import { fetchModuleStages } from '../lib/moduleStages'
 import { fetchLessonStageMap, inStage } from '../lib/lessonStages'
-import { getGuestFlags, toggleGuestFlag, saveGuestIncorrect, enrichGuestFlagsWithResults, addGuestHistory } from '../lib/reviewStorage'
+import { getGuestFlags, toggleGuestFlag, enrichGuestFlagsWithResults, addGuestHistory } from '../lib/reviewStorage'
 import { loadSavedActiveExam, persistActiveExam, clearActiveExam } from '../lib/activeExam'
+import { fetchAllRows } from '../lib/fetchAllRows'
+import { storageGet, storageSet } from '../lib/safeStorage'
 import { optionLabels } from './mcq/mcqShared'
 import MCQBrowse from './mcq/MCQBrowse'
 import MCQExamFlow from './mcq/MCQExamFlow'
@@ -50,11 +52,11 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
   const FONT_SCALES = [0.9, 1, 1.15, 1.3]
   const [fontScale, setFontScale] = useState<number>(() => {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('znu_mcq_font_scale') : null
+    const saved = storageGet('znu_mcq_font_scale')
     const parsed = saved ? parseFloat(saved) : 1
     return FONT_SCALES.includes(parsed) ? parsed : 1
   })
-  useEffect(() => { localStorage.setItem('znu_mcq_font_scale', String(fontScale)) }, [fontScale])
+  useEffect(() => { storageSet('znu_mcq_font_scale', String(fontScale)) }, [fontScale])
   function cycleFontScale() {
     setFontScale(prev => FONT_SCALES[(FONT_SCALES.indexOf(prev) + 1) % FONT_SCALES.length])
   }
@@ -70,8 +72,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const autoStartedLessonRef = useRef(false)
   const autoStartedSubjectRef = useRef(false)
   const isMountedRef = useRef(true)
-  // Kept in a ref (not read directly) so the unmount-flush effect below
-  // always sees the current user, not whoever was signed in at mount.
+  // Ref so the unmount flush below sees the current user.
   const userRef = useRef(user)
   useEffect(() => { userRef.current = user }, [user])
 
@@ -105,10 +106,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules])
 
-  // Drops question caches for modules that no longer exist. Only prune
-  // once the modules fetch is confirmed to have actually succeeded —
-  // otherwise a transient error would wipe every cache instead of
-  // just stale ones.
+  // Drops caches of deleted modules — only once the modules fetch succeeded.
   useEffect(() => {
     if (!modulesLoaded || modulesError) return
     try {
@@ -164,15 +162,15 @@ export default function MCQ({ dark }: { dark: boolean }) {
     return () => { cancelled = true }
   }, [user, quizMode])
 
-  // Debounced save of in-progress exam state (for Resume). Pending
-  // snapshot lives in a ref so a real unmount can flush it.
+  // Debounced save of the in-progress exam; the pending snapshot lives in a
+  // ref so a real unmount can flush it.
   useEffect(() => {
     if (!quizMode || submitted || quizMode === 'retry') { pendingPersistRef.current = null; return }
     if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current)
     const payload = { activeModule, quizMode, quizQuestions, answers, startedAt: quizStartedAtRef.current }
     pendingPersistRef.current = payload
     persistTimeoutRef.current = setTimeout(() => {
-      persistActiveExam(user, payload)
+      persistActiveExam(user, { ...payload, savedAt: Date.now() })
       pendingPersistRef.current = null
     }, 1500)
     return () => {
@@ -181,11 +179,9 @@ export default function MCQ({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quizMode, quizQuestions, answers, submitted])
 
-  // Flushes a still-pending save only on real unmount, using the
-  // latest auth state via userRef.
   useEffect(() => {
     return () => {
-      if (pendingPersistRef.current) persistActiveExam(userRef.current, pendingPersistRef.current)
+      if (pendingPersistRef.current) persistActiveExam(userRef.current, { ...pendingPersistRef.current, savedAt: Date.now() })
     }
   }, [])
 
@@ -224,19 +220,19 @@ export default function MCQ({ dark }: { dark: boolean }) {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [quizMode, submitted, grading, currentIndex, quizQuestions, results])
+  }, [quizMode, submitted, grading, currentIndex, quizQuestions, results, flaggedIds])
 
   async function fetchSubjects() {
     const { data, error } = await supabase.from('subjects').select('*').order('name')
     if (error) {
       try {
-        const cached = localStorage.getItem('mcq_subjects_cache')
+        const cached = storageGet('mcq_subjects_cache')
         if (cached) setSubjects(JSON.parse(cached))
         else setLoadError(true)
       } catch { setLoadError(true) }
     } else if (data) {
       setSubjects(data)
-      localStorage.setItem('mcq_subjects_cache', JSON.stringify(data))
+      storageSet('mcq_subjects_cache', JSON.stringify(data))
     }
   }
 
@@ -244,18 +240,18 @@ export default function MCQ({ dark }: { dark: boolean }) {
     const { data, error } = await supabase.from('lessons').select('id, title, subject_id')
     if (error) {
       try {
-        const cached = localStorage.getItem('mcq_lessons_cache')
+        const cached = storageGet('mcq_lessons_cache')
         if (cached) setLessons(JSON.parse(cached))
       } catch { /* ignore corrupt cache */ }
     } else if (data) {
       setLessons(data)
-      localStorage.setItem('mcq_lessons_cache', JSON.stringify(data))
+      storageSet('mcq_lessons_cache', JSON.stringify(data))
     }
   }
 
   async function fetchQuestionsForModule(moduleId: string, isIgnored: () => boolean = () => false) {
     const cacheKey = `mcq_questions_cache_${moduleId}`
-    const cached = localStorage.getItem(cacheKey)
+    const cached = storageGet(cacheKey)
     let hadCache = false
     if (cached) {
       try {
@@ -268,11 +264,12 @@ export default function MCQ({ dark }: { dark: boolean }) {
     }
     if (!isIgnored()) setLoading(!hadCache)
 
-    const { data, error } = await supabase
+    const { data, error } = await fetchAllRows(() => supabase
       .from('questions_public')
       .select('id, question, option_a, option_b, option_c, option_d, exam_type, exam_stage, module_id, subject_id, lesson_id, source, created_at')
       .eq('module_id', moduleId)
       .order('created_at')
+      .order('id'))
 
     if (isIgnored()) return
 
@@ -282,7 +279,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     } else if (data) {
       setQuestions(data)
       setUsingCache(false)
-      try { localStorage.setItem(cacheKey, JSON.stringify(data)) } catch { /* cache write skipped */ }
+      storageSet(cacheKey, JSON.stringify(data))
     }
     setLoading(false)
   }
@@ -331,7 +328,10 @@ export default function MCQ({ dark }: { dark: boolean }) {
       showToast('Flag removed')
     } else {
       if (user) {
-        const { error } = await supabase.from('flagged_questions').insert({ user_id: user.id, question_id: q.id, module_id: q.module_id })
+        const { error } = await supabase.from('flagged_questions').upsert(
+          { user_id: user.id, question_id: q.id, module_id: q.module_id },
+          { onConflict: 'user_id,question_id', ignoreDuplicates: true }
+        )
         if (error) { showToast('❌ Could not flag question — try again', 'error'); return }
       } else {
         toggleGuestFlag({
@@ -347,8 +347,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     }
   }
 
-  // Stopwatch — counts up from quiz start, same for every mode
-  // (mock/practice/retry). No limit, no auto-submit.
+  // Stopwatch counting up from quiz start — no limit, no auto-submit.
   function startTimer(startedAt: number) {
     clearInterval(timerRef.current)
     const tick = () => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000))
@@ -421,6 +420,10 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
   async function resumeExam() {
     if (!resumeData) return
+    // Time spent away isn't counted: rebuild the start from elapsed-at-last-save.
+    const startedAt = resumeData.savedAt && resumeData.startedAt
+      ? Date.now() - (resumeData.savedAt - resumeData.startedAt)
+      : resumeData.startedAt
     setActiveModule(resumeData.activeModule)
     setQuizQuestions(resumeData.quizQuestions || [])
     setAnswers(resumeData.answers || {})
@@ -432,13 +435,13 @@ export default function MCQ({ dark }: { dark: boolean }) {
     setStruckOut({})
     gradingInFlightRef.current.clear()
     sessionIdRef.current++
-    quizStartedAtRef.current = resumeData.startedAt
+    quizStartedAtRef.current = startedAt
     const flagSession = sessionIdRef.current
     loadFlagsFor((resumeData.quizQuestions || []).map((q: any) => q.id)).then(ids => {
       if (sessionIdRef.current === flagSession) setFlaggedIds(ids)
     })
 
-    startTimer(resumeData.startedAt)
+    startTimer(startedAt)
     setResumeData(null)
     window.scrollTo({ top: 0 })
   }
@@ -537,7 +540,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
     const payload = quizQuestions.map((q, i) => ({ id: q.id, answer: answers[i] || null }))
     const total = quizQuestions.length
-    // No fixed duration in any mode anymore — time isn't tracked in history.
     const timeSec = null
 
     const retryModuleIsUniform = quizMode === 'retry' && quizQuestions.every(q => q.module_id === quizQuestions[0]?.module_id)
@@ -620,16 +622,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
       const guestCorrectCount = quizQuestions.filter(q => resultMap[q.id]?.is_correct).length
       const guestScorePercent = total > 0 ? Math.round((guestCorrectCount / total) * 100) : 0
 
-      quizQuestions.forEach(q => {
-        const r = resultMap[q.id]
-        if (r && !r.is_correct) {
-          saveGuestIncorrect({
-            question_id: q.id, question: q.question,
-            option_a: q.option_a, option_b: q.option_b, option_c: q.option_c, option_d: q.option_d,
-            module_id: q.module_id, source: q.source, correct_answer: r.correct_answer, explanation: r.explanation
-          })
-        }
-      })
       enrichGuestFlagsWithResults(resultMap)
       addGuestHistory({
         module_id: historyModuleId, quiz_type: quizMode,

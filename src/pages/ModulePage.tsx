@@ -23,6 +23,7 @@ interface PageModule {
 }
 interface PageSubject { id: string; module_id: string; name: string; icon?: string | null; color?: string | null }
 interface ExamStage { value: string; title: string; emoji?: string; Icon?: (p: { color: string; size?: number }) => JSX.Element; color: string }
+interface ContentFacet { kind: 'file' | 'question' | 'summary'; item_type: string | null; exam_stage: string | null; lesson_id: string | null }
 
 export default function ModulePage({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
@@ -56,31 +57,22 @@ export default function ModulePage({ dark }: { dark: boolean }) {
       if (error) setLoadError(true)
     })
 
-    // One select per table (type/id + exam_stage + lesson_id together)
-    // instead of a count query plus a separate exam_stage query for each
-    // table — the "has any content" booleans and the stage set (own tag
-    // plus the item's lesson stages) all come from the same results.
+    // One RPC returns the distinct (kind, type, stage, lesson) combinations, so it
+    // stays small and correct regardless of how many rows the module holds.
     Promise.all([
-      supabase.from('files').select('type, exam_stage, lesson_id').eq('module_id', moduleId),
-      supabase.from('questions_public').select('id, exam_stage, lesson_id').eq('module_id', moduleId),
-      supabase.from('summaries').select('id, exam_stage, lesson_id').eq('module_id', moduleId),
+      supabase.rpc('get_module_content_facets', { p_module_id: moduleId }),
       fetchLessonStageMap(),
-    ]).then(([filesRes, questionsRes, summariesRes, stageMapRes]) => {
+    ]).then(([facetsRes, stageMapRes]) => {
       if (ignore) return
+      if (facetsRes.error) { setLoadError(true); return }
 
-      if (filesRes.data) setPresentFileTypes(new Set(filesRes.data.map((f: any) => f.type)))
-      if (filesRes.error) setLoadError(true)
-
-      if (questionsRes.data) setHasModuleQuestions(questionsRes.data.length > 0)
-      if (questionsRes.error) setLoadError(true)
-
-      if (summariesRes.data) setHasModuleSummaries(summariesRes.data.length > 0)
-      if (summariesRes.error) setLoadError(true)
+      const rows = (facetsRes.data || []) as ContentFacet[]
+      setPresentFileTypes(new Set(rows.filter(r => r.kind === 'file').map(r => r.item_type as string)))
+      setHasModuleQuestions(rows.some(r => r.kind === 'question'))
+      setHasModuleSummaries(rows.some(r => r.kind === 'summary'))
 
       const stages = new Set<string>()
-      ;[filesRes, questionsRes, summariesRes].forEach(res => {
-        (res.data || []).forEach((row: any) => { stagesOf(row, stageMapRes.map).forEach((s: string) => stages.add(s)) })
-      })
+      rows.forEach(row => { stagesOf(row, stageMapRes.map).forEach((s: string) => stages.add(s)) })
       setStagesWithContent(stages)
     })
 

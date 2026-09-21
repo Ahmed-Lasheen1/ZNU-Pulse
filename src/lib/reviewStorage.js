@@ -1,15 +1,11 @@
-// Local (per-device) fallback for Review/Resume — used only when
-// nobody is signed in. Signing in switches to the real Supabase-backed
-// versions (see migrateGuestData.js for the one-time handoff).
+// Per-device fallback for Review/Resume when nobody is signed in.
+// Signing in switches to Supabase (see migrateGuestData.js).
 
 const FLAGGED_KEY = 'mcq_flagged'
-const INCORRECT_KEY = 'mcq_incorrect'
 const HISTORY_KEY = 'mcq_history'
 const ACTIVE_EXAM_KEY = 'mcq_active_exam'
 
-// Caps growth for long-term guest devices — oldest entries are dropped.
 const MAX_FLAGGED = 200
-const MAX_INCORRECT = 200
 
 function readList(key) {
   try { return JSON.parse(localStorage.getItem(key) || '[]') } catch { return [] }
@@ -21,7 +17,6 @@ function removeKey(key) {
   try { localStorage.removeItem(key) } catch { /* storage unavailable */ }
 }
 
-// ── Flags ──────────────────────────────────────────────────────────
 export function getGuestFlags() { return readList(FLAGGED_KEY) }
 export function setGuestFlags(list) { writeList(FLAGGED_KEY, list) }
 
@@ -43,22 +38,7 @@ export function clearGuestFlags() {
   removeKey(FLAGGED_KEY)
 }
 
-// ── Incorrect questions ───────────────────────────────────────────
-export function getGuestIncorrect() { return readList(INCORRECT_KEY) }
-export function setGuestIncorrect(list) { writeList(INCORRECT_KEY, list) }
-
-export function saveGuestIncorrect(entry) {
-  const list = readList(INCORRECT_KEY)
-  const idx = list.findIndex(q => q.question_id === entry.question_id)
-  if (idx >= 0) list[idx] = { ...list[idx], ...entry, updatedAt: Date.now() }
-  else list.push({ ...entry, updatedAt: Date.now() })
-  if (list.length > MAX_INCORRECT) list.splice(0, list.length - MAX_INCORRECT)
-  writeList(INCORRECT_KEY, list)
-}
-
-// Backfills the correct answer/explanation for a flagged question once
-// a quiz grades it — the grading result already legitimately reveals
-// this, so copying it into the flag entry isn't a new exposure.
+// Backfills answer/explanation on flagged entries once a quiz grades them.
 export function enrichGuestFlagsWithResults(resultMap) {
   const list = readList(FLAGGED_KEY)
   let changed = false
@@ -73,11 +53,6 @@ export function enrichGuestFlagsWithResults(resultMap) {
   if (changed) writeList(FLAGGED_KEY, list)
 }
 
-export function clearGuestIncorrect() {
-  removeKey(INCORRECT_KEY)
-}
-
-// ── Exam history ──────────────────────────────────────────────────
 export function getGuestHistory() { return readList(HISTORY_KEY) }
 export function setGuestHistory(list) { writeList(HISTORY_KEY, list) }
 
@@ -92,7 +67,6 @@ export function clearGuestHistory() {
   removeKey(HISTORY_KEY)
 }
 
-// ── Active (in-progress) exam, for Resume ─────────────────────────
 export function getGuestActiveExam() {
   try { return JSON.parse(localStorage.getItem(ACTIVE_EXAM_KEY) || 'null') } catch { return null }
 }

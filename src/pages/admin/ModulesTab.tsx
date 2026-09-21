@@ -47,7 +47,7 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
     resetForm: resetModuleForm, refresh: fetchModules, showMessage: showMsg
   })
 
-  // Dup check needs the live module list, so it stays outside the hook.
+  // The duplicate check needs the live module list, so it stays outside the hook.
   function saveModule() {
     if (!modName || crud.saving) return
     const dup = modules.some(m => m.name.trim().toLowerCase() === modName.trim().toLowerCase() && m.id !== editingModuleId)
@@ -57,7 +57,8 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
 
   async function toggleModuleStatus(mod: AdminModule) {
     const newStatus = mod.status === 'active' ? 'completed' : 'active'
-    await supabase.from('modules').update({ status: newStatus }).eq('id', mod.id)
+    const { error } = await supabase.from('modules').update({ status: newStatus }).eq('id', mod.id)
+    if (error) showMsg('❌ ' + error.message)
     fetchModules()
   }
 

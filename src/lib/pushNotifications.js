@@ -1,6 +1,5 @@
 import { supabase } from '../supabase'
 
-// Public half of the VAPID keypair — safe to expose to the browser.
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY
 
 function urlBase64ToUint8Array(base64String) {
@@ -10,16 +9,17 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)))
 }
 
-// Call right after Notification permission is granted, and also
-// silently on every page load, to keep the server-side record in
-// sync. Reuses an existing browser subscription if present.
-//
-// Saves via the upsert_push_subscription RPC rather than a direct
-// table upsert — RLS locks push_subscriptions to "a row you already
-// own," so this security-definer RPC can see the one row matching
-// this endpoint, insert if new, and claim it via auth.uid() without
-// broader table access. If already claimed by a different account,
-// it silently no-ops.
+// Resolves null instead of hanging forever when no service worker is active.
+export function getSwRegistration(timeoutMs = 4000) {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return Promise.resolve(null)
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+  ])
+}
+
+// Idempotent: reuses an existing browser subscription and (via the RPC)
+// claims an unowned guest row for the signed-in user.
 export async function subscribeToPush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     console.warn('[push] Push not supported in this browser.')
@@ -32,7 +32,9 @@ export async function subscribeToPush() {
   }
 
   try {
-    const reg = await navigator.serviceWorker.ready
+    const reg = await getSwRegistration()
+    if (!reg) return { success: false, reason: 'subscribe_exception' }
+
     let sub = await reg.pushManager.getSubscription()
     if (!sub) {
       sub = await reg.pushManager.subscribe({
@@ -60,18 +62,15 @@ export async function subscribeToPush() {
   }
 }
 
-// Turns push off for this device — unsubscribes the browser's own
-// PushManager subscription and removes the matching server row (via
-// a security-definer RPC, since guest rows have user_id IS NULL and
-// RLS's `auth.uid() = user_id` never matches NULL = NULL).
+// Removes the browser subscription and the matching server row.
 export async function unsubscribeFromPush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     return { success: false, reason: 'unsupported' }
   }
 
   try {
-    const reg = await navigator.serviceWorker.ready
-    const sub = await reg.pushManager.getSubscription()
+    const reg = await getSwRegistration()
+    const sub = reg ? await reg.pushManager.getSubscription() : null
     if (!sub) return { success: true }
 
     const endpoint = sub.endpoint

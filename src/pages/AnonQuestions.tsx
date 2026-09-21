@@ -15,6 +15,7 @@ import { useToast } from '../components/ToastProvider'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { containsProfanity } from '../lib/moderation'
 import { isSuccessMessage } from '../lib/messageStyle'
+import { storageGet, storageSet } from '../lib/safeStorage'
 import { getMyAnonTokens, addMyAnonToken, getNotifiedTokens, markTokensNotified } from '../lib/anonTracking'
 import { showLocalNotification } from '../lib/localNotification'
 import { AnonQAIcon, QuestionMarkIcon, ClockIcon, CheckCircleIcon, TrashIcon, LightbulbIcon, EmptyBoxIcon } from '../components/ui/tool-icons'
@@ -55,8 +56,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
   const [cooldownRemaining, setCooldownRemaining] = useState(0)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const cooldownTimerRef = useRef<ReturnType<typeof setInterval>>()
-  // Guards against a rapid double-click firing two inserts before
-  // cooldownRemaining state has re-rendered to block the second click.
+  // Blocks a rapid double-click before cooldown state re-renders.
   const submittingRef = useRef(false)
 
   useEffect(() => {
@@ -73,17 +73,13 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
   }, [])
 
   function updateCooldownRemaining() {
-    const lastSubmitAt = Number(localStorage.getItem(COOLDOWN_STORAGE_KEY) || 0)
+    const lastSubmitAt = Number(storageGet(COOLDOWN_STORAGE_KEY) || 0)
     const remaining = Math.max(0, SUBMIT_COOLDOWN_MS - (Date.now() - lastSubmitAt))
     setCooldownRemaining(remaining)
   }
 
-  // BUG FIX: this used to call `new Notification(...)` directly, which
-  // throws on Chrome for Android (see lib/localNotification.js) and,
-  // being inside an effect, crashed the page into ErrorBoundary. It now
-  // goes through showLocalNotification(), which can't throw. Tokens are
-  // marked as notified first so a re-run can't announce them twice, and
-  // several newly answered questions collapse into one notification.
+  // Goes through showLocalNotification() (can't throw on Chrome for Android).
+  // Tokens are marked first so a re-run can't announce them twice.
   useEffect(() => {
     if (!('Notification' in window) || Notification.permission !== 'granted') return
     const notified = getNotifiedTokens()
@@ -145,10 +141,8 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
     if (error) setLoadError(true)
   }
 
-  // Submission goes through the submit_anon_question RPC rather than
-  // a direct table insert — it re-checks the cooldown and a profanity
-  // filter server-side (this client-side pass is just fast feedback,
-  // not the real gate), and hands back the tracking token itself.
+  // Submits via the submit_anon_question RPC, which re-checks cooldown and
+  // profanity server-side (the client pass is just fast feedback).
   async function submitQuestion() {
     if (!newQ.trim() || submittingRef.current) return
     if (cooldownRemaining > 0) {
@@ -166,7 +160,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
     const { data: token, error } = await supabase.rpc('submit_anon_question', { p_question: newQ.trim() })
     submittingRef.current = false
     if (!error && token) {
-      localStorage.setItem(COOLDOWN_STORAGE_KEY, String(Date.now()))
+      storageSet(COOLDOWN_STORAGE_KEY, String(Date.now()))
       updateCooldownRemaining()
       addMyAnonToken(token)
       setMsg('✅ Question submitted anonymously!')
@@ -175,7 +169,13 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
       fetchMyQuestions()
       setTimeout(() => setMsg(''), 3000)
     } else {
-      setMsg('❌ Could not submit — check your connection and try again')
+      const busy = /wait|too many/i.test(error?.message || '')
+      const inappropriate = /inappropriate/i.test(error?.message || '')
+      setMsg(
+        busy ? '❌ Too many questions right now — please try again in a moment'
+        : inappropriate ? '❌ Please remove inappropriate language from your question'
+        : '❌ Could not submit — check your connection and try again'
+      )
       setTimeout(() => setMsg(''), 3000)
     }
   }

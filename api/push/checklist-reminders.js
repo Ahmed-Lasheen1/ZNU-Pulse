@@ -1,9 +1,8 @@
 // api/push/checklist-reminders.js
-import { getAdminClient, sendToSubscriptions, requireCronSecret } from '../_lib/webpush'
+import { getAdminClient, sendToSubscriptions, requireCronSecret, fetchAllRows } from '../_lib/webpush'
 
-// `deadline` is date-only, so "6 hours before" treats it as
-// end-of-day Egypt time. Egypt observes DST, so the offset comes
-// from the IANA timezone rather than a fixed number.
+// `deadline` is date-only, so "6 hours before" treats it as end-of-day Egypt time.
+// Egypt observes DST, so the offset comes from the IANA timezone.
 const EGYPT_TIMEZONE = 'Africa/Cairo'
 const REMINDER_WINDOW_HOURS = 6
 const MAX_OVERDUE_HOURS = 24
@@ -27,8 +26,7 @@ function cairoOffsetMs(instant) {
 function deadlineInstant(dateStr) {
   const [year, month, day] = dateStr.split('-').map(Number)
   const wallClockTime = Date.UTC(year, month - 1, day, 23, 59, 59)
-  // Resolve the Cairo offset at the resulting instant; repeating once
-  // handles the DST boundary correctly.
+  // Resolve the offset at the resulting instant; twice handles DST boundaries.
   let timestamp = wallClockTime
   for (let i = 0; i < 2; i += 1) {
     timestamp = wallClockTime - cairoOffsetMs(new Date(timestamp))
@@ -36,29 +34,30 @@ function deadlineInstant(dateStr) {
   return new Date(timestamp)
 }
 
-// Hourly cron. Notifies only a task's own owner, via that task's
-// user_id — never a broadcast. Guest checklists can't be reached here.
+// Hourly cron. Notifies only a task's own owner via its user_id, never a broadcast.
 export default async function handler(req, res) {
   if (!requireCronSecret(req, res)) return
 
   const supabase = getAdminClient('checklist-reminders')
   if (!supabase) return res.status(500).json({ error: 'Server misconfiguration (missing SUPABASE_URL)' })
 
-  const { data: tasks, error: tasksError } = await supabase
-    .from('user_checklist')
-    .select('id, user_id, text, deadline, module_id, modules(name)')
-    .eq('done', false)
-    .eq('reminder_sent', false)
-    .not('deadline', 'is', null)
-    .not('user_id', 'is', null)
+  const { data: tasks, error: tasksError } = await fetchAllRows(() =>
+    supabase
+      .from('user_checklist')
+      .select('id, user_id, text, deadline, module_id, modules(name)')
+      .eq('done', false)
+      .eq('reminder_sent', false)
+      .not('deadline', 'is', null)
+      .not('user_id', 'is', null)
+      .order('id')
+  )
 
   if (tasksError) return res.status(500).json({ error: tasksError.message })
   if (!tasks || tasks.length === 0) return res.status(200).json({ sent: 0, reason: 'no eligible tasks' })
 
   const now = Date.now()
   const due = []
-  // Tasks more than MAX_OVERDUE_HOURS past due get marked reminder_sent
-  // (without counting as sent) so they stop being refetched every hour.
+  // Long-overdue tasks are marked reminder_sent (not counted as sent) so they stop being refetched.
   const staleIds = []
 
   tasks.forEach((t) => {

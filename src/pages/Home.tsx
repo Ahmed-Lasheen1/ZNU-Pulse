@@ -10,7 +10,8 @@ import { supabase } from '../supabase'
 import ErrorBanner from '../components/ErrorBanner'
 import { computeStreak } from '../lib/streak'
 import { getGuestHistory } from '../lib/reviewStorage'
-import { loadSavedActiveExam } from '../lib/activeExam'
+import { hasSavedActiveExam } from '../lib/activeExam'
+import { fetchSubjectById } from '../lib/subjects'
 import { ENTRANCE_PAUSE } from '../lib/pulseMotion'
 import { useOncePerSession } from '../lib/useOncePerSession'
 import NotifyPermissionButton from '../components/NotifyPermissionButton'
@@ -34,14 +35,10 @@ const toolCards = [
   { Icon: LeaderboardIcon, title: 'Leaderboard', sub: 'See where you stand', to: '/profile?tab=leaderboard', accent: 'amber' },
 ] as const
 
-// Fixed accents for marks rendered directly on PULSE_BG (not inside a
-// glass card) — these must not shift with the light/dark toggle since
-// the gradient itself doesn't change with the theme toggle.
+// Marks drawn directly on PULSE_BG must not shift with the theme toggle.
 const ACTIVE_MODULES_ACCENT = getPulseTheme(false).cobalt
 const FOOTER_LINE_COLOR = getPulseTheme(true).border
 
-// Caps how much exam history Home pulls just to compute a streak and
-// weekly summary — mirrors the same cap Review.tsx already uses.
 const HOME_HISTORY_LIMIT = 200
 
 const MODULE_BLURBS: Record<string, string> = {
@@ -56,9 +53,7 @@ function moduleBlurb(name: string) {
   return key ? MODULE_BLURBS[key] : 'Master the essentials of this module.'
 }
 
-// Weekly Report accuracy feedback — same tiers/colors used by the MCQ
-// results screen and the weekly push notification (mcqShared.tsx),
-// so all three surfaces always agree.
+// Same tiers/colors as the MCQ results screen and the weekly push.
 function weeklyAccuracyFeedback(accuracy: number, pt: ReturnType<typeof getPulseTheme>) {
   const labels: Record<AccuracyTier, string> = {
     excellent: 'Outstanding week!',
@@ -70,10 +65,9 @@ function weeklyAccuracyFeedback(accuracy: number, pt: ReturnType<typeof getPulse
   return { label: labels[accuracyTier(accuracy)], color: accuracyColor(accuracy, pt) }
 }
 
-// Major dashboard-number style, scaled down from the shared `display` size.
 const statNumStyle = { ...pulseType.display, fontSize: 28, lineHeight: 1.1 }
 
-// Entrance-animation reveal order
+// Entrance reveal order
 const HERO_DELAY = ENTRANCE_PAUSE
 const LOGO_DELAY = ENTRANCE_PAUSE + 0.5
 const NOTIFY_DELAY = LOGO_DELAY + 0.3
@@ -87,7 +81,6 @@ function msFor(targetSeconds: number) {
   return Math.round(((targetSeconds - ENTRANCE_PAUSE) / 1.5) * 1000)
 }
 
-// Brand block timeline
 const BRAND_WORDS_START = LOGO_DELAY + 0.45
 const BRAND_WORD_STAGGER = 0.2
 const BRAND_TAGLINE_DELAY = BRAND_WORDS_START + BRAND_WORD_STAGGER * 2 + 0.2
@@ -101,33 +94,27 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
   const { modules, modulesLoaded, modulesError } = useModules() as { modules: HomeModule[]; modulesLoaded: boolean; modulesError: boolean }
   const [announcement, setAnnouncement] = useState('')
   const [streak, setStreak] = useState(0)
-  const [pausedExam, setPausedExam] = useState<any>(null)
+  const [pausedExam, setPausedExam] = useState(false)
   const [weeklySummary, setWeeklySummary] = useState<WeeklySummary | null>(null)
 
-  // Collapsible Completed Modules disclosure — collapsed by default
   const [archiveOpen, setArchiveOpen] = useState(false)
 
-  // overflow stays hidden during the height animation (needed for the
-  // collapse/expand), then switches to visible so card hover effects
-  // aren't clipped once the list is settled.
+  // Overflow stays hidden during the height animation, then visible so hover effects aren't clipped.
   const [archiveOverflowVisible, setArchiveOverflowVisible] = useState(false)
 
   useEffect(() => {
     if (!archiveOpen) setArchiveOverflowVisible(false)
   }, [archiveOpen])
 
-  // Plays the full staggered entrance once per browser tab session;
-  // returning to Home later in the same tab renders instantly.
+  // Full entrance once per tab session.
   const playEntrance = useOncePerSession('znu_home_entrance_played')
 
-  // Home announcement banner
   useEffect(() => {
     supabase.from('site_settings').select('value').eq('key', 'home_announcement').maybeSingle()
       .then(({ data }) => { if (data?.value) setAnnouncement(data.value) })
   }, [])
 
-  // Streak + weekly accuracy summary — one exam_history fetch serves
-  // both (streak needs recent history; weekly summary filters it client-side).
+  // One exam_history fetch serves both the streak and the weekly summary.
   useEffect(() => {
     let ignore = false
     async function loadStreakAndWeeklySummary() {
@@ -166,9 +153,9 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
 
       let topSubjectName: string | null = null
       if (topSubjectId) {
-        const { data: subData } = await supabase.from('subjects').select('name').eq('id', topSubjectId).maybeSingle()
+        const { subject } = await fetchSubjectById(topSubjectId)
         if (ignore) return
-        topSubjectName = subData?.name || null
+        topSubjectName = subject?.name || null
       }
 
       if (ignore) return
@@ -178,22 +165,16 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
     return () => { ignore = true }
   }, [user])
 
-  // Resume-exam card
   useEffect(() => {
     let ignore = false
-    loadSavedActiveExam(user).then(saved => { if (!ignore) setPausedExam(saved) })
+    hasSavedActiveExam(user).then(has => { if (!ignore) setPausedExam(has) })
     return () => { ignore = true }
   }, [user])
-
-  // Exam reminders are handled entirely by the server-side cron
-  // (api/push/exam-reminders.js) — no client-side check here.
 
   const activeModules = modules.filter(m => m.status === 'active')
   const completedModules = modules.filter(m => m.status === 'completed')
 
-  // Section eyebrow labels rendered directly on PulseBackground — the
-  // color zone (top/bottom) depends on where the section sits on the
-  // page, since the gradient itself doesn't change with the theme toggle.
+  // Eyebrow labels sit directly on the fixed gradient, so color depends on page zone, not theme.
   const sectionTitle = (
     text: string,
     delaySeconds: number,
@@ -235,20 +216,11 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
         pointerEvents: 'none',
       }}>
         <div className="pulse-wide" style={{
-          // index.html sets viewport-fit=cover so PulseBackground can
-          // bleed under the notch/status bar — this fixed header would
-          // otherwise bleed under it too, so top padding grows by
-          // env(safe-area-inset-top) to keep the brand/nav row clear of
-          // it. Falls back to 0px where there's no safe area, so this
-          // is pixel-identical to before there. Mirrors the same
-          // change in PulseOverlayHeader.jsx (the non-Home version of
-          // this same header).
           paddingTop: 'calc(16px + env(safe-area-inset-top, 0px))',
           paddingBottom: 16,
           pointerEvents: 'auto'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            {/* PulseBrand owns its own click-to-home navigation */}
             <PulseBrand
               dark={dark}
               instant={!playEntrance}
@@ -293,7 +265,6 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
           }
           @media (max-width: 1000px) {
             .pulse-dash-grid { grid-template-columns: 1fr; }
-            /* Mobile stacking order: hero, then report column, then modules */
             .pulse-hero-panel { order: 1; }
             .pulse-dash-report { order: 2; }
             .pulse-dash-modules { order: 3; }
@@ -312,12 +283,6 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
           .pulse-hero-panel {
             min-height: clamp(150px, 36vw, 340px);
           }
-          /* Nudges the ECG art down slightly to balance it within its
-             own column on the 3-column desktop layout — a transform,
-             so it doesn't affect layout height. Below 1000px the grid
-             stacks to one column and the hero panel sits directly
-             above the Weekly Report card, so this offset would bleed
-             into it; disabled there. */
           .pulse-hero-inner {
             width: 100%;
             transform: translateY(8%);
@@ -336,10 +301,6 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
           }
         `}</style>
 
-        {/* Matches the header's real rendered height (76px), plus the
-            env(safe-area-inset-top) padding added to the header above
-            now that index.html sets viewport-fit=cover. Falls back to
-            0px where there's no safe area. */}
         <div style={{ height: 'calc(76px + env(safe-area-inset-top, 0px))' }} />
 
         <div className="pulse-fold">
@@ -536,7 +497,6 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
           </motion.div>
         </div>
 
-        {/* Completed Modules — collapsible, muted card treatment */}
         {completedModules.length > 0 && (
           <div className="pulse-wide" style={{ paddingBottom: 40 }}>
             <div style={{ maxWidth: 640, margin: '0 auto' }}>

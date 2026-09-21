@@ -19,10 +19,7 @@ import { LeaderboardIcon, ClockIcon } from '../components/ui/tool-icons'
 import { Lock, User, Star, ClipboardList, Pencil, Award } from 'lucide-react'
 
 const MIN_PASSWORD_LENGTH = 8
-
-function initialOf(name?: string | null) {
-  return name && name.trim() ? name.trim().charAt(0).toUpperCase() : '?'
-}
+const MAX_NAME_LENGTH = 60
 
 interface Profile {
   id: string
@@ -91,7 +88,7 @@ function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
 
         <label style={{ ...pulseType.small, color: pt.textMuted, display: 'block', marginBottom: 6 }}>Full Name</label>
         <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-          <input value={name} onChange={e => setName(e.target.value)} style={{ ...inStyle, flex: 1, marginBottom: 0 }} />
+          <input value={name} maxLength={MAX_NAME_LENGTH} onChange={e => setName(e.target.value)} style={{ ...inStyle, flex: 1, marginBottom: 0 }} />
           <button onClick={saveName} disabled={saving} style={{
             background: pt.cobalt, color: '#fff', border: 'none',
             padding: '0 20px', borderRadius: 999, cursor: saving ? 'not-allowed' : 'pointer',
@@ -148,12 +145,12 @@ export default function Profile({ dark }: { dark: boolean }) {
     setLoadError(false)
     const [profileRes, lbRes] = await Promise.all([
       user
-        ? supabase.from('profiles').select('*').eq('id', user.id).single()
+        ? supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
         : Promise.resolve({ data: null, error: null }),
       supabase.from('profiles').select('name, points').order('points', { ascending: false }).limit(10),
     ])
     if (isIgnored()) return
-    if (profileRes.data) setProfile(profileRes.data as Profile)
+    setProfile((profileRes.data as Profile) || null)
     if (lbRes.data) setLeaderboard(lbRes.data as Profile[])
     if (profileRes.error || lbRes.error) setLoadError(true)
     setLoading(false)
@@ -293,7 +290,14 @@ export default function Profile({ dark }: { dark: boolean }) {
                   Sign Out
                 </button>
               </div>
-            ) : null}
+            ) : (
+              <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
+                <p style={{ color: pt.sub, marginBottom: 20, fontSize: 14 }}>We couldn't load your profile.</p>
+                <button onClick={() => fetchData()} style={{ ...glassPrimaryBtn(pt, dark, false), width: 'auto', padding: '12px 28px', margin: '0 auto' }}>
+                  Try again
+                </button>
+              </LiquidGlassCard>
+            )}
           </>
         )}
 

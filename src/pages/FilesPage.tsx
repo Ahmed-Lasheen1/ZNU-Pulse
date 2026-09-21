@@ -15,6 +15,7 @@ import EmptyState from '../components/pulse/EmptyState'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
 import { useBodyScrollLock } from '../lib/useBodyScrollLock'
 import { fetchSubjectsForModule } from '../lib/subjects'
+import { fetchAllRows } from '../lib/fetchAllRows'
 import { getDriveOrRawUrl, getVideoEmbedUrl, isSafeExternalUrl } from '../lib/embedUrl'
 import { BookIcon, QuestionMarkIcon, VideoIcon, GraduationCapIcon, DocumentIcon, AudioIcon, FolderIcon, PlayIcon } from '../components/ui/tool-icons'
 
@@ -124,10 +125,9 @@ export default function FilesPage({ dark }: { dark: boolean }) {
 
   const activeModules = modules.filter(m => m.status === 'active')
 
-  // Tracks the moduleParam value already applied, so a later
-  // reference change to `modules` (context re-render) can't silently
-  // revert a tab the user has since switched away from manually.
+  // Remember what's been applied so later re-renders can't revert a manual tab or reopen a closed viewer.
   const appliedModuleParamRef = useRef<string | null>(null)
+  const openedFileRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (moduleParam) {
@@ -146,7 +146,9 @@ export default function FilesPage({ dark }: { dark: boolean }) {
     let ignore = false
     async function fetchFiles() {
       setLoading(true)
-      const { data, error } = await supabase.from('files').select('*').eq('module_id', activeModule).order('created_at', { ascending: false })
+      setLoadError(false)
+      const { data, error } = await fetchAllRows(() => supabase
+        .from('files').select('*').eq('module_id', activeModule).order('created_at', { ascending: false }).order('id'))
       if (ignore) return
       if (data) setFiles(data)
       if (error) setLoadError(true)
@@ -179,9 +181,10 @@ export default function FilesPage({ dark }: { dark: boolean }) {
   }, [activeModule])
 
   useEffect(() => {
-    if (!fileParam || viewer) return
+    if (!fileParam || viewer || openedFileRef.current === fileParam) return
     const match = files.find(f => f.id === fileParam)
     if (match) {
+      openedFileRef.current = fileParam
       setViewer(match)
       setActiveType(match.type)
     }

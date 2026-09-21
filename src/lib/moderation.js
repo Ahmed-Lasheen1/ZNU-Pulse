@@ -1,33 +1,38 @@
-// Simple filter for offensive/inappropriate words — easy to add to or
-// remove from right here, no need to touch any other page.
-// Note: no filter like this catches 100% of cases — this just blocks the
-// obvious, common ones.
-
-const BAD_WORDS = [
-  // English
-  'fuck', 'shit', 'bitch', 'asshole', 'dick', 'pussy', 'cunt',
+// Long, unambiguous terms match anywhere; short ones only as whole words
+// so real names (خولة, زبيدة, أليكس, Nikos, Dickson) aren't blocked.
+// Keep in sync with public.is_inappropriate_text in the database.
+const SUBSTRING_WORDS = [
+  'fuck', 'shit', 'bitch', 'asshole', 'pussy', 'cunt',
   'nigger', 'nigga', 'whore', 'slut', 'bastard',
-  // Arabic (written in Arabic script and common Latin transliterations)
-  'كس', 'طيز', 'زبي', 'شرموط', 'شرموطة', 'عاهر', 'عاهرة', 'قحبه', 'قحبة',
-  'منيك', 'خول', 'كسمك', 'ابن الكلب', 'يلعن',
-  'zebi', '5awal', 'kosomak', 'sharmota', '2ahba',
+  'طيز', 'شرموط', 'شرموطة', 'قحبه', 'قحبة', 'كسمك', 'ابن الكلب',
+  'kosomak', 'sharmota', '2ahba',
 ]
 
-function normalize(text) {
-  return (text || '')
+const WHOLE_WORDS = [
+  'dick', 'kos', 'zebi', '5awal',
+  'كس', 'زبي', 'عاهر', 'عاهرة', 'منيك', 'خول', 'يلعن',
+]
+
+function leet(text) {
+  return text
     .toLowerCase()
-    // replace common leetspeak digits with letters (0->o, 1->i, 3->e, 4->a, 5->s, 7->t)
     .replace(/0/g, 'o').replace(/1/g, 'i').replace(/3/g, 'e')
     .replace(/4/g, 'a').replace(/5/g, 's').replace(/7/g, 't')
     .replace(/@/g, 'a')
-    // collapse any letter repeated more than twice (e.g. "fuuuuck")
     .replace(/(.)\1{2,}/g, '$1$1')
-    // strip whitespace/punctuation so spacing or dots inside a word can't dodge the filter
-    .replace(/[\s._\-*]/g, '')
 }
+
+const squash = (text) => leet(text).replace(/[\s._\-*]/g, '')
+
+const BLOCKED_SUBSTRINGS = SUBSTRING_WORDS.map(squash)
+const BLOCKED_WORDS = new Set(WHOLE_WORDS.map(leet))
 
 export function containsProfanity(text) {
   if (!text || !text.trim()) return false
-  const normalized = normalize(text)
-  return BAD_WORDS.some(word => normalized.includes(normalize(word)))
+  const squashed = squash(text)
+  if (BLOCKED_SUBSTRINGS.some(word => squashed.includes(word))) return true
+  return text
+    .toLowerCase()
+    .split(/[\s._*,;:!?()+/-]+/)
+    .some(token => token && BLOCKED_WORDS.has(leet(token)))
 }

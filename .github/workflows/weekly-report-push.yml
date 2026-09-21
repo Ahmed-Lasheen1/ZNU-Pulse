@@ -2,7 +2,7 @@ name: Weekly Report Push
 
 on:
   schedule:
-    - cron: '0 18 * * 4'   # every Thursday at 18:00 UTC
+    - cron: '0 18 * * 4'   # Thursdays 18:00 UTC
   workflow_dispatch:
 
 jobs:
@@ -11,7 +11,7 @@ jobs:
     steps:
       - name: Trigger weekly report
         run: |
-          curl -s -X POST \
+          curl -sS -f --retry 2 --retry-delay 10 -X POST \
             -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.SITE_URL }}/api/push/weekly-report"
             

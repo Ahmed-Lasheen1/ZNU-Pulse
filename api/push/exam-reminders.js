@@ -1,18 +1,19 @@
 // api/push/exam-reminders.js
-import { getAdminClient, sendToSubscriptions, requireCronSecret } from '../_lib/webpush'
+import { getAdminClient, sendToSubscriptions, requireCronSecret, fetchAllRows } from '../_lib/webpush'
 
-// Daily cron (.github/workflows/exam-reminders-push.yml). Not user-facing.
+// Daily cron (.github/workflows/exam-reminders-push.yml).
 export default async function handler(req, res) {
   if (!requireCronSecret(req, res)) return
 
   const supabase = getAdminClient('exam-reminders')
   if (!supabase) return res.status(500).json({ error: 'Server misconfiguration (missing SUPABASE_URL)' })
 
-  const { data: schedules } = await supabase
+  const { data: schedules, error: schedulesError } = await supabase
     .from('schedules')
     .select('title, dates, module_id, modules(name)')
     .eq('type', 'exam')
     .not('dates', 'is', null)
+  if (schedulesError) return res.status(500).json({ error: schedulesError.message })
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -26,7 +27,11 @@ export default async function handler(req, res) {
   if (upcoming.length === 0) return res.status(200).json({ sent: 0, reason: 'no upcoming exams' })
 
   const body = upcoming.map((s) => `${s.modules?.name || ''} — ${s.title}`.trim()).join(', ')
-  const { data: subs } = await supabase.from('push_subscriptions').select('*')
+  const { data: subs, error: subsError } = await fetchAllRows(() =>
+    supabase.from('push_subscriptions').select('*').order('id')
+  )
+  if (subsError) return res.status(500).json({ error: subsError.message })
+
   const { sent } = await sendToSubscriptions(supabase, subs, { title: '📝 Upcoming Exam', body, url: '/schedule' })
 
   return res.status(200).json({ sent, upcomingCount: upcoming.length })

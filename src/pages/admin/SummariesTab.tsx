@@ -16,7 +16,7 @@ import { fetchModuleStages } from '../../lib/moduleStages'
 import { useAdminMessage } from './useAdminMessage'
 import { useAdminEntityCrud } from './useAdminEntityCrud'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon, LinkIcon, UploadIcon } from '../../components/ui/tool-icons'
-import { publishSummary } from '../../lib/publishSummary'
+import { publishSummary, MAX_UPLOAD_BYTES } from '../../lib/publishSummary'
 import type { AdminModule, AdminSubject, AdminLesson } from './adminTypes'
 
 const EXAM_STAGES = STAGE_META.map(s => ({ value: s.value, label: s.title }))
@@ -142,7 +142,7 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
   const isBusy = crud.saving || publishing
   const totalUploadBytes = (htmlFile?.size || 0) + imageFiles.reduce((a, f) => a + f.size, 0)
   const totalUploadMb = (totalUploadBytes / (1024 * 1024)).toFixed(1)
-  const overSizeLimit = totalUploadBytes > 4 * 1024 * 1024
+  const overSizeLimit = totalUploadBytes > MAX_UPLOAD_BYTES
   const publishBlocked = isBusy || overSizeLimit
 
   const form = (
@@ -234,7 +234,7 @@ export default function SummariesTab({ dark, modules, subjects, lessons }: Summa
           )}
           {(htmlFile || imageFiles.length > 0) && (
             <div style={{ color: overSizeLimit ? pt.danger : pt.textMuted, fontSize: 11, marginBottom: 12 }}>
-              Total: {totalUploadMb} MB{overSizeLimit ? ' — too large to publish; compress images and keep the total under ~4 MB' : ''}
+              Total: {totalUploadMb} MB{overSizeLimit ? ' — too large to publish; compress images and keep the total under ~3 MB' : ''}
             </div>
           )}
           <button onClick={publishSummaryFromFile} disabled={publishBlocked} style={{ ...btnStyle(pt, dark), width: '100%', opacity: publishBlocked ? 0.7 : 1, cursor: publishBlocked ? 'not-allowed' : 'pointer' }}>

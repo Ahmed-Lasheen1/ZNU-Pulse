@@ -16,6 +16,7 @@ import { fetchModuleStages, stageMetaFrom } from '../lib/moduleStages'
 import { fetchSubjectsForModule } from '../lib/subjects'
 import { fetchDriveUrl } from '../lib/siteSettings'
 import { fetchLessonStageMap, inStage } from '../lib/lessonStages'
+import { fetchAllRows } from '../lib/fetchAllRows'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
 import { getPreviewUrl } from '../lib/embedUrl'
 import { ExamIcon, NotesIcon } from '../lib/medicalIcons'
@@ -25,6 +26,7 @@ interface PageModule { id: string; name: string; icon?: string | null; color: st
 interface PageSubject { id: string; module_id: string; name: string; icon?: string | null; color?: string | null }
 interface ExamStage { value: string; title: string; emoji?: string; Icon?: (p: { color: string; size?: number }) => JSX.Element; color: string }
 interface Summary { id: string; title: string; url: string; exam_stage?: string | null; lesson_id?: string | null }
+interface ContentFacet { kind: 'file' | 'question' | 'summary'; item_type: string | null; exam_stage: string | null; lesson_id: string | null }
 
 export default function StagePage({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
@@ -62,28 +64,26 @@ export default function StagePage({ dark }: { dark: boolean }) {
     let ignore = false
     setSummariesLoaded(false)
 
-    // Everything in the module is fetched once and narrowed to this
-    // stage in the browser: an item belongs here through its own stage
-    // tag OR its lesson's stages, and is counted once either way.
+    // An item belongs to this stage through its own tag or its lesson's stages, counted once either way.
     Promise.all([
-      supabase.from('files').select('type, exam_stage, lesson_id').eq('module_id', moduleId),
-      supabase.from('summaries').select('*').eq('module_id', moduleId).order('created_at'),
-      supabase.from('questions_public').select('id, exam_stage, lesson_id').eq('module_id', moduleId),
+      supabase.rpc('get_module_content_facets', { p_module_id: moduleId }),
+      fetchAllRows(() => supabase.from('summaries').select('*').eq('module_id', moduleId).order('created_at').order('id')),
       fetchLessonStageMap(),
-    ]).then(([filesRes, summariesRes, questionsRes, stageMapRes]) => {
+    ]).then(([facetsRes, summariesRes, stageMapRes]) => {
       if (ignore) return
       const map = stageMapRes.map
       const here = (row: any) => inStage(row, stage!, map)
 
-      if (filesRes.data) setPresentFileTypes(new Set(filesRes.data.filter(here).map((f: any) => f.type)))
-      if (filesRes.error) setLoadError(true)
+      if (facetsRes.data) {
+        const rows = facetsRes.data as ContentFacet[]
+        setPresentFileTypes(new Set(rows.filter(r => r.kind === 'file' && here(r)).map(r => r.item_type as string)))
+        setHasStageQuestions(rows.some(r => r.kind === 'question' && here(r)))
+      }
+      if (facetsRes.error) setLoadError(true)
 
       if (summariesRes.data) setSummaries(summariesRes.data.filter(here))
       if (summariesRes.error) setLoadError(true)
       setSummariesLoaded(true)
-
-      if (questionsRes.data) setHasStageQuestions(questionsRes.data.filter(here).length > 0)
-      if (questionsRes.error) setLoadError(true)
     })
     fetchSubjectsForModule(moduleId!).then(({ subjects, error }) => {
       if (ignore) return

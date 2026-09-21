@@ -8,6 +8,8 @@ import { subscribeOnlinePresence } from './lib/onlinePresence'
 import { migrateGuestDataIfNeeded } from './lib/migrateGuestData'
 import { unsubscribeFromPush } from './lib/pushNotifications'
 import { useOncePerSession } from './lib/useOncePerSession'
+import { storageGet, storageSet } from './lib/safeStorage'
+import { containsProfanity } from './lib/moderation'
 import ErrorBoundary from './components/ErrorBoundary'
 import ToastProvider from './components/ToastProvider'
 import PulseOverlayHeader from './components/pulse/PulseOverlayHeader'
@@ -38,6 +40,7 @@ export { default as NavMenu } from './components/NavMenu'
 
 const ensureProfileInFlight = new Set()
 
+// Fallback when the DB trigger didn't create a profile row.
 async function ensureProfile(user) {
   if (ensureProfileInFlight.has(user.id)) return
   ensureProfileInFlight.add(user.id)
@@ -45,8 +48,12 @@ async function ensureProfile(user) {
     const { data: existing } = await supabase.from('profiles').select('id').eq('id', user.id).maybeSingle()
     if (existing) return
     const meta = user.user_metadata || {}
-    const fallbackName = meta.full_name || meta.name || (user.email ? user.email.split('@')[0] : 'Student')
-    const { error } = await supabase.from('profiles').insert([{ id: user.id, name: fallbackName, points: 0 }])
+    const raw = (meta.full_name || meta.name || '').trim().slice(0, 60)
+    const name = raw && !containsProfanity(raw) ? raw : 'Student'
+    let { error } = await supabase.from('profiles').insert([{ id: user.id, name, points: 0 }])
+    if (error && name !== 'Student') {
+      ({ error } = await supabase.from('profiles').insert([{ id: user.id, name: 'Student', points: 0 }]))
+    }
     if (error) console.warn('[ensureProfile] Could not create profile row:', error.message)
   } catch (e) {
     console.warn('[ensureProfile] Unexpected error:', e)
@@ -78,15 +85,12 @@ function SiteHeader({ dark, toggleTheme }) {
   return (
     <>
       <PulseOverlayHeader dark={dark} toggleTheme={toggleTheme} />
-      {/* Matches PulseOverlayHeader's rendered height (76px + safe-area-inset-top) */}
       <div style={{ height: 'calc(76px + env(safe-area-inset-top, 0px))' }} />
     </>
   )
 }
 
-// Renders the shared Footer, only animating its entrance on Home and
-// only once per tab session (own useOncePerSession key so it never
-// races Home's own entrance flag).
+// Footer entrance plays only on Home, once per tab session.
 function SiteFooter({ dark }) {
   const location = useLocation()
   const isHome = location.pathname === '/'
@@ -125,15 +129,10 @@ function RoutedContent({ dark, toggleTheme }) {
 }
 
 export default function App() {
-  const [dark, setDark] = useState(() => {
-    const saved = localStorage.getItem('znu_theme')
-    if (saved === 'light') return false
-    if (saved === 'dark') return true
-    return true
-  })
+  const [dark, setDark] = useState(() => storageGet('znu_theme') !== 'light')
 
   useEffect(() => {
-    localStorage.setItem('znu_theme', dark ? 'dark' : 'light')
+    storageSet('znu_theme', dark ? 'dark' : 'light')
   }, [dark])
 
   const [user, setUser] = useState(null)
@@ -148,9 +147,8 @@ export default function App() {
   async function loadModules() {
     const { modules: sorted, error } = await fetchModulesSorted()
     setModules(sorted)
-    if (error) setModulesError(true)
+    setModulesError(!!error)
     setModulesLoaded(true)
-    // Returned so callers (e.g. Admin) can reuse this fetch instead of re-querying.
     return { modules: sorted, error }
   }
 
@@ -162,7 +160,7 @@ export default function App() {
   }, [])
 
   async function fetchProfile(userId) {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
     if (data) setProfile(data)
   }
 
@@ -190,11 +188,11 @@ export default function App() {
     }
     initSession()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // Not async: awaiting Supabase calls inside this callback can deadlock the auth lock.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setUser(session.user)
-        await handleSignedIn(session.user)
-        cleanUpAuthHash()
+        setTimeout(() => { handleSignedIn(session.user).finally(cleanUpAuthHash) }, 0)
       } else {
         lastHandledUserIdRef.current = null
         setUser(null)
@@ -205,10 +203,7 @@ export default function App() {
   }, [])
 
   async function signOut() {
-    // Unsubscribe while still authenticated, so the DB row (scoped to
-    // this user's auth.uid()) actually gets released — otherwise a
-    // later sign-in with a different account on this device inherits
-    // a subscription still owned by this one.
+    // Unsubscribe first, while still authenticated, so the DB row is released.
     await unsubscribeFromPush()
     await supabase.auth.signOut()
     setUser(null)
@@ -223,26 +218,22 @@ export default function App() {
         <ModulesContextProvider modules={modules} modulesLoaded={modulesLoaded} modulesError={modulesError} refreshModules={loadModules}>
         <ToastProvider>
         <Router>
-          {/* Main Layout Container */}
           <div style={{
-            position: 'relative', /* Positions content context cleanly over background */
-            minHeight: '100dvh', 
+            position: 'relative',
+            minHeight: '100dvh',
             color: getPulseTheme(dark).text,
-            display: 'flex', 
+            display: 'flex',
             flexDirection: 'column',
             fontFamily: "'Segoe UI', sans-serif"
           }}>
-            {/* Global Pulse Background */}
             <PulseBackground />
 
-            {/* Page Essentials & Content */}
             <ScrollToTop />
             <SiteHeader dark={dark} toggleTheme={toggleTheme} />
             <main style={{ flex: 1, position: 'relative', zIndex: 1 }}>
               <RoutedContent dark={dark} toggleTheme={toggleTheme} />
             </main>
-            
-            {/* Footer Layer */}
+
             <SiteFooter dark={dark} />
           </div>
         </Router>

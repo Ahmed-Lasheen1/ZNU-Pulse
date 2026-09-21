@@ -1,5 +1,5 @@
 // src/pages/Schedule.tsx
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
 import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
@@ -64,17 +64,20 @@ export default function Schedule({ dark }: { dark: boolean }) {
   const [viewer, setViewer] = useState<ScheduleRow | null>(null)
   const [loadError, setLoadError] = useState(false)
 
+  // Remember what's been applied so later re-renders can't revert a manual tab or reopen a closed viewer.
+  const appliedModuleParamRef = useRef<string | null>(null)
+  const openedItemRef = useRef<string | null>(null)
+
   useHistoryOverlay(!!viewer, () => setViewer(null))
 
   const activeModules = modules.filter(m => m.status === 'active')
 
-  // Resolve the active module: a `?module=` param always wins and is
-  // re-applied whenever it changes (e.g. a Search result linking to a
-  // different module while already on this page); otherwise falls back
-  // to the first active module once modules have loaded.
   useEffect(() => {
     if (moduleParam && modules.some(m => m.id === moduleParam)) {
-      if (activeModule !== moduleParam) setActiveModule(moduleParam)
+      if (appliedModuleParamRef.current !== moduleParam) {
+        appliedModuleParamRef.current = moduleParam
+        setActiveModule(moduleParam)
+      }
       return
     }
     if (!activeModule && modulesLoaded && activeModules.length > 0) {
@@ -83,13 +86,13 @@ export default function Schedule({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules, moduleParam])
 
-  // Scoped to the active module — refetches on module switch instead
-  // of loading every schedule row up front.
+  // Refetches on module switch instead of loading every schedule up front.
   useEffect(() => {
     if (!activeModule) return
     let ignore = false
     async function fetchData() {
       setLoading(true)
+      setLoadError(false)
       const { data, error } = await supabase.from('schedules').select('*').eq('module_id', activeModule).order('created_at')
       if (ignore) return
       if (data) setSchedules(data as ScheduleRow[])
@@ -101,9 +104,12 @@ export default function Schedule({ dark }: { dark: boolean }) {
   }, [activeModule])
 
   useEffect(() => {
-    if (!itemParam || viewer || schedules.length === 0) return
+    if (!itemParam || viewer || schedules.length === 0 || openedItemRef.current === itemParam) return
     const match = schedules.find(s => s.id === itemParam)
-    if (match) setViewer(match)
+    if (match) {
+      openedItemRef.current = itemParam
+      setViewer(match)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemParam, schedules])
 

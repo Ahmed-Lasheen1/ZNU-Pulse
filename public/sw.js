@@ -1,9 +1,8 @@
-// ZNU Future Doctors — minimal service worker.
-// Goal: make the app installable and keep the shell available offline,
-// without needing a build-time list of hashed asset filenames.
+// ZNU Future Doctors — minimal service worker: installable app + offline shell.
 
-const CACHE_NAME = 'znu-shell-v6'
+const CACHE_NAME = 'znu-shell-v7'
 const SHELL_URLS = ['/', '/favicon.svg', '/icon-192.png', '/icon-512.png']
+const MAX_CACHE_ENTRIES = 150
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
@@ -20,14 +19,22 @@ self.addEventListener('activate', (event) => {
   )
 })
 
+// Old hashed assets from previous deploys would otherwise pile up forever.
+async function trimCache(cache) {
+  const keys = await cache.keys()
+  if (keys.length <= MAX_CACHE_ENTRIES) return
+  const removable = keys.filter((req) => !SHELL_URLS.includes(new URL(req.url).pathname))
+  await Promise.all(removable.slice(0, keys.length - MAX_CACHE_ENTRIES).map((req) => cache.delete(req)))
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event
   if (request.method !== 'GET') return
 
   const url = new URL(request.url)
-  if (url.origin !== self.location.origin) return // let Supabase/API calls go straight to network
+  if (url.origin !== self.location.origin) return
 
-  // Page navigations: try the network first, fall back to the cached shell when offline.
+  // Navigations: network first, cached shell when offline.
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request).catch(() => caches.match('/'))
@@ -35,14 +42,14 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Static assets: cache-first, then update the cache in the background.
+  // Static assets: cache first, refreshed in the background.
   event.respondWith(
     caches.match(request).then((cached) => {
       const networkFetch = fetch(request)
         .then((response) => {
           if (response && response.ok) {
             const clone = response.clone()
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone).then(() => trimCache(cache)))
           }
           return response
         })
@@ -52,10 +59,7 @@ self.addEventListener('fetch', (event) => {
   )
 })
 
-// ── Web Push ─────────────────────────────────────────────────────
-// Shows the notification even if no tab is open — this is what makes
-// exam reminders, weekly reports, and admin broadcasts arrive while
-// the site itself is fully closed.
+// Shows the notification even when no tab is open.
 self.addEventListener('push', (event) => {
   let data = {}
   try {
@@ -75,8 +79,7 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(title, options))
 })
 
-// Tapping the notification focuses an already-open tab if there is
-// one, otherwise opens a new one at the relevant page.
+// Focuses an open tab if there is one, otherwise opens the page.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const url = new URL(event.notification.data?.url || '/', self.location.origin).href

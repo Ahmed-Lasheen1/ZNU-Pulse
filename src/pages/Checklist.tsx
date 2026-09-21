@@ -14,6 +14,7 @@ import TabRow from '../components/TabRow'
 import NotifyPermissionButton from '../components/NotifyPermissionButton'
 import { useToast } from '../components/ToastProvider'
 import { showLocalNotification } from '../lib/localNotification'
+import { storageGet, storageSet } from '../lib/safeStorage'
 import { ChecklistIcon, LightbulbIcon, CalendarDotIcon, WarningIcon, ClockIcon, CelebrationIcon, TrashIcon, BookIcon, CheckCircleIcon } from '../components/ui/tool-icons'
 import type { ChecklistTask } from '../types/checklist'
 
@@ -35,7 +36,7 @@ function pruneOrphanedGuestChecklists(validModuleIds: Set<string>) {
     }
     keysToRemove.forEach(key => localStorage.removeItem(key))
   } catch {
-    // localStorage can throw in private-browsing/storage-full edge cases.
+    // localStorage can throw in private-browsing/storage-full cases.
   }
 }
 
@@ -100,6 +101,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
 
   const [activeModule, setActiveModule] = useState<string | null>(null)
   const [tasks, setTasks] = useState<ChecklistTask[]>([])
+  const [tasksLoading, setTasksLoading] = useState(false)
   const [tasksError, setTasksError] = useState(false)
   const [newTask, setNewTask] = useState('')
   const [newDeadline, setNewDeadline] = useState('')
@@ -115,13 +117,8 @@ export default function Checklist({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules])
 
-  // BUG FIX: App.jsx's loadModules() sets modulesLoaded=true even when
-  // the fetch fails (modules ends up []). Without the modulesError
-  // guard here, a transient network error on the modules fetch would
-  // make validIds an empty set and this would delete EVERY guest's
-  // checklist_* localStorage key, mistaking "fetch failed" for
-  // "no modules exist". Only prune once we know the fetch actually
-  // succeeded.
+  // App.jsx sets modulesLoaded even when the fetch fails (modules = []), so
+  // pruning without the modulesError guard would wipe every guest checklist.
   useEffect(() => {
     if (!modulesLoaded || modulesError) return
     const validIds = new Set((modules as any[]).map(m => m.id))
@@ -139,28 +136,26 @@ export default function Checklist({ dark }: { dark: boolean }) {
 
   useEffect(() => { setShowCompleted(false) }, [activeModule])
 
-  // (Removed: a "✅ Signed in — checklist synced to your account" toast
-  // that fired every time a signed-in student opened this page, not
-  // just right after signing in. It was noise on every visit.)
-
   async function fetchTasks(isIgnored: () => boolean = () => false) {
     setTasksError(false)
+    setTasksLoading(true)
     if (user) {
       const { data, error } = await supabase.from('user_checklist')
         .select('*').eq('user_id', user.id).eq('module_id', activeModule).order('created_at')
       if (isIgnored()) return
-      if (data) setTasks(data as ChecklistTask[])
+      setTasks((data || []) as ChecklistTask[])
       if (error) setTasksError(true)
     } else {
       let saved: ChecklistTask[] = []
       try {
-        saved = JSON.parse(localStorage.getItem(`checklist_${activeModule}`) || '[]')
+        saved = JSON.parse(storageGet(`checklist_${activeModule}`) || '[]')
       } catch {
         saved = []
       }
       if (isIgnored()) return
       setTasks(saved)
     }
+    setTasksLoading(false)
   }
 
   async function addTask() {
@@ -185,7 +180,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
       }
       setTasks(prev => {
         const updated = [...prev, task]
-        localStorage.setItem(`checklist_${activeModule}`, JSON.stringify(updated))
+        storageSet(`checklist_${activeModule}`, JSON.stringify(updated))
         return updated
       })
       setAddingTask(false)
@@ -202,7 +197,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
     }
     const updated = tasks.map(t => t.id === task.id ? { ...t, done: !t.done } : t)
     setTasks(updated)
-    if (!user) localStorage.setItem(`checklist_${activeModule}`, JSON.stringify(updated))
+    if (!user) storageSet(`checklist_${activeModule}`, JSON.stringify(updated))
   }
 
   async function deleteTask(task: ChecklistTask) {
@@ -212,31 +207,22 @@ export default function Checklist({ dark }: { dark: boolean }) {
     }
     const updated = tasks.filter(t => t.id !== task.id)
     setTasks(updated)
-    if (!user) localStorage.setItem(`checklist_${activeModule}`, JSON.stringify(updated))
+    if (!user) storageSet(`checklist_${activeModule}`, JSON.stringify(updated))
   }
 
-  // Per-module key: without it, whichever module's tab resolved first
-  // today would use up the single daily local-notification slot and
-  // silently suppress a different module's urgent items for the rest
-  // of the day. The server-side push cron (checklist-reminders.js) is
-  // unaffected either way — this only gates this in-tab popup.
-  //
-  // BUG FIX: this used to call `new Notification(...)` directly, which
-  // throws on Chrome for Android (see lib/localNotification.js) and,
-  // being inside an effect, crashed the whole page into ErrorBoundary.
-  // It now goes through showLocalNotification(), which can't throw.
+  // Per-module key so one module's popup doesn't use up the day's slot for another.
+  // Goes through showLocalNotification(), which can't throw (see localNotification.js).
   useEffect(() => {
     if (!('Notification' in window) || Notification.permission !== 'granted') return
     if (tasks.length === 0) return
     const notifyKey = `znu_checklist_last_notify_${activeModule}`
     const todayStr = new Date().toDateString()
-    if (localStorage.getItem(notifyKey) === todayStr) return
+    if (storageGet(notifyKey) === todayStr) return
 
     const urgent = tasks.filter(t => !t.done && (isOverdue(t.deadline) || isDueSoon(t.deadline)))
     if (urgent.length > 0) {
-      // Marked before the (async) send so a quick re-run of this effect
-      // can't fire the same popup twice.
-      localStorage.setItem(notifyKey, todayStr)
+      // Marked before the async send so a quick re-run can't fire it twice.
+      storageSet(notifyKey, todayStr)
       showLocalNotification('ZNU Future Doctors', {
         body: `You have ${urgent.length} checklist item(s) due soon or overdue.`,
         data: { url: '/checklist' },
@@ -245,11 +231,13 @@ export default function Checklist({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks])
 
-  const activeTasks = useMemo(() => sortByUrgency(tasks.filter(t => !t.done)), [tasks])
-  const completedTasks = useMemo(() => tasks.filter(t => t.done), [tasks])
+  // Nothing from the previous module shows while the new one loads.
+  const shownTasks = tasksLoading ? [] : tasks
+  const activeTasks = useMemo(() => sortByUrgency(shownTasks.filter(t => !t.done)), [shownTasks])
+  const completedTasks = useMemo(() => shownTasks.filter(t => t.done), [shownTasks])
 
   const doneTasks = completedTasks.length
-  const totalTasks = tasks.length
+  const totalTasks = shownTasks.length
   const percent = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0
 
   const inStyle = { ...glassInput(pt, dark), padding: '13px 20px', marginBottom: 0 }
@@ -423,9 +411,9 @@ export default function Checklist({ dark }: { dark: boolean }) {
         </LiquidGlassCard>
       </div>
 
-      {!modulesLoaded && <LoadingText />}
+      {(!modulesLoaded || tasksLoading) && <LoadingText />}
 
-      {modulesLoaded && totalTasks === 0 && (
+      {modulesLoaded && !tasksLoading && totalTasks === 0 && (
         <LiquidGlassCard dark={dark} delay={200} style={{ padding: 40, textAlign: 'center' }}>
           <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             No tasks yet — add topics you need to study! <BookIcon color={pt.sub} size={15} />

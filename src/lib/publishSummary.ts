@@ -1,7 +1,9 @@
 import { supabase } from '../supabase'
 
-// Reads a File as base64 (no data: prefix) — the shape GitHub's
-// Contents API expects for file content.
+// Vercel rejects request bodies over ~4.5 MB and base64 adds ~33%, so raw files must stay near 3 MB.
+export const MAX_UPLOAD_BYTES = 3 * 1024 * 1024
+
+// Base64 without the data: prefix, as GitHub's Contents API expects.
 function readFileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -32,12 +34,8 @@ export interface PublishSummaryResult {
   summary?: unknown
 }
 
-// Uploads the HTML file (+ any images) to /api/admin/publish-summary,
-// which commits them to the dedicated summaries GitHub repo, gets a
-// public jsdelivr URL, and saves that URL into the `summaries` table
-// — the exact same row shape SummariesTab's existing "paste a link"
-// flow already produces, so nothing downstream (SummaryOverlay, the
-// student-facing Summary button) needs to know the difference.
+// Uploads the HTML (+ images) to /api/admin/publish-summary, which commits them
+// to the summaries repo and saves the public URL in the `summaries` table.
 export async function publishSummary(params: PublishSummaryParams): Promise<PublishSummaryResult> {
   const { title, htmlFile, imageFiles, moduleId, moduleName, subjectId, subjectName, lessonId, examStage } = params
 
@@ -65,7 +63,12 @@ export async function publishSummary(params: PublishSummaryParams): Promise<Publ
     }),
   })
 
-  const result = await res.json()
-  if (!res.ok) throw new Error(result.error || 'Failed to publish summary')
-  return result
+  const result = await res.json().catch(() => ({} as { error?: string; url?: string }))
+  if (!res.ok) {
+    throw new Error(
+      result.error ||
+      (res.status === 413 ? 'Files are too large — keep the total under ~3 MB' : `Failed to publish summary (${res.status})`)
+    )
+  }
+  return result as PublishSummaryResult
 }

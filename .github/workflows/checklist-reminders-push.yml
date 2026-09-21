@@ -2,10 +2,7 @@ name: Checklist Deadline Reminders Push
 
 on:
   schedule:
-    # Every hour, on the hour. Deadlines only have day-level precision
-    # (no time picker), so hourly is plenty granular for a 6-hour
-    # reminder window — no need to run more often than that.
-    - cron: '0 * * * *'
+    - cron: '0 * * * *'   # hourly; deadlines are date-only
   workflow_dispatch:
 
 jobs:
@@ -14,7 +11,7 @@ jobs:
     steps:
       - name: Trigger checklist reminder check
         run: |
-          curl -s -X POST \
+          curl -sS -f --retry 2 --retry-delay 10 -X POST \
             -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.SITE_URL }}/api/push/checklist-reminders"
             

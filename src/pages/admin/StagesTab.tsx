@@ -75,36 +75,24 @@ export default function StagesTab({ dark, modules }: StagesTabProps) {
     setModuleStagesList(prev => [...prev, { _key: crypto.randomUUID(), id: null, value, title: 'New Stage', emoji: '', color: '#64748b' }])
   }
 
+  // Replaced in one database transaction, so a failure can't leave the module with no stages.
   async function saveModuleStages() {
     if (!stageModuleId) return
     if (moduleStagesList.length === 0) return showMsg('❌ A module needs at least one exam stage')
     setStagesSaving(true)
 
-    const { data: existingRows } = await supabase
-      .from('module_exam_stages')
-      .select('*')
-      .eq('module_id', stageModuleId)
-
-    await supabase.from('module_exam_stages').delete().eq('module_id', stageModuleId)
     const rows = moduleStagesList.map((s, i) => ({
-      module_id: stageModuleId,
       value: s.value || slugify(s.title),
       title: s.title || 'Stage',
       emoji: s.emoji || '',
       color: s.color || '#64748b',
       position: i
     }))
-    const { error } = await supabase.from('module_exam_stages').insert(rows)
-
-    if (error) {
-      if (existingRows && existingRows.length > 0) {
-        await supabase.from('module_exam_stages').insert(existingRows)
-      }
-      setStagesSaving(false)
-      return showMsg('❌ ' + error.message)
-    }
+    const { error } = await supabase.rpc('admin_replace_module_stages', { p_module_id: stageModuleId, p_rows: rows })
 
     setStagesSaving(false)
+    if (error) return showMsg('❌ ' + error.message)
+
     invalidateModuleStagesCache()
     showMsg('✅ Stages saved for this module!')
     setStagesIsCustom(true)
@@ -119,8 +107,9 @@ export default function StagesTab({ dark, modules }: StagesTabProps) {
   async function resetModuleStages() {
     setConfirmResetOpen(false)
     setStagesSaving(true)
-    await supabase.from('module_exam_stages').delete().eq('module_id', stageModuleId)
+    const { error } = await supabase.from('module_exam_stages').delete().eq('module_id', stageModuleId)
     setStagesSaving(false)
+    if (error) return showMsg('❌ ' + error.message)
     invalidateModuleStagesCache()
     showMsg('✅ Reset to default stages')
     loadModuleStagesForAdmin(stageModuleId)

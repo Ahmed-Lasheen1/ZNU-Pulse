@@ -11,7 +11,7 @@ import type { PulseTheme } from './adminStyles'
 import type { AdminModule } from './adminTypes'
 
 interface DifficultyRow {
-  question_id: string
+  id: string
   question: string
   module_id: string
   incorrect_count: number
@@ -29,9 +29,6 @@ interface StatCardProps {
   loading: boolean
 }
 
-// FIX: this used to ignore the `pt` prop it was already handed and
-// recompute `getPulseTheme(dark)` locally instead — same result,
-// just wasted work on every render. Uses the passed prop now.
 function StatCard({ label, Icon, value, color, pt, dark, loading }: StatCardProps) {
   return (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '18px 20px', textAlign: 'center', flex: '1 1 140px' }}>
@@ -95,13 +92,14 @@ export default function AnalyticsTab({ dark, modules }: AnalyticsTabProps) {
     setStatsLoading(true)
     setStatsError(false)
     try {
+      // RLS only lets a user see their own push row, so the count goes through an admin RPC.
       const [accountsRes, notifRes] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
-        supabase.from('push_subscriptions').select('*', { count: 'exact', head: true }),
+        supabase.rpc('admin_count_push_subscriptions'),
       ])
       if (accountsRes.error || notifRes.error) setStatsError(true)
       setAccountCount(accountsRes?.count ?? 0)
-      setNotifCount(notifRes?.count ?? 0)
+      setNotifCount(Number(notifRes?.data ?? 0))
     } catch (e) {
       console.warn('[AnalyticsTab] Could not load overview stats:', e)
       setStatsError(true)
@@ -152,7 +150,7 @@ export default function AnalyticsTab({ dark, modules }: AnalyticsTabProps) {
         {difficulty.map(row => {
           const mod = modules.find(m => m.id === row.module_id)
           return (
-            <LiquidGlassCard key={row.question_id} dark={dark} delay={0} style={{
+            <LiquidGlassCard key={row.id} dark={dark} delay={0} style={{
               padding: '14px 18px', display: 'flex',
               justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap'
             }}>

@@ -1,18 +1,15 @@
 import { supabase } from '../supabase'
 import {
   getGuestFlags, clearGuestFlags, setGuestFlags,
-  getGuestIncorrect, clearGuestIncorrect, setGuestIncorrect,
   getGuestHistory, clearGuestHistory, setGuestHistory,
 } from './reviewStorage'
 
-// One-time handoff for a student who practiced as a guest and then
-// signs in on the same device. The guest "active exam" (paused quiz)
-// is deliberately NOT migrated — short-lived selection state, not a
-// durable record.
+// One-time handoff when a guest signs in on the same device.
+// The paused guest exam is not migrated.
 async function safeInsert(table, row) {
   try {
     const { error } = await supabase.from(table).insert(row)
-    // Postgres unique_violation (23505) = "already exists" = success.
+    // 23505 = already exists = success.
     if (error && error.code !== '23505') {
       console.warn(`[migrateGuestData] Could not migrate a row into ${table}:`, error.message)
       return false
@@ -24,10 +21,7 @@ async function safeInsert(table, row) {
   }
 }
 
-// Each migrate* function keeps only the rows that actually failed in
-// local storage — a single bad row (e.g. pointing at a deleted
-// question) no longer blocks the rest of that batch from ever being
-// cleared.
+// Only rows that failed stay in local storage.
 async function migrateFlags(userId) {
   const flags = getGuestFlags()
   if (flags.length === 0) return
@@ -39,19 +33,6 @@ async function migrateFlags(userId) {
   const failed = flags.filter((_, i) => !results[i])
   if (failed.length > 0) setGuestFlags(failed)
   else clearGuestFlags()
-}
-
-async function migrateIncorrect(userId) {
-  const incorrect = getGuestIncorrect()
-  if (incorrect.length === 0) return
-  const results = await Promise.all(incorrect.map(q => safeInsert('answered_questions', {
-    user_id: userId,
-    question_id: q.question_id,
-    correct: false,
-  })))
-  const failed = incorrect.filter((_, i) => !results[i])
-  if (failed.length > 0) setGuestIncorrect(failed)
-  else clearGuestIncorrect()
 }
 
 async function migrateHistory(userId) {
@@ -73,19 +54,12 @@ async function migrateHistory(userId) {
   else clearGuestHistory()
 }
 
-// Cheap to call on every sign-in — returns immediately if there's
-// nothing local to migrate.
 export async function migrateGuestDataIfNeeded(userId) {
   if (!userId) return
-  const hasAnything =
-    getGuestFlags().length > 0 ||
-    getGuestIncorrect().length > 0 ||
-    getGuestHistory().length > 0
-  if (!hasAnything) return
+  if (getGuestFlags().length === 0 && getGuestHistory().length === 0) return
 
   await Promise.all([
     migrateFlags(userId),
-    migrateIncorrect(userId),
     migrateHistory(userId),
   ])
 }

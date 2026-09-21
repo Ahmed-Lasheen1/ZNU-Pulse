@@ -1,8 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Same "read from environment, never hardcode" pattern as the other
-// api/push/*.js functions in this project.
 const SUPABASE_URL = process.env.SUPABASE_URL
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 const GITHUB_TOKEN = process.env.SUMMARIES_GITHUB_TOKEN
 const GITHUB_OWNER = process.env.SUMMARIES_GITHUB_OWNER
 const GITHUB_REPO = process.env.SUMMARIES_GITHUB_REPO
@@ -10,7 +9,8 @@ const GITHUB_BRANCH = process.env.SUMMARIES_GITHUB_BRANCH || 'main'
 
 const ALLOWED_EXTENSIONS = ['html', 'htm', 'png', 'jpg', 'jpeg', 'svg', 'gif', 'webp']
 const MAX_FILES = 30
-const UPLOAD_BATCH_SIZE = 5
+const UPLOAD_BATCH_SIZE = 3
+const COMMIT_ATTEMPTS = 4
 
 function slugify(text) {
   return (text || '')
@@ -26,70 +26,52 @@ function extOf(filename) {
   return m ? m[1].toLowerCase() : ''
 }
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+// Parallel commits to one branch can 409/422 — retry with backoff.
 async function githubPutFile(path, base64Content, message) {
   const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${path}`
-  const res = await fetch(url, {
-    method: 'PUT',
-    headers: {
-      Authorization: `Bearer ${GITHUB_TOKEN}`,
-      Accept: 'application/vnd.github+json',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      message,
-      content: base64Content,
-      branch: GITHUB_BRANCH,
-    }),
-  })
-  if (!res.ok) {
+  let lastError
+  for (let attempt = 1; attempt <= COMMIT_ATTEMPTS; attempt++) {
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${GITHUB_TOKEN}`,
+        Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ message, content: base64Content, branch: GITHUB_BRANCH }),
+    })
+    if (res.ok) return res.json()
+
     const text = await res.text().catch(() => '')
-    throw new Error(`GitHub commit failed for ${path}: ${res.status} ${text}`)
+    lastError = new Error(`GitHub commit failed for ${path}: ${res.status} ${text}`)
+    const retryable = res.status === 409 || res.status === 422 || res.status >= 500
+    if (!retryable || attempt === COMMIT_ATTEMPTS) break
+    await sleep(400 * attempt + Math.random() * 300)
   }
-  return res.json()
+  throw lastError
 }
 
-// Runs `fn` over `items` with at most `batchSize` in flight at once —
-// faster than fully sequential for many small images, without hammering
-// GitHub's API with everything at once.
 async function runInBatches(items, batchSize, fn) {
   for (let i = 0; i < items.length; i += batchSize) {
     await Promise.all(items.slice(i, i + batchSize).map(fn))
   }
 }
 
-// NOTE: jsdelivr was the original plan here, but jsdelivr deliberately
-// serves .html files as `text/plain` (not `text/html`) as an anti-
-// phishing/anti-XSS measure — a summary opened via jsdelivr shows raw
-// source code instead of rendering. GitHub Pages serves the correct
-// content-type for every file extension, so the public URL below is
-// built from the repo's Pages URL instead. Requires GitHub Pages to
-// be enabled on the repo (Settings → Pages → Deploy from branch →
-// main → /root) and a `.nojekyll` file committed to the repo root
-// (stops Jekyll processing from mangling folders/files, which isn't
-// needed for a plain static-file repo like this one).
-//
-// GitHub Pages rebuilds asynchronously after a push — usually live
-// within a minute, occasionally longer on the very first deploy after
-// enabling Pages. A summary published moments ago may briefly 404
-// until that rebuild finishes; there's nothing to poll for here since
-// Pages doesn't expose a "build finished" webhook this function could
-// wait on.
+// jsdelivr serves .html as text/plain, so the public URL is the repo's GitHub Pages URL
+// (Pages enabled on the repo, plus a .nojekyll file at its root). Pages rebuilds
+// asynchronously — a just-published summary can 404 for a minute.
 function buildPagesUrl(path) {
   return `https://${GITHUB_OWNER.toLowerCase()}.github.io/${GITHUB_REPO}/${path}`
 }
 
-// Publishes an admin-uploaded HTML summary (+ optional images) to the
-// dedicated GitHub "summaries" repo, then saves the resulting public
-// GitHub Pages URL into the existing `summaries` table — the exact same
-// row shape as a manually-pasted-link summary, so the student-facing
-// SummaryOverlay needs zero changes. Auth is verified server-side
-// (mirrors api/push/broadcast.js): the caller must send a valid
-// signed-in Supabase access token, and that user's profile must have
-// role = 'admin'.
+// Admin-only: verifies the caller's Supabase token and profile role, commits the
+// files to the summaries repo, then saves the URL in the `summaries` table.
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  if (!SUPABASE_URL || !GITHUB_TOKEN || !GITHUB_OWNER || !GITHUB_REPO) {
+  if (!SUPABASE_URL || !SERVICE_ROLE_KEY || !GITHUB_TOKEN || !GITHUB_OWNER || !GITHUB_REPO) {
     console.error('[publish-summary] Missing required environment variables.')
     return res.status(500).json({ error: 'Server misconfiguration — missing environment variables' })
   }
@@ -97,7 +79,7 @@ export default async function handler(req, res) {
   const token = (req.headers.authorization || '').replace('Bearer ', '')
   if (!token) return res.status(401).json({ error: 'Missing auth token' })
 
-  const supabase = createClient(SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
   const { data: userData, error: userError } = await supabase.auth.getUser(token)
   if (userError || !userData?.user) return res.status(401).json({ error: 'Invalid session' })
@@ -124,10 +106,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // Organizes the repo as summaries/<module>/<subject>/<title>-<id>/ so
-  // browsing the GitHub repo directly stays readable as it grows —
-  // the subject level is skipped entirely when no subject was picked,
-  // matching the existing "Subject (optional)" behavior in the form.
+  // Repo layout: summaries/<module>/<subject>/<title>-<id>/ (subject level skipped when none picked).
   const folderSlug = `${slugify(title)}-${Date.now().toString(36)}`
   const modulePart = slugify(module_name || module_id)
   const subjectPart = subject_name ? slugify(subject_name) : null
@@ -164,9 +143,7 @@ export default async function handler(req, res) {
     .single()
 
   if (insertError) {
-    // Files are already live on GitHub even if this insert failed —
-    // return the URL so the admin isn't left with orphaned files and
-    // no way to know they published successfully.
+    // Files are already live — return the URL so they aren't orphaned unnoticed.
     return res.status(500).json({
       error: 'Files were published but could not be saved to the database: ' + insertError.message,
       url: publicUrl,

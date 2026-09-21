@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../supabase'
 import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
@@ -39,6 +39,10 @@ interface QuestionsTabProps {
   lessons: AdminLesson[]
 }
 
+function escapeLikePattern(value: string) {
+  return value.replace(/[%_\\]/g, '\\$&')
+}
+
 export default function QuestionsTab({ dark, modules, subjects, lessons }: QuestionsTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
@@ -68,20 +72,31 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
   const [moduleFilter, setModuleFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const requestIdRef = useRef(0)
 
-  useEffect(() => { fetchQuestions() }, [])
+  // Search runs on the server so questions beyond the newest LIST_LIMIT stay findable.
+  useEffect(() => {
+    const timer = setTimeout(fetchQuestions, search.trim() ? 300 : 0)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search])
   useEffect(() => {
     fetchModuleStages(qModuleId).then(list => setQStageOptions(list.map(s => ({ value: s.value, label: s.title }))))
   }, [qModuleId])
 
   async function fetchQuestions() {
+    const requestId = ++requestIdRef.current
     setQuestionsLoading(true)
     setQuestionsError(false)
-    const { data, error } = await supabase
+    let query = supabase
       .from('questions')
       .select('id, question, module_id, subject_id, lesson_id, exam_type, exam_stage, source, created_at')
       .order('created_at', { ascending: false })
       .limit(LIST_LIMIT)
+    const term = search.trim()
+    if (term) query = query.ilike('question', `%${escapeLikePattern(term)}%`)
+    const { data, error } = await query
+    if (requestId !== requestIdRef.current) return
     if (data) setQuestions(data as QuestionRow[])
     if (error) setQuestionsError(true)
     setQuestionsLoading(false)
@@ -114,7 +129,7 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
       lesson_id: qLessonId || null, source: qSource || null
     }),
     resetForm: resetQuestionForm, refresh: fetchQuestions, showMessage: showMsg,
-    // Editing an existing question goes through an RPC (not a plain update).
+    // Editing goes through an RPC, not a plain update.
     updateFn: (id, p: any) => supabase.rpc('admin_update_question', {
       p_id: id,
       p_question: p.question, p_option_a: p.option_a, p_option_b: p.option_b, p_option_c: p.option_c, p_option_d: p.option_d,
@@ -166,7 +181,7 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
     return { questions: parsed, errors }
   }
 
-    async function bulkAddQuestions() {
+  async function bulkAddQuestions() {
     if (bulkSaving) return
     if (!qModuleId) return showMsg('❌ Please select a module first')
     if (!bulkText.trim()) return showMsg('❌ Paste some questions first')
@@ -201,7 +216,6 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
   const filteredLessons = (subjectId: string) => lessons.filter(l => l.subject_id === subjectId)
 
   const visibleModules = moduleFilter === 'all' ? modules : modules.filter(m => m.id === moduleFilter)
-  const searchLower = search.trim().toLowerCase()
 
   const form = (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
@@ -354,20 +368,21 @@ Correct: A`}</pre>
       </div>
 
       {questions.length === LIST_LIMIT && (
-        <p style={{ color: pt.textMuted, fontSize: 11, marginBottom: 12 }}>Showing the most recent {LIST_LIMIT} — older questions aren't listed here.</p>
+        <p style={{ color: pt.textMuted, fontSize: 11, marginBottom: 12 }}>
+          Showing the most recent {LIST_LIMIT}{search.trim() ? ' matches' : ' — use search to find older questions'}.
+        </p>
       )}
 
       {questionsLoading && <AdminStatusCard dark={dark} message="Loading..." />}
 
       {!questionsLoading && questions.length === 0 && (
-        <AdminStatusCard dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No questions yet — add one on the left</>} />
+        <AdminStatusCard dark={dark} message={search.trim()
+          ? <><SearchIcon2 color={pt.sub} size={14} /> No questions match your search</>
+          : <><ConstructionIcon color={pt.sub} size={14} /> No questions yet — add one on the left</>} />
       )}
 
       {!questionsLoading && visibleModules.map(mod => {
-        const modQuestions = questions.filter(q =>
-          q.module_id === mod.id &&
-          (!searchLower || q.question.toLowerCase().includes(searchLower))
-        )
+        const modQuestions = questions.filter(q => q.module_id === mod.id)
         if (modQuestions.length === 0) return null
         return (
           <div key={mod.id} style={{ marginBottom: 20 }}>
