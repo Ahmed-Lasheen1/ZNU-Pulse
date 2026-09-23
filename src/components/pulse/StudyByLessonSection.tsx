@@ -84,7 +84,7 @@ export default function StudyByLessonSection({
         .study-lesson-actions { display: flex; gap: 6px; flex-shrink: 0; }
         @media (max-width: 480px) {
           .study-lesson-main { min-width: 100%; }
-          .study-lesson-actions { min-width: 100%; justify-content: flex-end; }
+          .study-lesson-actions { min-width: 100%; justify-content: center; }
         }
       `}</style>
 
@@ -97,7 +97,7 @@ export default function StudyByLessonSection({
           const open = openSubjectId === sub.id
           return (
             <LiquidGlassCard key={sub.id} dark={dark} delay={0} style={{ padding: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'stretch' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingRight: 16 }}>
                 <button
                   type="button"
                   onClick={() => setOpenSubjectId(open ? null : sub.id)}
@@ -123,9 +123,8 @@ export default function StudyByLessonSection({
                   </span>
                 </button>
                 <button onClick={() => practiceSubject(sub.id)} style={{
-                  background: '#e2725b', color: '#0f172a', border: 'none', padding: '0 16px',
-                  fontWeight: 700, fontSize: 12, cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  background: '#e2725b', color: '#0f172a', border: 'none', padding: '8px 16px',
+                  borderRadius: 999, fontWeight: 700, fontSize: 12, cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit'
                 }}>Practice All</button>
               </div>
 
