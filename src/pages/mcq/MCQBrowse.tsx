@@ -12,7 +12,7 @@ import LoadingText from '../../components/pulse/LoadingText'
 import { ModuleIcon, ExamIcon } from '../../lib/medicalIcons'
 import { OfflineIcon, BookIcon, PauseIcon, PlayIcon, EmptyBoxIcon, GraduationCapIcon } from '../../components/ui/tool-icons'
 import { MCQ_ACCENT, EXAM_LOW_SHADOW } from './mcqShared'
-import { inStage } from '../../lib/lessonStages'
+import { stagesOf, inStage } from '../../lib/lessonStages'
 
 interface MCQBrowseProps {
   dark: boolean
@@ -37,7 +37,6 @@ interface MCQBrowseProps {
   onStartQuiz: (type: string, subjectId?: string | null, lessonId?: string | null, sourceFilter?: string | null) => void
 }
 
-// Plain text with a soft shadow so it stays readable over the gradient.
 function CountText({ children }: { children: ReactNode }) {
   return (
     <span style={{
@@ -49,8 +48,6 @@ function CountText({ children }: { children: ReactNode }) {
 
 const countLabel = (n: number) => `${n} question${n === 1 ? '' : 's'}`
 
-// Shown before starting a Mock Exam only when the selection mixes
-// University Doctors-tagged questions with everything else.
 function MockSourceDialog({
   dark, open, allCount, doctorCount, onCancel, onChooseAll, onChooseDoctors
 }: {
@@ -121,8 +118,6 @@ interface SubjectAccordionRowProps {
   onPracticeLesson: (lessonId: string) => void
 }
 
-// One subject as a collapsible row; tapping it reveals that subject's
-// lessons in place instead of a separate, unscoped lesson list.
 function SubjectAccordionRow({
   dark, sub, count, tabAccentColor, delay, lessonRows, expanded, forceOpen, onToggle, onPracticeSubject, onPracticeLesson
 }: SubjectAccordionRowProps) {
@@ -320,7 +315,6 @@ export default function MCQBrowse({
 
       {loading && <LoadingText />}
 
-      {/* Mock Exam — the subject tab here only scopes Mock Exam, nothing else */}
       <div style={{ marginBottom: 32 }}>
         <LiquidGlassCard dark={dark} delay={0} style={{ padding: '22px 24px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap', marginBottom: moduleSubjects.length > 0 ? 16 : 0 }}>
@@ -353,7 +347,6 @@ export default function MCQBrowse({
         </LiquidGlassCard>
       </div>
 
-      {/* Practice — pick a subject, its lessons unfold in place */}
       <h3 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16 }}>Practice by Subject</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {moduleSubjects.map((sub, i) => {
