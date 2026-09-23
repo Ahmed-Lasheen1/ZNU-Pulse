@@ -287,7 +287,10 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const moduleSubjects = subjects.filter(s => s.module_id === activeModule)
   const activeModuleObj = modules.find((m: any) => m.id === activeModule)
 
-  const getFilteredQuestions = (type: string) => {
+  // `sourceOnly` lets a caller (Mock Exam's "University Doctors Only" choice)
+  // narrow to just questions tagged with that source, without touching the
+  // normal module/type/subject/stage filters everyone else relies on.
+  const getFilteredQuestions = (type: string, sourceOnly: string | null = null) => {
     return questions.filter(q => {
       const modMatch = q.module_id === activeModule
       const typeMatch = type === 'mock'
@@ -295,7 +298,8 @@ export default function MCQ({ dark }: { dark: boolean }) {
         : q.exam_type === 'practice' || q.exam_type === 'both'
       const subMatch = activeSubject === 'all' || q.subject_id === activeSubject
       const stageMatch = inStage(q, activeStage, lessonStageMap)
-      return modMatch && typeMatch && subMatch && stageMatch
+      const sourceMatch = !sourceOnly || q.source === sourceOnly
+      return modMatch && typeMatch && subMatch && stageMatch && sourceMatch
     })
   }
 
@@ -355,11 +359,14 @@ export default function MCQ({ dark }: { dark: boolean }) {
     timerRef.current = setInterval(tick, 1000)
   }
 
-  function startQuiz(type: string, subjectId: string | null = null) {
+  // `subjectId`/`lessonId` pick the practice scope (lessonId wins when both
+  // are somehow set); `sourceFilter` narrows a Mock Exam to one question
+  // source (currently only 'university', from MCQBrowse's doctors-only choice).
+  function startQuiz(type: string, subjectId: string | null = null, lessonId: string | null = null, sourceFilter: string | null = null) {
     let qs = type === 'mock'
-      ? shuffle(getFilteredQuestions('mock'))
+      ? shuffle(getFilteredQuestions('mock', sourceFilter))
       : shuffle(questions.filter(q =>
-          q.subject_id === subjectId &&
+          (lessonId ? q.lesson_id === lessonId : q.subject_id === subjectId) &&
           (q.exam_type === 'practice' || q.exam_type === 'both') &&
           inStage(q, activeStage, lessonStageMap)
         ))
@@ -697,6 +704,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
       onSelectSubject={setActiveSubject}
       loading={loading}
       questions={questions}
+      lessons={lessons}
       lessonStageMap={lessonStageMap}
       getFilteredQuestions={getFilteredQuestions}
       onStartQuiz={startQuiz}
