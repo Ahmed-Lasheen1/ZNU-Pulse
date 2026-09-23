@@ -108,8 +108,8 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
             Delivered instantly to every device with notifications enabled — even if they don't have the site open right now.
             You'll be asked to confirm before it sends.
           </p>
-          <input placeholder="Title (e.g. New questions added!)" value={broadcastTitle} onChange={e => setBroadcastTitle(e.target.value)} style={inStyle} />
-          <textarea placeholder="Message" value={broadcastBody} onChange={e => setBroadcastBody(e.target.value)} style={{ ...inStyle, minHeight: 70, resize: 'vertical', flex: 1 }} />
+          <input dir="auto" placeholder="Title (e.g. New questions added!)" value={broadcastTitle} onChange={e => setBroadcastTitle(e.target.value)} style={inStyle} />
+          <textarea dir="auto" placeholder="Message" value={broadcastBody} onChange={e => setBroadcastBody(e.target.value)} style={{ ...inStyle, minHeight: 70, resize: 'vertical', flex: 1 }} />
           <button onClick={requestBroadcast} disabled={broadcastSending} style={{ ...btnStyle(pt, dark), width: '100%', marginTop: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
             {broadcastSending ? 'Sending...' : <><SendIcon color="#fff" size={13} /> Send to Everyone</>}
           </button>
@@ -126,6 +126,7 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
           <div style={{ maxWidth: ANNOUNCEMENT_PREVIEW_MAX_WIDTH, marginBottom: 12, flex: 1 }}>
             <LiquidGlassCard dark={dark} instant style={{ padding: '16px 20px', height: '100%' }}>
               <textarea
+                dir="auto"
                 placeholder="e.g. Pharma exam next week, study well!"
                 value={announcement}
                 onChange={e => setAnnouncement(e.target.value)}

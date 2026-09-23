@@ -19,6 +19,7 @@ import GuestSignInButton from '../components/GuestSignInButton'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import EcgHero from '../components/pulse/EcgHero'
 import PulseBrand from '../components/pulse/PulseBrand'
+import AutoDirText from '../components/AutoDirText'
 import { ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, PauseIcon, LightningIcon, CheckCircleIcon, WeeklyReportIcon, StreakFlameIcon } from '@/components/ui/tool-icons'
 import { NumberTicker } from '@/components/ui/number-ticker'
 import { ModuleIcon } from '../lib/medicalIcons'
@@ -388,12 +389,10 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
                         <PauseIcon color={pt.cobalt} size={13} /> Continue where you left off →
                       </div>
                     ) : (
-                      <div style={{
+                      <AutoDirText text={announcement} style={{
                         ...pulseType.bodyEmphasis, fontSize: 13, color: pt.textPrimary,
-                        lineHeight: 1.5, whiteSpace: 'pre-line', wordBreak: 'break-word'
-                      }}>
-                        {announcement}
-                      </div>
+                        lineHeight: 1.5, wordBreak: 'break-word'
+                      }} />
                     )}
                   </LiquidGlassCard>
                 )}

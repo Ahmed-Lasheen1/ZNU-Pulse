@@ -13,6 +13,7 @@ import ErrorBanner from '../components/ErrorBanner'
 import NotifyPermissionButton from '../components/NotifyPermissionButton'
 import { useToast } from '../components/ToastProvider'
 import ConfirmDialog from '../components/ConfirmDialog'
+import AutoDirText from '../components/AutoDirText'
 import { containsProfanity } from '../lib/moderation'
 import { isSuccessMessage } from '../lib/messageStyle'
 import { storageGet, storageSet } from '../lib/safeStorage'
@@ -224,7 +225,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
                   padding: '16px 18px',
                   boxShadow: `inset 0 0 0 1px ${q.answered ? 'rgba(74,222,128,0.35)' : 'transparent'}`
                 }}>
-                  <p style={{ color: pt.textPrimary, fontSize: 13, marginBottom: 8 }}>{q.question}</p>
+                  <AutoDirText text={q.question} style={{ color: pt.textPrimary, fontSize: 13, marginBottom: 8 }} />
                   <span style={{
                     fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
                     background: q.answered ? 'rgba(74,222,128,0.16)' : `${pt.amber}20`,
@@ -239,7 +240,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
                       background: 'rgba(74,222,128,0.10)', border: '1px solid rgba(74,222,128,0.25)',
                       borderRadius: 10, padding: '10px 14px', marginTop: 10
                     }}>
-                      <p style={{ color: pt.textPrimary, fontSize: 13 }}>{q.answer}</p>
+                      <AutoDirText text={q.answer} style={{ color: pt.textPrimary, fontSize: 13 }} />
                     </div>
                   )}
                 </LiquidGlassCard>
@@ -255,6 +256,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
             <QuestionMarkIcon color={QNA_ACCENT} size={14} /> Ask a Question
           </h3>
           <textarea
+            dir="auto"
             placeholder="Type your question here..."
             value={newQ} onChange={e => setNewQ(e.target.value)}
             style={{ ...inStyle, minHeight: 80, resize: 'vertical' }} />
@@ -294,9 +296,11 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
               <div key={q.id} style={{ marginBottom: isLast ? 0 : 12 }}>
                 <LiquidGlassCard dark={dark} delay={i * 60} style={{ padding: 18 }}>
                   <p style={{ color: pt.textPrimary, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                    <QuestionMarkIcon color={pt.textPrimary} size={15} /> <span>{q.question}</span>
+                    <QuestionMarkIcon color={pt.textPrimary} size={15} />
+                    <AutoDirText text={q.question} wrapperStyle={{ flex: 1 }} />
                   </p>
                   <textarea
+                    dir="auto"
                     placeholder="Type your answer..."
                     value={replyText[q.id] || ''}
                     onChange={e => setReplyText(prev => ({ ...prev, [q.id]: e.target.value }))}
@@ -336,7 +340,8 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
             <div key={q.id} style={{ marginBottom: isLast ? 0 : 12 }}>
               <LiquidGlassCard dark={dark} delay={i * 60} style={{ padding: 20 }}>
                 <p style={{ color: pt.textPrimary, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                  <QuestionMarkIcon color={pt.textPrimary} size={15} /> <span>{q.question}</span>
+                  <QuestionMarkIcon color={pt.textPrimary} size={15} />
+                  <AutoDirText text={q.question} wrapperStyle={{ flex: 1 }} />
                 </p>
                 <div style={{
                   background: 'rgba(74,222,128,0.10)', border: '1px solid rgba(74,222,128,0.25)',
@@ -345,7 +350,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
                   <div style={{ color: '#4ade80', fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
                     <LightbulbIcon color="#4ade80" size={12} /> Answer
                   </div>
-                  <p style={{ color: pt.textPrimary, fontSize: 14 }}>{q.answer}</p>
+                  <AutoDirText text={q.answer || ''} style={{ color: pt.textPrimary, fontSize: 14 }} />
                 </div>
                 {isAdmin && (
                   <button onClick={() => setConfirmDeleteId(q.id)} style={{

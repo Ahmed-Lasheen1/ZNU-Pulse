@@ -12,6 +12,7 @@ export { webpush }
 
 const SEND_TIMEOUT_MS = 10000
 const SEND_BATCH_SIZE = 50
+const AR_RE = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/
 
 export function getAdminClient(tag) {
   const url = process.env.SUPABASE_URL
@@ -53,7 +54,8 @@ export async function sendToSubscriptions(supabase, subs, payload) {
   let sent = 0
   const expiredIds = []
   const list = subs || []
-  const body = JSON.stringify(payload)
+  const lang = AR_RE.test(`${payload.title} ${payload.body}`) ? 'ar' : 'en'
+  const body = JSON.stringify({ ...payload, lang })
 
   for (let i = 0; i < list.length; i += SEND_BATCH_SIZE) {
     await Promise.all(list.slice(i, i + SEND_BATCH_SIZE).map(async (sub) => {
