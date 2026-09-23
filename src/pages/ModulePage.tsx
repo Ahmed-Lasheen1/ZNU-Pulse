@@ -8,13 +8,17 @@ import PageShell from '../components/pulse/PageShell'
 import ModuleNotFoundState from '../components/pulse/ModuleNotFoundState'
 import StudyMaterialsSection from '../components/pulse/StudyMaterialsSection'
 import StudyByLessonSection from '../components/pulse/StudyByLessonSection'
+import SummaryOverlay from '../components/SummaryOverlay'
 import AutoGrid from '../components/AutoGrid'
 import { useToast } from '../components/ToastProvider'
 import { useModules } from '../contexts'
 import { fetchModuleStages } from '../lib/moduleStages'
 import { fetchSubjectsForModule } from '../lib/subjects'
+import { fetchLessonsForModule } from '../lib/lessons'
 import { fetchDriveUrl } from '../lib/siteSettings'
 import { fetchLessonStageMap, stagesOf } from '../lib/lessonStages'
+import { useHistoryOverlay } from '../lib/useHistoryOverlay'
+import { getPreviewUrl } from '../lib/embedUrl'
 import { ModuleIcon, ExamIcon, NotesIcon } from '../lib/medicalIcons'
 import { ExamStageIcon, SmartSummariesIcon, PracticeIcon } from '@/components/ui/tool-icons'
 
@@ -22,6 +26,8 @@ interface PageModule {
   id: string; name: string; icon?: string | null; color: string; status: 'active' | 'completed'
 }
 interface PageSubject { id: string; module_id: string; name: string; icon?: string | null; color?: string | null }
+interface PageLesson { id: string; title: string; icon?: string | null; subject_id: string }
+interface ModuleSummary { id: string; title: string; url: string }
 interface ExamStage { value: string; title: string; emoji?: string; Icon?: (p: { color: string; size?: number }) => JSX.Element; color: string }
 interface ContentFacet { kind: 'file' | 'question' | 'summary'; item_type: string | null; exam_stage: string | null; lesson_id: string | null }
 
@@ -39,8 +45,14 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   const [examStages, setExamStages] = useState<ExamStage[]>([])
   const [stagesWithContent, setStagesWithContent] = useState<Set<string>>(new Set())
   const [subjects, setSubjects] = useState<PageSubject[]>([])
+  const [lessons, setLessons] = useState<PageLesson[]>([])
+  const [lessonQuestionIds, setLessonQuestionIds] = useState<Set<string>>(new Set())
+  const [lessonSummaries, setLessonSummaries] = useState<Record<string, ModuleSummary[]>>({})
+  const [selectedSummary, setSelectedSummary] = useState<ModuleSummary | null>(null)
   const [hasModuleSummaries, setHasModuleSummaries] = useState<boolean | null>(null)
   const [hasModuleQuestions, setHasModuleQuestions] = useState<boolean | null>(null)
+
+  useHistoryOverlay(!!selectedSummary, () => setSelectedSummary(null))
 
   useEffect(() => {
     let ignore = false
@@ -50,15 +62,33 @@ export default function ModulePage({ dark }: { dark: boolean }) {
 
   useEffect(() => {
     let ignore = false
+
     fetchModuleStages(moduleId!).then(result => { if (!ignore) setExamStages(result) })
+
     fetchSubjectsForModule(moduleId!).then(({ subjects, error }) => {
       if (ignore) return
       setSubjects(subjects)
       if (error) setLoadError(true)
     })
 
-    // One RPC returns the distinct (kind, type, stage, lesson) combinations, so it
-    // stays small and correct regardless of how many rows the module holds.
+    fetchLessonsForModule(moduleId!).then(({ lessons, error }) => {
+      if (ignore) return
+      setLessons(lessons)
+      if (error) setLoadError(true)
+    })
+
+    // Lesson-linked summaries, for the accordion's inline "Summary" action.
+    supabase.from('summaries').select('id, title, url, lesson_id').eq('module_id', moduleId).not('lesson_id', 'is', null)
+      .then(({ data, error }) => {
+        if (ignore) return
+        if (data) {
+          const byLesson: Record<string, ModuleSummary[]> = {}
+          data.forEach((s: any) => { (byLesson[s.lesson_id] ||= []).push(s) })
+          setLessonSummaries(byLesson)
+        }
+        if (error) setLoadError(true)
+      })
+
     Promise.all([
       supabase.rpc('get_module_content_facets', { p_module_id: moduleId }),
       fetchLessonStageMap(),
@@ -70,6 +100,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
       setPresentFileTypes(new Set(rows.filter(r => r.kind === 'file').map(r => r.item_type as string)))
       setHasModuleQuestions(rows.some(r => r.kind === 'question'))
       setHasModuleSummaries(rows.some(r => r.kind === 'summary'))
+      setLessonQuestionIds(new Set(rows.filter(r => r.kind === 'question' && r.lesson_id).map(r => r.lesson_id as string)))
 
       const stages = new Set<string>()
       rows.forEach(row => { stagesOf(row, stageMapRes.map).forEach((s: string) => stages.add(s)) })
@@ -85,6 +116,10 @@ export default function ModulePage({ dark }: { dark: boolean }) {
       loaded={modulesLoaded}
       errorMessage="Couldn't load this module — check your connection."
     />
+  )
+
+  if (selectedSummary) return (
+    <SummaryOverlay dark={dark} onBack={() => setSelectedSummary(null)} title={selectedSummary.title} url={getPreviewUrl(selectedSummary.url)} />
   )
 
   const visibleExamStages = examStages.filter(stage => stagesWithContent.has(stage.value))
@@ -140,7 +175,15 @@ export default function ModulePage({ dark }: { dark: boolean }) {
         </div>
       )}
 
-      <StudyByLessonSection dark={dark} moduleId={moduleId as string} subjects={subjects} />
+      <StudyByLessonSection
+        dark={dark}
+        moduleId={moduleId as string}
+        subjects={subjects}
+        lessons={lessons}
+        lessonQuestionIds={lessonQuestionIds}
+        lessonSummaries={lessonSummaries}
+        onOpenSummary={setSelectedSummary}
+      />
 
       <StudyMaterialsSection dark={dark} moduleId={moduleId as string} presentFileTypes={presentFileTypes} driveUrl={driveUrl} />
 

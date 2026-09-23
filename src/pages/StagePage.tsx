@@ -14,6 +14,7 @@ import { useToast } from '../components/ToastProvider'
 import { useModules } from '../contexts'
 import { fetchModuleStages, stageMetaFrom } from '../lib/moduleStages'
 import { fetchSubjectsForModule } from '../lib/subjects'
+import { fetchLessonsForModule } from '../lib/lessons'
 import { fetchDriveUrl } from '../lib/siteSettings'
 import { fetchLessonStageMap, inStage } from '../lib/lessonStages'
 import { fetchAllRows } from '../lib/fetchAllRows'
@@ -24,6 +25,7 @@ import { SmartSummariesIcon, PracticeIcon } from '@/components/ui/tool-icons'
 
 interface PageModule { id: string; name: string; icon?: string | null; color: string }
 interface PageSubject { id: string; module_id: string; name: string; icon?: string | null; color?: string | null }
+interface StageLesson { id: string; title: string; icon?: string | null; subject_id: string }
 interface ExamStage { value: string; title: string; emoji?: string; Icon?: (p: { color: string; size?: number }) => JSX.Element; color: string }
 interface Summary { id: string; title: string; url: string; exam_stage?: string | null; lesson_id?: string | null }
 interface ContentFacet { kind: 'file' | 'question' | 'summary'; item_type: string | null; exam_stage: string | null; lesson_id: string | null }
@@ -45,6 +47,9 @@ export default function StagePage({ dark }: { dark: boolean }) {
   const [loadError, setLoadError] = useState(false)
   const [driveUrl, setDriveUrl] = useState('')
   const [subjects, setSubjects] = useState<PageSubject[]>([])
+  const [lessons, setLessons] = useState<StageLesson[]>([])
+  const [lessonQuestionIds, setLessonQuestionIds] = useState<Set<string>>(new Set())
+  const [lessonSummaries, setLessonSummaries] = useState<Record<string, Summary[]>>({})
 
   useHistoryOverlay(!!selectedSummary, () => setSelectedSummary(null))
 
@@ -64,27 +69,46 @@ export default function StagePage({ dark }: { dark: boolean }) {
     let ignore = false
     setSummariesLoaded(false)
 
-    // An item belongs to this stage through its own tag or its lesson's stages, counted once either way.
+    // A lesson belongs to this stage via its own item tags OR its
+    // lesson_exam_stages assignment — `here()` covers both.
     Promise.all([
       supabase.rpc('get_module_content_facets', { p_module_id: moduleId }),
       fetchAllRows(() => supabase.from('summaries').select('*').eq('module_id', moduleId).order('created_at').order('id')),
       fetchLessonStageMap(),
-    ]).then(([facetsRes, summariesRes, stageMapRes]) => {
+      fetchLessonsForModule(moduleId!),
+    ]).then(([facetsRes, summariesRes, stageMapRes, lessonsRes]) => {
       if (ignore) return
       const map = stageMapRes.map
       const here = (row: any) => inStage(row, stage!, map)
+      const stageLessonIds = new Set<string>()
 
       if (facetsRes.data) {
         const rows = facetsRes.data as ContentFacet[]
         setPresentFileTypes(new Set(rows.filter(r => r.kind === 'file' && here(r)).map(r => r.item_type as string)))
-        setHasStageQuestions(rows.some(r => r.kind === 'question' && here(r)))
+        const qIds = new Set(rows.filter(r => r.kind === 'question' && here(r) && r.lesson_id).map(r => r.lesson_id as string))
+        setHasStageQuestions(qIds.size > 0)
+        setLessonQuestionIds(qIds)
+        rows.forEach(r => { if (here(r) && r.lesson_id) stageLessonIds.add(r.lesson_id) })
       }
       if (facetsRes.error) setLoadError(true)
 
-      if (summariesRes.data) setSummaries(summariesRes.data.filter(here))
+      if (summariesRes.data) {
+        const stageSummaries = summariesRes.data.filter(here)
+        setSummaries(stageSummaries)
+        const byLesson: Record<string, Summary[]> = {}
+        stageSummaries.forEach(s => {
+          if (s.lesson_id) { (byLesson[s.lesson_id] ||= []).push(s); stageLessonIds.add(s.lesson_id) }
+        })
+        setLessonSummaries(byLesson)
+      }
       if (summariesRes.error) setLoadError(true)
+
+      if (lessonsRes.lessons) setLessons(lessonsRes.lessons.filter(l => stageLessonIds.has(l.id)))
+      if (lessonsRes.error) setLoadError(true)
+
       setSummariesLoaded(true)
     })
+
     fetchSubjectsForModule(moduleId!).then(({ subjects, error }) => {
       if (ignore) return
       setSubjects(subjects)
@@ -133,7 +157,15 @@ export default function StagePage({ dark }: { dark: boolean }) {
 
       <StudyMaterialsSection dark={dark} moduleId={moduleId as string} presentFileTypes={presentFileTypes} driveUrl={driveUrl} />
 
-      <StudyByLessonSection dark={dark} moduleId={moduleId as string} subjects={subjects} stage={stage} />
+      <StudyByLessonSection
+        dark={dark}
+        moduleId={moduleId as string}
+        subjects={subjects}
+        lessons={lessons}
+        lessonQuestionIds={lessonQuestionIds}
+        lessonSummaries={lessonSummaries}
+        onOpenSummary={setSelectedSummary}
+      />
 
       <div className="summary-practice-row" style={{ marginBottom: 32 }}>
         <div>

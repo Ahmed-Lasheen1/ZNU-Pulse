@@ -24,8 +24,6 @@ const Review = lazy(() => import('./pages/Review'))
 const Summaries = lazy(() => import('./pages/Summaries'))
 const ModulePage = lazy(() => import('./pages/ModulePage'))
 const StagePage = lazy(() => import('./pages/StagePage'))
-const SubjectPage = lazy(() => import('./pages/SubjectPage'))
-const LessonPage = lazy(() => import('./pages/LessonPage'))
 const Auth = lazy(() => import('./pages/Auth'))
 const Profile = lazy(() => import('./pages/Profile'))
 const AnonQuestions = lazy(() => import('./pages/AnonQuestions'))
@@ -37,7 +35,6 @@ import Footer from './components/Footer'
 
 const ensureProfileInFlight = new Set()
 
-// Fallback when the DB trigger didn't create a profile row.
 async function ensureProfile(user) {
   if (ensureProfileInFlight.has(user.id)) return
   ensureProfileInFlight.add(user.id)
@@ -87,7 +84,6 @@ function SiteHeader({ dark, toggleTheme }) {
   )
 }
 
-// Footer entrance plays only on Home, once per tab session.
 function SiteFooter({ dark }) {
   const location = useLocation()
   const isHome = location.pathname === '/'
@@ -104,8 +100,6 @@ function RoutedContent({ dark, toggleTheme }) {
           <Route path="/" element={<Home dark={dark} toggleTheme={toggleTheme} />} />
           <Route path="/module/:moduleId" element={<ModulePage dark={dark} />} />
           <Route path="/module/:moduleId/stage/:stage" element={<StagePage dark={dark} />} />
-          <Route path="/module/:moduleId/subject/:subjectId" element={<SubjectPage dark={dark} />} />
-          <Route path="/module/:moduleId/subject/:subjectId/lesson/:lessonId" element={<LessonPage dark={dark} />} />
           <Route path="/checklist" element={<Checklist dark={dark} />} />
           <Route path="/schedule" element={<Schedule dark={dark} />} />
           <Route path="/files" element={<FilesPage dark={dark} />} />
@@ -185,7 +179,6 @@ export default function App() {
     }
     initSession()
 
-    // Not async: awaiting Supabase calls inside this callback can deadlock the auth lock.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setUser(session.user)
@@ -200,7 +193,6 @@ export default function App() {
   }, [])
 
   async function signOut() {
-    // Unsubscribe first, while still authenticated, so the DB row is released.
     await unsubscribeFromPush()
     await supabase.auth.signOut()
     setUser(null)
