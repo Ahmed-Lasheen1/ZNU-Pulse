@@ -146,7 +146,7 @@ export default function StagePage({ dark }: { dark: boolean }) {
   }
 
   return (
-    <PageShell dark={dark} backFallback={`/module/${moduleId}`}>
+    <PageShell dark={dark} backFallback={`/module/${moduleId}`} maxWidth={900}>
       <EntityPageHeader
         icon={meta.Icon ? <meta.Icon color={meta.color} size={44} /> : <span style={{ fontSize: 44 }}>{meta.emoji}</span>}
         title={meta.title}

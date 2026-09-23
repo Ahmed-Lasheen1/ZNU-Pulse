@@ -147,7 +147,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   )
 
   return (
-    <PageShell dark={dark} backFallback="/">
+    <PageShell dark={dark} backFallback="/" maxWidth={900}>
       <div style={{ textAlign: 'center', padding: '20px 0 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
           <ModuleIcon value={module.icon} size={52} color={module.color} />

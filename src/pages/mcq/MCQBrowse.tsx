@@ -233,7 +233,7 @@ export default function MCQBrowse({
   const singleSubject = moduleSubjects.length === 1
 
   return (
-    <PageShell dark={dark} backFallback="/">
+    <PageShell dark={dark} backFallback="/" maxWidth={900}>
       {(loadError || modulesError) && <ErrorBanner />}
       {usingCache && (
         <div style={{ marginBottom: 16 }}>
