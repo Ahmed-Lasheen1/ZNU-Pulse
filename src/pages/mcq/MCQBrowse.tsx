@@ -38,8 +38,7 @@ interface MCQBrowseProps {
   onStartQuiz: (type: string, subjectId?: string | null) => void
 }
 
-// Plain text, no box. A soft shadow keeps it readable over the
-// viewport-fixed gradient wherever the card sits while scrolling.
+// Plain text with a soft shadow so it stays readable over the gradient.
 function CountText({ children }: { children: ReactNode }) {
   return (
     <span style={{
@@ -64,8 +63,7 @@ export default function MCQBrowse({
   // Tab accent follows the current module's own color, matching Summaries.tsx.
   const tabAccentColor = activeModuleObj?.color || pt.cobalt
 
-  // A stage tab only appears once this module has at least one question in it,
-  // by the question's own stage tag or its lesson's stages.
+  // A stage tab only appears once this module has at least one question in it.
   const stagesWithQuestions = new Set(questions.flatMap(q => stagesOf(q, lessonStageMap)))
   const visibleStages = stages.filter(s => stagesWithQuestions.has(s.value))
 
@@ -174,7 +172,7 @@ export default function MCQBrowse({
             </div>
             <div style={{ flex: 1, minWidth: 160 }}>
               <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: MCQ_ACCENT, marginBottom: 6 }}>Mock Exam</h3>
-              <CountText>{loading ? '…' : countLabel(Math.min(36, getFilteredQuestions('mock').length))}</CountText>
+              <CountText>{loading ? '…' : countLabel(getFilteredQuestions('mock').length)}</CountText>
             </div>
             <button onClick={() => onStartQuiz('mock')} style={{
               background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '12px 24px',
@@ -188,7 +186,7 @@ export default function MCQBrowse({
       <h3 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16 }}>Practice by Subject</h3>
       <div style={{
         display: 'flex', gap: 14, overflowX: 'auto',
-        paddingTop: 8, paddingBottom: 14, paddingLeft: 2, paddingRight: 2,
+        paddingTop: 8, paddingBottom: 14, paddingLeft: 12, paddingRight: 12,
         scrollSnapType: 'x mandatory'
       }}>
         {moduleSubjects.map((sub, i) => {

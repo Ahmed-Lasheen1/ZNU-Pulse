@@ -357,12 +357,12 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
   function startQuiz(type: string, subjectId: string | null = null) {
     let qs = type === 'mock'
-      ? shuffle(getFilteredQuestions('mock')).slice(0, 36)
+      ? shuffle(getFilteredQuestions('mock'))
       : shuffle(questions.filter(q =>
           q.subject_id === subjectId &&
           (q.exam_type === 'practice' || q.exam_type === 'both') &&
           inStage(q, activeStage, lessonStageMap)
-        )).slice(0, 50)
+        ))
 
     if (qs.length === 0) {
       showToast('❌ No questions available for this selection yet', 'error')
