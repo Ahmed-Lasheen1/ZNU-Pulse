@@ -277,6 +277,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
             grid-template-columns: repeat(4, 1fr);
             gap: clamp(10px, 1.2vw, 18px);
           }
+          .pulse-tools-grid > * { min-width: 0; }
           @media (max-width: 720px) {
             .pulse-tools-grid { grid-template-columns: repeat(2, 1fr); }
           }

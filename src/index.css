@@ -8,6 +8,8 @@ body {
   font-family: 'Sora', 'Segoe UI', sans-serif;
   color: #e2e8f0;
   direction: ltr;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 .app {
