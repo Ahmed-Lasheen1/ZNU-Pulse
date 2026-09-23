@@ -1,9 +1,7 @@
 // src/pages/mcq/MCQBrowse.tsx
-// Module / subject browsing view — the "pick a module, pick a
-// stage/subject, start Mock Exam or Practice" screen. All quiz state
-// lives in MCQ.tsx; this just takes props and fires callbacks back up.
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ChevronDown } from 'lucide-react'
 import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../../premiumTheme'
 import ErrorBanner from '../../components/ErrorBanner'
 import TabRow from '../../components/TabRow'
@@ -14,7 +12,7 @@ import LoadingText from '../../components/pulse/LoadingText'
 import { ModuleIcon, ExamIcon } from '../../lib/medicalIcons'
 import { OfflineIcon, BookIcon, PauseIcon, PlayIcon, EmptyBoxIcon, GraduationCapIcon } from '../../components/ui/tool-icons'
 import { MCQ_ACCENT, EXAM_LOW_SHADOW } from './mcqShared'
-import { stagesOf, inStage } from '../../lib/lessonStages'
+import { inStage } from '../../lib/lessonStages'
 
 interface MCQBrowseProps {
   dark: boolean
@@ -51,9 +49,8 @@ function CountText({ children }: { children: ReactNode }) {
 
 const countLabel = (n: number) => `${n} question${n === 1 ? '' : 's'}`
 
-// Shown before starting a Mock Exam only when this selection mixes
-// University Doctors-tagged questions with everything else — lets the
-// student pick between the full set or just the doctors' set.
+// Shown before starting a Mock Exam only when the selection mixes
+// University Doctors-tagged questions with everything else.
 function MockSourceDialog({
   dark, open, allCount, doctorCount, onCancel, onChooseAll, onChooseDoctors
 }: {
@@ -110,6 +107,85 @@ function MockSourceDialog({
   )
 }
 
+interface SubjectAccordionRowProps {
+  dark: boolean
+  sub: any
+  count: number
+  tabAccentColor: string
+  delay: number
+  lessonRows: { lesson: any; count: number }[]
+  expanded: boolean
+  forceOpen: boolean
+  onToggle: () => void
+  onPracticeSubject: () => void
+  onPracticeLesson: (lessonId: string) => void
+}
+
+// One subject as a collapsible row; tapping it reveals that subject's
+// lessons in place instead of a separate, unscoped lesson list.
+function SubjectAccordionRow({
+  dark, sub, count, tabAccentColor, delay, lessonRows, expanded, forceOpen, onToggle, onPracticeSubject, onPracticeLesson
+}: SubjectAccordionRowProps) {
+  const pt = getPulseTheme(dark)
+  const canExpand = lessonRows.length > 0 && !forceOpen
+  const isOpen = forceOpen || expanded
+  const panelId = `subject-lessons-${sub.id}`
+
+  return (
+    <LiquidGlassCard dark={dark} delay={delay} style={{ padding: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px' }}>
+        <button
+          type="button"
+          onClick={canExpand ? onToggle : undefined}
+          aria-expanded={canExpand ? isOpen : undefined}
+          aria-controls={canExpand ? panelId : undefined}
+          disabled={!canExpand}
+          style={{
+            flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10,
+            background: 'transparent', border: 'none', padding: 0, textAlign: 'left',
+            cursor: canExpand ? 'pointer' : 'default', font: 'inherit', color: 'inherit'
+          }}
+        >
+          <ModuleIcon value={sub.icon} size={18} color={sub.color || tabAccentColor} />
+          <span style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ color: pt.textPrimary, fontWeight: 700, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub.name}</div>
+            <div style={{ color: pt.textMuted, fontSize: 11.5, marginTop: 1 }}>{countLabel(count)}</div>
+          </span>
+          {canExpand && (
+            <span style={{ display: 'inline-flex', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease', flexShrink: 0 }}>
+              <ChevronDown size={16} color={pt.textMuted} />
+            </span>
+          )}
+        </button>
+        <button onClick={onPracticeSubject} style={{
+          background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '8px 16px',
+          borderRadius: 999, fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: pulseFonts.body,
+          flexShrink: 0
+        }}>Practice All</button>
+      </div>
+
+      {isOpen && lessonRows.length > 0 && (
+        <div id={panelId} role="region" aria-label={`${sub.name} lessons`} style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {lessonRows.map(({ lesson, count: lessonQCount }) => (
+            <PulseGlassRow
+              key={lesson.id} dark={dark} radius={12}
+              hoverTint={dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'}
+              onClick={() => onPracticeLesson(lesson.id)}
+              role="button" tabIndex={0}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPracticeLesson(lesson.id) } }}
+            >
+              <div style={{ padding: '9px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                <span style={{ color: pt.textPrimary, fontSize: 13, fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lesson.title}</span>
+                <span style={{ color: pt.textMuted, fontSize: 11, flexShrink: 0 }}>{countLabel(lessonQCount)}</span>
+              </div>
+            </PulseGlassRow>
+          ))}
+        </div>
+      )}
+    </LiquidGlassCard>
+  )
+}
+
 export default function MCQBrowse({
   dark, modulesError, loadError, usingCache, resumeData, onResume, onDiscardResume,
   activeModuleObj, stages, activeStage, onSelectStage,
@@ -120,16 +196,13 @@ export default function MCQBrowse({
   const navigate = useNavigate()
   const hoverTint = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'
   const [mockChoiceOpen, setMockChoiceOpen] = useState(false)
+  const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null)
 
-  // Tab accent follows the current module's own color, matching Summaries.tsx.
   const tabAccentColor = activeModuleObj?.color || pt.cobalt
 
-  // A stage tab only appears once this module has at least one question in it.
   const stagesWithQuestions = new Set(questions.flatMap(q => stagesOf(q, lessonStageMap)))
   const visibleStages = stages.filter(s => stagesWithQuestions.has(s.value))
 
-  // Only offer the "doctors only" split when the current mock selection
-  // actually contains a mix — no point asking when it's all-one or none.
   const mockQuestions = getFilteredQuestions('mock')
   const doctorMockQuestions = mockQuestions.filter(q => q.source === 'university')
   const hasDoctorChoice = doctorMockQuestions.length > 0 && doctorMockQuestions.length < mockQuestions.length
@@ -147,12 +220,22 @@ export default function MCQBrowse({
     onStartQuiz('mock', null, null, 'university')
   }
 
-  // Lessons belonging to this module's subjects, narrowed further by the
-  // active subject tab (same scoping the subject carousel below uses).
-  const moduleLessons = lessons.filter(l =>
-    moduleSubjects.some(s => s.id === l.subject_id) &&
-    (activeSubject === 'all' || l.subject_id === activeSubject)
-  )
+  function practiceCountFor(subjectId: string) {
+    return questions.filter(q =>
+      q.subject_id === subjectId &&
+      (q.exam_type === 'practice' || q.exam_type === 'both') &&
+      inStage(q, activeStage, lessonStageMap)
+    ).length
+  }
+  function lessonCountFor(lessonId: string) {
+    return questions.filter(q =>
+      q.lesson_id === lessonId &&
+      (q.exam_type === 'practice' || q.exam_type === 'both') &&
+      inStage(q, activeStage, lessonStageMap)
+    ).length
+  }
+
+  const singleSubject = moduleSubjects.length === 1
 
   return (
     <PageShell dark={dark} backFallback="/">
@@ -235,21 +318,12 @@ export default function MCQBrowse({
         />
       )}
 
-      <TabRow
-        items={[{ value: 'all', label: 'All' }, ...moduleSubjects.map(sub => ({ value: sub.id, label: sub.name }))]}
-        active={activeSubject}
-        onSelect={onSelectSubject}
-        dark={dark}
-        accentColor={tabAccentColor}
-        style={{ marginBottom: 28 }}
-      />
-
       {loading && <LoadingText />}
 
-      {/* Mock Exam — hero banner */}
+      {/* Mock Exam — the subject tab here only scopes Mock Exam, nothing else */}
       <div style={{ marginBottom: 32 }}>
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 18, padding: '22px 24px', flexWrap: 'wrap' }}>
+        <LiquidGlassCard dark={dark} delay={0} style={{ padding: '22px 24px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap', marginBottom: moduleSubjects.length > 0 ? 16 : 0 }}>
             <div style={{
               width: 60, height: 60, borderRadius: 18, flexShrink: 0,
               background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`,
@@ -266,86 +340,46 @@ export default function MCQBrowse({
               borderRadius: 999, fontWeight: 800, cursor: 'pointer', fontFamily: pulseFonts.body, flexShrink: 0
             }}>Start →</button>
           </div>
+          {moduleSubjects.length > 0 && (
+            <TabRow
+              items={[{ value: 'all', label: 'All' }, ...moduleSubjects.map(sub => ({ value: sub.id, label: sub.name }))]}
+              active={activeSubject}
+              onSelect={onSelectSubject}
+              dark={dark}
+              accentColor={MCQ_ACCENT}
+              style={{ marginBottom: 0 }}
+            />
+          )}
         </LiquidGlassCard>
       </div>
 
-      {/* Practice by Subject — horizontal scroll-snap carousel */}
+      {/* Practice — pick a subject, its lessons unfold in place */}
       <h3 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16 }}>Practice by Subject</h3>
-      <div style={{
-        display: 'flex', gap: 14, overflowX: 'auto',
-        paddingTop: 8, paddingBottom: 14, paddingLeft: 12, paddingRight: 12,
-        scrollSnapType: 'x mandatory'
-      }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {moduleSubjects.map((sub, i) => {
-          const subQs = questions.filter(q =>
-            q.subject_id === sub.id &&
-            (q.exam_type === 'practice' || q.exam_type === 'both') &&
-            inStage(q, activeStage, lessonStageMap)
-          )
+          const lessonsForSubject = lessons.filter(l => l.subject_id === sub.id)
+          const lessonRows = lessonsForSubject.map(lesson => ({ lesson, count: lessonCountFor(lesson.id) }))
           return (
-            <div key={sub.id} style={{ flex: '0 0 auto', width: 'clamp(150px, 40vw, 220px)', scrollSnapAlign: 'start' }}>
-              <LiquidGlassCard dark={dark} delay={i * 70}
-                onClick={() => onStartQuiz('practice', sub.id)}
-                style={{ padding: '20px 18px', height: '100%' }}>
-                <div style={{ color: pt.textPrimary, fontWeight: 700, marginBottom: 8, fontSize: 15 }}>{sub.name}</div>
-                <div style={{ marginBottom: 16 }}>
-                  <CountText>{loading ? '…' : countLabel(subQs.length)}</CountText>
-                </div>
-                <div style={{
-                  background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '7px 0',
-                  borderRadius: 999, fontWeight: 700, textAlign: 'center', fontSize: 12, fontFamily: pulseFonts.body
-                }}>Practice</div>
-              </LiquidGlassCard>
-            </div>
+            <SubjectAccordionRow
+              key={sub.id}
+              dark={dark}
+              sub={sub}
+              count={practiceCountFor(sub.id)}
+              tabAccentColor={tabAccentColor}
+              delay={i * 70}
+              lessonRows={lessonRows}
+              expanded={expandedSubjectId === sub.id}
+              forceOpen={singleSubject}
+              onToggle={() => setExpandedSubjectId(prev => prev === sub.id ? null : sub.id)}
+              onPracticeSubject={() => onStartQuiz('practice', sub.id)}
+              onPracticeLesson={(lessonId) => onStartQuiz('practice', null, lessonId)}
+            />
           )
         })}
         {moduleSubjects.length === 0 && !loading && (
-          <LiquidGlassCard dark={dark} delay={0} style={{ padding: 24, width: '100%', textAlign: 'center' }}>
+          <LiquidGlassCard dark={dark} delay={0} style={{ padding: 24, textAlign: 'center' }}>
             <p style={{ color: pt.sub, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               <EmptyBoxIcon color={pt.sub} size={16} /> No subjects for this module yet
-            </p>
-          </LiquidGlassCard>
-        )}
-      </div>
-
-      {/* Practice by Lesson — same carousel treatment, one level deeper */}
-      <h3 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, marginTop: 28 }}>Practice by Lesson</h3>
-      <div style={{
-        display: 'flex', gap: 14, overflowX: 'auto',
-        paddingTop: 8, paddingBottom: 14, paddingLeft: 12, paddingRight: 12,
-        scrollSnapType: 'x mandatory'
-      }}>
-        {moduleLessons.map((lesson, i) => {
-          const lessonQs = questions.filter(q =>
-            q.lesson_id === lesson.id &&
-            (q.exam_type === 'practice' || q.exam_type === 'both') &&
-            inStage(q, activeStage, lessonStageMap)
-          )
-          const subj = moduleSubjects.find(s => s.id === lesson.subject_id)
-          return (
-            <div key={lesson.id} style={{ flex: '0 0 auto', width: 'clamp(150px, 40vw, 220px)', scrollSnapAlign: 'start' }}>
-              <LiquidGlassCard dark={dark} delay={i * 70}
-                onClick={() => onStartQuiz('practice', null, lesson.id)}
-                style={{ padding: '20px 18px', height: '100%' }}>
-                <div style={{ color: pt.textPrimary, fontWeight: 700, marginBottom: 4, fontSize: 15 }}>{lesson.title}</div>
-                {subj && (
-                  <div style={{ color: pt.textMuted, fontSize: 11, marginBottom: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subj.name}</div>
-                )}
-                <div style={{ marginBottom: 16 }}>
-                  <CountText>{loading ? '…' : countLabel(lessonQs.length)}</CountText>
-                </div>
-                <div style={{
-                  background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '7px 0',
-                  borderRadius: 999, fontWeight: 700, textAlign: 'center', fontSize: 12, fontFamily: pulseFonts.body
-                }}>Practice</div>
-              </LiquidGlassCard>
-            </div>
-          )
-        })}
-        {moduleLessons.length === 0 && !loading && (
-          <LiquidGlassCard dark={dark} delay={0} style={{ padding: 24, width: '100%', textAlign: 'center' }}>
-            <p style={{ color: pt.sub, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              <EmptyBoxIcon color={pt.sub} size={16} /> No lessons for this module yet
             </p>
           </LiquidGlassCard>
         )}
