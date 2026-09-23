@@ -97,7 +97,7 @@ export default function StudyByLessonSection({
           const open = openSubjectId === sub.id
           return (
             <LiquidGlassCard key={sub.id} dark={dark} delay={0} style={{ padding: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px' }}>
                 <button
                   type="button"
                   onClick={() => setOpenSubjectId(open ? null : sub.id)}
@@ -107,7 +107,7 @@ export default function StudyByLessonSection({
                   style={{
                     ['--sbl-hover' as any]: hoverTint,
                     flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10,
-                    background: 'transparent', border: 'none', padding: 16, textAlign: 'left',
+                    background: 'transparent', border: 'none', padding: 0, textAlign: 'left',
                     cursor: 'pointer', font: 'inherit', color: 'inherit'
                   }}
                 >
@@ -124,8 +124,7 @@ export default function StudyByLessonSection({
                 </button>
                 <button onClick={() => practiceSubject(sub.id)} style={{
                   background: '#e2725b', color: '#0f172a', border: 'none', padding: '8px 16px',
-                  borderRadius: 999, fontWeight: 700, fontSize: 12, cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit',
-                  marginRight: 16
+                  borderRadius: 999, fontWeight: 700, fontSize: 12, cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit'
                 }}>Practice All</button>
               </div>
 
