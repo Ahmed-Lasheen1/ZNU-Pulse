@@ -97,7 +97,7 @@ export default function StudyByLessonSection({
           const open = openSubjectId === sub.id
           return (
             <LiquidGlassCard key={sub.id} dark={dark} delay={0} style={{ padding: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingRight: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <button
                   type="button"
                   onClick={() => setOpenSubjectId(open ? null : sub.id)}
@@ -124,7 +124,8 @@ export default function StudyByLessonSection({
                 </button>
                 <button onClick={() => practiceSubject(sub.id)} style={{
                   background: '#e2725b', color: '#0f172a', border: 'none', padding: '8px 16px',
-                  borderRadius: 999, fontWeight: 700, fontSize: 12, cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit'
+                  borderRadius: 999, fontWeight: 700, fontSize: 12, cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit',
+                  marginRight: 16
                 }}>Practice All</button>
               </div>
 
