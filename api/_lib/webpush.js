@@ -2,23 +2,49 @@
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 
-webpush.setVapidDetails(
-  'mailto:admin@znu-future-doctors.app',
-  process.env.VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
-)
-
 export { webpush }
 
 const SEND_TIMEOUT_MS = 10000
 const SEND_BATCH_SIZE = 50
 const AR_RE = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/
 
+// Set up on first use instead of at import time, so a missing/invalid
+// VAPID key produces a readable error instead of crashing the function.
+let vapidReady = false
+function ensureVapid() {
+  if (vapidReady) return
+  if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+    throw new Error('Missing VAPID_PUBLIC_KEY or VAPID_PRIVATE_KEY environment variable')
+  }
+  webpush.setVapidDetails(
+    'mailto:admin@znu-future-doctors.app',
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  )
+  vapidReady = true
+}
+
+// Wraps a handler so any unexpected crash returns the real message as JSON
+// (visible in the GitHub Actions log) instead of a blank 500.
+export function safeHandler(fn) {
+  return async (req, res) => {
+    try {
+      return await fn(req, res)
+    } catch (err) {
+      console.error('[api] Unhandled error:', err)
+      if (!res.headersSent) res.status(500).json({ error: err?.message || String(err) })
+    }
+  }
+}
+
 export function getAdminClient(tag) {
   const url = process.env.SUPABASE_URL
   if (!url) {
     console.error(`[${tag}] Missing SUPABASE_URL environment variable.`)
     return null
+  }
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY environment variable')
   }
   return createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY)
 }
@@ -51,6 +77,8 @@ export async function fetchAllRows(makeQuery, pageSize = 1000) {
 
 // Sends one payload to many subscriptions, deleting any that return 410/404.
 export async function sendToSubscriptions(supabase, subs, payload) {
+  ensureVapid()
+
   let sent = 0
   const expiredIds = []
   const list = subs || []

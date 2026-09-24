@@ -1,8 +1,8 @@
 // api/push/exam-reminders.js
-import { getAdminClient, sendToSubscriptions, requireCronSecret, fetchAllRows } from '../_lib/webpush'
+import { getAdminClient, sendToSubscriptions, requireCronSecret, fetchAllRows, safeHandler } from '../_lib/webpush'
 
 // Daily cron (.github/workflows/exam-reminders-push.yml).
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (!requireCronSecret(req, res)) return
 
   const supabase = getAdminClient('exam-reminders')
@@ -13,7 +13,7 @@ export default async function handler(req, res) {
     .select('title, dates, module_id, modules(name)')
     .eq('type', 'exam')
     .not('dates', 'is', null)
-  if (schedulesError) return res.status(500).json({ error: schedulesError.message })
+  if (schedulesError) return res.status(500).json({ error: 'schedules query: ' + schedulesError.message })
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -30,9 +30,11 @@ export default async function handler(req, res) {
   const { data: subs, error: subsError } = await fetchAllRows(() =>
     supabase.from('push_subscriptions').select('*').order('id')
   )
-  if (subsError) return res.status(500).json({ error: subsError.message })
+  if (subsError) return res.status(500).json({ error: 'push_subscriptions query: ' + subsError.message })
 
   const { sent } = await sendToSubscriptions(supabase, subs, { title: '📝 Upcoming Exam', body, url: '/schedule' })
 
   return res.status(200).json({ sent, upcomingCount: upcoming.length })
 }
+
+export default safeHandler(handler)
