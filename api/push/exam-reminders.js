@@ -1,5 +1,5 @@
 // api/push/exam-reminders.js
-import { getAdminClient, sendToSubscriptions, requireCronSecret, fetchAllRows, safeHandler } from '../_lib/webpush'
+import { getAdminClient, sendToSubscriptions, requireCronSecret, fetchAllRows, safeHandler } from '../_lib/webpush.js'
 
 // Daily cron (.github/workflows/exam-reminders-push.yml).
 async function handler(req, res) {

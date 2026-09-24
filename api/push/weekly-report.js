@@ -1,8 +1,8 @@
 // api/push/weekly-report.js
-import { getAdminClient, sendToSubscriptions, requireCronSecret, fetchAllRows } from '../_lib/webpush'
+import { getAdminClient, sendToSubscriptions, requireCronSecret, fetchAllRows, safeHandler } from '../_lib/webpush.js'
 
 // Weekly cron. Only signed-in users get a report (guest stats live in their browser).
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (!requireCronSecret(req, res)) return
 
   const supabase = getAdminClient('weekly-report')
@@ -56,3 +56,5 @@ export default async function handler(req, res) {
 
   return res.status(200).json({ sent })
 }
+
+export default safeHandler(handler)

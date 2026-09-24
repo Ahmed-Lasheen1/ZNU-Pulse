@@ -1,5 +1,5 @@
 // api/push/checklist-reminders.js
-import { getAdminClient, sendToSubscriptions, requireCronSecret, fetchAllRows } from '../_lib/webpush'
+import { getAdminClient, sendToSubscriptions, requireCronSecret, fetchAllRows, safeHandler } from '../_lib/webpush.js'
 
 // `deadline` is date-only, so "6 hours before" treats it as end-of-day Egypt time.
 // Egypt observes DST, so the offset comes from the IANA timezone.
@@ -35,7 +35,7 @@ function deadlineInstant(dateStr) {
 }
 
 // Hourly cron. Notifies only a task's own owner via its user_id, never a broadcast.
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (!requireCronSecret(req, res)) return
 
   const supabase = getAdminClient('checklist-reminders')
@@ -94,3 +94,5 @@ export default async function handler(req, res) {
 
   return res.status(200).json({ sent, tasksChecked: due.length })
 }
+
+export default safeHandler(handler)

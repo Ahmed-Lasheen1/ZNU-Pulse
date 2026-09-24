@@ -1,8 +1,8 @@
 // api/push/broadcast.js
-import { getAdminClient, sendToSubscriptions, fetchAllRows } from '../_lib/webpush'
+import { getAdminClient, sendToSubscriptions, fetchAllRows, safeHandler } from '../_lib/webpush.js'
 
 // Admin-triggered broadcast. Auth is a signed-in Supabase token whose profile has role='admin'.
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const supabase = getAdminClient('broadcast')
@@ -29,3 +29,5 @@ export default async function handler(req, res) {
   const { sent } = await sendToSubscriptions(supabase, subs, { title, body, url: url || '/' })
   return res.status(200).json({ sent, total: subs.length })
 }
+
+export default safeHandler(handler)
