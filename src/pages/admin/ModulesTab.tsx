@@ -1,16 +1,18 @@
+// src/pages/admin/ModulesTab.tsx
 import { useState } from 'react'
 import { supabase } from '../../supabase'
 import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
 import IconPicker from '../../components/admin/IconPicker'
 import AdminSplitLayout from './AdminSplitLayout'
-import AdminStatusCard from './AdminStatusCard'
+import EmptyState from '../../components/pulse/EmptyState'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
 import { useAdminEntityCrud } from './useAdminEntityCrud'
+import { useConfirmDelete } from './useConfirmDelete'
 import { EditIcon, PlusIcon, TrashIcon, PauseIcon, PlayIcon, DotIcon, CheckCircleIcon, ConstructionIcon } from '../../components/ui/tool-icons'
 import type { AdminModule } from './adminTypes'
 
@@ -31,7 +33,6 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
   const [modColor, setModColor] = useState('#38bdf8')
   const [modIcon, setModIcon] = useState('📚')
   const [modStatus, setModStatus] = useState<'active' | 'completed'>('active')
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   function editModule(mod: AdminModule) {
     setEditingModuleId(mod.id)
@@ -46,6 +47,7 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
     buildPayload: () => ({ name: modName, color: modColor, icon: modIcon, status: modStatus }),
     resetForm: resetModuleForm, refresh: fetchModules, showMessage: showMsg
   })
+  const del = useConfirmDelete(crud.remove)
 
   // The duplicate check needs the live module list, so it stays outside the hook.
   function saveModule() {
@@ -77,7 +79,7 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => editModule(mod)} aria-label={`Edit module: ${mod.name}`} style={{ ...miniBtn(pt, pt.cobalt), display: 'inline-flex', alignItems: 'center', gap: 4 }}><EditIcon color={pt.cobalt} size={12} /></button>
           <button onClick={() => toggleModuleStatus(mod)} style={{ ...miniBtn(pt, toggleColor), display: 'inline-flex', alignItems: 'center', gap: 4 }}><ToggleIcon color={toggleColor} size={12} /> {toggleLabel}</button>
-          <button onClick={() => setConfirmDeleteId(mod.id)} aria-label={`Delete module: ${mod.name}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center', gap: 4 }}><TrashIcon color={pt.danger} size={12} /></button>
+          <button onClick={() => del.requestDelete(mod.id)} aria-label={`Delete module: ${mod.name}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center', gap: 4 }}><TrashIcon color={pt.danger} size={12} /></button>
         </div>
       </LiquidGlassCard>
     )
@@ -116,7 +118,7 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
 
   const list = (
     <div>
-      {refDataLoading && <AdminStatusCard dark={dark} message="Loading..." />}
+      {refDataLoading && <EmptyState dark={dark} message="Loading..." />}
 
       {!refDataLoading && activeModules.length > 0 && (
         <div style={{ marginBottom: 16 }}>
@@ -137,7 +139,7 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
       )}
 
       {!refDataLoading && modules.length === 0 && (
-        <AdminStatusCard dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No modules yet — add one on the left</>} />
+        <EmptyState dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No modules yet — add one on the left</>} />
       )}
     </div>
   )
@@ -148,13 +150,13 @@ export default function ModulesTab({ dark, modules, fetchModules, refDataLoading
       <AdminSplitLayout form={form} list={list} />
       <ConfirmDialog
         dark={dark}
-        open={!!confirmDeleteId}
+        open={del.open}
         title="Delete module?"
         message="This will also permanently delete all its subjects, files, schedules, questions and summaries. This cannot be undone."
         confirmLabel="Delete"
         confirmColor={pt.danger}
-        onCancel={() => setConfirmDeleteId(null)}
-        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) crud.remove(id) }}
+        onCancel={del.cancel}
+        onConfirm={del.confirm}
       />
     </div>
   )

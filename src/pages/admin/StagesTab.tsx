@@ -1,10 +1,11 @@
+// src/pages/admin/StagesTab.tsx
 import { useState, useEffect } from 'react'
 import { supabase } from '../../supabase'
 import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
 import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
-import AdminStatusCard from './AdminStatusCard'
+import EmptyState from '../../components/pulse/EmptyState'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle } from './adminStyles'
@@ -132,7 +133,7 @@ export default function StagesTab({ dark, modules }: StagesTabProps) {
   const list = (
     <div>
       {!stageModuleId && (
-        <AdminStatusCard dark={dark} message={<><TargetIcon color={pt.sub} size={15} /> Pick a module on the left to edit its exam stages</>} />
+        <EmptyState dark={dark} message={<><TargetIcon color={pt.sub} size={15} /> Pick a module on the left to edit its exam stages</>} />
       )}
 
       {stageModuleId && (

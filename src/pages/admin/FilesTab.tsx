@@ -1,3 +1,4 @@
+// src/pages/admin/FilesTab.tsx
 import { useState, useEffect } from 'react'
 import { supabase } from '../../supabase'
 import { getPulseTheme } from '../../premiumTheme'
@@ -5,7 +6,7 @@ import InlineMessage from '../../components/InlineMessage'
 import ErrorBanner from '../../components/ErrorBanner'
 import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
-import AdminStatusCard from './AdminStatusCard'
+import EmptyState from '../../components/pulse/EmptyState'
 import AdminModuleFilterSelect from './AdminModuleFilterSelect'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import ConfirmDialog from '../../components/ConfirmDialog'
@@ -15,6 +16,7 @@ import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
 import { fetchModuleStages } from '../../lib/moduleStages'
 import { useAdminMessage } from './useAdminMessage'
 import { useAdminEntityCrud } from './useAdminEntityCrud'
+import { useConfirmDelete } from './useConfirmDelete'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon, VideoIcon, AudioIcon, DocumentIcon } from '../../components/ui/tool-icons'
 import type { AdminModule, AdminSubject, AdminLesson } from './adminTypes'
 
@@ -58,7 +60,6 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
   const [fileExamStage, setFileExamStage] = useState('')
   const [fileStageOptions, setFileStageOptions] = useState(EXAM_STAGES)
   const [moduleFilter, setModuleFilter] = useState('all')
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   useEffect(() => { fetchFiles() }, [])
   useEffect(() => {
@@ -96,6 +97,7 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
     }),
     resetForm: resetFileForm, refresh: fetchFiles, showMessage: showMsg
   })
+  const del = useConfirmDelete(crud.remove)
 
   function saveFile() {
     if (!fileName || !fileUrl || !fileModuleId || crud.saving) return
@@ -179,10 +181,10 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
         <p style={{ color: pt.textMuted, fontSize: 11, marginBottom: 12 }}>Showing the most recent {LIST_LIMIT} — older files aren't listed here.</p>
       )}
 
-      {filesLoading && <AdminStatusCard dark={dark} message="Loading..." />}
+      {filesLoading && <EmptyState dark={dark} message="Loading..." />}
 
       {!filesLoading && files.length === 0 && (
-        <AdminStatusCard dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No files yet — add one on the left</>} />
+        <EmptyState dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No files yet — add one on the left</>} />
       )}
 
       {!filesLoading && visibleModules.map(mod => {
@@ -204,7 +206,7 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                     <button onClick={() => editFile(f)} aria-label={`Edit file: ${f.name}`} style={{ ...miniBtn(pt, pt.cobalt), display: 'inline-flex', alignItems: 'center' }}><EditIcon color={pt.cobalt} size={12} /></button>
-                    <button onClick={() => setConfirmDeleteId(f.id)} aria-label={`Delete file: ${f.name}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
+                    <button onClick={() => del.requestDelete(f.id)} aria-label={`Delete file: ${f.name}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
                   </div>
                 </LiquidGlassCard>
               ))}
@@ -221,13 +223,13 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
       <AdminSplitLayout form={form} list={list} />
       <ConfirmDialog
         dark={dark}
-        open={!!confirmDeleteId}
+        open={del.open}
         title="Delete file?"
         message="This cannot be undone."
         confirmLabel="Delete"
         confirmColor={pt.danger}
-        onCancel={() => setConfirmDeleteId(null)}
-        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) crud.remove(id) }}
+        onCancel={del.cancel}
+        onConfirm={del.confirm}
       />
     </div>
   )

@@ -1,3 +1,4 @@
+// src/pages/admin/QuestionsTab.tsx
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../supabase'
 import { getPulseTheme } from '../../premiumTheme'
@@ -5,7 +6,7 @@ import InlineMessage from '../../components/InlineMessage'
 import ErrorBanner from '../../components/ErrorBanner'
 import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
-import AdminStatusCard from './AdminStatusCard'
+import EmptyState from '../../components/pulse/EmptyState'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { ModuleIcon } from '../../lib/medicalIcons'
@@ -14,6 +15,7 @@ import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
 import { fetchModuleStages } from '../../lib/moduleStages'
 import { useAdminMessage } from './useAdminMessage'
 import { useAdminEntityCrud } from './useAdminEntityCrud'
+import { useConfirmDelete } from './useConfirmDelete'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon, ListIcon, SearchIcon2, RobotIcon, BookIcon, GraduationCapIcon } from '../../components/ui/tool-icons'
 import QuestionSourceBadge from '../../components/QuestionSourceBadge'
 import type { AdminModule, AdminSubject, AdminLesson } from './adminTypes'
@@ -71,7 +73,6 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
   const [bulkSaving, setBulkSaving] = useState(false)
   const [moduleFilter, setModuleFilter] = useState('all')
   const [search, setSearch] = useState('')
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const requestIdRef = useRef(0)
 
   // Search runs on the server so questions beyond the newest LIST_LIMIT stay findable.
@@ -137,6 +138,7 @@ export default function QuestionsTab({ dark, modules, subjects, lessons }: Quest
       p_module_id: p.module_id, p_subject_id: p.subject_id, p_lesson_id: p.lesson_id, p_source: p.source
     })
   })
+  const del = useConfirmDelete(crud.remove)
 
   function saveQuestion() {
     if (!qText || !qA || !qB || !qC || !qD || !qModuleId || crud.saving) return
@@ -373,10 +375,10 @@ Correct: A`}</pre>
         </p>
       )}
 
-      {questionsLoading && <AdminStatusCard dark={dark} message="Loading..." />}
+      {questionsLoading && <EmptyState dark={dark} message="Loading..." />}
 
       {!questionsLoading && questions.length === 0 && (
-        <AdminStatusCard dark={dark} message={search.trim()
+        <EmptyState dark={dark} message={search.trim()
           ? <><SearchIcon2 color={pt.sub} size={14} /> No questions match your search</>
           : <><ConstructionIcon color={pt.sub} size={14} /> No questions yet — add one on the left</>} />
       )}
@@ -411,7 +413,7 @@ Correct: A`}</pre>
                       }}>{q.question}</p>
                       <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                         <button onClick={() => editQuestion(q)} aria-label={`Edit question: ${q.question}`} style={{ ...miniBtn(pt, pt.cobalt), display: 'inline-flex', alignItems: 'center' }}><EditIcon color={pt.cobalt} size={12} /></button>
-                        <button onClick={() => setConfirmDeleteId(q.id)} aria-label={`Delete question: ${q.question}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
+                        <button onClick={() => del.requestDelete(q.id)} aria-label={`Delete question: ${q.question}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
@@ -445,13 +447,13 @@ Correct: A`}</pre>
       <AdminSplitLayout formWidth={420} form={form} list={list} />
       <ConfirmDialog
         dark={dark}
-        open={!!confirmDeleteId}
+        open={del.open}
         title="Delete question?"
         message="This cannot be undone."
         confirmLabel="Delete"
         confirmColor={pt.danger}
-        onCancel={() => setConfirmDeleteId(null)}
-        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) crud.remove(id) }}
+        onCancel={del.cancel}
+        onConfirm={del.confirm}
       />
     </div>
   )

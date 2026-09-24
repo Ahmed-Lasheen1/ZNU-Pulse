@@ -124,6 +124,9 @@ export default function FilesPage({ dark }: { dark: boolean }) {
   useHistoryOverlay(!!viewer, () => setViewer(null))
 
   const activeModules = modules.filter(m => m.status === 'active')
+  // Falls back to any module if none are active, so the page never gets
+  // stuck with nothing selectable.
+  const selectableModules = activeModules.length > 0 ? activeModules : modules
 
   // Remember what's been applied so later re-renders can't revert a manual tab or reopen a closed viewer.
   const appliedModuleParamRef = useRef<string | null>(null)
@@ -135,8 +138,8 @@ export default function FilesPage({ dark }: { dark: boolean }) {
         appliedModuleParamRef.current = moduleParam
         setActiveModule(moduleParam)
       }
-    } else if (modulesLoaded && activeModules.length > 0 && !activeModule) {
-      setActiveModule(activeModules[0].id)
+    } else if (modulesLoaded && selectableModules.length > 0 && !activeModule) {
+      setActiveModule(selectableModules[0].id)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules, moduleParam])
@@ -230,7 +233,7 @@ export default function FilesPage({ dark }: { dark: boolean }) {
       />
 
       <TabRow
-        items={activeModules.map(m => ({ value: m.id, label: m.name, icon: m.icon, color: m.color, completed: m.status === 'completed' }))}
+        items={selectableModules.map(m => ({ value: m.id, label: m.name, icon: m.icon, color: m.color, completed: m.status === 'completed' }))}
         active={activeModule}
         onSelect={(id) => { setActiveModule(id); setActiveSubject('all'); setActiveType(null) }}
         dark={dark}

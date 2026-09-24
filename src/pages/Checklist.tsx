@@ -1,3 +1,4 @@
+// src/pages/Checklist.tsx
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
@@ -109,10 +110,13 @@ export default function Checklist({ dark }: { dark: boolean }) {
   const [showCompleted, setShowCompleted] = useState(false)
 
   const activeModulesList = (modules as any[]).filter(m => m.status === 'active')
+  // Falls back to any module if none are active, so the page never gets
+  // stuck with nothing selectable.
+  const selectableModules = activeModulesList.length > 0 ? activeModulesList : (modules as any[])
 
   useEffect(() => {
-    if (modulesLoaded && activeModulesList.length > 0 && !activeModule) {
-      setActiveModule(activeModulesList[0].id)
+    if (modulesLoaded && selectableModules.length > 0 && !activeModule) {
+      setActiveModule(selectableModules[0].id)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules])
@@ -337,7 +341,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
 
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: SECTION_GAP }}>
         <TabRow
-          items={activeModulesList.map((m: any) => ({
+          items={selectableModules.map((m: any) => ({
             value: m.id, label: m.name, icon: m.icon, color: m.color, completed: m.status === 'completed'
           }))}
           active={activeModule}

@@ -71,6 +71,9 @@ export default function Schedule({ dark }: { dark: boolean }) {
   useHistoryOverlay(!!viewer, () => setViewer(null))
 
   const activeModules = modules.filter(m => m.status === 'active')
+  // Falls back to any module if none are active, so the page never gets
+  // stuck with nothing selectable.
+  const selectableModules = activeModules.length > 0 ? activeModules : modules
 
   useEffect(() => {
     if (moduleParam && modules.some(m => m.id === moduleParam)) {
@@ -80,8 +83,8 @@ export default function Schedule({ dark }: { dark: boolean }) {
       }
       return
     }
-    if (!activeModule && modulesLoaded && activeModules.length > 0) {
-      setActiveModule(activeModules[0].id)
+    if (!activeModule && modulesLoaded && selectableModules.length > 0) {
+      setActiveModule(selectableModules[0].id)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules, moduleParam])
@@ -134,7 +137,7 @@ export default function Schedule({ dark }: { dark: boolean }) {
 
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: SECTION_GAP }}>
         <TabRow
-          items={activeModules.map(m => ({ value: m.id, label: m.name, icon: m.icon, color: m.color, completed: m.status === 'completed' }))}
+          items={selectableModules.map(m => ({ value: m.id, label: m.name, icon: m.icon, color: m.color, completed: m.status === 'completed' }))}
           active={activeModule}
           onSelect={setActiveModule}
           dark={dark}

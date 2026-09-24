@@ -1,9 +1,10 @@
+// src/pages/admin/SubjectsTab.tsx
 import { useState } from 'react'
 import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
 import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
-import AdminStatusCard from './AdminStatusCard'
+import EmptyState from '../../components/pulse/EmptyState'
 import AdminModuleFilterSelect from './AdminModuleFilterSelect'
 import IconPicker from '../../components/admin/IconPicker'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
@@ -12,6 +13,7 @@ import { ModuleIcon } from '../../lib/medicalIcons'
 import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
 import { useAdminEntityCrud } from './useAdminEntityCrud'
+import { useConfirmDelete } from './useConfirmDelete'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon } from '../../components/ui/tool-icons'
 import type { AdminModule, AdminSubject } from './adminTypes'
 
@@ -35,7 +37,6 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
   const [subIcon, setSubIcon] = useState('📖')
   const [subColor, setSubColor] = useState('#34d399')
   const [moduleFilter, setModuleFilter] = useState('all')
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   function editSubject(sub: AdminSubject) {
     setEditingSubjectId(sub.id)
@@ -55,6 +56,7 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
     }),
     resetForm: resetSubjectForm, refresh: fetchSubjects, showMessage: showMsg
   })
+  const del = useConfirmDelete(crud.remove)
 
   function saveSubject() {
     if (!subName || !subModuleId || crud.saving) return
@@ -100,10 +102,10 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
     <div>
       <AdminModuleFilterSelect modules={modules} value={moduleFilter} onChange={setModuleFilter} totalCount={subjects.length} inStyle={inStyle} />
 
-      {refDataLoading && <AdminStatusCard dark={dark} message="Loading..." />}
+      {refDataLoading && <EmptyState dark={dark} message="Loading..." />}
 
       {!refDataLoading && subjects.length === 0 && (
-        <AdminStatusCard dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No subjects yet — add one on the left</>} />
+        <EmptyState dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No subjects yet — add one on the left</>} />
       )}
 
       {!refDataLoading && visibleModules.map(mod => {
@@ -128,7 +130,7 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={() => editSubject(sub)} aria-label={`Edit subject: ${sub.name}`} style={{ ...miniBtn(pt, pt.cobalt), display: 'inline-flex', alignItems: 'center' }}><EditIcon color={pt.cobalt} size={12} /></button>
-                    <button onClick={() => setConfirmDeleteId(sub.id)} aria-label={`Delete subject: ${sub.name}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
+                    <button onClick={() => del.requestDelete(sub.id)} aria-label={`Delete subject: ${sub.name}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
                   </div>
                 </LiquidGlassCard>
               ))}
@@ -145,13 +147,13 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
       <AdminSplitLayout form={form} list={list} />
       <ConfirmDialog
         dark={dark}
-        open={!!confirmDeleteId}
+        open={del.open}
         title="Delete subject?"
         message="Its files, lessons and questions will also be deleted. This cannot be undone."
         confirmLabel="Delete"
         confirmColor={pt.danger}
-        onCancel={() => setConfirmDeleteId(null)}
-        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) crud.remove(id) }}
+        onCancel={del.cancel}
+        onConfirm={del.confirm}
       />
     </div>
   )

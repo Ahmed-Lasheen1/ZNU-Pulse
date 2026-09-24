@@ -1,10 +1,11 @@
+// src/pages/admin/LessonsTab.tsx
 import { useState, useEffect } from 'react'
 import { supabase } from '../../supabase'
 import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
 import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
-import AdminStatusCard from './AdminStatusCard'
+import EmptyState from '../../components/pulse/EmptyState'
 import AdminModuleFilterSelect from './AdminModuleFilterSelect'
 import IconPicker from '../../components/admin/IconPicker'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
@@ -15,6 +16,7 @@ import { invalidateLessonStagesCache } from '../../lib/lessonStages'
 import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
 import { useAdminEntityCrud } from './useAdminEntityCrud'
+import { useConfirmDelete } from './useConfirmDelete'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon, CheckCircleIcon } from '../../components/ui/tool-icons'
 import type { AdminModule, AdminSubject, AdminLesson } from './adminTypes'
 
@@ -43,7 +45,6 @@ export default function LessonsTab({ dark, modules, subjects, lessons, fetchLess
   const [savedStages, setSavedStages] = useState<Record<string, string[]>>({})
   const [moduleStagesMap, setModuleStagesMap] = useState<Record<string, StageOption[]>>({})
   const [moduleFilter, setModuleFilter] = useState('all')
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   useEffect(() => { fetchSavedStages() }, [])
 
@@ -127,6 +128,7 @@ export default function LessonsTab({ dark, modules, subjects, lessons, fetchLess
       return syncLessonStages(id)
     }
   })
+  const del = useConfirmDelete(crud.remove)
 
   function saveLesson() {
     if (!lessonTitle || !lessonSubjectId || !lessonModuleId || crud.saving) return showMsg('❌ Pick a module, subject, and title first')
@@ -209,10 +211,10 @@ export default function LessonsTab({ dark, modules, subjects, lessons, fetchLess
         <p style={{ color: pt.textMuted, fontSize: 11, marginBottom: 12 }}>Showing the most recent {LIST_LIMIT} — older lessons aren't listed here.</p>
       )}
 
-      {refDataLoading && <AdminStatusCard dark={dark} message="Loading..." />}
+      {refDataLoading && <EmptyState dark={dark} message="Loading..." />}
 
       {!refDataLoading && lessons.length === 0 && (
-        <AdminStatusCard dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No lessons yet — add one on the left</>} />
+        <EmptyState dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No lessons yet — add one on the left</>} />
       )}
 
       {!refDataLoading && visibleModules.map(mod => {
@@ -247,7 +249,7 @@ export default function LessonsTab({ dark, modules, subjects, lessons, fetchLess
                         </div>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button onClick={() => editLesson(l)} aria-label={`Edit lesson: ${l.title}`} style={{ ...miniBtn(pt, pt.cobalt), display: 'inline-flex', alignItems: 'center' }}><EditIcon color={pt.cobalt} size={12} /></button>
-                          <button onClick={() => setConfirmDeleteId(l.id)} aria-label={`Delete lesson: ${l.title}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
+                          <button onClick={() => del.requestDelete(l.id)} aria-label={`Delete lesson: ${l.title}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
                         </div>
                       </LiquidGlassCard>
                     ))}
@@ -267,13 +269,13 @@ export default function LessonsTab({ dark, modules, subjects, lessons, fetchLess
       <AdminSplitLayout form={form} list={list} />
       <ConfirmDialog
         dark={dark}
-        open={!!confirmDeleteId}
+        open={del.open}
         title="Delete lesson?"
         message="Questions tagged to it keep their module/subject tags but lose the lesson link. This cannot be undone."
         confirmLabel="Delete"
         confirmColor={pt.danger}
-        onCancel={() => setConfirmDeleteId(null)}
-        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) crud.remove(id) }}
+        onCancel={del.cancel}
+        onConfirm={del.confirm}
       />
     </div>
   )

@@ -1,3 +1,4 @@
+// src/pages/admin/SchedulesTab.tsx
 import { useState, useEffect } from 'react'
 import { supabase } from '../../supabase'
 import { getPulseTheme } from '../../premiumTheme'
@@ -5,7 +6,7 @@ import InlineMessage from '../../components/InlineMessage'
 import ErrorBanner from '../../components/ErrorBanner'
 import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
-import AdminStatusCard from './AdminStatusCard'
+import EmptyState from '../../components/pulse/EmptyState'
 import AdminModuleFilterSelect from './AdminModuleFilterSelect'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import ConfirmDialog from '../../components/ConfirmDialog'
@@ -13,6 +14,7 @@ import { ModuleIcon } from '../../lib/medicalIcons'
 import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
 import { useAdminEntityCrud } from './useAdminEntityCrud'
+import { useConfirmDelete } from './useConfirmDelete'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon, CalendarDotIcon } from '../../components/ui/tool-icons'
 import { ExamIcon } from '../../lib/medicalIcons'
 import type { AdminModule } from './adminTypes'
@@ -47,7 +49,6 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
   const [schDates, setSchDates] = useState<string[]>([''])
   const [schDateIds, setSchDateIds] = useState<string[]>([crypto.randomUUID()])
   const [moduleFilter, setModuleFilter] = useState('all')
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   useEffect(() => { fetchSchedules() }, [])
 
@@ -95,6 +96,7 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
     },
     resetForm: resetScheduleForm, refresh: fetchSchedules, showMessage: showMsg
   })
+  const del = useConfirmDelete(crud.remove)
 
   function saveSchedule() {
     if (!schTitle || !schUrl || !schModuleId || crud.saving) return
@@ -161,10 +163,10 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
         <p style={{ color: pt.textMuted, fontSize: 11, marginBottom: 12 }}>Showing the most recent {LIST_LIMIT} — older schedules aren't listed here.</p>
       )}
 
-      {schedulesLoading && <AdminStatusCard dark={dark} message="Loading..." />}
+      {schedulesLoading && <EmptyState dark={dark} message="Loading..." />}
 
       {!schedulesLoading && schedules.length === 0 && (
-        <AdminStatusCard dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No schedules yet — add one on the left</>} />
+        <EmptyState dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No schedules yet — add one on the left</>} />
       )}
 
       {!schedulesLoading && visibleModules.map(mod => {
@@ -188,7 +190,7 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={() => editSchedule(s)} aria-label={`Edit schedule: ${s.title}`} style={{ ...miniBtn(pt, pt.cobalt), display: 'inline-flex', alignItems: 'center' }}><EditIcon color={pt.cobalt} size={12} /></button>
-                    <button onClick={() => setConfirmDeleteId(s.id)} aria-label={`Delete schedule: ${s.title}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
+                    <button onClick={() => del.requestDelete(s.id)} aria-label={`Delete schedule: ${s.title}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
                   </div>
                 </LiquidGlassCard>
               ))}
@@ -205,13 +207,13 @@ export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
       <AdminSplitLayout form={form} list={list} />
       <ConfirmDialog
         dark={dark}
-        open={!!confirmDeleteId}
+        open={del.open}
         title="Delete schedule?"
         message="This cannot be undone."
         confirmLabel="Delete"
         confirmColor={pt.danger}
-        onCancel={() => setConfirmDeleteId(null)}
-        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) crud.remove(id) }}
+        onCancel={del.cancel}
+        onConfirm={del.confirm}
       />
     </div>
   )
