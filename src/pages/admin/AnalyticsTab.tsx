@@ -4,7 +4,7 @@ import { getPulseTheme } from '../../premiumTheme'
 import { watchOnlineCount } from '../../lib/onlinePresence'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
-import AdminStatusCard from './AdminStatusCard'
+import EmptyState from '../../components/pulse/EmptyState'
 import ErrorBanner from '../../components/ErrorBanner'
 import { DotIcon, PeopleIcon, BellIcon, ChartBarIcon, ConstructionIcon } from '../../components/ui/tool-icons'
 import type { PulseTheme } from './adminStyles'
@@ -140,7 +140,7 @@ export default function AnalyticsTab({ dark, modules }: AnalyticsTabProps) {
       {difficultyLoading && <p style={{ color: pt.sub, textAlign: 'center' }}>Loading...</p>}
 
       {!difficultyLoading && !difficultyError && difficulty.length === 0 && (
-        <AdminStatusCard dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> Not enough attempts yet to report on</>} />
+        <EmptyState dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> Not enough attempts yet to report on</>} />
       )}
 
       <div className="admin-list-grid">
