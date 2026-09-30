@@ -68,9 +68,8 @@ export default function StagePage({ dark }: { dark: boolean }) {
   useEffect(() => {
     let ignore = false
     setSummariesLoaded(false)
+    setHasStageQuestions(null)
 
-    // A lesson belongs to this stage via its own item tags OR its
-    // lesson_exam_stages assignment — `here()` covers both.
     Promise.all([
       supabase.rpc('get_module_content_facets', { p_module_id: moduleId }),
       fetchAllRows(() => supabase.from('summaries').select('*').eq('module_id', moduleId).order('created_at').order('id')),
@@ -85,9 +84,8 @@ export default function StagePage({ dark }: { dark: boolean }) {
       if (facetsRes.data) {
         const rows = facetsRes.data as ContentFacet[]
         setPresentFileTypes(new Set(rows.filter(r => r.kind === 'file' && here(r)).map(r => r.item_type as string)))
-        const qIds = new Set(rows.filter(r => r.kind === 'question' && here(r) && r.lesson_id).map(r => r.lesson_id as string))
-        setHasStageQuestions(qIds.size > 0)
-        setLessonQuestionIds(qIds)
+        setHasStageQuestions(rows.some(r => r.kind === 'question' && here(r)))
+        setLessonQuestionIds(new Set(rows.filter(r => r.kind === 'question' && here(r) && r.lesson_id).map(r => r.lesson_id as string)))
         rows.forEach(r => { if (here(r) && r.lesson_id) stageLessonIds.add(r.lesson_id) })
       }
       if (facetsRes.error) setLoadError(true)

@@ -37,6 +37,14 @@ interface MCQBrowseProps {
   onStartQuiz: (type: string, subjectId?: string | null, lessonId?: string | null, sourceFilter?: string | null) => void
 }
 
+interface SourceChoice {
+  type: 'mock' | 'practice'
+  subjectId: string | null
+  lessonId: string | null
+  allCount: number
+  doctorCount: number
+}
+
 function CountText({ children }: { children: ReactNode }) {
   return (
     <span style={{
@@ -48,7 +56,7 @@ function CountText({ children }: { children: ReactNode }) {
 
 const countLabel = (n: number) => `${n} question${n === 1 ? '' : 's'}`
 
-function MockSourceDialog({
+function SourceChoiceDialog({
   dark, open, allCount, doctorCount, onCancel, onChooseAll, onChooseDoctors
 }: {
   dark: boolean
@@ -71,13 +79,13 @@ function MockSourceDialog({
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
       }}
     >
-      <div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="mock-source-dialog-title" style={{ width: '100%', maxWidth: 380 }}>
+      <div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="source-choice-dialog-title" style={{ width: '100%', maxWidth: 380 }}>
         <LiquidGlassCard dark={dark} delay={0} instant style={{ padding: '26px 24px', textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
             <GraduationCapIcon color={MCQ_ACCENT} size={30} />
           </div>
-          <h3 id="mock-source-dialog-title" style={{ ...pulseType.sectionTitle, fontSize: 16, color: pt.textPrimary, marginBottom: 6, fontFamily: pulseFonts.display }}>
-            This module has University Doctors' questions
+          <h3 id="source-choice-dialog-title" style={{ ...pulseType.sectionTitle, fontSize: 16, color: pt.textPrimary, marginBottom: 6, fontFamily: pulseFonts.display }}>
+            This selection has University Doctors' questions
           </h3>
           <p style={{ color: pt.sub, fontSize: 13, lineHeight: 1.5, marginBottom: 20, fontFamily: pulseFonts.body }}>
             Include every question, or practice only the ones tagged by University Doctors?
@@ -122,12 +130,20 @@ function SubjectAccordionRow({
   dark, sub, count, tabAccentColor, delay, lessonRows, expanded, forceOpen, onToggle, onPracticeSubject, onPracticeLesson
 }: SubjectAccordionRowProps) {
   const pt = getPulseTheme(dark)
-  const canExpand = lessonRows.length > 0 && !forceOpen
-  const isOpen = forceOpen || expanded
+  const hasLessons = lessonRows.length > 0
+  const canExpand = hasLessons && !forceOpen
+  const isOpen = hasLessons && (forceOpen || expanded)
   const panelId = `subject-lessons-${sub.id}`
+  const hoverTint = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'
 
   return (
     <LiquidGlassCard dark={dark} delay={delay} style={{ padding: 0 }}>
+      <style>{`
+        .mcq-subject-toggle { transition: background 0.15s ease; }
+        .mcq-subject-toggle:active { background: var(--mcq-sbl-hover); }
+        @media (hover: hover) { .mcq-subject-toggle:hover { background: var(--mcq-sbl-hover); } }
+      `}</style>
+
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px' }}>
         <button
           type="button"
@@ -135,7 +151,9 @@ function SubjectAccordionRow({
           aria-expanded={canExpand ? isOpen : undefined}
           aria-controls={canExpand ? panelId : undefined}
           disabled={!canExpand}
+          className="mcq-subject-toggle"
           style={{
+            ['--mcq-sbl-hover' as any]: canExpand ? hoverTint : 'transparent',
             flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10,
             background: 'transparent', border: 'none', padding: 0, textAlign: 'left',
             cursor: canExpand ? 'pointer' : 'default', font: 'inherit', color: 'inherit'
@@ -159,22 +177,33 @@ function SubjectAccordionRow({
         }}>Practice All</button>
       </div>
 
-      {isOpen && lessonRows.length > 0 && (
-        <div id={panelId} role="region" aria-label={`${sub.name} lessons`} style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {lessonRows.map(({ lesson, count: lessonQCount }) => (
-            <PulseGlassRow
-              key={lesson.id} dark={dark} radius={12}
-              hoverTint={dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'}
-              onClick={() => onPracticeLesson(lesson.id)}
-              role="button" tabIndex={0}
-              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPracticeLesson(lesson.id) } }}
+      {hasLessons && (
+        <div style={{
+          display: 'grid', gridTemplateRows: isOpen ? '1fr' : '0fr',
+          visibility: isOpen ? 'visible' : 'hidden',
+          transition: 'grid-template-rows 0.25s ease, visibility 0.25s'
+        }}>
+          <div style={{ overflow: 'hidden' }}>
+            <div
+              id={panelId} role="region" aria-label={`${sub.name} lessons`} aria-hidden={!isOpen}
+              style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}
             >
-              <div style={{ padding: '9px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                <span style={{ color: pt.textPrimary, fontSize: 13, fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lesson.title}</span>
-                <span style={{ color: pt.textMuted, fontSize: 11, flexShrink: 0 }}>{countLabel(lessonQCount)}</span>
-              </div>
-            </PulseGlassRow>
-          ))}
+              {lessonRows.map(({ lesson, count: lessonQCount }) => (
+                <PulseGlassRow
+                  key={lesson.id} dark={dark} radius={12}
+                  hoverTint={hoverTint}
+                  onClick={() => onPracticeLesson(lesson.id)}
+                  role="button" tabIndex={isOpen ? 0 : -1}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPracticeLesson(lesson.id) } }}
+                >
+                  <div style={{ padding: '9px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                    <span style={{ color: pt.textPrimary, fontSize: 13, fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lesson.title}</span>
+                    <span style={{ color: pt.textMuted, fontSize: 11, flexShrink: 0 }}>{countLabel(lessonQCount)}</span>
+                  </div>
+                </PulseGlassRow>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </LiquidGlassCard>
@@ -190,7 +219,7 @@ export default function MCQBrowse({
   const pt = getPulseTheme(dark)
   const navigate = useNavigate()
   const hoverTint = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'
-  const [mockChoiceOpen, setMockChoiceOpen] = useState(false)
+  const [sourceChoice, setSourceChoice] = useState<SourceChoice | null>(null)
   const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null)
 
   const tabAccentColor = activeModuleObj?.color || pt.cobalt
@@ -199,35 +228,45 @@ export default function MCQBrowse({
   const visibleStages = stages.filter(s => stagesWithQuestions.has(s.value))
 
   const mockQuestions = getFilteredQuestions('mock')
-  const doctorMockQuestions = mockQuestions.filter(q => q.source === 'university')
-  const hasDoctorChoice = doctorMockQuestions.length > 0 && doctorMockQuestions.length < mockQuestions.length
+
+  function practiceScope(subjectId: string | null, lessonId: string | null) {
+    return questions.filter(q =>
+      (lessonId ? q.lesson_id === lessonId : q.subject_id === subjectId) &&
+      (q.exam_type === 'practice' || q.exam_type === 'both') &&
+      inStage(q, activeStage, lessonStageMap)
+    )
+  }
+
+  function requestStart(type: 'mock' | 'practice', subjectId: string | null, lessonId: string | null, scope: any[]) {
+    const doctorCount = scope.filter(q => q.source === 'university').length
+    if (doctorCount > 0 && doctorCount < scope.length) {
+      setSourceChoice({ type, subjectId, lessonId, allCount: scope.length, doctorCount })
+      return
+    }
+    onStartQuiz(type, subjectId, lessonId)
+  }
 
   function handleStartMock() {
-    if (hasDoctorChoice) { setMockChoiceOpen(true); return }
-    onStartQuiz('mock')
+    requestStart('mock', null, null, mockQuestions)
   }
-  function chooseAllMock() {
-    setMockChoiceOpen(false)
-    onStartQuiz('mock')
+  function handlePracticeSubject(subjectId: string) {
+    requestStart('practice', subjectId, null, practiceScope(subjectId, null))
   }
-  function chooseDoctorsMock() {
-    setMockChoiceOpen(false)
-    onStartQuiz('mock', null, null, 'university')
+  function handlePracticeLesson(lessonId: string) {
+    requestStart('practice', null, lessonId, practiceScope(null, lessonId))
   }
 
-  function practiceCountFor(subjectId: string) {
-    return questions.filter(q =>
-      q.subject_id === subjectId &&
-      (q.exam_type === 'practice' || q.exam_type === 'both') &&
-      inStage(q, activeStage, lessonStageMap)
-    ).length
+  function chooseAll() {
+    if (!sourceChoice) return
+    const { type, subjectId, lessonId } = sourceChoice
+    setSourceChoice(null)
+    onStartQuiz(type, subjectId, lessonId)
   }
-  function lessonCountFor(lessonId: string) {
-    return questions.filter(q =>
-      q.lesson_id === lessonId &&
-      (q.exam_type === 'practice' || q.exam_type === 'both') &&
-      inStage(q, activeStage, lessonStageMap)
-    ).length
+  function chooseDoctors() {
+    if (!sourceChoice) return
+    const { type, subjectId, lessonId } = sourceChoice
+    setSourceChoice(null)
+    onStartQuiz(type, subjectId, lessonId, 'university')
   }
 
   const singleSubject = moduleSubjects.length === 1
@@ -351,21 +390,21 @@ export default function MCQBrowse({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {moduleSubjects.map((sub, i) => {
           const lessonsForSubject = lessons.filter(l => l.subject_id === sub.id)
-          const lessonRows = lessonsForSubject.map(lesson => ({ lesson, count: lessonCountFor(lesson.id) }))
+          const lessonRows = lessonsForSubject.map(lesson => ({ lesson, count: practiceScope(null, lesson.id).length }))
           return (
             <SubjectAccordionRow
               key={sub.id}
               dark={dark}
               sub={sub}
-              count={practiceCountFor(sub.id)}
+              count={practiceScope(sub.id, null).length}
               tabAccentColor={tabAccentColor}
               delay={i * 70}
               lessonRows={lessonRows}
               expanded={expandedSubjectId === sub.id}
               forceOpen={singleSubject}
               onToggle={() => setExpandedSubjectId(prev => prev === sub.id ? null : sub.id)}
-              onPracticeSubject={() => onStartQuiz('practice', sub.id)}
-              onPracticeLesson={(lessonId) => onStartQuiz('practice', null, lessonId)}
+              onPracticeSubject={() => handlePracticeSubject(sub.id)}
+              onPracticeLesson={handlePracticeLesson}
             />
           )
         })}
@@ -378,14 +417,14 @@ export default function MCQBrowse({
         )}
       </div>
 
-      <MockSourceDialog
+      <SourceChoiceDialog
         dark={dark}
-        open={mockChoiceOpen}
-        allCount={mockQuestions.length}
-        doctorCount={doctorMockQuestions.length}
-        onCancel={() => setMockChoiceOpen(false)}
-        onChooseAll={chooseAllMock}
-        onChooseDoctors={chooseDoctorsMock}
+        open={!!sourceChoice}
+        allCount={sourceChoice?.allCount ?? 0}
+        doctorCount={sourceChoice?.doctorCount ?? 0}
+        onCancel={() => setSourceChoice(null)}
+        onChooseAll={chooseAll}
+        onChooseDoctors={chooseDoctors}
       />
     </PageShell>
   )

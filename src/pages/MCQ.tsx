@@ -14,6 +14,13 @@ import { optionLabels } from './mcq/mcqShared'
 import MCQBrowse from './mcq/MCQBrowse'
 import MCQExamFlow from './mcq/MCQExamFlow'
 
+interface QuizConfig {
+  type: string
+  subjectId: string | null
+  lessonId: string | null
+  sourceFilter: string | null
+}
+
 export default function MCQ({ dark }: { dark: boolean }) {
   const { user, fetchProfile } = useAuth() as any
   const { modules, modulesLoaded, modulesError } = useModules() as any
@@ -63,6 +70,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
   const timerRef = useRef<ReturnType<typeof setInterval>>()
   const quizStartedAtRef = useRef<number | null>(null)
+  const lastQuizConfigRef = useRef<QuizConfig | null>(null)
   const [usingCache, setUsingCache] = useState(false)
   const gradingInFlightRef = useRef<Set<number>>(new Set())
   const sessionIdRef = useRef(0)
@@ -167,7 +175,11 @@ export default function MCQ({ dark }: { dark: boolean }) {
   useEffect(() => {
     if (!quizMode || submitted || quizMode === 'retry') { pendingPersistRef.current = null; return }
     if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current)
-    const payload = { activeModule, quizMode, quizQuestions, answers, startedAt: quizStartedAtRef.current }
+    const payload = {
+      activeModule, quizMode, quizQuestions, answers,
+      startedAt: quizStartedAtRef.current,
+      quizConfig: lastQuizConfigRef.current
+    }
     pendingPersistRef.current = payload
     persistTimeoutRef.current = setTimeout(() => {
       persistActiveExam(user, { ...payload, savedAt: Date.now() })
@@ -360,7 +372,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   }
 
   // `subjectId`/`lessonId` pick the practice scope (lessonId wins when both
-  // are somehow set); `sourceFilter` narrows a Mock Exam to one question
+  // are somehow set); `sourceFilter` narrows the quiz to one question
   // source (currently only 'university', from MCQBrowse's doctors-only choice).
   function startQuiz(type: string, subjectId: string | null = null, lessonId: string | null = null, sourceFilter: string | null = null) {
     let qs = type === 'mock'
@@ -368,13 +380,16 @@ export default function MCQ({ dark }: { dark: boolean }) {
       : shuffle(questions.filter(q =>
           (lessonId ? q.lesson_id === lessonId : q.subject_id === subjectId) &&
           (q.exam_type === 'practice' || q.exam_type === 'both') &&
-          inStage(q, activeStage, lessonStageMap)
+          inStage(q, activeStage, lessonStageMap) &&
+          (!sourceFilter || q.source === sourceFilter)
         ))
 
     if (qs.length === 0) {
       showToast('❌ No questions available for this selection yet', 'error')
       return
     }
+
+    lastQuizConfigRef.current = { type, subjectId, lessonId, sourceFilter }
 
     setQuizQuestions(qs)
     setAnswers({})
@@ -404,6 +419,8 @@ export default function MCQ({ dark }: { dark: boolean }) {
       return
     }
 
+    lastQuizConfigRef.current = null
+
     setQuizQuestions(list)
     setAnswers({})
     setResults({})
@@ -431,6 +448,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     const startedAt = resumeData.savedAt && resumeData.startedAt
       ? Date.now() - (resumeData.savedAt - resumeData.startedAt)
       : resumeData.startedAt
+    lastQuizConfigRef.current = resumeData.quizConfig || null
     setActiveModule(resumeData.activeModule)
     setQuizQuestions(resumeData.quizQuestions || [])
     setAnswers(resumeData.answers || {})
@@ -521,7 +539,9 @@ export default function MCQ({ dark }: { dark: boolean }) {
   function goNext() { setCurrentIndex(i => Math.min(quizQuestions.length - 1, i + 1)) }
 
   function tryAgain() {
-    if (quizMode === 'retry') startRetryQuiz(quizQuestions)
+    if (quizMode === 'retry') { startRetryQuiz(quizQuestions); return }
+    const config = lastQuizConfigRef.current
+    if (config) startQuiz(config.type, config.subjectId, config.lessonId, config.sourceFilter)
     else startQuiz(quizMode!)
   }
 
