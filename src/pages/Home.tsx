@@ -3,8 +3,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown } from 'lucide-react'
-import { useAuth, useModules } from '../contexts'
-import NavMenu from '../components/NavMenu'
+import { useAuth, useModules, useHomeEntrance } from '../contexts'
 import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP, ON_GRADIENT_BOTTOM } from '../premiumTheme'
 import { supabase } from '../supabase'
 import ErrorBanner from '../components/ErrorBanner'
@@ -12,13 +11,11 @@ import { computeStreak } from '../lib/streak'
 import { getGuestHistory } from '../lib/reviewStorage'
 import { hasSavedActiveExam } from '../lib/activeExam'
 import { fetchSubjectById } from '../lib/subjects'
-import { ENTRANCE_PAUSE } from '../lib/pulseMotion'
-import { useOncePerSession } from '../lib/useOncePerSession'
+import { ENTRANCE_PAUSE, LOGO_DELAY } from '../lib/pulseMotion'
 import NotifyPermissionButton from '../components/NotifyPermissionButton'
 import GuestSignInButton from '../components/GuestSignInButton'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import EcgHero from '../components/pulse/EcgHero'
-import PulseBrand from '../components/pulse/PulseBrand'
 import AutoDirText from '../components/AutoDirText'
 import { ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, PauseIcon, LightningIcon, CheckCircleIcon, WeeklyReportIcon, StreakFlameIcon } from '@/components/ui/tool-icons'
 import { NumberTicker } from '@/components/ui/number-ticker'
@@ -36,7 +33,7 @@ const toolCards = [
   { Icon: LeaderboardIcon, title: 'Leaderboard', sub: 'See where you stand', to: '/profile?tab=leaderboard', accent: 'amber' },
 ] as const
 
-// Marks drawn directly on PULSE_BG must not shift with the theme toggle.
+// Drawn directly on PULSE_BG, so these must not follow the theme toggle.
 const ACTIVE_MODULES_ACCENT = getPulseTheme(false).cobalt
 const FOOTER_LINE_COLOR = getPulseTheme(true).border
 
@@ -68,9 +65,8 @@ function weeklyAccuracyFeedback(accuracy: number, pt: ReturnType<typeof getPulse
 
 const statNumStyle = { ...pulseType.display, fontSize: 28, lineHeight: 1.1 }
 
-// Entrance reveal order
+// Entrance order. Header timings live in lib/pulseMotion.js.
 const HERO_DELAY = ENTRANCE_PAUSE
-const LOGO_DELAY = ENTRANCE_PAUSE + 0.5
 const NOTIFY_DELAY = LOGO_DELAY + 0.3
 const WEEKLY_REPORT_START = LOGO_DELAY + 0.6
 const ACTIVE_MODULES_START = WEEKLY_REPORT_START + 0.6
@@ -82,13 +78,9 @@ function msFor(targetSeconds: number) {
   return Math.round(((targetSeconds - ENTRANCE_PAUSE) / 1.5) * 1000)
 }
 
-const BRAND_WORDS_START = LOGO_DELAY + 0.45
-const BRAND_WORD_STAGGER = 0.2
-const BRAND_TAGLINE_DELAY = BRAND_WORDS_START + BRAND_WORD_STAGGER * 2 + 0.2
-
 interface WeeklySummary { totalAttempted: number; accuracy: number; topSubjectName: string | null }
 
-export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme: () => void }) {
+export default function Home({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const navigate = useNavigate()
   const { user, profile } = useAuth() as any
@@ -100,15 +92,16 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
 
   const [archiveOpen, setArchiveOpen] = useState(false)
 
-  // Overflow stays hidden during the height animation, then visible so hover effects aren't clipped.
+  // Hidden during the height animation, then visible so hover effects aren't clipped.
   const [archiveOverflowVisible, setArchiveOverflowVisible] = useState(false)
 
   useEffect(() => {
     if (!archiveOpen) setArchiveOverflowVisible(false)
   }, [archiveOpen])
 
-  // Full entrance once per tab session.
-  const playEntrance = useOncePerSession('znu_home_entrance_played')
+  // Entrance flag comes from HomeEntranceProvider; captured once per mount.
+  const { playEntrance: entranceNow } = useHomeEntrance() as { playEntrance: boolean }
+  const [playEntrance] = useState(entranceNow)
 
   useEffect(() => {
     supabase.from('site_settings').select('value').eq('key', 'home_announcement').maybeSingle()
@@ -175,7 +168,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
   const activeModules = modules.filter(m => m.status === 'active')
   const completedModules = modules.filter(m => m.status === 'completed')
 
-  // Eyebrow labels sit directly on the fixed gradient, so color depends on page zone, not theme.
+  // Labels sit directly on the gradient, so color depends on page zone, not theme.
   const sectionTitle = (
     text: string,
     delaySeconds: number,
@@ -208,41 +201,7 @@ export default function Home({ dark, toggleTheme }: { dark: boolean; toggleTheme
 
   return (
     <div style={{ position: 'relative', overflowX: 'hidden' }}>
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 500,
-        pointerEvents: 'none',
-      }}>
-        <div className="pulse-wide" style={{
-          paddingTop: 'calc(16px + env(safe-area-inset-top, 0px))',
-          paddingBottom: 16,
-          pointerEvents: 'auto'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <PulseBrand
-              dark={dark}
-              instant={!playEntrance}
-              animation={{
-                logoDelay: LOGO_DELAY,
-                wordsStart: BRAND_WORDS_START,
-                wordStagger: BRAND_WORD_STAGGER,
-                taglineDelay: BRAND_TAGLINE_DELAY,
-              }}
-            />
-
-            <motion.div
-              initial={playEntrance ? { opacity: 0, x: 20 } : false}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.7, delay: LOGO_DELAY }}
-            >
-              <NavMenu dark={dark} toggleTheme={toggleTheme} align="right" />
-            </motion.div>
-          </div>
-        </div>
-      </div>
+      {/* The header is the shared <PulseOverlayHeader /> in App.jsx. */}
 
       <div style={{
         position: 'relative', zIndex: 1,

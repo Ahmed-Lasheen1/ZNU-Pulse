@@ -1,7 +1,7 @@
 // ZNU Future Doctors — minimal service worker: installable app + offline shell.
 
-const CACHE_NAME = 'znu-shell-v7'
-const SHELL_URLS = ['/', '/favicon.svg', '/icon-192.png', '/icon-512.png']
+const CACHE_NAME = 'znu-shell-v8'
+const SHELL_URLS = ['/', '/favicon.svg', '/logo.svg', '/icon-192.png', '/icon-512.png']
 const MAX_CACHE_ENTRIES = 150
 
 self.addEventListener('install', (event) => {
@@ -19,7 +19,7 @@ self.addEventListener('activate', (event) => {
   )
 })
 
-// Old hashed assets from previous deploys would otherwise pile up forever.
+// Stops old hashed assets from piling up.
 async function trimCache(cache) {
   const keys = await cache.keys()
   if (keys.length <= MAX_CACHE_ENTRIES) return

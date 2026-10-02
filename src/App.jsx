@@ -12,6 +12,7 @@ import { storageGet, storageSet } from './lib/safeStorage'
 import { containsProfanity } from './lib/moderation'
 import ErrorBoundary from './components/ErrorBoundary'
 import ToastProvider from './components/ToastProvider'
+import HomeEntranceProvider from './components/HomeEntranceProvider'
 import PulseOverlayHeader from './components/pulse/PulseOverlayHeader'
 import { AuthContext, ModulesContext } from './contexts'
 import Home from './pages/Home'
@@ -73,13 +74,15 @@ function ScrollToTop() {
   return null
 }
 
+// One persistent header on every page. Only the spacer differs:
+// Home has its own inside its content.
 function SiteHeader({ dark, toggleTheme }) {
   const location = useLocation()
-  if (location.pathname === '/') return null
+  const isHome = location.pathname === '/'
   return (
     <>
       <PulseOverlayHeader dark={dark} toggleTheme={toggleTheme} />
-      <div style={{ height: 'calc(76px + env(safe-area-inset-top, 0px))' }} />
+      {!isHome && <div style={{ height: 'calc(76px + env(safe-area-inset-top, 0px))' }} />}
     </>
   )
 }
@@ -91,13 +94,13 @@ function SiteFooter({ dark }) {
   return <Footer dark={dark} animate={isHome && playEntrance} />
 }
 
-function RoutedContent({ dark, toggleTheme }) {
+function RoutedContent({ dark }) {
   const location = useLocation()
   return (
     <ErrorBoundary resetKey={location.pathname}>
       <Suspense fallback={<PageLoader dark={dark} />}>
         <Routes>
-          <Route path="/" element={<Home dark={dark} toggleTheme={toggleTheme} />} />
+          <Route path="/" element={<Home dark={dark} />} />
           <Route path="/module/:moduleId" element={<ModulePage dark={dark} />} />
           <Route path="/module/:moduleId/stage/:stage" element={<StagePage dark={dark} />} />
           <Route path="/checklist" element={<Checklist dark={dark} />} />
@@ -206,6 +209,7 @@ export default function App() {
       <ModulesContextProvider modules={modules} modulesLoaded={modulesLoaded} modulesError={modulesError} refreshModules={loadModules}>
       <ToastProvider>
       <Router>
+        <HomeEntranceProvider>
         <div style={{
           position: 'relative',
           minHeight: '100dvh',
@@ -219,11 +223,12 @@ export default function App() {
           <ScrollToTop />
           <SiteHeader dark={dark} toggleTheme={toggleTheme} />
           <main style={{ flex: 1, position: 'relative', zIndex: 1 }}>
-            <RoutedContent dark={dark} toggleTheme={toggleTheme} />
+            <RoutedContent dark={dark} />
           </main>
 
           <SiteFooter dark={dark} />
         </div>
+        </HomeEntranceProvider>
       </Router>
       </ToastProvider>
       </ModulesContextProvider>
