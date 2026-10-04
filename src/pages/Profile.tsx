@@ -27,8 +27,9 @@ interface Profile {
   points: number
 }
 
-// Shared points pill (profile card + leaderboard) so both look identical.
-// Number uses the primary text color for contrast; amber stays as the tint, border and star.
+// Shared points pill (profile card + leaderboard). Number uses the primary text color
+// for contrast; amber is only the tint, border and star. 'md' is deliberately quiet
+// so a leaderboard row reads name first, points second.
 function PointsBadge({ points, dark, size = 'md', borderColor }: {
   points: number; dark: boolean; size?: 'md' | 'lg'; borderColor?: string
 }) {
@@ -36,17 +37,17 @@ function PointsBadge({ points, dark, size = 'md', borderColor }: {
   const lg = size === 'lg'
   return (
     <div style={{
-      display: 'inline-flex', alignItems: 'center', gap: lg ? 8 : 7, flexShrink: 0,
-      background: dark ? `${pt.amber}38` : `${pt.amber}22`,
-      border: `1px solid ${borderColor || `${pt.amber}66`}`,
-      borderRadius: 999, padding: lg ? '8px 20px' : '6px 14px 6px 11px'
+      display: 'inline-flex', alignItems: 'center', gap: lg ? 8 : 5, flexShrink: 0,
+      background: lg ? (dark ? `${pt.amber}38` : `${pt.amber}22`) : (dark ? `${pt.amber}26` : `${pt.amber}18`),
+      border: `1px solid ${borderColor || `${pt.amber}${lg ? '66' : '4D'}`}`,
+      borderRadius: 999, padding: lg ? '8px 20px' : '4px 10px 4px 8px'
     }}>
-      <Star size={lg ? 20 : 15} color={pt.amber} fill={pt.amber} />
+      <Star size={lg ? 20 : 12} color={pt.amber} fill={pt.amber} />
       <span style={{
-        color: pt.textPrimary, fontWeight: 800, fontSize: lg ? 24 : 18, lineHeight: 1,
+        color: pt.textPrimary, fontWeight: lg ? 800 : 700, fontSize: lg ? 24 : 14, lineHeight: 1,
         fontVariantNumeric: 'tabular-nums', textAlign: 'right'
       }}>{points.toLocaleString()}</span>
-      <span style={{ color: pt.textSecondary, fontSize: lg ? 13 : 11, fontWeight: 600 }}>points</span>
+      {lg && <span style={{ color: pt.textSecondary, fontSize: 13, fontWeight: 600 }}>pts</span>}
     </div>
   )
 }
@@ -346,11 +347,11 @@ export default function Profile({ dark }: { dark: boolean }) {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{
-                        ...pulseType.cardTitle, color: pt.textPrimary,
+                        ...pulseType.cardTitle, fontSize: 17, fontWeight: 700, color: pt.textPrimary,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                       }}>Dr. {student.name}</div>
                     </div>
-                    <PointsBadge points={student.points} dark={dark} borderColor={isTop3 ? medalColors[i] : undefined} />
+                    <PointsBadge points={student.points} dark={dark} />
                   </LiquidGlassCard>
                 </div>
               )
