@@ -407,7 +407,7 @@ export default function MCQBrowse({
               <ExamIcon color={MCQ_ACCENT} size={28} />
             </div>
             <div style={{ flex: 1, minWidth: 160 }}>
-              <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: MCQ_ACCENT, marginBottom: 6 }}>Mock Exam</h3>
+              <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: MCQ_ACCENT, marginBottom: 6 }}>{stageActive ? `${stageTitle} Mock Exam` : 'Mock Exam'}</h3>
               <CountText>{loading ? '…' : countLabel(mockQuestions.length)}</CountText>
             </div>
             <button onClick={handleStartMock} style={{
@@ -434,17 +434,17 @@ export default function MCQBrowse({
             <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
               <div style={{
                 width: 60, height: 60, borderRadius: 18, flexShrink: 0,
-                background: `${pt.cobalt}22`, border: `1px solid ${pt.cobalt}55`,
+                background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>
-                <TargetIcon color={pt.cobalt} size={28} />
+                <TargetIcon color={MCQ_ACCENT} size={28} />
               </div>
               <div style={{ flex: 1, minWidth: 160 }}>
-                <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: pt.cobalt, marginBottom: 6 }}>{stageTitle} Simulator</h3>
+                <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: MCQ_ACCENT, marginBottom: 6 }}>{stageTitle} Simulator</h3>
                 <CountText>{countLabel(simTotal)} · {simSubjectCount} subject{simSubjectCount === 1 ? '' : 's'} · new mix each time</CountText>
               </div>
               <button onClick={() => onStartSimulator(activeStage)} style={{
-                background: pt.cobalt, color: '#fff', border: 'none', padding: '12px 24px',
+                background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '12px 24px',
                 borderRadius: 999, fontWeight: 800, cursor: 'pointer', fontFamily: pulseFonts.body, flexShrink: 0
               }}>Start →</button>
             </div>
