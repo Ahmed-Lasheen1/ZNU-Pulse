@@ -177,6 +177,9 @@ export default function StagePage({ dark }: { dark: boolean }) {
     if (hasStageQuestions === false) { showToast('No questions added for this stage yet'); return }
     navigate(`/mcq?module=${moduleId}&stage=${stage}`)
   }
+  function openSimulator() {
+    navigate(`/mcq?module=${moduleId}&stage=${stage}&simulator=1`)
+  }
 
   const simulatorVisible = simStats.total > 0 && hasStageQuestions !== false
   const subjectText = `${simStats.subjects} subject${simStats.subjects === 1 ? '' : 's'}`
@@ -222,7 +225,7 @@ export default function StagePage({ dark }: { dark: boolean }) {
           <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
             <TargetIcon color={ON_GRADIENT_TOP.muted} size={14} /> Exam Simulator
           </h2>
-          <LiquidGlassCard dark={dark} delay={0} onClick={openPractice} style={{ padding: '20px 24px' }}>
+          <LiquidGlassCard dark={dark} delay={0} onClick={openSimulator} style={{ padding: '20px 24px' }}>
             <div className="sim-row">
               <div className="sim-icon" style={{
                 background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`

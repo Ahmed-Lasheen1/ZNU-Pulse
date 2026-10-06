@@ -43,8 +43,10 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const [activeSubject, setActiveSubject] = useState('all')
   const [stages, setStages] = useState<any[]>([])
   const [lessonStageMap, setLessonStageMap] = useState<Record<string, string[]>>({})
+  const [lessonStageMapLoaded, setLessonStageMapLoaded] = useState(false)
   const [lessonFilter] = useState(() => new URLSearchParams(location.search).get('lesson') || null)
   const [subjectFilter] = useState(() => new URLSearchParams(location.search).get('subject') || null)
+  const [simulatorParam] = useState(() => new URLSearchParams(location.search).get('simulator') === '1')
   const [quizMode, setQuizMode] = useState<string | null>(null)
   const [quizQuestions, setQuizQuestions] = useState<any[]>([])
   const [answers, setAnswers] = useState<Record<number, string>>({})
@@ -83,6 +85,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const submittingRef = useRef(false)
   const autoStartedLessonRef = useRef(false)
   const autoStartedSubjectRef = useRef(false)
+  const autoStartedSimulatorRef = useRef(false)
   const isMountedRef = useRef(true)
   const userRef = useRef(user)
   useEffect(() => { userRef.current = user }, [user])
@@ -98,13 +101,18 @@ export default function MCQ({ dark }: { dark: boolean }) {
     const params = new URLSearchParams(location.search)
     params.delete('lesson')
     params.delete('subject')
+    params.delete('simulator')
     const search = params.toString()
     navigate({ pathname: location.pathname, search: search ? `?${search}` : '' }, { replace: true })
   }
 
   useEffect(() => {
     let ignore = false
-    fetchLessonStageMap().then(({ map }) => { if (!ignore) setLessonStageMap(map) })
+    fetchLessonStageMap().then(({ map }) => {
+      if (ignore) return
+      setLessonStageMap(map)
+      setLessonStageMapLoaded(true)
+    })
     return () => { ignore = true }
   }, [])
 
@@ -190,6 +198,16 @@ export default function MCQ({ dark }: { dark: boolean }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subjectFilter, lessonFilter, questions])
+
+  useEffect(() => {
+    if (!simulatorParam || autoStartedSimulatorRef.current || quizMode) return
+    if (!activeModule || !simLoaded || !lessonStageMapLoaded || activeStage === 'all') return
+    if (!questions.some(q => q.module_id === activeModule)) return
+    autoStartedSimulatorRef.current = true
+    startSimulator(activeStage)
+    clearAutoStartParams()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [simulatorParam, quizMode, activeModule, activeStage, simLoaded, lessonStageMapLoaded, questions])
 
   useEffect(() => {
     if (quizMode) return
