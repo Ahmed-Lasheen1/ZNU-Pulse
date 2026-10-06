@@ -1,5 +1,5 @@
 // src/pages/admin/StagesTab.tsx
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../supabase'
 import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
@@ -8,12 +8,15 @@ import AdminSplitLayout from './AdminSplitLayout'
 import EmptyState from '../../components/pulse/EmptyState'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import ConfirmDialog from '../../components/ConfirmDialog'
-import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle } from './adminStyles'
+import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle, fieldLabel } from './adminStyles'
 import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
 import { invalidateModuleStagesCache } from '../../lib/moduleStages'
+import { fetchLessonStageMap } from '../../lib/lessonStages'
+import { fetchAllRows } from '../../lib/fetchAllRows'
+import { simulatorPool } from '../../lib/stageSimulator'
 import { useAdminMessage } from './useAdminMessage'
 import { TargetIcon, GearIcon, DotIcon, TrashIcon, CheckCircleIcon } from '../../components/ui/tool-icons'
-import type { AdminModule } from './adminTypes'
+import type { AdminModule, AdminSubject } from './adminTypes'
 
 interface StageRow {
   _key: string
@@ -27,13 +30,22 @@ interface StageRow {
 interface StagesTabProps {
   dark: boolean
   modules: AdminModule[]
+  subjects: AdminSubject[]
 }
+
+const MAX_PER_SUBJECT = 100
+const MAX_TOTAL = 200
 
 function slugify(text: string) {
   return text.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'stage'
 }
 
-export default function StagesTab({ dark, modules }: StagesTabProps) {
+function toCount(v: string | undefined) {
+  const n = parseInt(v || '', 10)
+  return Number.isFinite(n) ? Math.max(0, Math.min(MAX_PER_SUBJECT, n)) : 0
+}
+
+export default function StagesTab({ dark, modules, subjects }: StagesTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
   const { message: msg, showMessage: showMsg } = useAdminMessage()
@@ -45,9 +57,57 @@ export default function StagesTab({ dark, modules }: StagesTabProps) {
   const [stagesSaving, setStagesSaving] = useState(false)
   const [confirmResetOpen, setConfirmResetOpen] = useState(false)
 
+  const [simStage, setSimStage] = useState('')
+  const [simCounts, setSimCounts] = useState<Record<string, string>>({})
+  const [simQuestions, setSimQuestions] = useState<any[]>([])
+  const [lessonStageMap, setLessonStageMap] = useState<Record<string, string[]>>({})
+  const [simLoading, setSimLoading] = useState(false)
+  const [simSaving, setSimSaving] = useState(false)
+
   useEffect(() => {
     if (stageModuleId) loadModuleStagesForAdmin(stageModuleId)
   }, [stageModuleId])
+
+  useEffect(() => {
+    setSimStage('')
+    setSimCounts({})
+    setSimQuestions([])
+    if (!stageModuleId) return
+    let ignore = false
+    Promise.all([
+      fetchAllRows(() => supabase
+        .from('questions_public')
+        .select('id, subject_id, lesson_id, exam_type, exam_stage')
+        .eq('module_id', stageModuleId)
+        .order('id')),
+      fetchLessonStageMap(),
+    ]).then(([qRes, mapRes]) => {
+      if (ignore) return
+      setSimQuestions(qRes.data || [])
+      setLessonStageMap(mapRes.map)
+    })
+    return () => { ignore = true }
+  }, [stageModuleId])
+
+  useEffect(() => {
+    setSimCounts({})
+    if (!stageModuleId || !simStage) return
+    let ignore = false
+    setSimLoading(true)
+    supabase.from('stage_simulator_config')
+      .select('subject_id, question_count')
+      .eq('module_id', stageModuleId).eq('stage', simStage)
+      .then(({ data, error }) => {
+        if (ignore) return
+        if (error) showMsg('❌ Could not load simulator settings')
+        const next: Record<string, string> = {}
+        ;(data || []).forEach((r: any) => { next[r.subject_id] = String(r.question_count) })
+        setSimCounts(next)
+        setSimLoading(false)
+      })
+    return () => { ignore = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stageModuleId, simStage])
 
   async function loadModuleStagesForAdmin(moduleId: string) {
     setStagesLoading(true)
@@ -114,6 +174,31 @@ export default function StagesTab({ dark, modules }: StagesTabProps) {
     invalidateModuleStagesCache()
     showMsg('✅ Reset to default stages')
     loadModuleStagesForAdmin(stageModuleId)
+  }
+
+  const moduleSubjects = useMemo(() => subjects.filter(s => s.module_id === stageModuleId), [subjects, stageModuleId])
+
+  const available = useMemo(() => {
+    const out: Record<string, number> = {}
+    if (!simStage) return out
+    moduleSubjects.forEach(s => { out[s.id] = simulatorPool(simQuestions, s.id, simStage, lessonStageMap).length })
+    return out
+  }, [moduleSubjects, simQuestions, simStage, lessonStageMap])
+
+  const simTotal = moduleSubjects.reduce((sum, s) => sum + toCount(simCounts[s.id]), 0)
+
+  async function saveSimulator() {
+    if (!stageModuleId || !simStage || simSaving) return
+    if (simTotal > MAX_TOTAL) return showMsg(`❌ Total cannot exceed ${MAX_TOTAL} questions`)
+    const rows = moduleSubjects
+      .map(s => ({ subject_id: s.id, question_count: toCount(simCounts[s.id]) }))
+      .filter(r => r.question_count > 0)
+    setSimSaving(true)
+    const { error } = await supabase.rpc('admin_replace_stage_simulator', {
+      p_module_id: stageModuleId, p_stage: simStage, p_rows: rows
+    })
+    setSimSaving(false)
+    showMsg(error ? '❌ ' + error.message : rows.length === 0 ? '✅ Simulator turned off for this stage' : '✅ Simulator saved for this stage!')
   }
 
   const form = (
@@ -193,6 +278,68 @@ export default function StagesTab({ dark, modules }: StagesTabProps) {
             </>
           )}
         </LiquidGlassCard>
+      )}
+
+      {stageModuleId && !stagesLoading && (
+        <div style={{ marginTop: 16 }}>
+          <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
+            <h3 style={{ color: pt.cobalt, marginBottom: 8, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <TargetIcon color={pt.cobalt} size={18} /> Stage Simulator
+            </h3>
+            <p style={{ color: pt.textMuted, fontSize: 13, marginBottom: 16 }}>
+              Pick a stage and set how many questions to draw from each subject. Every time a student starts the
+              simulator, the questions are picked at random from those tagged to that stage. Leave a subject at 0 to
+              skip it; save with everything at 0 to turn the simulator off for the stage.
+            </p>
+
+            <label style={fieldLabel(pt)}>Stage</label>
+            <select value={simStage} onChange={e => setSimStage(e.target.value)} style={inStyle}>
+              <option value="">Select a stage</option>
+              {moduleStagesList.map(s => <option key={s._key} value={s.value}>{s.title}</option>)}
+            </select>
+
+            {simStage && moduleSubjects.length === 0 && (
+              <p style={{ color: pt.textMuted, fontSize: 12 }}>This module has no subjects yet.</p>
+            )}
+
+            {simStage && simLoading && <p style={{ color: pt.sub, textAlign: 'center' }}>Loading...</p>}
+
+            {simStage && !simLoading && moduleSubjects.length > 0 && (
+              <>
+                {moduleSubjects.map(sub => {
+                  const avail = available[sub.id] ?? 0
+                  const want = toCount(simCounts[sub.id])
+                  const short = want > avail
+                  return (
+                    <div key={sub.id} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: pt.text, fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub.name}</div>
+                        <div style={{ color: short ? pt.amber : pt.textMuted, fontSize: 11, marginTop: 2 }}>
+                          {avail} available{short ? ` — only ${avail} will be used` : ''}
+                        </div>
+                      </div>
+                      <input
+                        type="number" inputMode="numeric" min={0} max={MAX_PER_SUBJECT}
+                        value={simCounts[sub.id] ?? ''} placeholder="0"
+                        onChange={e => setSimCounts(prev => ({ ...prev, [sub.id]: e.target.value }))}
+                        aria-label={`Questions from ${sub.name}`}
+                        style={{ ...inStyle, marginBottom: 0, marginTop: 0, width: 80, textAlign: 'center', flexShrink: 0 }}
+                      />
+                    </div>
+                  )
+                })}
+
+                <div style={{ color: simTotal > MAX_TOTAL ? pt.danger : pt.textMuted, fontSize: 12, fontWeight: 700, margin: '4px 0 14px' }}>
+                  Total requested: {simTotal}
+                </div>
+
+                <button onClick={saveSimulator} disabled={simSaving} style={{ ...btnStyle(pt, dark), width: '100%', opacity: simSaving ? 0.7 : 1, cursor: simSaving ? 'not-allowed' : 'pointer' }}>
+                  {simSaving ? 'Saving...' : 'Save Simulator'}
+                </button>
+              </>
+            )}
+          </LiquidGlassCard>
+        </div>
       )}
     </div>
   )

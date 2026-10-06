@@ -1,5 +1,5 @@
 // src/pages/mcq/MCQBrowse.tsx
-import { useState, type ReactNode } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
 import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../../premiumTheme'
@@ -10,9 +10,16 @@ import PageShell from '../../components/pulse/PageShell'
 import PulseGlassRow from '../../components/pulse/PulseGlassRow'
 import LoadingText from '../../components/pulse/LoadingText'
 import { ModuleIcon, ExamIcon } from '../../lib/medicalIcons'
-import { OfflineIcon, BookIcon, PauseIcon, PlayIcon, EmptyBoxIcon, GraduationCapIcon } from '../../components/ui/tool-icons'
+import { OfflineIcon, BookIcon, PauseIcon, PlayIcon, EmptyBoxIcon, GraduationCapIcon, TargetIcon } from '../../components/ui/tool-icons'
 import { MCQ_ACCENT, EXAM_LOW_SHADOW } from './mcqShared'
 import { stagesOf, inStage } from '../../lib/lessonStages'
+import { simulatorPool } from '../../lib/stageSimulator'
+
+interface SimulatorRow {
+  stage: string
+  subject_id: string
+  question_count: number
+}
 
 interface MCQBrowseProps {
   dark: boolean
@@ -33,8 +40,10 @@ interface MCQBrowseProps {
   questions: any[]
   lessons: any[]
   lessonStageMap: Record<string, string[]>
+  simulatorRows: SimulatorRow[]
   getFilteredQuestions: (type: string, sourceOnly?: string | null) => any[]
   onStartQuiz: (type: string, subjectId?: string | null, lessonId?: string | null, sourceFilter?: string | null) => void
+  onStartSimulator: (stage: string) => void
 }
 
 interface SourceChoice {
@@ -214,7 +223,8 @@ export default function MCQBrowse({
   dark, modulesError, loadError, usingCache, resumeData, onResume, onDiscardResume,
   activeModuleObj, stages, activeStage, onSelectStage,
   moduleSubjects, activeSubject, onSelectSubject,
-  loading, questions, lessons, lessonStageMap, getFilteredQuestions, onStartQuiz
+  loading, questions, lessons, lessonStageMap, simulatorRows,
+  getFilteredQuestions, onStartQuiz, onStartSimulator
 }: MCQBrowseProps) {
   const pt = getPulseTheme(dark)
   const navigate = useNavigate()
@@ -223,6 +233,7 @@ export default function MCQBrowse({
   const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null)
 
   const tabAccentColor = activeModuleObj?.color || pt.cobalt
+  const stageActive = activeStage !== 'all'
 
   const stagesWithQuestions = new Set(questions.flatMap(q => stagesOf(q, lessonStageMap)))
   const visibleStages = stages.filter(s => stagesWithQuestions.has(s.value))
@@ -236,6 +247,37 @@ export default function MCQBrowse({
       inStage(q, activeStage, lessonStageMap)
     )
   }
+
+  // With a stage selected, only subjects/lessons that actually have questions in it are listed.
+  const stageSubjectIds = new Set(
+    questions.filter(q => inStage(q, activeStage, lessonStageMap)).map(q => q.subject_id)
+  )
+  const tabSubjects = stageActive ? moduleSubjects.filter(s => stageSubjectIds.has(s.id)) : moduleSubjects
+
+  const subjectRows = moduleSubjects
+    .map(sub => {
+      const lessonRows = lessons
+        .filter(l => l.subject_id === sub.id)
+        .map(lesson => ({ lesson, count: practiceScope(null, lesson.id).length }))
+        .filter(r => !stageActive || r.count > 0)
+      return { sub, count: practiceScope(sub.id, null).length, lessonRows }
+    })
+    .filter(r => !stageActive || r.count > 0 || r.lessonRows.length > 0)
+
+  useEffect(() => {
+    if (loading || !stageActive || activeSubject === 'all') return
+    if (!tabSubjects.some(s => s.id === activeSubject)) onSelectSubject('all')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, activeStage, activeSubject, questions])
+
+  const stageSimRows = stageActive ? simulatorRows.filter(r => r.stage === activeStage) : []
+  const simTotal = stageSimRows.reduce(
+    (sum, r) => sum + Math.min(r.question_count, simulatorPool(questions, r.subject_id, activeStage, lessonStageMap).length), 0
+  )
+  const simSubjectCount = stageSimRows.filter(
+    r => simulatorPool(questions, r.subject_id, activeStage, lessonStageMap).length > 0
+  ).length
+  const stageTitle = stages.find(s => s.value === activeStage)?.title || 'Stage'
 
   function requestStart(type: 'mock' | 'practice', subjectId: string | null, lessonId: string | null, scope: any[]) {
     const doctorCount = scope.filter(q => q.source === 'university').length
@@ -269,7 +311,7 @@ export default function MCQBrowse({
     onStartQuiz(type, subjectId, lessonId, 'university')
   }
 
-  const singleSubject = moduleSubjects.length === 1
+  const singleSubject = subjectRows.length === 1
 
   return (
     <PageShell dark={dark} backFallback="/" maxWidth={900}>
@@ -356,7 +398,7 @@ export default function MCQBrowse({
 
       <div style={{ marginBottom: 32 }}>
         <LiquidGlassCard dark={dark} delay={0} style={{ padding: '22px 24px 20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap', marginBottom: moduleSubjects.length > 0 ? 16 : 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap', marginBottom: tabSubjects.length > 0 ? 16 : 0 }}>
             <div style={{
               width: 60, height: 60, borderRadius: 18, flexShrink: 0,
               background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`,
@@ -373,9 +415,9 @@ export default function MCQBrowse({
               borderRadius: 999, fontWeight: 800, cursor: 'pointer', fontFamily: pulseFonts.body, flexShrink: 0
             }}>Start →</button>
           </div>
-          {moduleSubjects.length > 0 && (
+          {tabSubjects.length > 0 && (
             <TabRow
-              items={[{ value: 'all', label: 'All' }, ...moduleSubjects.map(sub => ({ value: sub.id, label: sub.name }))]}
+              items={[{ value: 'all', label: 'All' }, ...tabSubjects.map(sub => ({ value: sub.id, label: sub.name }))]}
               active={activeSubject}
               onSelect={onSelectSubject}
               dark={dark}
@@ -386,32 +428,52 @@ export default function MCQBrowse({
         </LiquidGlassCard>
       </div>
 
+      {stageActive && !loading && simTotal > 0 && (
+        <div style={{ marginBottom: 32 }}>
+          <LiquidGlassCard dark={dark} delay={0} style={{ padding: '22px 24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
+              <div style={{
+                width: 60, height: 60, borderRadius: 18, flexShrink: 0,
+                background: `${pt.cobalt}22`, border: `1px solid ${pt.cobalt}55`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <TargetIcon color={pt.cobalt} size={28} />
+              </div>
+              <div style={{ flex: 1, minWidth: 160 }}>
+                <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: pt.cobalt, marginBottom: 6 }}>{stageTitle} Simulator</h3>
+                <CountText>{countLabel(simTotal)} · {simSubjectCount} subject{simSubjectCount === 1 ? '' : 's'} · new mix each time</CountText>
+              </div>
+              <button onClick={() => onStartSimulator(activeStage)} style={{
+                background: pt.cobalt, color: '#fff', border: 'none', padding: '12px 24px',
+                borderRadius: 999, fontWeight: 800, cursor: 'pointer', fontFamily: pulseFonts.body, flexShrink: 0
+              }}>Start →</button>
+            </div>
+          </LiquidGlassCard>
+        </div>
+      )}
+
       <h3 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16 }}>Practice by Subject</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {moduleSubjects.map((sub, i) => {
-          const lessonsForSubject = lessons.filter(l => l.subject_id === sub.id)
-          const lessonRows = lessonsForSubject.map(lesson => ({ lesson, count: practiceScope(null, lesson.id).length }))
-          return (
-            <SubjectAccordionRow
-              key={sub.id}
-              dark={dark}
-              sub={sub}
-              count={practiceScope(sub.id, null).length}
-              tabAccentColor={tabAccentColor}
-              delay={i * 70}
-              lessonRows={lessonRows}
-              expanded={expandedSubjectId === sub.id}
-              forceOpen={singleSubject}
-              onToggle={() => setExpandedSubjectId(prev => prev === sub.id ? null : sub.id)}
-              onPracticeSubject={() => handlePracticeSubject(sub.id)}
-              onPracticeLesson={handlePracticeLesson}
-            />
-          )
-        })}
-        {moduleSubjects.length === 0 && !loading && (
+        {subjectRows.map(({ sub, count, lessonRows }, i) => (
+          <SubjectAccordionRow
+            key={sub.id}
+            dark={dark}
+            sub={sub}
+            count={count}
+            tabAccentColor={tabAccentColor}
+            delay={i * 70}
+            lessonRows={lessonRows}
+            expanded={expandedSubjectId === sub.id}
+            forceOpen={singleSubject}
+            onToggle={() => setExpandedSubjectId(prev => prev === sub.id ? null : sub.id)}
+            onPracticeSubject={() => handlePracticeSubject(sub.id)}
+            onPracticeLesson={handlePracticeLesson}
+          />
+        ))}
+        {subjectRows.length === 0 && !loading && (
           <LiquidGlassCard dark={dark} delay={0} style={{ padding: 24, textAlign: 'center' }}>
             <p style={{ color: pt.sub, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              <EmptyBoxIcon color={pt.sub} size={16} /> No subjects for this module yet
+              <EmptyBoxIcon color={pt.sub} size={16} /> {stageActive ? 'No questions in this stage yet' : 'No subjects for this module yet'}
             </p>
           </LiquidGlassCard>
         )}

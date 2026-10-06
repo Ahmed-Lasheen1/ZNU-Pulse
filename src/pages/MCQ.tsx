@@ -10,6 +10,7 @@ import { getGuestFlags, toggleGuestFlag, enrichGuestFlagsWithResults, addGuestHi
 import { loadSavedActiveExam, persistActiveExam, clearActiveExam } from '../lib/activeExam'
 import { fetchAllRows } from '../lib/fetchAllRows'
 import { storageGet, storageSet } from '../lib/safeStorage'
+import { fetchSimulatorConfig, drawSimulator, shuffle } from '../lib/stageSimulator'
 import { optionLabels } from './mcq/mcqShared'
 import MCQBrowse from './mcq/MCQBrowse'
 import MCQExamFlow from './mcq/MCQExamFlow'
@@ -19,6 +20,7 @@ interface QuizConfig {
   subjectId: string | null
   lessonId: string | null
   sourceFilter: string | null
+  simulatorStage?: string | null
 }
 
 export default function MCQ({ dark }: { dark: boolean }) {
@@ -31,6 +33,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const [subjects, setSubjects] = useState<any[]>([])
   const [lessons, setLessons] = useState<any[]>([])
   const [questions, setQuestions] = useState<any[]>([])
+  const [simRows, setSimRows] = useState<any[]>([])
   const [activeModule, setActiveModule] = useState<string | null>(null)
   const [activeStage, setActiveStage] = useState(() => {
     const params = new URLSearchParams(location.search)
@@ -80,7 +83,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const autoStartedLessonRef = useRef(false)
   const autoStartedSubjectRef = useRef(false)
   const isMountedRef = useRef(true)
-  // Ref so the unmount flush below sees the current user.
   const userRef = useRef(user)
   useEffect(() => { userRef.current = user }, [user])
 
@@ -88,6 +90,16 @@ export default function MCQ({ dark }: { dark: boolean }) {
     isMountedRef.current = true
     return () => { isMountedRef.current = false }
   }, [])
+
+  // Drops lesson/subject from the URL once they've auto-started a quiz, so Back
+  // from another page lands on the browse screen instead of restarting it.
+  function clearAutoStartParams() {
+    const params = new URLSearchParams(location.search)
+    params.delete('lesson')
+    params.delete('subject')
+    const search = params.toString()
+    navigate({ pathname: location.pathname, search: search ? `?${search}` : '' }, { replace: true })
+  }
 
   useEffect(() => {
     let ignore = false
@@ -138,6 +150,14 @@ export default function MCQ({ dark }: { dark: boolean }) {
   }, [activeModule])
 
   useEffect(() => {
+    if (!activeModule) return
+    let ignore = false
+    setSimRows([])
+    fetchSimulatorConfig(activeModule).then(({ rows }) => { if (!ignore) setSimRows(rows) })
+    return () => { ignore = true }
+  }, [activeModule])
+
+  useEffect(() => {
     if (location.state?.retryQuestions?.length) {
       startRetryQuiz(location.state.retryQuestions)
       navigate(location.pathname, { replace: true, state: {} })
@@ -150,6 +170,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
       autoStartedLessonRef.current = true
       const lessonQs = questions.filter(q => q.lesson_id === lessonFilter)
       startRetryQuiz(lessonQs)
+      clearAutoStartParams()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lessonFilter, questions])
@@ -159,6 +180,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
       autoStartedSubjectRef.current = true
       const subjectQs = questions.filter(q => q.subject_id === subjectFilter)
       startRetryQuiz(subjectQs)
+      clearAutoStartParams()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subjectFilter, lessonFilter, questions])
@@ -299,9 +321,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const moduleSubjects = subjects.filter(s => s.module_id === activeModule)
   const activeModuleObj = modules.find((m: any) => m.id === activeModule)
 
-  // `sourceOnly` lets a caller (Mock Exam's "University Doctors Only" choice)
-  // narrow to just questions tagged with that source, without touching the
-  // normal module/type/subject/stage filters everyone else relies on.
+  // `sourceOnly` narrows to one question source (Mock Exam's "University Doctors Only").
   const getFilteredQuestions = (type: string, sourceOnly: string | null = null) => {
     return questions.filter(q => {
       const modMatch = q.module_id === activeModule
@@ -314,8 +334,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
       return modMatch && typeMatch && subMatch && stageMatch && sourceMatch
     })
   }
-
-  function shuffle<T>(arr: T[]): T[] { return [...arr].sort(() => Math.random() - 0.5) }
 
   async function loadFlagsFor(ids: string[]) {
     if (ids.length === 0) return new Set<string>()
@@ -371,25 +389,8 @@ export default function MCQ({ dark }: { dark: boolean }) {
     timerRef.current = setInterval(tick, 1000)
   }
 
-  // `subjectId`/`lessonId` pick the practice scope (lessonId wins when both
-  // are somehow set); `sourceFilter` narrows the quiz to one question
-  // source (currently only 'university', from MCQBrowse's doctors-only choice).
-  function startQuiz(type: string, subjectId: string | null = null, lessonId: string | null = null, sourceFilter: string | null = null) {
-    let qs = type === 'mock'
-      ? shuffle(getFilteredQuestions('mock', sourceFilter))
-      : shuffle(questions.filter(q =>
-          (lessonId ? q.lesson_id === lessonId : q.subject_id === subjectId) &&
-          (q.exam_type === 'practice' || q.exam_type === 'both') &&
-          inStage(q, activeStage, lessonStageMap) &&
-          (!sourceFilter || q.source === sourceFilter)
-        ))
-
-    if (qs.length === 0) {
-      showToast('❌ No questions available for this selection yet', 'error')
-      return
-    }
-
-    lastQuizConfigRef.current = { type, subjectId, lessonId, sourceFilter }
+  function beginQuiz(qs: any[], type: string, config: QuizConfig) {
+    lastQuizConfigRef.current = config
 
     setQuizQuestions(qs)
     setAnswers({})
@@ -411,6 +412,36 @@ export default function MCQ({ dark }: { dark: boolean }) {
     quizStartedAtRef.current = Date.now()
     startTimer(quizStartedAtRef.current)
     window.scrollTo({ top: 0 })
+  }
+
+  // `lessonId` wins over `subjectId`; `sourceFilter` is currently only 'university'.
+  function startQuiz(type: string, subjectId: string | null = null, lessonId: string | null = null, sourceFilter: string | null = null) {
+    const qs = type === 'mock'
+      ? shuffle(getFilteredQuestions('mock', sourceFilter))
+      : shuffle(questions.filter(q =>
+          (lessonId ? q.lesson_id === lessonId : q.subject_id === subjectId) &&
+          (q.exam_type === 'practice' || q.exam_type === 'both') &&
+          inStage(q, activeStage, lessonStageMap) &&
+          (!sourceFilter || q.source === sourceFilter)
+        ))
+
+    if (qs.length === 0) {
+      showToast('❌ No questions available for this selection yet', 'error')
+      return
+    }
+
+    beginQuiz(qs, type, { type, subjectId, lessonId, sourceFilter, simulatorStage: null })
+  }
+
+  // Draws a fresh random set per the admin's per-subject counts for this stage.
+  function startSimulator(stage: string) {
+    const rows = simRows.filter(r => r.stage === stage)
+    const qs = drawSimulator(questions, rows, stage, lessonStageMap)
+    if (qs.length === 0) {
+      showToast('❌ No simulator questions available for this stage yet', 'error')
+      return
+    }
+    beginQuiz(qs, 'mock', { type: 'mock', subjectId: null, lessonId: null, sourceFilter: null, simulatorStage: stage })
   }
 
   function startRetryQuiz(list: any[]) {
@@ -541,6 +572,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   function tryAgain() {
     if (quizMode === 'retry') { startRetryQuiz(quizQuestions); return }
     const config = lastQuizConfigRef.current
+    if (config?.simulatorStage) { startSimulator(config.simulatorStage); return }
     if (config) startQuiz(config.type, config.subjectId, config.lessonId, config.sourceFilter)
     else startQuiz(quizMode!)
   }
@@ -726,8 +758,10 @@ export default function MCQ({ dark }: { dark: boolean }) {
       questions={questions}
       lessons={lessons}
       lessonStageMap={lessonStageMap}
+      simulatorRows={simRows}
       getFilteredQuestions={getFilteredQuestions}
       onStartQuiz={startQuiz}
+      onStartSimulator={startSimulator}
     />
   )
 }
