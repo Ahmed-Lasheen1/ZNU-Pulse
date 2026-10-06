@@ -59,7 +59,7 @@ function CountText({ children }: { children: ReactNode }) {
   return (
     <span style={{
       display: 'inline-block', color: '#fff', fontSize: 12, fontWeight: 600,
-      fontFamily: pulseFonts.body, whiteSpace: 'nowrap', textShadow: EXAM_LOW_SHADOW,
+      fontFamily: pulseFonts.body, textShadow: EXAM_LOW_SHADOW,
     }}>{children}</span>
   )
 }
@@ -436,22 +436,33 @@ export default function MCQBrowse({
 
       {simulatorShown && (
         <div style={{ marginBottom: 32 }}>
+          <style>{`
+            .sim-card-row { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+            .sim-card-icon { width: 60px; height: 60px; border-radius: 18px; flex-shrink: 0; }
+            .sim-card-text { flex: 1; min-width: 160px; }
+            .sim-card-btn { padding: 12px 24px; flex-shrink: 0; }
+            @media (max-width: 520px) {
+              .sim-card-row { gap: 12px; }
+              .sim-card-icon { width: 44px; height: 44px; border-radius: 14px; }
+              .sim-card-text { min-width: 0; }
+              .sim-card-btn { width: 100%; padding: 11px 20px; text-align: center; }
+            }
+          `}</style>
           <LiquidGlassCard dark={dark} delay={0} style={{ padding: '22px 24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
-              <div style={{
-                width: 60, height: 60, borderRadius: 18, flexShrink: 0,
+            <div className="sim-card-row">
+              <div className="sim-card-icon" style={{
                 background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>
                 <TargetIcon color={MCQ_ACCENT} size={28} />
               </div>
-              <div style={{ flex: 1, minWidth: 160 }}>
+              <div className="sim-card-text">
                 <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: MCQ_ACCENT, marginBottom: 6 }}>{stageTitle} Simulator</h3>
                 <CountText>{countLabel(simTotal)} · {simSubjectCount} subject{simSubjectCount === 1 ? '' : 's'} · new mix each time</CountText>
               </div>
-              <button onClick={() => onStartSimulator(activeStage)} style={{
-                background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '12px 24px',
-                borderRadius: 999, fontWeight: 800, cursor: 'pointer', fontFamily: pulseFonts.body, flexShrink: 0
+              <button className="sim-card-btn" onClick={() => onStartSimulator(activeStage)} style={{
+                background: MCQ_ACCENT, color: '#0f172a', border: 'none',
+                borderRadius: 999, fontWeight: 800, cursor: 'pointer', fontFamily: pulseFonts.body
               }}>Start →</button>
             </div>
           </LiquidGlassCard>
