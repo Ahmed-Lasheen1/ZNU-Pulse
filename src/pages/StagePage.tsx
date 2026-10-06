@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
-import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
+import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PageShell from '../components/pulse/PageShell'
 import ModuleNotFoundState from '../components/pulse/ModuleNotFoundState'
@@ -18,10 +18,12 @@ import { fetchLessonsForModule } from '../lib/lessons'
 import { fetchDriveUrl } from '../lib/siteSettings'
 import { fetchLessonStageMap, inStage } from '../lib/lessonStages'
 import { fetchAllRows } from '../lib/fetchAllRows'
+import { fetchSimulatorConfig } from '../lib/stageSimulator'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
 import { getPreviewUrl } from '../lib/embedUrl'
 import { ExamIcon, NotesIcon } from '../lib/medicalIcons'
-import { SmartSummariesIcon, PracticeIcon } from '@/components/ui/tool-icons'
+import { SmartSummariesIcon, PracticeIcon, TargetIcon } from '@/components/ui/tool-icons'
+import { MCQ_ACCENT } from './mcq/mcqShared'
 
 interface PageModule { id: string; name: string; icon?: string | null; color: string }
 interface PageSubject { id: string; module_id: string; name: string; icon?: string | null; color?: string | null }
@@ -43,6 +45,7 @@ export default function StagePage({ dark }: { dark: boolean }) {
   const [summaries, setSummaries] = useState<Summary[]>([])
   const [summariesLoaded, setSummariesLoaded] = useState(false)
   const [hasStageQuestions, setHasStageQuestions] = useState<boolean | null>(null)
+  const [hasSimulator, setHasSimulator] = useState(false)
   const [selectedSummary, setSelectedSummary] = useState<Summary | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [driveUrl, setDriveUrl] = useState('')
@@ -64,6 +67,16 @@ export default function StagePage({ dark }: { dark: boolean }) {
     fetchDriveUrl().then(url => { if (!ignore) setDriveUrl(url) })
     return () => { ignore = true }
   }, [])
+
+  useEffect(() => {
+    let ignore = false
+    setHasSimulator(false)
+    fetchSimulatorConfig(moduleId!).then(({ rows }) => {
+      if (ignore) return
+      setHasSimulator(rows.some((r: any) => r.stage === stage && r.question_count > 0))
+    })
+    return () => { ignore = true }
+  }, [moduleId, stage])
 
   useEffect(() => {
     let ignore = false
@@ -143,6 +156,8 @@ export default function StagePage({ dark }: { dark: boolean }) {
     navigate(`/mcq?module=${moduleId}&stage=${stage}`)
   }
 
+  const simulatorVisible = hasSimulator && hasStageQuestions !== false
+
   return (
     <PageShell dark={dark} backFallback={`/module/${moduleId}`} maxWidth={900}>
       <EntityPageHeader
@@ -164,6 +179,35 @@ export default function StagePage({ dark }: { dark: boolean }) {
         lessonSummaries={lessonSummaries}
         onOpenSummary={setSelectedSummary}
       />
+
+      {simulatorVisible && (
+        <div style={{ marginBottom: 32 }}>
+          <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <TargetIcon color={ON_GRADIENT_TOP.muted} size={14} /> Exam Simulator
+          </h2>
+          <LiquidGlassCard dark={dark} delay={0} onClick={openPractice} style={{
+            padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap'
+          }}>
+            <div style={{
+              width: 60, height: 60, borderRadius: 18, flexShrink: 0,
+              background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <TargetIcon color={MCQ_ACCENT} size={28} />
+            </div>
+            <div style={{ flex: 1, minWidth: 160 }}>
+              <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>{meta.title} Simulator</div>
+              <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>
+                Real exam question counts · new mix each time
+              </div>
+            </div>
+            <div style={{
+              background: MCQ_ACCENT, color: '#0f172a', borderRadius: 999, padding: '12px 24px',
+              fontWeight: 800, fontSize: 14, fontFamily: pulseFonts.body, flexShrink: 0
+            }}>Start →</div>
+          </LiquidGlassCard>
+        </div>
+      )}
 
       <div className="summary-practice-row" style={{ marginBottom: 32 }}>
         <div>
