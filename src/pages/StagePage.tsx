@@ -182,40 +182,29 @@ export default function StagePage({ dark }: { dark: boolean }) {
 
       {simulatorVisible && (
         <div style={{ marginBottom: 32 }}>
-          <style>{`
-            .sim-card-row { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
-            .sim-card-icon { width: 60px; height: 60px; border-radius: 18px; flex-shrink: 0; }
-            .sim-card-text { flex: 1; min-width: 160px; }
-            .sim-card-btn { padding: 12px 24px; flex-shrink: 0; }
-            @media (max-width: 520px) {
-              .sim-card-row { gap: 12px; }
-              .sim-card-icon { width: 44px; height: 44px; border-radius: 14px; }
-              .sim-card-text { min-width: 0; }
-              .sim-card-btn { width: 100%; padding: 11px 20px; text-align: center; }
-            }
-          `}</style>
           <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
             <TargetIcon color={ON_GRADIENT_TOP.muted} size={14} /> Exam Simulator
           </h2>
-          <LiquidGlassCard dark={dark} delay={0} onClick={openPractice} style={{ padding: '20px 24px' }}>
-            <div className="sim-card-row">
-              <div className="sim-card-icon" style={{
-                background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>
-                <TargetIcon color={MCQ_ACCENT} size={28} />
-              </div>
-              <div className="sim-card-text">
-                <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>{meta.title} Simulator</div>
-                <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>
-                  Real exam question counts · new mix each time
-                </div>
-              </div>
-              <div className="sim-card-btn" style={{
-                background: MCQ_ACCENT, color: '#0f172a', borderRadius: 999,
-                fontWeight: 800, fontSize: 14, fontFamily: pulseFonts.body
-              }}>Start →</div>
+          <LiquidGlassCard dark={dark} delay={0} onClick={openPractice} style={{
+            padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap'
+          }}>
+            <div style={{
+              width: 60, height: 60, borderRadius: 18, flexShrink: 0,
+              background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <TargetIcon color={MCQ_ACCENT} size={28} />
             </div>
+            <div style={{ flex: 1, minWidth: 160 }}>
+              <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>{meta.title} Simulator</div>
+              <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>
+                Real exam question counts · new mix each time
+              </div>
+            </div>
+            <div style={{
+              background: MCQ_ACCENT, color: '#0f172a', borderRadius: 999, padding: '12px 24px',
+              fontWeight: 800, fontSize: 14, fontFamily: pulseFonts.body, flexShrink: 0
+            }}>Start →</div>
           </LiquidGlassCard>
         </div>
       )}
