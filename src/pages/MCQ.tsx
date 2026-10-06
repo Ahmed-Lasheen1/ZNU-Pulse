@@ -34,6 +34,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const [lessons, setLessons] = useState<any[]>([])
   const [questions, setQuestions] = useState<any[]>([])
   const [simRows, setSimRows] = useState<any[]>([])
+  const [simLoaded, setSimLoaded] = useState(false)
   const [activeModule, setActiveModule] = useState<string | null>(null)
   const [activeStage, setActiveStage] = useState(() => {
     const params = new URLSearchParams(location.search)
@@ -153,7 +154,12 @@ export default function MCQ({ dark }: { dark: boolean }) {
     if (!activeModule) return
     let ignore = false
     setSimRows([])
-    fetchSimulatorConfig(activeModule).then(({ rows }) => { if (!ignore) setSimRows(rows) })
+    setSimLoaded(false)
+    fetchSimulatorConfig(activeModule).then(({ rows }) => {
+      if (ignore) return
+      setSimRows(rows)
+      setSimLoaded(true)
+    })
     return () => { ignore = true }
   }, [activeModule])
 
@@ -759,6 +765,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
       lessons={lessons}
       lessonStageMap={lessonStageMap}
       simulatorRows={simRows}
+      simulatorLoading={!simLoaded}
       getFilteredQuestions={getFilteredQuestions}
       onStartQuiz={startQuiz}
       onStartSimulator={startSimulator}

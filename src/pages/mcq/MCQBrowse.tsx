@@ -41,6 +41,7 @@ interface MCQBrowseProps {
   lessons: any[]
   lessonStageMap: Record<string, string[]>
   simulatorRows: SimulatorRow[]
+  simulatorLoading: boolean
   getFilteredQuestions: (type: string, sourceOnly?: string | null) => any[]
   onStartQuiz: (type: string, subjectId?: string | null, lessonId?: string | null, sourceFilter?: string | null) => void
   onStartSimulator: (stage: string) => void
@@ -223,7 +224,7 @@ export default function MCQBrowse({
   dark, modulesError, loadError, usingCache, resumeData, onResume, onDiscardResume,
   activeModuleObj, stages, activeStage, onSelectStage,
   moduleSubjects, activeSubject, onSelectSubject,
-  loading, questions, lessons, lessonStageMap, simulatorRows,
+  loading, questions, lessons, lessonStageMap, simulatorRows, simulatorLoading,
   getFilteredQuestions, onStartQuiz, onStartSimulator
 }: MCQBrowseProps) {
   const pt = getPulseTheme(dark)
@@ -278,6 +279,9 @@ export default function MCQBrowse({
     r => simulatorPool(questions, r.subject_id, activeStage, lessonStageMap).length > 0
   ).length
   const stageTitle = stages.find(s => s.value === activeStage)?.title || 'Stage'
+
+  const simulatorShown = stageActive && !loading && !simulatorLoading && simTotal > 0
+  const mockHidden = stageActive && (loading || simulatorLoading || simulatorShown)
 
   function requestStart(type: 'mock' | 'practice', subjectId: string | null, lessonId: string | null, scope: any[]) {
     const doctorCount = scope.filter(q => q.source === 'university').length
@@ -396,39 +400,41 @@ export default function MCQBrowse({
 
       {loading && <LoadingText />}
 
-      <div style={{ marginBottom: 32 }}>
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: '22px 24px 20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap', marginBottom: tabSubjects.length > 0 ? 16 : 0 }}>
-            <div style={{
-              width: 60, height: 60, borderRadius: 18, flexShrink: 0,
-              background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-              <ExamIcon color={MCQ_ACCENT} size={28} />
+      {!mockHidden && (
+        <div style={{ marginBottom: 32 }}>
+          <LiquidGlassCard dark={dark} delay={0} style={{ padding: '22px 24px 20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap', marginBottom: tabSubjects.length > 0 ? 16 : 0 }}>
+              <div style={{
+                width: 60, height: 60, borderRadius: 18, flexShrink: 0,
+                background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <ExamIcon color={MCQ_ACCENT} size={28} />
+              </div>
+              <div style={{ flex: 1, minWidth: 160 }}>
+                <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: MCQ_ACCENT, marginBottom: 6 }}>Mock Exam</h3>
+                <CountText>{loading ? '…' : countLabel(mockQuestions.length)}</CountText>
+              </div>
+              <button onClick={handleStartMock} style={{
+                background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '12px 24px',
+                borderRadius: 999, fontWeight: 800, cursor: 'pointer', fontFamily: pulseFonts.body, flexShrink: 0
+              }}>Start →</button>
             </div>
-            <div style={{ flex: 1, minWidth: 160 }}>
-              <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: MCQ_ACCENT, marginBottom: 6 }}>{stageActive ? `${stageTitle} Mock Exam` : 'Mock Exam'}</h3>
-              <CountText>{loading ? '…' : countLabel(mockQuestions.length)}</CountText>
-            </div>
-            <button onClick={handleStartMock} style={{
-              background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '12px 24px',
-              borderRadius: 999, fontWeight: 800, cursor: 'pointer', fontFamily: pulseFonts.body, flexShrink: 0
-            }}>Start →</button>
-          </div>
-          {tabSubjects.length > 0 && (
-            <TabRow
-              items={[{ value: 'all', label: 'All' }, ...tabSubjects.map(sub => ({ value: sub.id, label: sub.name }))]}
-              active={activeSubject}
-              onSelect={onSelectSubject}
-              dark={dark}
-              accentColor={MCQ_ACCENT}
-              style={{ marginBottom: 0 }}
-            />
-          )}
-        </LiquidGlassCard>
-      </div>
+            {tabSubjects.length > 0 && (
+              <TabRow
+                items={[{ value: 'all', label: 'All' }, ...tabSubjects.map(sub => ({ value: sub.id, label: sub.name }))]}
+                active={activeSubject}
+                onSelect={onSelectSubject}
+                dark={dark}
+                accentColor={MCQ_ACCENT}
+                style={{ marginBottom: 0 }}
+              />
+            )}
+          </LiquidGlassCard>
+        </div>
+      )}
 
-      {stageActive && !loading && simTotal > 0 && (
+      {simulatorShown && (
         <div style={{ marginBottom: 32 }}>
           <LiquidGlassCard dark={dark} delay={0} style={{ padding: '22px 24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
