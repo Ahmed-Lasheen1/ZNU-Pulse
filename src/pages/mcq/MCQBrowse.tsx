@@ -436,6 +436,13 @@ export default function MCQBrowse({
 
       {simulatorShown && (
         <div style={{ marginBottom: 32 }}>
+          <style>{`
+            .sim-sub-short { display: none; }
+            @media (max-width: 480px) {
+              .sim-sub-full { display: none; }
+              .sim-sub-short { display: inline; }
+            }
+          `}</style>
           <LiquidGlassCard dark={dark} delay={0} style={{ padding: '22px 24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
               <div style={{
@@ -447,7 +454,10 @@ export default function MCQBrowse({
               </div>
               <div style={{ flex: 1, minWidth: 160 }}>
                 <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: MCQ_ACCENT, marginBottom: 6 }}>{stageTitle} Simulator</h3>
-                <CountText>{countLabel(simTotal)} · {simSubjectCount} subject{simSubjectCount === 1 ? '' : 's'} · new mix each time</CountText>
+                <CountText>
+                  <span className="sim-sub-full">{countLabel(simTotal)} · {simSubjectCount} subject{simSubjectCount === 1 ? '' : 's'} · new mix each time</span>
+                  <span className="sim-sub-short">{countLabel(simTotal)} · {simSubjectCount} subject{simSubjectCount === 1 ? '' : 's'}</span>
+                </CountText>
               </div>
               <button onClick={() => onStartSimulator(activeStage)} style={{
                 background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '12px 24px',

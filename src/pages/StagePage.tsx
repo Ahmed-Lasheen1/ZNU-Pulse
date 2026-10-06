@@ -18,7 +18,7 @@ import { fetchLessonsForModule } from '../lib/lessons'
 import { fetchDriveUrl } from '../lib/siteSettings'
 import { fetchLessonStageMap, inStage } from '../lib/lessonStages'
 import { fetchAllRows } from '../lib/fetchAllRows'
-import { fetchSimulatorConfig } from '../lib/stageSimulator'
+import { fetchSimulatorConfig, simulatorPool } from '../lib/stageSimulator'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
 import { getPreviewUrl } from '../lib/embedUrl'
 import { ExamIcon, NotesIcon } from '../lib/medicalIcons'
@@ -31,6 +31,8 @@ interface StageLesson { id: string; title: string; icon?: string | null; subject
 interface ExamStage { value: string; title: string; emoji?: string; Icon?: (p: { color: string; size?: number }) => JSX.Element; color: string }
 interface Summary { id: string; title: string; url: string; exam_stage?: string | null; lesson_id?: string | null }
 interface ContentFacet { kind: 'file' | 'question' | 'summary'; item_type: string | null; exam_stage: string | null; lesson_id: string | null }
+
+const countLabel = (n: number) => `${n} question${n === 1 ? '' : 's'}`
 
 export default function StagePage({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
@@ -45,7 +47,7 @@ export default function StagePage({ dark }: { dark: boolean }) {
   const [summaries, setSummaries] = useState<Summary[]>([])
   const [summariesLoaded, setSummariesLoaded] = useState(false)
   const [hasStageQuestions, setHasStageQuestions] = useState<boolean | null>(null)
-  const [hasSimulator, setHasSimulator] = useState(false)
+  const [simStats, setSimStats] = useState({ total: 0, subjects: 0 })
   const [selectedSummary, setSelectedSummary] = useState<Summary | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [driveUrl, setDriveUrl] = useState('')
@@ -70,11 +72,31 @@ export default function StagePage({ dark }: { dark: boolean }) {
 
   useEffect(() => {
     let ignore = false
-    setHasSimulator(false)
-    fetchSimulatorConfig(moduleId!).then(({ rows }) => {
+    setSimStats({ total: 0, subjects: 0 })
+    async function loadSimulatorStats() {
+      const { rows } = await fetchSimulatorConfig(moduleId!)
+      const stageRows = rows.filter((r: any) => r.stage === stage && r.question_count > 0)
+      if (ignore || stageRows.length === 0) return
+      const [qRes, mapRes] = await Promise.all([
+        fetchAllRows(() => supabase
+          .from('questions_public')
+          .select('id, subject_id, lesson_id, exam_type, exam_stage')
+          .eq('module_id', moduleId)
+          .order('id')),
+        fetchLessonStageMap(),
+      ])
       if (ignore) return
-      setHasSimulator(rows.some((r: any) => r.stage === stage && r.question_count > 0))
-    })
+      const questions = qRes.data || []
+      let total = 0
+      let subjectCount = 0
+      stageRows.forEach((r: any) => {
+        const pool = simulatorPool(questions, r.subject_id, stage, mapRes.map).length
+        total += Math.min(r.question_count, pool)
+        if (pool > 0) subjectCount++
+      })
+      setSimStats({ total, subjects: subjectCount })
+    }
+    loadSimulatorStats()
     return () => { ignore = true }
   }, [moduleId, stage])
 
@@ -156,7 +178,8 @@ export default function StagePage({ dark }: { dark: boolean }) {
     navigate(`/mcq?module=${moduleId}&stage=${stage}`)
   }
 
-  const simulatorVisible = hasSimulator && hasStageQuestions !== false
+  const simulatorVisible = simStats.total > 0 && hasStageQuestions !== false
+  const subjectText = `${simStats.subjects} subject${simStats.subjects === 1 ? '' : 's'}`
 
   return (
     <PageShell dark={dark} backFallback={`/module/${moduleId}`} maxWidth={900}>
@@ -182,6 +205,13 @@ export default function StagePage({ dark }: { dark: boolean }) {
 
       {simulatorVisible && (
         <div style={{ marginBottom: 32 }}>
+          <style>{`
+            .sim-sub-short { display: none; }
+            @media (max-width: 480px) {
+              .sim-sub-full { display: none; }
+              .sim-sub-short { display: inline; }
+            }
+          `}</style>
           <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
             <TargetIcon color={ON_GRADIENT_TOP.muted} size={14} /> Exam Simulator
           </h2>
@@ -198,7 +228,8 @@ export default function StagePage({ dark }: { dark: boolean }) {
             <div style={{ flex: 1, minWidth: 160 }}>
               <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>{meta.title} Simulator</div>
               <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>
-                Real exam question counts · new mix each time
+                <span className="sim-sub-full">{countLabel(simStats.total)} · {subjectText} · new mix each time</span>
+                <span className="sim-sub-short">{countLabel(simStats.total)} · {subjectText}</span>
               </div>
             </div>
             <div style={{
