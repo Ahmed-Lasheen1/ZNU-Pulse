@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import { supabase } from '../../supabase'
 
+export async function deleteAdminEntity(table: string, id: string) {
+  const { error } = await supabase.from(table).delete().eq('id', id)
+  return error
+}
+
 interface CrudArgs<T> {
   table: string
   label: string
@@ -9,13 +14,10 @@ interface CrudArgs<T> {
   resetForm: () => void
   refresh: () => void
   showMessage: (msg: string) => void
-  // Overrides for tabs that don't do a plain table insert/update (e.g. an RPC).
   updateFn?: (id: string, payload: T) => Promise<{ error: any }>
   insertFn?: (payload: T) => Promise<{ error: any }>
 }
 
-// Shared save/delete flow — same insert-or-update, message, reset,
-// refetch pattern every admin tab used to duplicate by hand.
 export function useAdminEntityCrud<T>({
   table, label, editingId, buildPayload, resetForm, refresh, showMessage, updateFn, insertFn
 }: CrudArgs<T>) {
@@ -37,7 +39,7 @@ export function useAdminEntityCrud<T>({
 
   async function remove(id: string) {
     if (editingId === id) resetForm()
-    const { error } = await supabase.from(table).delete().eq('id', id)
+    const error = await deleteAdminEntity(table, id)
     showMessage(error ? '❌ ' + error.message : `✅ ${label} deleted`)
     refresh()
   }

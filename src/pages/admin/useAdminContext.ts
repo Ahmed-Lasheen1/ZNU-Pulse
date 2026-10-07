@@ -5,6 +5,7 @@ import type { AdminModule, AdminSubject, AdminLesson, AdminContext, ContextSelec
 const STORAGE_KEY = 'znu_admin_context'
 
 export const PICK_MODULE_MESSAGE = '❌ Pick a module above first'
+export const REQUIRED_FIELDS_MESSAGE = '❌ Please fill in all required fields'
 
 function readStoredSelection(): ContextSelection {
   try {

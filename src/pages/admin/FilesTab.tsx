@@ -1,26 +1,20 @@
-// src/pages/admin/FilesTab.tsx
-import { useState, useEffect } from 'react'
-import { supabase } from '../../supabase'
+import { useState } from 'react'
 import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
-import ErrorBanner from '../../components/ErrorBanner'
-import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
-import EmptyState from '../../components/pulse/EmptyState'
-import AdminModuleFilterSelect from './AdminModuleFilterSelect'
-import LiquidGlassCard from '@/components/ui/liquid-glass-card'
-import ConfirmDialog from '../../components/ConfirmDialog'
-import { ModuleIcon } from '../../lib/medicalIcons'
-import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
-import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
-import { fetchModuleStages } from '../../lib/moduleStages'
+import AdminFormCard from './AdminFormCard'
+import AdminRow from './AdminRow'
+import AdminGroupedList from './AdminGroupedList'
+import AdminDeleteDialog from './AdminDeleteDialog'
+import { inStyle as adminInStyle, fieldLabel } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
 import { useAdminEntityCrud } from './useAdminEntityCrud'
 import { useConfirmDelete } from './useConfirmDelete'
-import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon, VideoIcon, AudioIcon, DocumentIcon } from '../../components/ui/tool-icons'
-import type { AdminModule, AdminSubject, AdminLesson } from './adminTypes'
-
-const EXAM_STAGES = STAGE_META.map(s => ({ value: s.value, label: s.title }))
+import { useAdminList } from './useAdminList'
+import { useStageOptions } from './useStageOptions'
+import { PICK_MODULE_MESSAGE, REQUIRED_FIELDS_MESSAGE } from './useAdminContext'
+import { ConstructionIcon, VideoIcon, AudioIcon, DocumentIcon } from '../../components/ui/tool-icons'
+import type { AdminModule, AdminContext } from './adminTypes'
 
 interface FileRow {
   id: string
@@ -37,91 +31,90 @@ interface FileRow {
 interface FilesTabProps {
   dark: boolean
   modules: AdminModule[]
-  subjects: AdminSubject[]
-  lessons: AdminLesson[]
+  context: AdminContext
 }
 
-export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabProps) {
+function FileTypeIcon({ type, color }: { type: FileRow['file_type']; color: string }) {
+  if (type === 'video') return <VideoIcon color={color} size={14} />
+  if (type === 'audio') return <AudioIcon color={color} size={14} />
+  return <DocumentIcon color={color} size={14} />
+}
+
+export default function FilesTab({ dark, modules, context }: FilesTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
-  const { message: msg, showMessage: showMsg } = useAdminMessage()
+  const { message, showMessage } = useAdminMessage()
+  const stageOptions = useStageOptions(context.moduleId)
+  const { rows: files, loading, error, refresh } = useAdminList<FileRow>({ table: 'files', moduleId: context.moduleId })
 
-  const [files, setFiles] = useState<FileRow[]>([])
-  const [filesLoading, setFilesLoading] = useState(true)
-  const [filesError, setFilesError] = useState(false)
-  const [editingFileId, setEditingFileId] = useState<string | null>(null)
-  const [fileName, setFileName] = useState('')
-  const [fileUrl, setFileUrl] = useState('')
-  const [fileType, setFileType] = useState('sharah')
-  const [fileFileType, setFileFileType] = useState('pdf')
-  const [fileModuleId, setFileModuleId] = useState('')
-  const [fileSubjectId, setFileSubjectId] = useState('')
-  const [fileLessonId, setFileLessonId] = useState('')
-  const [fileExamStage, setFileExamStage] = useState('')
-  const [fileStageOptions, setFileStageOptions] = useState(EXAM_STAGES)
-  const [moduleFilter, setModuleFilter] = useState('all')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [name, setName] = useState('')
+  const [url, setUrl] = useState('')
+  const [type, setType] = useState('sharah')
+  const [fileType, setFileType] = useState<FileRow['file_type']>('pdf')
+  const [examStage, setExamStage] = useState('')
 
-  useEffect(() => { fetchFiles() }, [])
-  useEffect(() => {
-    fetchModuleStages(fileModuleId).then(list => setFileStageOptions(list.map(s => ({ value: s.value, label: s.title }))))
-  }, [fileModuleId])
-
-  async function fetchFiles() {
-    setFilesLoading(true)
-    setFilesError(false)
-    const { data, error } = await supabase.from('files').select('*').order('created_at', { ascending: false }).limit(LIST_LIMIT)
-    if (data) setFiles(data as FileRow[])
-    if (error) setFilesError(true)
-    setFilesLoading(false)
+  function editFile(file: FileRow) {
+    setEditingId(file.id)
+    setName(file.name)
+    setUrl(file.url)
+    setType(file.type)
+    setFileType(file.file_type)
+    setExamStage(file.exam_stage || '')
+    context.setContext({ moduleId: file.module_id, subjectId: file.subject_id || '', lessonId: file.lesson_id || '' })
   }
 
-  function editFile(f: FileRow) {
-    setEditingFileId(f.id)
-    setFileName(f.name); setFileUrl(f.url); setFileType(f.type); setFileFileType(f.file_type)
-    setFileModuleId(f.module_id); setFileSubjectId(f.subject_id || ''); setFileLessonId(f.lesson_id || '')
-    setFileExamStage(f.exam_stage || '')
-  }
-  function resetFileForm() {
-    setEditingFileId(null); setFileName(''); setFileUrl('')
-    setFileSubjectId(''); setFileLessonId(''); setFileExamStage('')
+  function resetForm() {
+    setEditingId(null)
+    setName('')
+    setUrl('')
+    setExamStage('')
   }
 
   const crud = useAdminEntityCrud({
-    table: 'files', label: 'File', editingId: editingFileId,
+    table: 'files',
+    label: 'File',
+    editingId,
     buildPayload: () => ({
-      name: fileName, url: fileUrl, type: fileType,
-      file_type: fileFileType, module_id: fileModuleId,
-      subject_id: fileSubjectId || null,
-      lesson_id: fileLessonId || null,
-      exam_stage: fileExamStage || null
+      name,
+      url,
+      type,
+      file_type: fileType,
+      module_id: context.moduleId,
+      subject_id: context.subjectId || null,
+      lesson_id: context.lessonId || null,
+      exam_stage: examStage || null,
     }),
-    resetForm: resetFileForm, refresh: fetchFiles, showMessage: showMsg
+    resetForm,
+    refresh,
+    showMessage,
   })
   const del = useConfirmDelete(crud.remove)
 
   function saveFile() {
-    if (!fileName || !fileUrl || !fileModuleId || crud.saving) return
+    if (crud.saving) return
+    if (!context.moduleId) return showMessage(PICK_MODULE_MESSAGE)
+    if (!name || !url) return showMessage(REQUIRED_FIELDS_MESSAGE)
     crud.save()
   }
 
-  const filteredSubjects = (moduleId: string) => subjects.filter(s => s.module_id === moduleId)
-  const filteredLessons = (subjectId: string) => lessons.filter(l => l.subject_id === subjectId)
-  const visibleModules = moduleFilter === 'all' ? modules : modules.filter(m => m.id === moduleFilter)
-  const FileTypeIcon = ({ t, color, size }: { t: string; color: string; size: number }) =>
-    t === 'video' ? <VideoIcon color={color} size={size} /> : t === 'audio' ? <AudioIcon color={color} size={size} /> : <DocumentIcon color={color} size={size} />
-
   const form = (
-    <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
-      <h3 style={{ color: pt.cobalt, marginBottom: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
-        {editingFileId ? <><EditIcon color={pt.cobalt} size={16} /> Edit File / Recording</> : <><PlusIcon color={pt.cobalt} size={16} /> Add File / Recording</>}
-      </h3>
-      <input placeholder="File name" value={fileName} onChange={e => setFileName(e.target.value)} style={inStyle} />
-      <input placeholder="URL (Drive / YouTube / SoundCloud)" value={fileUrl} onChange={e => setFileUrl(e.target.value)} style={inStyle} />
+    <AdminFormCard
+      dark={dark}
+      noun="File / Recording"
+      editing={!!editingId}
+      addLabel="Add File"
+      saving={crud.saving}
+      onSave={saveFile}
+      onCancel={editingId ? resetForm : undefined}
+    >
+      <input placeholder="File name" value={name} onChange={e => setName(e.target.value)} style={inStyle} />
+      <input placeholder="URL (Drive / YouTube / SoundCloud)" value={url} onChange={e => setUrl(e.target.value)} style={inStyle} />
 
       <div className="admin-form-row-2">
         <div>
           <label style={fieldLabel(pt)}>Content Type</label>
-          <select value={fileType} onChange={e => setFileType(e.target.value)} style={inStyle}>
+          <select value={type} onChange={e => setType(e.target.value)} style={inStyle}>
             <option value="sharah">Explanation Files</option>
             <option value="questions">Question Files</option>
             <option value="lectures">Lecture Recordings</option>
@@ -130,7 +123,7 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
         </div>
         <div>
           <label style={fieldLabel(pt)}>File Type</label>
-          <select value={fileFileType} onChange={e => setFileFileType(e.target.value)} style={inStyle}>
+          <select value={fileType} onChange={e => setFileType(e.target.value as FileRow['file_type'])} style={inStyle}>
             <option value="pdf">PDF</option>
             <option value="video">Video</option>
             <option value="audio">Audio</option>
@@ -138,99 +131,47 @@ export default function FilesTab({ dark, modules, subjects, lessons }: FilesTabP
         </div>
       </div>
 
-      <label style={fieldLabel(pt)}>Module</label>
-      <ModuleSelect modules={modules} value={fileModuleId} onChange={id => { setFileModuleId(id); setFileSubjectId(''); setFileLessonId('') }} dark={dark} />
-
-      <label style={fieldLabel(pt)}>Subject (optional)</label>
-      <select value={fileSubjectId} onChange={e => { setFileSubjectId(e.target.value); setFileLessonId('') }} style={inStyle} disabled={!fileModuleId}>
-        <option value="">All Subjects</option>
-        {filteredSubjects(fileModuleId).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-      </select>
-
-      {fileSubjectId && filteredLessons(fileSubjectId).length > 0 && (
-        <>
-          <label style={fieldLabel(pt)}>Lesson (optional)</label>
-          <select value={fileLessonId} onChange={e => setFileLessonId(e.target.value)} style={inStyle}>
-            <option value="">No specific lesson</option>
-            {filteredLessons(fileSubjectId).map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
-          </select>
-        </>
-      )}
-
       <label style={fieldLabel(pt)}>Exam Stage (optional)</label>
-      <select value={fileExamStage} onChange={e => setFileExamStage(e.target.value)} style={inStyle}>
+      <select value={examStage} onChange={e => setExamStage(e.target.value)} style={inStyle}>
         <option value="">No specific stage</option>
-        {fileStageOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+        {stageOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
       </select>
-
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={saveFile} disabled={crud.saving} style={submitBtnStyle(pt, dark, crud.saving)}>
-          {crud.saving ? 'Saving...' : editingFileId ? 'Save Changes' : 'Add File'}
-        </button>
-        {editingFileId && <button onClick={resetFileForm} disabled={crud.saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
-      </div>
-    </LiquidGlassCard>
+    </AdminFormCard>
   )
 
   const list = (
-    <div>
-      {filesError && <ErrorBanner message="Couldn't load files — check your connection." />}
-      <AdminModuleFilterSelect modules={modules} value={moduleFilter} onChange={setModuleFilter} totalCount={files.length} inStyle={inStyle} />
-
-      {files.length === LIST_LIMIT && (
-        <p style={{ color: pt.textMuted, fontSize: 11, marginBottom: 12 }}>Showing the most recent {LIST_LIMIT} — older files aren't listed here.</p>
+    <AdminGroupedList
+      dark={dark}
+      modules={modules}
+      items={files}
+      moduleOf={f => f.module_id}
+      loading={loading}
+      error={error}
+      noun="files"
+      emptyMessage={<><ConstructionIcon color={pt.sub} size={14} /> No files yet — add one on the left</>}
+      renderItem={f => (
+        <AdminRow
+          key={f.id}
+          dark={dark}
+          noun="file"
+          label={f.name}
+          active={editingId === f.id}
+          onEdit={() => editFile(f)}
+          onDelete={() => del.requestDelete(f.id)}
+        >
+          <FileTypeIcon type={f.file_type} color={pt.text} />
+          <span style={{ color: pt.text, fontWeight: 600 }}>{f.name}</span>
+          <span style={{ color: pt.textMuted, fontSize: 12 }}>· {f.type} · {f.file_type}</span>
+        </AdminRow>
       )}
-
-      {filesLoading && <EmptyState dark={dark} message="Loading..." />}
-
-      {!filesLoading && files.length === 0 && (
-        <EmptyState dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No files yet — add one on the left</>} />
-      )}
-
-      {!filesLoading && visibleModules.map(mod => {
-        const modFiles = files.filter(f => f.module_id === mod.id)
-        if (modFiles.length === 0) return null
-        return (
-          <div key={mod.id} style={{ marginBottom: 20 }}>
-            <h4 style={groupHeading(mod.color)}>
-              <ModuleIcon value={mod.icon} size={18} color={mod.color} /> {mod.name}
-              <span style={{ color: pt.textMuted, fontSize: 12, fontWeight: 400 }}>({modFiles.length})</span>
-            </h4>
-            <div className="admin-list-grid">
-              {modFiles.map(f => (
-                <LiquidGlassCard key={f.id} dark={dark} delay={0} style={{ padding: '12px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-                  <div style={{ minWidth: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <FileTypeIcon t={f.file_type} color={pt.text} size={14} />
-                    <span style={{ color: pt.text, fontWeight: 600 }}>{f.name}</span>
-                    <span style={{ color: pt.textMuted, fontSize: 12, marginLeft: 8 }}>· {f.type} · {f.file_type}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                    <button onClick={() => editFile(f)} aria-label={`Edit file: ${f.name}`} style={{ ...miniBtn(pt, pt.cobalt), display: 'inline-flex', alignItems: 'center' }}><EditIcon color={pt.cobalt} size={12} /></button>
-                    <button onClick={() => del.requestDelete(f.id)} aria-label={`Delete file: ${f.name}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
-                  </div>
-                </LiquidGlassCard>
-              ))}
-            </div>
-          </div>
-        )
-      })}
-    </div>
+    />
   )
 
   return (
     <div>
-      <InlineMessage message={msg} />
+      <InlineMessage message={message} />
       <AdminSplitLayout form={form} list={list} />
-      <ConfirmDialog
-        dark={dark}
-        open={del.open}
-        title="Delete file?"
-        message="This cannot be undone."
-        confirmLabel="Delete"
-        confirmColor={pt.danger}
-        onCancel={del.cancel}
-        onConfirm={del.confirm}
-      />
+      <AdminDeleteDialog dark={dark} noun="file" del={del} />
     </div>
   )
 }

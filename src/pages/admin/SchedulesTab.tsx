@@ -1,23 +1,20 @@
-// src/pages/admin/SchedulesTab.tsx
-import { useState, useEffect } from 'react'
-import { supabase } from '../../supabase'
+import { useState } from 'react'
 import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
-import ErrorBanner from '../../components/ErrorBanner'
-import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
-import EmptyState from '../../components/pulse/EmptyState'
-import AdminModuleFilterSelect from './AdminModuleFilterSelect'
-import LiquidGlassCard from '@/components/ui/liquid-glass-card'
-import ConfirmDialog from '../../components/ConfirmDialog'
-import { ModuleIcon } from '../../lib/medicalIcons'
-import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
+import AdminFormCard from './AdminFormCard'
+import AdminRow from './AdminRow'
+import AdminGroupedList from './AdminGroupedList'
+import AdminDeleteDialog from './AdminDeleteDialog'
+import { miniBtn, inStyle as adminInStyle, fieldLabel } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
 import { useAdminEntityCrud } from './useAdminEntityCrud'
 import { useConfirmDelete } from './useConfirmDelete'
-import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon, CalendarDotIcon } from '../../components/ui/tool-icons'
+import { useAdminList } from './useAdminList'
+import { PICK_MODULE_MESSAGE, REQUIRED_FIELDS_MESSAGE } from './useAdminContext'
+import { PlusIcon, TrashIcon, ConstructionIcon, CalendarDotIcon } from '../../components/ui/tool-icons'
 import { ExamIcon } from '../../lib/medicalIcons'
-import type { AdminModule } from './adminTypes'
+import type { AdminModule, AdminContext } from './adminTypes'
 
 interface ScheduleRow {
   id: string
@@ -28,193 +25,164 @@ interface ScheduleRow {
   dates?: string[] | null
 }
 
+interface DateEntry {
+  id: string
+  value: string
+}
+
 interface SchedulesTabProps {
   dark: boolean
   modules: AdminModule[]
+  context: AdminContext
 }
 
-export default function SchedulesTab({ dark, modules }: SchedulesTabProps) {
+const createDateEntry = (value = ''): DateEntry => ({ id: crypto.randomUUID(), value })
+
+export default function SchedulesTab({ dark, modules, context }: SchedulesTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
-  const { message: msg, showMessage: showMsg } = useAdminMessage()
+  const { message, showMessage } = useAdminMessage()
+  const { rows: schedules, loading, error, refresh } = useAdminList<ScheduleRow>({ table: 'schedules', moduleId: context.moduleId })
 
-  const [schedules, setSchedules] = useState<ScheduleRow[]>([])
-  const [schedulesLoading, setSchedulesLoading] = useState(true)
-  const [schedulesError, setSchedulesError] = useState(false)
-  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null)
-  const [schTitle, setSchTitle] = useState('')
-  const [schUrl, setSchUrl] = useState('')
-  const [schType, setSchType] = useState<'study' | 'exam'>('study')
-  const [schModuleId, setSchModuleId] = useState('')
-  const [schDates, setSchDates] = useState<string[]>([''])
-  const [schDateIds, setSchDateIds] = useState<string[]>([crypto.randomUUID()])
-  const [moduleFilter, setModuleFilter] = useState('all')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [title, setTitle] = useState('')
+  const [url, setUrl] = useState('')
+  const [type, setType] = useState<ScheduleRow['type']>('study')
+  const [dates, setDates] = useState<DateEntry[]>(() => [createDateEntry()])
 
-  useEffect(() => { fetchSchedules() }, [])
-
-  async function fetchSchedules() {
-    setSchedulesLoading(true)
-    setSchedulesError(false)
-    const { data, error } = await supabase.from('schedules').select('*').order('created_at', { ascending: false }).limit(LIST_LIMIT)
-    if (data) setSchedules(data as ScheduleRow[])
-    if (error) setSchedulesError(true)
-    setSchedulesLoading(false)
+  function editSchedule(schedule: ScheduleRow) {
+    setEditingId(schedule.id)
+    setTitle(schedule.title)
+    setUrl(schedule.url)
+    setType(schedule.type)
+    setDates((schedule.dates && schedule.dates.length > 0 ? schedule.dates : ['']).map(value => createDateEntry(value)))
+    context.setContext({ moduleId: schedule.module_id, subjectId: '', lessonId: '' })
   }
 
-  function editSchedule(s: ScheduleRow) {
-    setEditingScheduleId(s.id)
-    setSchTitle(s.title); setSchUrl(s.url); setSchType(s.type); setSchModuleId(s.module_id)
-    const dates = s.dates && s.dates.length > 0 ? s.dates : ['']
-    setSchDates(dates)
-    setSchDateIds(dates.map(() => crypto.randomUUID()))
-  }
-  function resetScheduleForm() {
-    setEditingScheduleId(null); setSchTitle(''); setSchUrl('')
-    setSchDates(['']); setSchDateIds([crypto.randomUUID()])
+  function resetForm() {
+    setEditingId(null)
+    setTitle('')
+    setUrl('')
+    setDates([createDateEntry()])
   }
 
-  function updateDateAt(index: number, value: string) {
-    setSchDates(prev => prev.map((d, i) => i === index ? value : d))
+  function updateDate(id: string, value: string) {
+    setDates(prev => prev.map(d => d.id === id ? { ...d, value } : d))
   }
-  function addDateRow() {
-    setSchDates(prev => [...prev, ''])
-    setSchDateIds(prev => [...prev, crypto.randomUUID()])
+
+  function addDate() {
+    setDates(prev => [...prev, createDateEntry()])
   }
-  function removeDateRow(index: number) {
-    setSchDates(prev => (prev.length === 1 ? [''] : prev.filter((_, i) => i !== index)))
-    setSchDateIds(prev => (prev.length === 1 ? [crypto.randomUUID()] : prev.filter((_, i) => i !== index)))
+
+  function removeDate(id: string) {
+    setDates(prev => prev.length === 1 ? [createDateEntry()] : prev.filter(d => d.id !== id))
   }
 
   const crud = useAdminEntityCrud({
-    table: 'schedules', label: 'Schedule', editingId: editingScheduleId,
+    table: 'schedules',
+    label: 'Schedule',
+    editingId,
     buildPayload: () => {
-      const cleanedDates = schDates.map(d => d.trim()).filter(Boolean)
+      const cleaned = dates.map(d => d.value.trim()).filter(Boolean)
       return {
-        title: schTitle, url: schUrl, type: schType, module_id: schModuleId,
-        dates: schType === 'exam' && cleanedDates.length > 0 ? cleanedDates : null
+        title,
+        url,
+        type,
+        module_id: context.moduleId,
+        dates: type === 'exam' && cleaned.length > 0 ? cleaned : null,
       }
     },
-    resetForm: resetScheduleForm, refresh: fetchSchedules, showMessage: showMsg
+    resetForm,
+    refresh,
+    showMessage,
   })
   const del = useConfirmDelete(crud.remove)
 
   function saveSchedule() {
-    if (!schTitle || !schUrl || !schModuleId || crud.saving) return
+    if (crud.saving) return
+    if (!context.moduleId) return showMessage(PICK_MODULE_MESSAGE)
+    if (!title || !url) return showMessage(REQUIRED_FIELDS_MESSAGE)
     crud.save()
   }
 
-  const visibleModules = moduleFilter === 'all' ? modules : modules.filter(m => m.id === moduleFilter)
-
   const form = (
-    <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
-      <h3 style={{ color: pt.cobalt, marginBottom: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
-        {editingScheduleId ? <><EditIcon color={pt.cobalt} size={16} /> Edit Schedule</> : <><PlusIcon color={pt.cobalt} size={16} /> Add Schedule</>}
-      </h3>
-      <input placeholder="Title (e.g. Week 1)" value={schTitle} onChange={e => setSchTitle(e.target.value)} style={inStyle} />
-      <input placeholder="Image URL (Google Drive)" value={schUrl} onChange={e => setSchUrl(e.target.value)} style={inStyle} />
+    <AdminFormCard
+      dark={dark}
+      noun="Schedule"
+      editing={!!editingId}
+      addLabel="Add Schedule"
+      saving={crud.saving}
+      onSave={saveSchedule}
+      onCancel={editingId ? resetForm : undefined}
+    >
+      <input placeholder="Title (e.g. Week 1)" value={title} onChange={e => setTitle(e.target.value)} style={inStyle} />
+      <input placeholder="Image URL (Google Drive)" value={url} onChange={e => setUrl(e.target.value)} style={inStyle} />
+
       <label style={fieldLabel(pt)}>Type</label>
-      <select value={schType} onChange={e => setSchType(e.target.value as 'study' | 'exam')} style={inStyle}>
+      <select value={type} onChange={e => setType(e.target.value as ScheduleRow['type'])} style={inStyle}>
         <option value="study">Study Schedule</option>
         <option value="exam">Exam Schedule</option>
       </select>
-      {schType === 'exam' && (
+
+      {type === 'exam' && (
         <>
           <label style={fieldLabel(pt)}>Exam Date(s) (for reminder notifications)</label>
-          {schDates.map((d, i) => (
-            <div key={schDateIds[i]} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+          {dates.map(d => (
+            <div key={d.id} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
               <input
                 type="date"
-                value={d}
-                onChange={e => updateDateAt(i, e.target.value)}
+                value={d.value}
+                onChange={e => updateDate(d.id, e.target.value)}
                 style={{ ...inStyle, marginBottom: 0, flex: 1 }}
               />
-              <button
-                onClick={() => removeDateRow(i)}
-                aria-label="Remove this date"
-                style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-              ><TrashIcon color={pt.danger} size={12} /></button>
+              <button onClick={() => removeDate(d.id)} aria-label="Remove this date" style={miniBtn(pt.danger)}>
+                <TrashIcon color={pt.danger} size={12} />
+              </button>
             </div>
           ))}
-          <button onClick={addDateRow} style={{
-            background: 'transparent', border: `1px dashed ${pt.border}`, borderRadius: 10,
-            padding: '8px', width: '100%', cursor: 'pointer', color: pt.sub,
-            fontFamily: 'inherit', fontSize: 12, fontWeight: 700, marginBottom: 12,
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5
-          }}><PlusIcon color={pt.sub} size={11} /> Add Another Exam Date</button>
+          <button onClick={addDate} style={{ ...miniBtn(pt.sub), width: '100%', justifyContent: 'center', borderStyle: 'dashed', marginBottom: 12 }}>
+            <PlusIcon color={pt.sub} size={11} /> Add Another Exam Date
+          </button>
         </>
       )}
-      <label style={fieldLabel(pt)}>Module</label>
-      <ModuleSelect modules={modules} value={schModuleId} onChange={setSchModuleId} dark={dark} />
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={saveSchedule} disabled={crud.saving} style={submitBtnStyle(pt, dark, crud.saving)}>
-          {crud.saving ? 'Saving...' : editingScheduleId ? 'Save Changes' : 'Add Schedule'}
-        </button>
-        {editingScheduleId && <button onClick={resetScheduleForm} disabled={crud.saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
-      </div>
-    </LiquidGlassCard>
+    </AdminFormCard>
   )
 
   const list = (
-    <div>
-      {schedulesError && <ErrorBanner message="Couldn't load schedules — check your connection." />}
-      <AdminModuleFilterSelect modules={modules} value={moduleFilter} onChange={setModuleFilter} totalCount={schedules.length} inStyle={inStyle} />
-
-      {schedules.length === LIST_LIMIT && (
-        <p style={{ color: pt.textMuted, fontSize: 11, marginBottom: 12 }}>Showing the most recent {LIST_LIMIT} — older schedules aren't listed here.</p>
+    <AdminGroupedList
+      dark={dark}
+      modules={modules}
+      items={schedules}
+      moduleOf={s => s.module_id}
+      loading={loading}
+      error={error}
+      noun="schedules"
+      emptyMessage={<><ConstructionIcon color={pt.sub} size={14} /> No schedules yet — add one on the left</>}
+      renderItem={s => (
+        <AdminRow
+          key={s.id}
+          dark={dark}
+          noun="schedule"
+          label={s.title}
+          active={editingId === s.id}
+          onEdit={() => editSchedule(s)}
+          onDelete={() => del.requestDelete(s.id)}
+        >
+          {s.type === 'exam' ? <ExamIcon color={pt.text} size={14} /> : <CalendarDotIcon color={pt.text} size={14} />}
+          <span style={{ color: pt.text, fontWeight: 600 }}>{s.title}</span>
+          <span style={{ color: pt.textMuted, fontSize: 12 }}>
+            · {s.type}{s.dates && s.dates.length > 0 ? ` · ${s.dates.slice().sort().join(', ')}` : ''}
+          </span>
+        </AdminRow>
       )}
-
-      {schedulesLoading && <EmptyState dark={dark} message="Loading..." />}
-
-      {!schedulesLoading && schedules.length === 0 && (
-        <EmptyState dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No schedules yet — add one on the left</>} />
-      )}
-
-      {!schedulesLoading && visibleModules.map(mod => {
-        const modSchedules = schedules.filter(s => s.module_id === mod.id)
-        if (modSchedules.length === 0) return null
-        return (
-          <div key={mod.id} style={{ marginBottom: 20 }}>
-            <h4 style={groupHeading(mod.color)}>
-              <ModuleIcon value={mod.icon} size={18} color={mod.color} /> {mod.name}
-              <span style={{ color: pt.textMuted, fontSize: 12, fontWeight: 400 }}>({modSchedules.length})</span>
-            </h4>
-            <div className="admin-list-grid">
-              {modSchedules.map(s => (
-                <LiquidGlassCard key={s.id} dark={dark} delay={0} style={{ padding: '12px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {s.type === 'exam' ? <ExamIcon color={pt.text} size={14} /> : <CalendarDotIcon color={pt.text} size={14} />}
-                    <span style={{ color: pt.text, fontWeight: 600 }}>{s.title}</span>
-                    <span style={{ color: pt.textMuted, fontSize: 12, marginLeft: 4 }}>
-                      · {s.type}{s.dates && s.dates.length > 0 ? ` · ${s.dates.slice().sort().join(', ')}` : ''}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => editSchedule(s)} aria-label={`Edit schedule: ${s.title}`} style={{ ...miniBtn(pt, pt.cobalt), display: 'inline-flex', alignItems: 'center' }}><EditIcon color={pt.cobalt} size={12} /></button>
-                    <button onClick={() => del.requestDelete(s.id)} aria-label={`Delete schedule: ${s.title}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
-                  </div>
-                </LiquidGlassCard>
-              ))}
-            </div>
-          </div>
-        )
-      })}
-    </div>
+    />
   )
 
   return (
     <div>
-      <InlineMessage message={msg} />
+      <InlineMessage message={message} />
       <AdminSplitLayout form={form} list={list} />
-      <ConfirmDialog
-        dark={dark}
-        open={del.open}
-        title="Delete schedule?"
-        message="This cannot be undone."
-        confirmLabel="Delete"
-        confirmColor={pt.danger}
-        onCancel={del.cancel}
-        onConfirm={del.confirm}
-      />
+      <AdminDeleteDialog dark={dark} noun="schedule" del={del} />
     </div>
   )
 }
