@@ -225,7 +225,7 @@ export default function StagePage({ dark }: { dark: boolean }) {
           <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
             <TargetIcon color={ON_GRADIENT_TOP.muted} size={14} /> Exam Simulator
           </h2>
-          <LiquidGlassCard dark={dark} delay={0} onClick={openSimulator} style={{ padding: '20px 24px' }}>
+          <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 24px' }}>
             <div className="sim-row">
               <div className="sim-icon" style={{
                 background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`
@@ -239,10 +239,15 @@ export default function StagePage({ dark }: { dark: boolean }) {
                   <span className="sim-sub-short">{countLabel(simStats.total)} · {subjectText}</span>
                 </div>
               </div>
-              <div className="sim-btn" style={{
-                background: MCQ_ACCENT, color: '#0f172a', borderRadius: 999,
-                fontWeight: 800, fontSize: 14, fontFamily: pulseFonts.body
-              }}>Start →</div>
+              <button
+                type="button"
+                onClick={openSimulator}
+                className="sim-btn glass-focus-ring"
+                style={{
+                  background: MCQ_ACCENT, color: '#0f172a', border: 'none', borderRadius: 999,
+                  fontWeight: 800, fontSize: 14, fontFamily: pulseFonts.body, cursor: 'pointer'
+                }}
+              >Start →</button>
             </div>
           </LiquidGlassCard>
         </div>
