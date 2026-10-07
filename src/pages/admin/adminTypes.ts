@@ -1,9 +1,3 @@
-// src/pages/admin/adminTypes.ts
-
-// Shared shapes for the reference data every admin tab is handed as
-// props from Admin.tsx (modules/subjects/lessons) — one place so each
-// tab isn't independently guessing at (or duplicating) the same
-// interface.
 export interface AdminModule {
   id: string
   name: string
@@ -28,4 +22,14 @@ export interface AdminLesson {
   title: string
   icon?: string | null
   exam_stage?: string | null
+}
+
+export interface ContextSelection {
+  moduleId: string
+  subjectId: string
+  lessonId: string
+}
+
+export interface AdminContext extends ContextSelection {
+  setContext: (next: ContextSelection) => void
 }

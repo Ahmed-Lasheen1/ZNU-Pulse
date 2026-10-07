@@ -1,8 +1,6 @@
-// src/pages/admin/SubjectsTab.tsx
 import { useState } from 'react'
 import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
-import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
 import EmptyState from '../../components/pulse/EmptyState'
 import AdminModuleFilterSelect from './AdminModuleFilterSelect'
@@ -14,25 +12,26 @@ import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, field
 import { useAdminMessage } from './useAdminMessage'
 import { useAdminEntityCrud } from './useAdminEntityCrud'
 import { useConfirmDelete } from './useConfirmDelete'
+import { PICK_MODULE_MESSAGE } from './useAdminContext'
 import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon } from '../../components/ui/tool-icons'
-import type { AdminModule, AdminSubject } from './adminTypes'
+import type { AdminModule, AdminSubject, AdminContext } from './adminTypes'
 
 interface SubjectsTabProps {
   dark: boolean
   modules: AdminModule[]
   subjects: AdminSubject[]
+  context: AdminContext
   fetchSubjects: () => void
   refDataLoading: boolean
 }
 
-export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, refDataLoading }: SubjectsTabProps) {
+export default function SubjectsTab({ dark, modules, subjects, context, fetchSubjects, refDataLoading }: SubjectsTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
   const { message: msg, showMessage: showMsg } = useAdminMessage()
 
   const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null)
   const [subName, setSubName] = useState('')
-  const [subModuleId, setSubModuleId] = useState('')
   const [subType, setSubType] = useState('both')
   const [subIcon, setSubIcon] = useState('📖')
   const [subColor, setSubColor] = useState('#34d399')
@@ -40,7 +39,8 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
 
   function editSubject(sub: AdminSubject) {
     setEditingSubjectId(sub.id)
-    setSubModuleId(sub.module_id); setSubName(sub.name); setSubType(sub.type || 'both')
+    context.setContext({ moduleId: sub.module_id, subjectId: '', lessonId: '' })
+    setSubName(sub.name); setSubType(sub.type || 'both')
     setSubIcon(sub.icon || '📖'); setSubColor(sub.color || '#34d399')
   }
   function resetSubjectForm() {
@@ -51,7 +51,7 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
   const crud = useAdminEntityCrud({
     table: 'subjects', label: 'Subject', editingId: editingSubjectId,
     buildPayload: () => ({
-      name: subName, module_id: subModuleId, type: subType,
+      name: subName, module_id: context.moduleId, type: subType,
       icon: subIcon || '📖', color: subColor || '#34d399'
     }),
     resetForm: resetSubjectForm, refresh: fetchSubjects, showMessage: showMsg
@@ -59,8 +59,10 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
   const del = useConfirmDelete(crud.remove)
 
   function saveSubject() {
-    if (!subName || !subModuleId || crud.saving) return
-    const existing = subjects.filter(s => s.module_id === subModuleId && s.id !== editingSubjectId)
+    if (crud.saving) return
+    if (!context.moduleId) return showMsg(PICK_MODULE_MESSAGE)
+    if (!subName) return
+    const existing = subjects.filter(s => s.module_id === context.moduleId && s.id !== editingSubjectId)
     if (existing.some(s => s.name.trim().toLowerCase() === subName.trim().toLowerCase())) {
       return showMsg('❌ This subject already exists in that module')
     }
@@ -75,8 +77,6 @@ export default function SubjectsTab({ dark, modules, subjects, fetchSubjects, re
       <h3 style={{ color: pt.cobalt, marginBottom: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
         {editingSubjectId ? <><EditIcon color={pt.cobalt} size={16} /> Edit Subject</> : <><PlusIcon color={pt.cobalt} size={16} /> Add Subject</>}
       </h3>
-      <label style={fieldLabel(pt)}>Module</label>
-      <ModuleSelect modules={modules} value={subModuleId} onChange={setSubModuleId} dark={dark} />
       <input placeholder="Subject name" value={subName} onChange={e => setSubName(e.target.value)} style={inStyle} />
 
       <IconPicker value={subIcon} onChange={setSubIcon} inStyle={inStyle} pt={pt} />

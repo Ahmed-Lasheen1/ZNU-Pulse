@@ -1,4 +1,3 @@
-// src/pages/Admin.tsx
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import { useAuth, useModules } from '../contexts'
@@ -22,13 +21,22 @@ import SummariesTab from './admin/SummariesTab'
 import StagesTab from './admin/StagesTab'
 import AnalyticsTab from './admin/AnalyticsTab'
 import SettingsTab from './admin/SettingsTab'
+import AdminContextBar from './admin/AdminContextBar'
+import { useAdminContext } from './admin/useAdminContext'
 import { LIST_LIMIT } from './admin/adminStyles'
 import type { AdminModule, AdminSubject, AdminLesson } from './admin/adminTypes'
 
-const TABS = ['modules', 'subjects', 'lessons', 'files', 'schedules', 'questions', 'summaries', 'stages', 'analytics', 'settings'] as const
-type AdminTab = typeof TABS[number]
+type TabIcon = (p: { color: string; size?: number }) => JSX.Element
 
-const TAB_META: Record<AdminTab, { Icon: (p: { color: string; size?: number }) => JSX.Element; label: string }> = {
+const SECTIONS = [
+  { id: 'content', label: 'Content', Icon: FolderIcon, tabs: ['questions', 'files', 'summaries', 'schedules'] },
+  { id: 'structure', label: 'Structure', Icon: PackageIcon, tabs: ['modules', 'subjects', 'lessons', 'stages'] },
+  { id: 'site', label: 'Site', Icon: GearIcon, tabs: ['analytics', 'settings'] }
+] as const
+
+type AdminTab = typeof SECTIONS[number]['tabs'][number]
+
+const TAB_META: Record<AdminTab, { Icon: TabIcon; label: string }> = {
   modules: { Icon: PackageIcon, label: 'Modules' },
   subjects: { Icon: BookIcon, label: 'Subjects' },
   lessons: { Icon: BookIcon, label: 'Lessons' },
@@ -41,6 +49,41 @@ const TAB_META: Record<AdminTab, { Icon: (p: { color: string; size?: number }) =
   settings: { Icon: GearIcon, label: 'Settings' }
 }
 
+const CONTEXT_DEPTH: Partial<Record<AdminTab, number>> = {
+  subjects: 1,
+  schedules: 1,
+  lessons: 2,
+  files: 3,
+  questions: 3,
+  summaries: 3
+}
+
+interface AdminPillProps {
+  dark: boolean
+  active: boolean
+  label: string
+  Icon: TabIcon
+  onSelect: () => void
+}
+
+function AdminPill({ dark, active, label, Icon, onSelect }: AdminPillProps) {
+  const pt = getPulseTheme(dark)
+  return (
+    <PulseGlassRow
+      dark={dark} radius={999} active={active}
+      activeTint={`${pt.cobalt}26`}
+      hoverTint={dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'}
+      onClick={onSelect} role="button" tabIndex={0}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
+      style={{ flexShrink: 0 }}
+    >
+      <div style={{ padding: '9px 16px', whiteSpace: 'nowrap', ...pulseType.button, color: active ? pt.cobalt : pt.sub, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <Icon color={active ? pt.cobalt : pt.sub} size={14} /> {label}
+      </div>
+    </PulseGlassRow>
+  )
+}
+
 interface AdminProps {
   dark: boolean
 }
@@ -51,7 +94,7 @@ export default function Admin({ dark }: AdminProps) {
   const isAuth = profile?.role === 'admin'
   const pt = getPulseTheme(dark)
 
-  const [activeTab, setActiveTab] = useState<AdminTab>('modules')
+  const [activeTab, setActiveTab] = useState<AdminTab>('questions')
 
   const [modules, setModules] = useState<AdminModule[]>([])
   const [subjects, setSubjects] = useState<AdminSubject[]>([])
@@ -59,6 +102,8 @@ export default function Admin({ dark }: AdminProps) {
 
   const [refDataLoading, setRefDataLoading] = useState(true)
   const [refDataError, setRefDataError] = useState(false)
+
+  const context = useAdminContext(modules, subjects, lessons)
 
   useEffect(() => {
     if (isAuth) {
@@ -69,7 +114,6 @@ export default function Admin({ dark }: AdminProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuth])
 
-  // Reuses ModulesContext's own fetch instead of querying modules twice.
   async function fetchModules() {
     const result = await refreshModules()
     setModules((result?.modules || []) as AdminModule[])
@@ -100,7 +144,11 @@ export default function Admin({ dark }: AdminProps) {
 
   if (!isAuth) return <NotFound dark={dark} />
 
-  const tabProps = { dark, modules, subjects, lessons, fetchModules, fetchSubjects, fetchLessons, refDataLoading }
+  const activeSection = SECTIONS.find(s => (s.tabs as readonly AdminTab[]).includes(activeTab)) ?? SECTIONS[0]
+  const sectionTabs: readonly AdminTab[] = activeSection.tabs
+  const contextDepth = CONTEXT_DEPTH[activeTab]
+
+  const tabProps = { dark, modules, subjects, lessons, context, fetchModules, fetchSubjects, fetchLessons, refDataLoading }
 
   return (
     <div style={{ position: 'relative' }}>
@@ -142,26 +190,34 @@ export default function Admin({ dark }: AdminProps) {
           </div>
         )}
 
-        <div className="admin-tabs">
-          {TABS.map(t => {
-            const active = activeTab === t
-            const { Icon, label } = TAB_META[t]
-            return (
-              <PulseGlassRow
-                key={t} dark={dark} radius={999} active={active}
-                activeTint={`${pt.cobalt}26`}
-                hoverTint={dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'}
-                onClick={() => setActiveTab(t)} role="button" tabIndex={0}
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveTab(t) } }}
-                style={{ flexShrink: 0 }}
-              >
-                <div style={{ padding: '9px 16px', whiteSpace: 'nowrap', ...pulseType.button, color: active ? pt.cobalt : pt.sub, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Icon color={active ? pt.cobalt : pt.sub} size={14} /> {label}
-                </div>
-              </PulseGlassRow>
-            )
-          })}
+        <div className="admin-tabs" style={{ marginBottom: 4 }}>
+          {SECTIONS.map(section => (
+            <AdminPill
+              key={section.id} dark={dark}
+              active={section.id === activeSection.id}
+              label={section.label} Icon={section.Icon}
+              onSelect={() => { if (section.id !== activeSection.id) setActiveTab(section.tabs[0]) }}
+            />
+          ))}
         </div>
+
+        <div className="admin-tabs">
+          {sectionTabs.map(t => (
+            <AdminPill
+              key={t} dark={dark}
+              active={activeTab === t}
+              label={TAB_META[t].label} Icon={TAB_META[t].Icon}
+              onSelect={() => setActiveTab(t)}
+            />
+          ))}
+        </div>
+
+        {contextDepth && (
+          <AdminContextBar
+            dark={dark} modules={modules} subjects={subjects} lessons={lessons}
+            context={context} depth={contextDepth}
+          />
+        )}
 
         {activeTab === 'modules' && <ModulesTab {...tabProps} />}
         {activeTab === 'subjects' && <SubjectsTab {...tabProps} />}
