@@ -1,3 +1,5 @@
+export type AdminIcon = (props: { color: string; size?: number }) => JSX.Element
+
 export interface AdminModule {
   id: string
   name: string
@@ -21,7 +23,6 @@ export interface AdminLesson {
   subject_id: string
   title: string
   icon?: string | null
-  exam_stage?: string | null
 }
 
 export interface ContextSelection {

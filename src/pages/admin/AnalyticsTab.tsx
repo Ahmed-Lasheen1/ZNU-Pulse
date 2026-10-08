@@ -6,9 +6,10 @@ import { ModuleIcon } from '../../lib/medicalIcons'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import EmptyState from '../../components/pulse/EmptyState'
 import ErrorBanner from '../../components/ErrorBanner'
+import AdminFormCard from './AdminFormCard'
 import { DotIcon, PeopleIcon, BellIcon, ChartBarIcon, ConstructionIcon } from '../../components/ui/tool-icons'
 import type { PulseTheme } from './adminStyles'
-import type { AdminModule } from './adminTypes'
+import type { AdminModule, AdminIcon } from './adminTypes'
 
 interface DifficultyRow {
   id: string
@@ -21,7 +22,7 @@ interface DifficultyRow {
 
 interface StatCardProps {
   label: string
-  Icon: (p: { color: string; size?: number }) => JSX.Element
+  Icon: AdminIcon
   value: number | string
   color: string
   pt: PulseTheme
@@ -32,9 +33,7 @@ interface StatCardProps {
 function StatCard({ label, Icon, value, color, pt, dark, loading }: StatCardProps) {
   return (
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '18px 20px', textAlign: 'center', flex: '1 1 140px' }}>
-      <div style={{ color, fontWeight: 900, fontSize: 26 }}>
-        {loading ? '…' : value}
-      </div>
+      <div style={{ color, fontWeight: 900, fontSize: 26 }}>{loading ? '…' : value}</div>
       <div style={{ color: pt.textMuted, fontSize: 12, fontWeight: 700, marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
         <Icon color={pt.textMuted} size={12} /> {label}
       </div>
@@ -50,7 +49,7 @@ interface AnalyticsTabProps {
 export default function AnalyticsTab({ dark, modules }: AnalyticsTabProps) {
   const pt = getPulseTheme(dark)
   const [difficulty, setDifficulty] = useState<DifficultyRow[]>([])
-  const [difficultyLoading, setDifficultyLoading] = useState(false)
+  const [difficultyLoading, setDifficultyLoading] = useState(true)
   const [difficultyError, setDifficultyError] = useState(false)
 
   const [onlineCount, setOnlineCount] = useState(0)
@@ -59,55 +58,33 @@ export default function AnalyticsTab({ dark, modules }: AnalyticsTabProps) {
   const [statsLoading, setStatsLoading] = useState(true)
   const [statsError, setStatsError] = useState(false)
 
-  useEffect(() => { fetchDifficulty() }, [])
-  useEffect(() => { fetchOverviewStats() }, [])
-
   useEffect(() => {
-    let unwatch = () => {}
-    try {
-      unwatch = watchOnlineCount(setOnlineCount) || (() => {})
-    } catch (e) {
-      console.warn('[AnalyticsTab] Could not watch online count:', e)
-    }
-    return () => {
-      try { unwatch() } catch { /* noop */ }
-    }
+    let ignore = false
+    supabase.rpc('get_question_difficulty', { p_min_attempts: 3 }).then(({ data, error }) => {
+      if (ignore) return
+      if (data && !error) setDifficulty(data)
+      setDifficultyError(!!error)
+      setDifficultyLoading(false)
+    })
+    return () => { ignore = true }
   }, [])
 
-  async function fetchDifficulty() {
-    setDifficultyLoading(true)
-    setDifficultyError(false)
-    try {
-      const { data, error } = await supabase.rpc('get_question_difficulty', { p_min_attempts: 3 })
-      if (!error && data) setDifficulty(data)
-      else if (error) setDifficultyError(true)
-    } catch (e) {
-      console.warn('[AnalyticsTab] Could not load question difficulty:', e)
-      setDifficultyError(true)
-    }
-    setDifficultyLoading(false)
-  }
+  useEffect(() => {
+    let ignore = false
+    Promise.all([
+      supabase.from('profiles').select('*', { count: 'exact', head: true }),
+      supabase.rpc('admin_count_push_subscriptions'),
+    ]).then(([accountsRes, notifRes]) => {
+      if (ignore) return
+      setStatsError(!!accountsRes.error || !!notifRes.error)
+      setAccountCount(accountsRes.count ?? 0)
+      setNotifCount(Number(notifRes.data ?? 0))
+      setStatsLoading(false)
+    })
+    return () => { ignore = true }
+  }, [])
 
-  async function fetchOverviewStats() {
-    setStatsLoading(true)
-    setStatsError(false)
-    try {
-      // RLS only lets a user see their own push row, so the count goes through an admin RPC.
-      const [accountsRes, notifRes] = await Promise.all([
-        supabase.from('profiles').select('*', { count: 'exact', head: true }),
-        supabase.rpc('admin_count_push_subscriptions'),
-      ])
-      if (accountsRes.error || notifRes.error) setStatsError(true)
-      setAccountCount(accountsRes?.count ?? 0)
-      setNotifCount(Number(notifRes?.data ?? 0))
-    } catch (e) {
-      console.warn('[AnalyticsTab] Could not load overview stats:', e)
-      setStatsError(true)
-      setAccountCount(0)
-      setNotifCount(0)
-    }
-    setStatsLoading(false)
-  }
+  useEffect(() => watchOnlineCount(setOnlineCount), [])
 
   return (
     <div>
@@ -124,48 +101,40 @@ export default function AnalyticsTab({ dark, modules }: AnalyticsTabProps) {
       </p>
 
       <div style={{ marginBottom: 16 }}>
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
-          <h3 style={{ color: pt.cobalt, marginBottom: 8, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ChartBarIcon color={pt.cobalt} size={18} /> Hardest Questions
-          </h3>
-          <p style={{ color: pt.textMuted, fontSize: 13 }}>
-            Questions with the highest wrong-answer rate across all students (minimum 3 attempts).
-            Worth double-checking these for a wording issue or a wrong answer key.
-          </p>
-        </LiquidGlassCard>
+        <AdminFormCard
+          dark={dark}
+          title="Hardest Questions"
+          Icon={ChartBarIcon}
+          description="Questions with the highest wrong-answer rate across all students (minimum 3 attempts). Worth double-checking these for a wording issue or a wrong answer key."
+        />
       </div>
 
       {difficultyError && <div style={{ marginBottom: 16 }}><ErrorBanner message="Couldn't load hardest questions — check your connection." /></div>}
 
-      {difficultyLoading && <p style={{ color: pt.sub, textAlign: 'center' }}>Loading...</p>}
+      {difficultyLoading && <EmptyState dark={dark} message="Loading..." />}
 
       {!difficultyLoading && !difficultyError && difficulty.length === 0 && (
         <EmptyState dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> Not enough attempts yet to report on</>} />
       )}
 
       <div className="admin-list-grid">
-        <style>{`
-          @media (min-width: 1300px) { .admin-list-grid { grid-template-columns: 1fr 1fr; gap: 10px; } }
-        `}</style>
         {difficulty.map(row => {
           const mod = modules.find(m => m.id === row.module_id)
+          const severe = row.error_rate >= 70
           return (
             <LiquidGlassCard key={row.id} dark={dark} delay={0} style={{
               padding: '14px 18px', display: 'flex',
               justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap'
             }}>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{
-                  color: pt.text, fontWeight: 600, fontSize: 13,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-                }}>{row.question}</div>
+                <div style={{ color: pt.text, fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.question}</div>
                 <div style={{ color: pt.textMuted, fontSize: 11, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
                   {mod && <><ModuleIcon value={mod.icon} size={11} color={pt.textMuted} /> {mod.name} ·</>} {row.incorrect_count}/{row.total_attempts} wrong
                 </div>
               </div>
               <div style={{
-                background: row.error_rate >= 70 ? 'rgba(239,68,68,0.16)' : `${pt.amber}22`,
-                color: row.error_rate >= 70 ? pt.danger : pt.amber,
+                background: severe ? 'rgba(239,68,68,0.16)' : `${pt.amber}22`,
+                color: severe ? pt.danger : pt.amber,
                 borderRadius: 20, padding: '4px 12px', fontWeight: 900, fontSize: 13, flexShrink: 0
               }}>{row.error_rate}%</div>
             </LiquidGlassCard>

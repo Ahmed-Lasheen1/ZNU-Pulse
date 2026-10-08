@@ -1,26 +1,23 @@
-// src/pages/admin/QuestionsTab.tsx
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { supabase } from '../../supabase'
 import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
-import ErrorBanner from '../../components/ErrorBanner'
-import ModuleSelect from './ModuleSelect'
+import QuestionSourceBadge from '../../components/QuestionSourceBadge'
 import AdminSplitLayout from './AdminSplitLayout'
-import EmptyState from '../../components/pulse/EmptyState'
-import LiquidGlassCard from '@/components/ui/liquid-glass-card'
-import ConfirmDialog from '../../components/ConfirmDialog'
-import { ModuleIcon } from '../../lib/medicalIcons'
-import { miniBtn, cancelBtnStyle, submitBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
-import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
-import { fetchModuleStages } from '../../lib/moduleStages'
+import AdminFormCard from './AdminFormCard'
+import AdminDetails from './AdminDetails'
+import AdminRow from './AdminRow'
+import AdminGroupedList from './AdminGroupedList'
+import AdminDeleteDialog from './AdminDeleteDialog'
+import { inStyle as adminInStyle, fieldLabel, miniBtn, LIST_LIMIT } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
 import { useAdminEntityCrud } from './useAdminEntityCrud'
 import { useConfirmDelete } from './useConfirmDelete'
-import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon, ListIcon, SearchIcon2, RobotIcon, BookIcon, GraduationCapIcon } from '../../components/ui/tool-icons'
-import QuestionSourceBadge from '../../components/QuestionSourceBadge'
-import type { AdminModule, AdminSubject, AdminLesson } from './adminTypes'
-
-const EXAM_STAGES = STAGE_META.map(s => ({ value: s.value, label: s.title }))
+import { useAdminList } from './useAdminList'
+import { useStageOptions } from './useStageOptions'
+import { PICK_MODULE_MESSAGE, REQUIRED_FIELDS_MESSAGE } from './useAdminContext'
+import { EditIcon, ListIcon, ConstructionIcon, SearchIcon2 } from '../../components/ui/tool-icons'
+import type { AdminModule, AdminContext } from './adminTypes'
 
 interface QuestionRow {
   id: string
@@ -34,271 +31,71 @@ interface QuestionRow {
   created_at: string
 }
 
+interface QuestionDraft {
+  question: string
+  optionA: string
+  optionB: string
+  optionC: string
+  optionD: string
+  correct: string
+  explanation: string
+  examType: string
+  examStage: string
+  source: string
+}
+
+interface QuestionPayload {
+  question: string
+  option_a: string
+  option_b: string
+  option_c: string
+  option_d: string
+  correct: string
+  explanation: string
+  exam_type: string
+  exam_stage: string | null
+  module_id: string
+  subject_id: string | null
+  lesson_id: string | null
+  source: string | null
+}
+
+type ParsedQuestion = Pick<QuestionPayload, 'question' | 'option_a' | 'option_b' | 'option_c' | 'option_d' | 'correct' | 'explanation'>
+
 interface QuestionsTabProps {
   dark: boolean
   modules: AdminModule[]
-  subjects: AdminSubject[]
-  lessons: AdminLesson[]
+  context: AdminContext
 }
 
-function escapeLikePattern(value: string) {
-  return value.replace(/[%_\\]/g, '\\$&')
+const QUESTION_COLUMNS = 'id, question, module_id, subject_id, lesson_id, exam_type, exam_stage, source, created_at'
+
+const EMPTY_DRAFT: QuestionDraft = {
+  question: '', optionA: '', optionB: '', optionC: '', optionD: '',
+  correct: 'a', explanation: '', examType: 'both', examStage: '', source: '',
 }
 
-export default function QuestionsTab({ dark, modules, subjects, lessons }: QuestionsTabProps) {
-  const pt = getPulseTheme(dark)
-  const inStyle = adminInStyle(pt, dark)
-  const { message: msg, showMessage: showMsg } = useAdminMessage()
+const OPTION_FIELDS = [
+  { key: 'optionA', label: 'A' },
+  { key: 'optionB', label: 'B' },
+  { key: 'optionC', label: 'C' },
+  { key: 'optionD', label: 'D' },
+] as const
 
-  const [questions, setQuestions] = useState<QuestionRow[]>([])
-  const [questionsLoading, setQuestionsLoading] = useState(true)
-  const [questionsError, setQuestionsError] = useState(false)
-  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null)
-  const [qText, setQText] = useState('')
-  const [qA, setQA] = useState('')
-  const [qB, setQB] = useState('')
-  const [qC, setQC] = useState('')
-  const [qD, setQD] = useState('')
-  const [qCorrect, setQCorrect] = useState('a')
-  const [qExplanation, setQExplanation] = useState('')
-  const [qModuleId, setQModuleId] = useState('')
-  const [qSubjectId, setQSubjectId] = useState('')
-  const [qLessonId, setQLessonId] = useState('')
-  const [qExamType, setQExamType] = useState('both')
-  const [qExamStage, setQExamStage] = useState('')
-  const [qStageOptions, setQStageOptions] = useState(EXAM_STAGES)
-  const [qSource, setQSource] = useState('')
-  const [bulkMode, setBulkMode] = useState(false)
-  const [bulkText, setBulkText] = useState('')
-  const [bulkSaving, setBulkSaving] = useState(false)
-  const [moduleFilter, setModuleFilter] = useState('all')
-  const [search, setSearch] = useState('')
-  const requestIdRef = useRef(0)
+const EXAM_TYPES = [
+  { value: 'both', label: 'Practice + Mock Exam' },
+  { value: 'practice', label: 'Practice Only' },
+  { value: 'mock', label: 'Mock Exam Only' },
+]
 
-  // Search runs on the server so questions beyond the newest LIST_LIMIT stay findable.
-  useEffect(() => {
-    const timer = setTimeout(fetchQuestions, search.trim() ? 300 : 0)
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search])
-  useEffect(() => {
-    fetchModuleStages(qModuleId).then(list => setQStageOptions(list.map(s => ({ value: s.value, label: s.title }))))
-  }, [qModuleId])
+const SOURCES = [
+  { value: '', label: 'No tag' },
+  { value: 'ai', label: 'AI' },
+  { value: 'courses', label: 'Courses' },
+  { value: 'university', label: 'University Doctors' },
+]
 
-  async function fetchQuestions() {
-    const requestId = ++requestIdRef.current
-    setQuestionsLoading(true)
-    setQuestionsError(false)
-    let query = supabase
-      .from('questions')
-      .select('id, question, module_id, subject_id, lesson_id, exam_type, exam_stage, source, created_at')
-      .order('created_at', { ascending: false })
-      .limit(LIST_LIMIT)
-    const term = search.trim()
-    if (term) query = query.ilike('question', `%${escapeLikePattern(term)}%`)
-    const { data, error } = await query
-    if (requestId !== requestIdRef.current) return
-    if (data) setQuestions(data as QuestionRow[])
-    if (error) setQuestionsError(true)
-    setQuestionsLoading(false)
-  }
-
-  async function editQuestion(q: QuestionRow) {
-    const { data, error } = await supabase.rpc('admin_get_question', { p_question_id: q.id })
-    if (error || !data || data.length === 0) return showMsg('❌ Could not load this question for editing')
-    const full = data[0]
-    setEditingQuestionId(full.id)
-    setQText(full.question); setQA(full.option_a); setQB(full.option_b); setQC(full.option_c); setQD(full.option_d)
-    setQCorrect(full.correct || 'a'); setQExplanation(full.explanation || '')
-    setQExamType(full.exam_type); setQExamStage(full.exam_stage || '')
-    setQModuleId(full.module_id); setQSubjectId(full.subject_id || '')
-    setQLessonId(full.lesson_id || ''); setQSource(full.source || '')
-    setBulkMode(false)
-  }
-  function resetQuestionForm() {
-    setEditingQuestionId(null)
-    setQText(''); setQA(''); setQB(''); setQC(''); setQD(''); setQCorrect('a'); setQExplanation('')
-    setQSubjectId(''); setQLessonId(''); setQExamStage('')
-  }
-
-  const crud = useAdminEntityCrud({
-    table: 'questions', label: 'Question', editingId: editingQuestionId,
-    buildPayload: () => ({
-      question: qText, option_a: qA, option_b: qB, option_c: qC, option_d: qD,
-      correct: qCorrect, explanation: qExplanation, exam_type: qExamType,
-      exam_stage: qExamStage || null, module_id: qModuleId, subject_id: qSubjectId || null,
-      lesson_id: qLessonId || null, source: qSource || null
-    }),
-    resetForm: resetQuestionForm, refresh: fetchQuestions, showMessage: showMsg,
-    // Editing goes through an RPC, not a plain update.
-    updateFn: (id, p: any) => supabase.rpc('admin_update_question', {
-      p_id: id,
-      p_question: p.question, p_option_a: p.option_a, p_option_b: p.option_b, p_option_c: p.option_c, p_option_d: p.option_d,
-      p_correct: p.correct, p_explanation: p.explanation, p_exam_type: p.exam_type, p_exam_stage: p.exam_stage,
-      p_module_id: p.module_id, p_subject_id: p.subject_id, p_lesson_id: p.lesson_id, p_source: p.source
-    })
-  })
-  const del = useConfirmDelete(crud.remove)
-
-  function saveQuestion() {
-    if (!qText || !qA || !qB || !qC || !qD || !qModuleId || crud.saving) return
-    crud.save()
-  }
-
-  function parseBulkQuestions(text: string) {
-    const blocks = text.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean)
-    const parsed: any[] = []
-    const errors: string[] = []
-
-    blocks.forEach((block, idx) => {
-      const lines = block.split('\n').map(l => l.trim()).filter(Boolean)
-      const qLine = lines.find(l => /^Q[:\-]/i.test(l))
-      const aLine = lines.find(l => /^A[)\.\-]/i.test(l))
-      const bLine = lines.find(l => /^B[)\.\-]/i.test(l))
-      const cLine = lines.find(l => /^C[)\.\-]/i.test(l))
-      const dLine = lines.find(l => /^D[)\.\-]/i.test(l))
-      const correctLine = lines.find(l => /^Correct[:\-]/i.test(l))
-      const explLine = lines.find(l => /^Explanation[:\-]/i.test(l))
-
-      if (!qLine || !aLine || !bLine || !cLine || !dLine || !correctLine) {
-        errors.push(`Question ${idx + 1}: missing Q/A/B/C/D/Correct line`)
-        return
-      }
-      const correctLetter = correctLine.replace(/^Correct[:\-]/i, '').trim().toLowerCase().charAt(0)
-      if (!['a', 'b', 'c', 'd'].includes(correctLetter)) {
-        errors.push(`Question ${idx + 1}: "Correct" must be A, B, C or D`)
-        return
-      }
-      parsed.push({
-        question: qLine.replace(/^Q[:\-]/i, '').trim(),
-        option_a: aLine.replace(/^A[)\.\-]/i, '').trim(),
-        option_b: bLine.replace(/^B[)\.\-]/i, '').trim(),
-        option_c: cLine.replace(/^C[)\.\-]/i, '').trim(),
-        option_d: dLine.replace(/^D[)\.\-]/i, '').trim(),
-        correct: correctLetter,
-        explanation: explLine ? explLine.replace(/^Explanation[:\-]/i, '').trim() : '',
-      })
-    })
-
-    return { questions: parsed, errors }
-  }
-
-  async function bulkAddQuestions() {
-    if (bulkSaving) return
-    if (!qModuleId) return showMsg('❌ Please select a module first')
-    if (!bulkText.trim()) return showMsg('❌ Paste some questions first')
-
-    const { questions: parsed, errors } = parseBulkQuestions(bulkText)
-    if (errors.length > 0) {
-      showMsg(`❌ ${errors.length} question(s) have a formatting problem — ${errors[0]}`)
-      return
-    }
-    if (parsed.length === 0) return showMsg('❌ No questions found in the text')
-
-    setBulkSaving(true)
-    const rows = parsed.map(q => ({
-      ...q,
-      exam_type: qExamType,
-      exam_stage: qExamStage || null,
-      module_id: qModuleId,
-      subject_id: qSubjectId || null,
-      lesson_id: qLessonId || null,
-      source: qSource || null
-    }))
-    const { error } = await supabase.from('questions').insert(rows)
-    setBulkSaving(false)
-
-    if (error) { showMsg('❌ ' + error.message); return }
-    showMsg(`✅ ${rows.length} questions added!`)
-    setBulkText('')
-    fetchQuestions()
-  }
-
-  const filteredSubjects = (moduleId: string) => subjects.filter(s => s.module_id === moduleId)
-  const filteredLessons = (subjectId: string) => lessons.filter(l => l.subject_id === subjectId)
-
-  const visibleModules = moduleFilter === 'all' ? modules : modules.filter(m => m.id === moduleFilter)
-
-  const form = (
-    <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
-        <h3 style={{ color: pt.cobalt, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
-          {editingQuestionId
-            ? <><EditIcon color={pt.cobalt} size={16} /> Edit Question</>
-            : bulkMode ? <><ListIcon color={pt.cobalt} size={16} /> Bulk Add Questions</> : <><PlusIcon color={pt.cobalt} size={16} /> Add MCQ Question</>}
-        </h3>
-        {!editingQuestionId && (
-          <button onClick={() => setBulkMode(!bulkMode)} style={{
-            background: 'transparent', border: `1px solid ${pt.border}`,
-            borderRadius: 8, padding: '6px 12px', cursor: 'pointer',
-            color: pt.sub, fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
-            display: 'inline-flex', alignItems: 'center', gap: 5
-          }}>{bulkMode ? <><EditIcon color={pt.sub} size={12} /> Single Add</> : <><ListIcon color={pt.sub} size={12} /> Bulk Add</>}</button>
-        )}
-      </div>
-
-      <label style={fieldLabel(pt)}>Module</label>
-      <ModuleSelect modules={modules} value={qModuleId} onChange={id => { setQModuleId(id); setQSubjectId(''); setQLessonId('') }} dark={dark} />
-
-      <label style={fieldLabel(pt)}>Subject (optional)</label>
-      <select value={qSubjectId} onChange={e => { setQSubjectId(e.target.value); setQLessonId('') }} style={inStyle} disabled={!qModuleId}>
-        <option value="">All Subjects</option>
-        {filteredSubjects(qModuleId).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-      </select>
-      {qSubjectId && filteredLessons(qSubjectId).length > 0 && (
-        <>
-          <label style={fieldLabel(pt)}>Lesson (optional)</label>
-          <select value={qLessonId} onChange={e => setQLessonId(e.target.value)} style={inStyle}>
-            <option value="">No specific lesson</option>
-            {filteredLessons(qSubjectId).map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
-          </select>
-        </>
-      )}
-      <div className="admin-form-row-2">
-        <div>
-          <label style={fieldLabel(pt)}>Use In</label>
-          <select value={qExamType} onChange={e => setQExamType(e.target.value)} style={inStyle}>
-            <option value="both">Practice + Mock Exam</option>
-            <option value="practice">Practice Only</option>
-            <option value="mock">Mock Exam Only</option>
-          </select>
-        </div>
-        <div>
-          <label style={fieldLabel(pt)}>Exam Stage (optional)</label>
-          <select value={qExamStage} onChange={e => setQExamStage(e.target.value)} style={inStyle}>
-            <option value="">No specific stage</option>
-            {qStageOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
-        </div>
-      </div>
-      <label style={fieldLabel(pt)}>Source (optional)</label>
-      <select value={qSource} onChange={e => setQSource(e.target.value)} style={inStyle}>
-        <option value="">No tag</option>
-        <option value="ai">AI</option>
-        <option value="courses">Courses</option>
-        <option value="university">University Doctors</option>
-      </select>
-      {qSource && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: -8, marginBottom: 12, color: pt.textMuted, fontSize: 11 }}>
-          {qSource === 'ai' && <RobotIcon color={pt.textMuted} size={12} />}
-          {qSource === 'courses' && <BookIcon color={pt.textMuted} size={12} />}
-          {qSource === 'university' && <GraduationCapIcon color={pt.textMuted} size={12} />}
-          Tag preview
-        </div>
-      )}
-
-      {bulkMode && !editingQuestionId ? (
-        <>
-          <p style={{ color: pt.textMuted, fontSize: 12, marginBottom: 8, lineHeight: 1.6 }}>
-            Paste as many questions as you want below, one after another,
-            separated by an empty line. Every question in this box will
-            be added to the module/subject/type selected above. Format:
-          </p>
-          <pre style={{
-            background: pt.surfaceFlat, border: `1px solid ${pt.border}`, borderRadius: 10,
-            padding: 12, fontSize: 11, color: pt.sub, marginBottom: 12,
-            whiteSpace: 'pre-wrap', lineHeight: 1.6, overflowX: 'auto'
-          }}>{`Q: What is the powerhouse of the cell?
+const BULK_FORMAT_EXAMPLE = `Q: What is the powerhouse of the cell?
 A) Nucleus
 B) Mitochondria
 C) Ribosome
@@ -311,150 +108,333 @@ A) ...
 B) ...
 C) ...
 D) ...
-Correct: A`}</pre>
+Correct: A`
+
+function parseBulkQuestions(text: string) {
+  const blocks = text.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean)
+  const questions: ParsedQuestion[] = []
+  const errors: string[] = []
+
+  blocks.forEach((block, index) => {
+    const lines = block.split('\n').map(l => l.trim()).filter(Boolean)
+    const qLine = lines.find(l => /^Q[:\-]/i.test(l))
+    const aLine = lines.find(l => /^A[)\.\-]/i.test(l))
+    const bLine = lines.find(l => /^B[)\.\-]/i.test(l))
+    const cLine = lines.find(l => /^C[)\.\-]/i.test(l))
+    const dLine = lines.find(l => /^D[)\.\-]/i.test(l))
+    const correctLine = lines.find(l => /^Correct[:\-]/i.test(l))
+    const explanationLine = lines.find(l => /^Explanation[:\-]/i.test(l))
+
+    if (!qLine || !aLine || !bLine || !cLine || !dLine || !correctLine) {
+      errors.push(`Question ${index + 1}: missing Q/A/B/C/D/Correct line`)
+      return
+    }
+    const correct = correctLine.replace(/^Correct[:\-]/i, '').trim().toLowerCase().charAt(0)
+    if (!['a', 'b', 'c', 'd'].includes(correct)) {
+      errors.push(`Question ${index + 1}: "Correct" must be A, B, C or D`)
+      return
+    }
+    questions.push({
+      question: qLine.replace(/^Q[:\-]/i, '').trim(),
+      option_a: aLine.replace(/^A[)\.\-]/i, '').trim(),
+      option_b: bLine.replace(/^B[)\.\-]/i, '').trim(),
+      option_c: cLine.replace(/^C[)\.\-]/i, '').trim(),
+      option_d: dLine.replace(/^D[)\.\-]/i, '').trim(),
+      correct,
+      explanation: explanationLine ? explanationLine.replace(/^Explanation[:\-]/i, '').trim() : '',
+    })
+  })
+
+  return { questions, errors }
+}
+
+export default function QuestionsTab({ dark, modules, context }: QuestionsTabProps) {
+  const pt = getPulseTheme(dark)
+  const inStyle = adminInStyle(pt, dark)
+  const { message, showMessage } = useAdminMessage()
+  const stageOptions = useStageOptions(context.moduleId)
+
+  const [search, setSearch] = useState('')
+  const { rows: questions, loading, error, refresh } = useAdminList<QuestionRow>({
+    table: 'questions',
+    moduleId: context.moduleId,
+    select: QUESTION_COLUMNS,
+    search: { column: 'question', term: search },
+  })
+
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [draft, setDraft] = useState<QuestionDraft>(EMPTY_DRAFT)
+  const [bulkMode, setBulkMode] = useState(false)
+  const [bulkText, setBulkText] = useState('')
+  const [bulkSaving, setBulkSaving] = useState(false)
+
+  const bulkActive = bulkMode && !editingId
+
+  function setField<K extends keyof QuestionDraft>(key: K, value: QuestionDraft[K]) {
+    setDraft(prev => ({ ...prev, [key]: value }))
+  }
+
+  async function editQuestion(row: QuestionRow) {
+    const { data, error: loadError } = await supabase.rpc('admin_get_question', { p_question_id: row.id })
+    if (loadError || !data || data.length === 0) return showMessage('❌ Could not load this question for editing')
+    const full = data[0]
+    setEditingId(full.id)
+    setDraft({
+      question: full.question,
+      optionA: full.option_a,
+      optionB: full.option_b,
+      optionC: full.option_c,
+      optionD: full.option_d,
+      correct: full.correct || 'a',
+      explanation: full.explanation || '',
+      examType: full.exam_type,
+      examStage: full.exam_stage || '',
+      source: full.source || '',
+    })
+    context.setContext({ moduleId: full.module_id, subjectId: full.subject_id || '', lessonId: full.lesson_id || '' })
+    setBulkMode(false)
+  }
+
+  function resetForm() {
+    setEditingId(null)
+    setDraft(prev => ({ ...EMPTY_DRAFT, examType: prev.examType, examStage: prev.examStage, source: prev.source }))
+  }
+
+  function scopeFields() {
+    return {
+      exam_type: draft.examType,
+      exam_stage: draft.examStage || null,
+      module_id: context.moduleId,
+      subject_id: context.subjectId || null,
+      lesson_id: context.lessonId || null,
+      source: draft.source || null,
+    }
+  }
+
+  const crud = useAdminEntityCrud<QuestionPayload>({
+    table: 'questions',
+    label: 'Question',
+    editingId,
+    buildPayload: () => ({
+      question: draft.question,
+      option_a: draft.optionA,
+      option_b: draft.optionB,
+      option_c: draft.optionC,
+      option_d: draft.optionD,
+      correct: draft.correct,
+      explanation: draft.explanation,
+      ...scopeFields(),
+    }),
+    resetForm,
+    refresh,
+    showMessage,
+    updateFn: (id, p) => supabase.rpc('admin_update_question', {
+      p_id: id,
+      p_question: p.question,
+      p_option_a: p.option_a,
+      p_option_b: p.option_b,
+      p_option_c: p.option_c,
+      p_option_d: p.option_d,
+      p_correct: p.correct,
+      p_explanation: p.explanation,
+      p_exam_type: p.exam_type,
+      p_exam_stage: p.exam_stage,
+      p_module_id: p.module_id,
+      p_subject_id: p.subject_id,
+      p_lesson_id: p.lesson_id,
+      p_source: p.source,
+    }),
+  })
+  const del = useConfirmDelete(crud.remove)
+
+  function saveQuestion() {
+    if (crud.saving) return
+    if (!context.moduleId) return showMessage(PICK_MODULE_MESSAGE)
+    if (!draft.question || !draft.optionA || !draft.optionB || !draft.optionC || !draft.optionD) {
+      return showMessage(REQUIRED_FIELDS_MESSAGE)
+    }
+    crud.save()
+  }
+
+  async function bulkAddQuestions() {
+    if (bulkSaving) return
+    if (!context.moduleId) return showMessage(PICK_MODULE_MESSAGE)
+    if (!bulkText.trim()) return showMessage('❌ Paste some questions first')
+
+    const { questions: parsed, errors } = parseBulkQuestions(bulkText)
+    if (errors.length > 0) return showMessage(`❌ ${errors.length} question(s) have a formatting problem — ${errors[0]}`)
+    if (parsed.length === 0) return showMessage('❌ No questions found in the text')
+
+    setBulkSaving(true)
+    const { error: insertError } = await supabase.from('questions').insert(parsed.map(q => ({ ...q, ...scopeFields() })))
+    setBulkSaving(false)
+
+    if (insertError) return showMessage('❌ ' + insertError.message)
+    showMessage(`✅ ${parsed.length} questions added!`)
+    setBulkText('')
+    refresh()
+  }
+
+  const stageLabel = (value: string) => stageOptions.find(s => s.value === value)?.label ?? value
+  const detailsSummary = [
+    draft.examType !== 'both' && EXAM_TYPES.find(t => t.value === draft.examType)?.label,
+    draft.examStage && stageLabel(draft.examStage),
+    draft.source && SOURCES.find(s => s.value === draft.source)?.label,
+  ].filter(Boolean).join(' · ')
+
+  const form = (
+    <AdminFormCard
+      dark={dark}
+      noun="Question"
+      title={bulkActive ? 'Bulk Add Questions' : undefined}
+      Icon={bulkActive ? ListIcon : undefined}
+      editing={!!editingId}
+      addLabel={bulkActive ? 'Parse & Add All' : 'Add Question'}
+      savingLabel={bulkActive ? 'Adding...' : 'Saving...'}
+      saving={bulkActive ? bulkSaving : crud.saving}
+      onSave={bulkActive ? bulkAddQuestions : saveQuestion}
+      onCancel={editingId ? resetForm : undefined}
+      headerAction={!editingId && (
+        <button onClick={() => setBulkMode(m => !m)} style={miniBtn(pt.sub)}>
+          {bulkMode ? <><EditIcon color={pt.sub} size={12} /> Single Add</> : <><ListIcon color={pt.sub} size={12} /> Bulk Add</>}
+        </button>
+      )}
+    >
+      {bulkActive ? (
+        <>
+          <p style={{ color: pt.textMuted, fontSize: 12, marginBottom: 8, lineHeight: 1.6 }}>
+            Paste as many questions as you want, separated by an empty line. Every question in this box is added
+            to the module, subject and lesson selected above. Format:
+          </p>
+          <pre style={{
+            background: pt.surfaceFlat, border: `1px solid ${pt.border}`, borderRadius: 10,
+            padding: 12, fontSize: 11, color: pt.sub, marginBottom: 12,
+            whiteSpace: 'pre-wrap', lineHeight: 1.6, overflowX: 'auto'
+          }}>{BULK_FORMAT_EXAMPLE}</pre>
           <textarea
             placeholder="Paste your questions here..."
             value={bulkText}
             onChange={e => setBulkText(e.target.value)}
-            style={{ ...inStyle, minHeight: 240, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }} />
-          <button onClick={bulkAddQuestions} disabled={bulkSaving} style={submitBtnStyle(pt, dark, bulkSaving, { width: '100%' })}>
-            {bulkSaving ? 'Adding...' : 'Parse & Add All'}
-          </button>
+            style={{ ...inStyle, minHeight: 240, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }}
+          />
         </>
       ) : (
         <>
-          <textarea placeholder="Question" value={qText} onChange={e => setQText(e.target.value)} style={{ ...inStyle, minHeight: 80, resize: 'vertical' }} />
-          {['A', 'B', 'C', 'D'].map((opt, i) => (
-            <input key={opt} placeholder={`Option ${opt}`}
-              value={[qA, qB, qC, qD][i]}
-              onChange={e => [setQA, setQB, setQC, setQD][i](e.target.value)}
-              style={inStyle} />
+          <textarea
+            placeholder="Question"
+            value={draft.question}
+            onChange={e => setField('question', e.target.value)}
+            style={{ ...inStyle, minHeight: 80, resize: 'vertical' }}
+          />
+          {OPTION_FIELDS.map(option => (
+            <input
+              key={option.key}
+              placeholder={`Option ${option.label}`}
+              value={draft[option.key]}
+              onChange={e => setField(option.key, e.target.value)}
+              style={inStyle}
+            />
           ))}
           <label style={fieldLabel(pt)}>Correct Answer</label>
-          <select value={qCorrect} onChange={e => setQCorrect(e.target.value)} style={inStyle}>
-            <option value="a">A</option>
-            <option value="b">B</option>
-            <option value="c">C</option>
-            <option value="d">D</option>
+          <select value={draft.correct} onChange={e => setField('correct', e.target.value)} style={inStyle}>
+            {OPTION_FIELDS.map(option => <option key={option.key} value={option.label.toLowerCase()}>{option.label}</option>)}
           </select>
-          <textarea placeholder="Explanation (optional)" value={qExplanation} onChange={e => setQExplanation(e.target.value)} style={{ ...inStyle, minHeight: 60, resize: 'vertical' }} />
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={saveQuestion} disabled={crud.saving} style={submitBtnStyle(pt, dark, crud.saving)}>
-              {crud.saving ? 'Saving...' : editingQuestionId ? 'Save Changes' : 'Add Question'}
-            </button>
-            {editingQuestionId && <button onClick={resetQuestionForm} disabled={crud.saving} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
-          </div>
+          <textarea
+            placeholder="Explanation (optional)"
+            value={draft.explanation}
+            onChange={e => setField('explanation', e.target.value)}
+            style={{ ...inStyle, minHeight: 60, resize: 'vertical' }}
+          />
         </>
       )}
-    </LiquidGlassCard>
+
+      <AdminDetails dark={dark} title="Details" summary={detailsSummary}>
+        <label style={fieldLabel(pt)}>Use In</label>
+        <select value={draft.examType} onChange={e => setField('examType', e.target.value)} style={inStyle}>
+          {EXAM_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+        <label style={fieldLabel(pt)}>Exam Stage (optional)</label>
+        <select value={draft.examStage} onChange={e => setField('examStage', e.target.value)} style={inStyle}>
+          <option value="">No specific stage</option>
+          {stageOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+        </select>
+        <label style={fieldLabel(pt)}>Source (optional)</label>
+        <select value={draft.source} onChange={e => setField('source', e.target.value)} style={inStyle}>
+          {SOURCES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+        </select>
+      </AdminDetails>
+    </AdminFormCard>
   )
+
+  const searchTerm = search.trim()
 
   const list = (
     <div>
-      {questionsError && <ErrorBanner message="Couldn't load questions — check your connection." />}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-          <input
-            placeholder="Search questions..."
-            value={search} onChange={e => setSearch(e.target.value)}
-            style={{ ...inStyle, marginBottom: 0, paddingLeft: 34 }}
-          />
-          <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-            <SearchIcon2 color={pt.faint} size={14} />
-          </span>
-        </div>
-        <select value={moduleFilter} onChange={e => setModuleFilter(e.target.value)} style={{ ...inStyle, width: 'auto', marginBottom: 0 }}>
-          <option value="all">All modules ({questions.length})</option>
-          {modules.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-        </select>
+      <div style={{ position: 'relative', marginBottom: 16 }}>
+        <input
+          placeholder="Search questions..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ ...inStyle, marginBottom: 0, paddingLeft: 34 }}
+        />
+        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+          <SearchIcon2 color={pt.faint} size={14} />
+        </span>
       </div>
 
-      {questions.length === LIST_LIMIT && (
-        <p style={{ color: pt.textMuted, fontSize: 11, marginBottom: 12 }}>
-          Showing the most recent {LIST_LIMIT}{search.trim() ? ' matches' : ' — use search to find older questions'}.
-        </p>
-      )}
-
-      {questionsLoading && <EmptyState dark={dark} message="Loading..." />}
-
-      {!questionsLoading && questions.length === 0 && (
-        <EmptyState dark={dark} message={search.trim()
+      <AdminGroupedList
+        dark={dark}
+        modules={modules}
+        items={questions}
+        moduleOf={q => q.module_id}
+        loading={loading}
+        error={error}
+        noun="questions"
+        limitNote={`Showing the most recent ${LIST_LIMIT}${searchTerm ? ' matches' : ' — use search to find older questions'}.`}
+        emptyMessage={searchTerm
           ? <><SearchIcon2 color={pt.sub} size={14} /> No questions match your search</>
-          : <><ConstructionIcon color={pt.sub} size={14} /> No questions yet — add one on the left</>} />
-      )}
-
-      {!questionsLoading && visibleModules.map(mod => {
-        const modQuestions = questions.filter(q => q.module_id === mod.id)
-        if (modQuestions.length === 0) return null
-        return (
-          <div key={mod.id} style={{ marginBottom: 20 }}>
-            <h4 style={groupHeading(mod.color)}>
-              <ModuleIcon value={mod.icon} size={18} color={mod.color} /> {mod.name}
-              <span style={{ color: pt.textMuted, fontSize: 12, fontWeight: 400 }}>({modQuestions.length})</span>
-            </h4>
-            <div className="admin-list-grid">
-              {modQuestions.map(q => {
-                const isEditing = editingQuestionId === q.id
-                const stageText = q.exam_stage
-                  ? (EXAM_STAGES.find(s => s.value === q.exam_stage)?.label || q.exam_stage)
-                  : null
-                return (
-                  <LiquidGlassCard
-                    key={q.id} dark={dark} delay={0}
-                    style={{
-                      padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10,
-                      boxShadow: isEditing ? `inset 0 0 0 2px ${pt.cobalt}` : undefined
-                    }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                      <p style={{
-                        color: pt.text, fontWeight: 600, fontSize: 13, lineHeight: 1.45, margin: 0,
-                        flex: 1, minWidth: 0, wordBreak: 'break-word', overflowWrap: 'anywhere',
-                        display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden'
-                      }}>{q.question}</p>
-                      <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                        <button onClick={() => editQuestion(q)} aria-label={`Edit question: ${q.question}`} style={{ ...miniBtn(pt, pt.cobalt), display: 'inline-flex', alignItems: 'center' }}><EditIcon color={pt.cobalt} size={12} /></button>
-                        <button onClick={() => del.requestDelete(q.id)} aria-label={`Delete question: ${q.question}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                      <span style={{
-                        fontSize: 10.5, fontWeight: 700, padding: '2px 9px', borderRadius: 20,
-                        background: `${pt.cobalt}18`, border: `1px solid ${pt.cobalt}40`, color: pt.cobalt
-                      }}>
-                        {q.exam_type === 'practice' ? 'Practice Only' : q.exam_type === 'mock' ? 'Mock Only' : 'Practice + Mock'}
-                      </span>
-                      {stageText && (
-                        <span style={{
-                          fontSize: 10.5, fontWeight: 700, padding: '2px 9px', borderRadius: 20,
-                          background: `${pt.indigo}18`, border: `1px solid ${pt.indigo}40`, color: pt.indigo
-                        }}>{stageText}</span>
-                      )}
-                      {q.source && <QuestionSourceBadge source={q.source} />}
-                    </div>
-                  </LiquidGlassCard>
-                )
-              })}
+          : <><ConstructionIcon color={pt.sub} size={14} /> No questions yet — add one on the left</>}
+        renderItem={q => (
+          <AdminRow
+            key={q.id}
+            dark={dark}
+            noun="question"
+            label={q.question}
+            active={editingId === q.id}
+            onEdit={() => editQuestion(q)}
+            onDelete={() => del.requestDelete(q.id)}
+          >
+            <div style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <p style={{
+                color: pt.text, fontWeight: 600, fontSize: 13, lineHeight: 1.45, margin: 0,
+                wordBreak: 'break-word', overflowWrap: 'anywhere',
+                display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+              }}>{q.question}</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                <span style={{
+                  fontSize: 10.5, fontWeight: 700, padding: '2px 9px', borderRadius: 20,
+                  background: `${pt.cobalt}18`, border: `1px solid ${pt.cobalt}40`, color: pt.cobalt
+                }}>{EXAM_TYPES.find(t => t.value === q.exam_type)?.label ?? q.exam_type}</span>
+                {q.exam_stage && (
+                  <span style={{
+                    fontSize: 10.5, fontWeight: 700, padding: '2px 9px', borderRadius: 20,
+                    background: `${pt.indigo}18`, border: `1px solid ${pt.indigo}40`, color: pt.indigo
+                  }}>{stageLabel(q.exam_stage)}</span>
+                )}
+                {q.source && <QuestionSourceBadge source={q.source} />}
+              </div>
             </div>
-          </div>
-        )
-      })}
+          </AdminRow>
+        )}
+      />
     </div>
   )
 
   return (
     <div>
-      <InlineMessage message={msg} />
+      <InlineMessage message={message} />
       <AdminSplitLayout formWidth={420} form={form} list={list} />
-      <ConfirmDialog
-        dark={dark}
-        open={del.open}
-        title="Delete question?"
-        message="This cannot be undone."
-        confirmLabel="Delete"
-        confirmColor={pt.danger}
-        onCancel={del.cancel}
-        onConfirm={del.confirm}
-      />
+      <AdminDeleteDialog dark={dark} noun="question" del={del} />
     </div>
   )
 }

@@ -4,7 +4,8 @@ import { getPulseTheme, pulseType } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import ConfirmDialog from '../../components/ConfirmDialog'
-import { btnStyle, inStyle as adminInStyle, fieldLabel } from './adminStyles'
+import AdminFormCard from './AdminFormCard'
+import { inStyle as adminInStyle, fieldLabel } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
 import { invalidateDriveUrlCache } from '../../lib/siteSettings'
 import { MegaphoneIcon, SendIcon, LinkIcon } from '../../components/ui/tool-icons'
@@ -18,7 +19,7 @@ const ANNOUNCEMENT_PREVIEW_MAX_WIDTH = 380
 export default function SettingsTab({ dark }: SettingsTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
-  const { message: msg, showMessage: showMsg } = useAdminMessage()
+  const { message, showMessage } = useAdminMessage()
 
   const [announcement, setAnnouncement] = useState('')
   const [announcementSaving, setAnnouncementSaving] = useState(false)
@@ -29,100 +30,97 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
   const [broadcastSending, setBroadcastSending] = useState(false)
   const [confirmBroadcastOpen, setConfirmBroadcastOpen] = useState(false)
 
-  useEffect(() => { fetchAnnouncement() }, [])
-
-  async function fetchAnnouncement() {
-    const { data } = await supabase.from('site_settings').select('key, value').in('key', ['home_announcement', 'drive_url'])
-    if (data) {
+  useEffect(() => {
+    supabase.from('site_settings').select('key, value').in('key', ['home_announcement', 'drive_url']).then(({ data }) => {
+      if (!data) return
       const byKey = Object.fromEntries(data.map((r: any) => [r.key, r.value || '']))
       setAnnouncement(byKey['home_announcement'] || '')
       setDriveUrl(byKey['drive_url'] || '')
-    }
-  }
+    })
+  }, [])
 
   async function saveAnnouncement() {
     setAnnouncementSaving(true)
     const { error } = await supabase.from('site_settings').upsert({ key: 'home_announcement', value: announcement.trim() })
     setAnnouncementSaving(false)
-    showMsg(error ? '❌ ' + error.message : '✅ Announcement updated!')
+    showMessage(error ? '❌ ' + error.message : '✅ Announcement updated!')
   }
 
-  async function saveDriveLinks() {
+  async function saveDriveUrl() {
     setDriveUrlSaving(true)
     const { error } = await supabase.from('site_settings').upsert({ key: 'drive_url', value: driveUrl.trim() })
     setDriveUrlSaving(false)
     if (!error) invalidateDriveUrlCache()
-    showMsg(error ? '❌ ' + error.message : '✅ Drive link updated!')
+    showMessage(error ? '❌ ' + error.message : '✅ Drive link updated!')
   }
 
   function requestBroadcast() {
-    if (!broadcastTitle.trim() || !broadcastBody.trim()) return showMsg('❌ Please fill in both fields')
+    if (!broadcastTitle.trim() || !broadcastBody.trim()) return showMessage('❌ Please fill in both fields')
     setConfirmBroadcastOpen(true)
   }
 
   async function sendBroadcast() {
     setConfirmBroadcastOpen(false)
-    const title = broadcastTitle.trim()
-    const body = broadcastBody.trim()
-
     setBroadcastSending(true)
     const { data: { session } } = await supabase.auth.getSession()
     try {
       const res = await fetch('/api/push/broadcast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ title, body })
+        body: JSON.stringify({ title: broadcastTitle.trim(), body: broadcastBody.trim() }),
       })
       const result = await res.json()
+      if (!res.ok) return showMessage('❌ ' + (result.error || 'Failed to send'))
+      showMessage(`✅ Sent to ${result.sent} device(s)!`)
+      setBroadcastTitle('')
+      setBroadcastBody('')
+    } catch {
+      showMessage('❌ Network error — please try again')
+    } finally {
       setBroadcastSending(false)
-      if (!res.ok) return showMsg('❌ ' + (result.error || 'Failed to send'))
-      showMsg(`✅ Sent to ${result.sent} device(s)!`)
-      setBroadcastTitle(''); setBroadcastBody('')
-    } catch (e) {
-      setBroadcastSending(false)
-      showMsg('❌ Network error — please try again')
     }
   }
 
   return (
     <div>
-      <InlineMessage message={msg} />
+      <InlineMessage message={message} />
 
       <style>{`
         .settings-row {
           display: grid;
           grid-template-columns: 1fr;
           gap: 16px;
+          margin-bottom: 16px;
         }
         @media (min-width: 900px) {
           .settings-row { grid-template-columns: 1fr 1fr; align-items: stretch; }
         }
       `}</style>
 
-      <div className="settings-row" style={{ marginBottom: 16 }}>
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px', height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <h3 style={{ color: pt.cobalt, marginBottom: 8, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <MegaphoneIcon color={pt.cobalt} size={17} /> Push Notification to Everyone
-          </h3>
-          <p style={{ color: pt.textMuted, fontSize: 13, marginBottom: 16 }}>
-            Delivered instantly to every device with notifications enabled — even if they don't have the site open right now.
-            You'll be asked to confirm before it sends.
-          </p>
+      <div className="settings-row">
+        <AdminFormCard
+          dark={dark}
+          title="Push Notification to Everyone"
+          Icon={MegaphoneIcon}
+          description="Delivered instantly to every device with notifications enabled, even if the site isn't open. You'll be asked to confirm before it sends."
+          addLabel={<><SendIcon color="#fff" size={13} /> Send to Everyone</>}
+          savingLabel="Sending..."
+          saving={broadcastSending}
+          onSave={requestBroadcast}
+        >
           <input dir="auto" placeholder="Title (e.g. New questions added!)" value={broadcastTitle} onChange={e => setBroadcastTitle(e.target.value)} style={inStyle} />
           <textarea dir="auto" placeholder="Message" value={broadcastBody} onChange={e => setBroadcastBody(e.target.value)} style={{ ...inStyle, minHeight: 70, resize: 'vertical', flex: 1 }} />
-          <button onClick={requestBroadcast} disabled={broadcastSending} style={{ ...btnStyle(pt, dark), width: '100%', marginTop: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
-            {broadcastSending ? 'Sending...' : <><SendIcon color="#fff" size={13} /> Send to Everyone</>}
-          </button>
-        </LiquidGlassCard>
+        </AdminFormCard>
 
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px', height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <h3 style={{ color: pt.cobalt, marginBottom: 8, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <MegaphoneIcon color={pt.cobalt} size={17} /> Home Page Announcement
-          </h3>
-          <p style={{ color: pt.textMuted, fontSize: 13, marginBottom: 16 }}>
-            Shows at the top of the Home page. Leave empty to hide it. Preview below matches the real
-            card's width, and Enter adds a line break.
-          </p>
+        <AdminFormCard
+          dark={dark}
+          title="Home Page Announcement"
+          Icon={MegaphoneIcon}
+          description="Shows at the top of the Home page. Leave empty to hide it. The preview matches the real card's width, and Enter adds a line break."
+          addLabel="Save Announcement"
+          saving={announcementSaving}
+          onSave={saveAnnouncement}
+        >
           <div style={{ maxWidth: ANNOUNCEMENT_PREVIEW_MAX_WIDTH, marginBottom: 12, flex: 1 }}>
             <LiquidGlassCard dark={dark} instant style={{ padding: '16px 20px', height: '100%' }}>
               <textarea
@@ -137,34 +135,25 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
                   lineHeight: 1.5, textAlign: 'left', fontFamily: 'inherit',
                   whiteSpace: 'pre-line', wordBreak: 'break-word',
                   resize: 'vertical', boxSizing: 'border-box'
-                }} />
+                }}
+              />
             </LiquidGlassCard>
           </div>
-          <button onClick={saveAnnouncement} disabled={announcementSaving} style={{ ...btnStyle(pt, dark), width: '100%', marginTop: 'auto' }}>
-            {announcementSaving ? 'Saving...' : 'Save Announcement'}
-          </button>
-        </LiquidGlassCard>
+        </AdminFormCard>
       </div>
 
-      <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
-        <h3 style={{ color: pt.cobalt, marginBottom: 8, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <LinkIcon color={pt.cobalt} size={17} /> Google Drive Link
-        </h3>
-        <p style={{ color: pt.textMuted, fontSize: 13, marginBottom: 16 }}>
-          Shown as the "University Google Drive" button wherever it's offered. Leave it empty to hide the button entirely.
-        </p>
-
+      <AdminFormCard
+        dark={dark}
+        title="Google Drive Link"
+        Icon={LinkIcon}
+        description={`Shown as the "University Google Drive" button wherever it's offered. Leave it empty to hide the button entirely.`}
+        addLabel="Save Drive Link"
+        saving={driveUrlSaving}
+        onSave={saveDriveUrl}
+      >
         <label style={fieldLabel(pt)}>Drive URL</label>
-        <input
-          placeholder="https://drive.google.com/..."
-          value={driveUrl}
-          onChange={e => setDriveUrl(e.target.value)}
-          style={{ ...inStyle, marginBottom: 16 }} />
-
-        <button onClick={saveDriveLinks} disabled={driveUrlSaving} style={{ ...btnStyle(pt, dark), width: '100%' }}>
-          {driveUrlSaving ? 'Saving...' : 'Save Drive Link'}
-        </button>
-      </LiquidGlassCard>
+        <input placeholder="https://drive.google.com/..." value={driveUrl} onChange={e => setDriveUrl(e.target.value)} style={{ ...inStyle, marginBottom: 16 }} />
+      </AdminFormCard>
 
       <ConfirmDialog
         dark={dark}

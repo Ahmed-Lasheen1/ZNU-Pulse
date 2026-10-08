@@ -8,61 +8,45 @@ import ErrorBanner from '../components/ErrorBanner'
 import { invalidateSubjectsCache } from '../lib/subjects'
 import { invalidateLessonsCache } from '../lib/lessons'
 import NotFound from './NotFound'
-import { PackageIcon, BookIcon, FolderIcon, CalendarDotIcon, QuestionMarkIcon, ChartBarIcon, GearIcon, TargetIcon } from '../components/ui/tool-icons'
+import { PackageIcon, FolderIcon, CalendarDotIcon, QuestionMarkIcon, ChartBarIcon, GearIcon } from '../components/ui/tool-icons'
 import { NotesIcon } from '../lib/medicalIcons'
 
-import ModulesTab from './admin/ModulesTab'
-import SubjectsTab from './admin/SubjectsTab'
-import LessonsTab from './admin/LessonsTab'
-import FilesTab from './admin/FilesTab'
-import SchedulesTab from './admin/SchedulesTab'
 import QuestionsTab from './admin/QuestionsTab'
+import FilesTab from './admin/FilesTab'
 import SummariesTab from './admin/SummariesTab'
-import StagesTab from './admin/StagesTab'
+import SchedulesTab from './admin/SchedulesTab'
+import StructureTab from './admin/StructureTab'
 import AnalyticsTab from './admin/AnalyticsTab'
 import SettingsTab from './admin/SettingsTab'
 import AdminContextBar from './admin/AdminContextBar'
 import { useAdminContext } from './admin/useAdminContext'
 import { LIST_LIMIT } from './admin/adminStyles'
-import type { AdminModule, AdminSubject, AdminLesson } from './admin/adminTypes'
+import type { AdminModule, AdminSubject, AdminLesson, AdminIcon } from './admin/adminTypes'
 
-type TabIcon = (p: { color: string; size?: number }) => JSX.Element
-
-const SECTIONS = [
-  { id: 'content', label: 'Content', Icon: FolderIcon, tabs: ['questions', 'files', 'summaries', 'schedules'] },
-  { id: 'structure', label: 'Structure', Icon: PackageIcon, tabs: ['modules', 'subjects', 'lessons', 'stages'] },
-  { id: 'site', label: 'Site', Icon: GearIcon, tabs: ['analytics', 'settings'] }
+const TABS = [
+  { id: 'questions', label: 'Questions', Icon: QuestionMarkIcon },
+  { id: 'files', label: 'Files', Icon: FolderIcon },
+  { id: 'summaries', label: 'Summaries', Icon: NotesIcon },
+  { id: 'schedules', label: 'Schedules', Icon: CalendarDotIcon },
+  { id: 'structure', label: 'Structure', Icon: PackageIcon },
+  { id: 'analytics', label: 'Analytics', Icon: ChartBarIcon },
+  { id: 'settings', label: 'Settings', Icon: GearIcon },
 ] as const
 
-type AdminTab = typeof SECTIONS[number]['tabs'][number]
-
-const TAB_META: Record<AdminTab, { Icon: TabIcon; label: string }> = {
-  modules: { Icon: PackageIcon, label: 'Modules' },
-  subjects: { Icon: BookIcon, label: 'Subjects' },
-  lessons: { Icon: BookIcon, label: 'Lessons' },
-  files: { Icon: FolderIcon, label: 'Files' },
-  schedules: { Icon: CalendarDotIcon, label: 'Schedules' },
-  questions: { Icon: QuestionMarkIcon, label: 'Questions' },
-  summaries: { Icon: NotesIcon, label: 'Summaries' },
-  stages: { Icon: TargetIcon, label: 'Stages' },
-  analytics: { Icon: ChartBarIcon, label: 'Analytics' },
-  settings: { Icon: GearIcon, label: 'Settings' }
-}
+type AdminTab = typeof TABS[number]['id']
 
 const CONTEXT_DEPTH: Partial<Record<AdminTab, number>> = {
-  subjects: 1,
   schedules: 1,
-  lessons: 2,
   files: 3,
   questions: 3,
-  summaries: 3
+  summaries: 3,
 }
 
 interface AdminPillProps {
   dark: boolean
   active: boolean
   label: string
-  Icon: TabIcon
+  Icon: AdminIcon
   onSelect: () => void
 }
 
@@ -84,53 +68,51 @@ function AdminPill({ dark, active, label, Icon, onSelect }: AdminPillProps) {
   )
 }
 
-interface AdminProps {
-  dark: boolean
-}
-
-export default function Admin({ dark }: AdminProps) {
+export default function Admin({ dark }: { dark: boolean }) {
   const { profile, authLoaded } = useAuth() as { profile?: { role?: string } | null; authLoaded: boolean }
   const { refreshModules } = useModules() as { refreshModules: () => Promise<{ modules: AdminModule[]; error?: any }> }
-  const isAuth = profile?.role === 'admin'
+  const isAdmin = profile?.role === 'admin'
   const pt = getPulseTheme(dark)
 
   const [activeTab, setActiveTab] = useState<AdminTab>('questions')
-
   const [modules, setModules] = useState<AdminModule[]>([])
   const [subjects, setSubjects] = useState<AdminSubject[]>([])
   const [lessons, setLessons] = useState<AdminLesson[]>([])
-
   const [refDataLoading, setRefDataLoading] = useState(true)
   const [refDataError, setRefDataError] = useState(false)
 
   const context = useAdminContext(modules, subjects, lessons)
-
-  useEffect(() => {
-    if (isAuth) {
-      setRefDataLoading(true)
-      setRefDataError(false)
-      Promise.all([fetchModules(), fetchSubjects(), fetchLessons()]).finally(() => setRefDataLoading(false))
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuth])
 
   async function fetchModules() {
     const result = await refreshModules()
     setModules((result?.modules || []) as AdminModule[])
     if (result?.error) setRefDataError(true)
   }
+
   async function fetchSubjects() {
     invalidateSubjectsCache()
     const { data, error } = await supabase.from('subjects').select('*').order('created_at')
     if (data) setSubjects(data as AdminSubject[])
     if (error) setRefDataError(true)
   }
+
   async function fetchLessons() {
     invalidateLessonsCache()
     const { data, error } = await supabase.from('lessons').select('*').order('created_at', { ascending: false }).limit(LIST_LIMIT)
     if (data) setLessons(data as AdminLesson[])
     if (error) setRefDataError(true)
   }
+
+  async function refreshStructure() {
+    setRefDataError(false)
+    await Promise.all([fetchModules(), fetchSubjects(), fetchLessons()])
+  }
+
+  useEffect(() => {
+    if (!isAdmin) return
+    setRefDataLoading(true)
+    refreshStructure().finally(() => setRefDataLoading(false))
+  }, [isAdmin])
 
   if (!authLoaded) {
     return (
@@ -142,13 +124,9 @@ export default function Admin({ dark }: AdminProps) {
     )
   }
 
-  if (!isAuth) return <NotFound dark={dark} />
+  if (!isAdmin) return <NotFound dark={dark} />
 
-  const activeSection = SECTIONS.find(s => (s.tabs as readonly AdminTab[]).includes(activeTab)) ?? SECTIONS[0]
-  const sectionTabs: readonly AdminTab[] = activeSection.tabs
   const contextDepth = CONTEXT_DEPTH[activeTab]
-
-  const tabProps = { dark, modules, subjects, lessons, context, fetchModules, fetchSubjects, fetchLessons, refDataLoading }
 
   return (
     <div style={{ position: 'relative' }}>
@@ -171,6 +149,12 @@ export default function Admin({ dark }: AdminProps) {
           @media (min-width: 640px) {
             .admin-form-row-2 { grid-template-columns: 1fr 1fr; gap: 12px; }
           }
+          .admin-list-grid {
+            display: grid; grid-template-columns: 1fr; gap: 10px;
+          }
+          @media (min-width: 1500px) {
+            .admin-list-grid { grid-template-columns: 1fr 1fr; }
+          }
         `}</style>
 
         <div style={{ marginBottom: 4 }}>
@@ -190,24 +174,15 @@ export default function Admin({ dark }: AdminProps) {
           </div>
         )}
 
-        <div className="admin-tabs" style={{ marginBottom: 4 }}>
-          {SECTIONS.map(section => (
-            <AdminPill
-              key={section.id} dark={dark}
-              active={section.id === activeSection.id}
-              label={section.label} Icon={section.Icon}
-              onSelect={() => { if (section.id !== activeSection.id) setActiveTab(section.tabs[0]) }}
-            />
-          ))}
-        </div>
-
         <div className="admin-tabs">
-          {sectionTabs.map(t => (
+          {TABS.map(tab => (
             <AdminPill
-              key={t} dark={dark}
-              active={activeTab === t}
-              label={TAB_META[t].label} Icon={TAB_META[t].Icon}
-              onSelect={() => setActiveTab(t)}
+              key={tab.id}
+              dark={dark}
+              active={activeTab === tab.id}
+              label={tab.label}
+              Icon={tab.Icon}
+              onSelect={() => setActiveTab(tab.id)}
             />
           ))}
         </div>
@@ -219,16 +194,18 @@ export default function Admin({ dark }: AdminProps) {
           />
         )}
 
-        {activeTab === 'modules' && <ModulesTab {...tabProps} />}
-        {activeTab === 'subjects' && <SubjectsTab {...tabProps} />}
-        {activeTab === 'lessons' && <LessonsTab {...tabProps} />}
-        {activeTab === 'files' && <FilesTab {...tabProps} />}
-        {activeTab === 'schedules' && <SchedulesTab {...tabProps} />}
-        {activeTab === 'questions' && <QuestionsTab {...tabProps} />}
-        {activeTab === 'summaries' && <SummariesTab {...tabProps} />}
-        {activeTab === 'stages' && <StagesTab {...tabProps} />}
-        {activeTab === 'analytics' && <AnalyticsTab {...tabProps} />}
-        {activeTab === 'settings' && <SettingsTab {...tabProps} />}
+        {activeTab === 'questions' && <QuestionsTab dark={dark} modules={modules} context={context} />}
+        {activeTab === 'files' && <FilesTab dark={dark} modules={modules} context={context} />}
+        {activeTab === 'summaries' && <SummariesTab dark={dark} modules={modules} subjects={subjects} context={context} />}
+        {activeTab === 'schedules' && <SchedulesTab dark={dark} modules={modules} context={context} />}
+        {activeTab === 'structure' && (
+          <StructureTab
+            dark={dark} modules={modules} subjects={subjects} lessons={lessons}
+            loading={refDataLoading} refresh={refreshStructure}
+          />
+        )}
+        {activeTab === 'analytics' && <AnalyticsTab dark={dark} modules={modules} />}
+        {activeTab === 'settings' && <SettingsTab dark={dark} />}
       </div>
     </div>
   )

@@ -1,27 +1,21 @@
-// src/pages/admin/SummariesTab.tsx
-import { useState, useEffect } from 'react'
-import { supabase } from '../../supabase'
+import { useState } from 'react'
 import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
-import ErrorBanner from '../../components/ErrorBanner'
-import ModuleSelect from './ModuleSelect'
 import AdminSplitLayout from './AdminSplitLayout'
-import EmptyState from '../../components/pulse/EmptyState'
-import AdminModuleFilterSelect from './AdminModuleFilterSelect'
-import LiquidGlassCard from '@/components/ui/liquid-glass-card'
-import ConfirmDialog from '../../components/ConfirmDialog'
-import { ModuleIcon } from '../../lib/medicalIcons'
-import { btnStyle, miniBtn, cancelBtnStyle, inStyle as adminInStyle, fieldLabel, groupHeading, LIST_LIMIT } from './adminStyles'
-import { EXAM_STAGES as STAGE_META } from '../../lib/examStages'
-import { fetchModuleStages } from '../../lib/moduleStages'
+import AdminFormCard from './AdminFormCard'
+import AdminRow from './AdminRow'
+import AdminGroupedList from './AdminGroupedList'
+import AdminDeleteDialog from './AdminDeleteDialog'
+import { inStyle as adminInStyle, fieldLabel } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
 import { useAdminEntityCrud } from './useAdminEntityCrud'
 import { useConfirmDelete } from './useConfirmDelete'
-import { EditIcon, PlusIcon, TrashIcon, ConstructionIcon, LinkIcon, UploadIcon } from '../../components/ui/tool-icons'
+import { useAdminList } from './useAdminList'
+import { useStageOptions } from './useStageOptions'
+import { PICK_MODULE_MESSAGE, REQUIRED_FIELDS_MESSAGE } from './useAdminContext'
+import { ConstructionIcon, LinkIcon, UploadIcon } from '../../components/ui/tool-icons'
 import { publishSummary, MAX_UPLOAD_BYTES } from '../../lib/publishSummary'
-import type { AdminModule, AdminSubject, AdminLesson } from './adminTypes'
-
-const EXAM_STAGES = STAGE_META.map(s => ({ value: s.value, label: s.title }))
+import type { AdminModule, AdminSubject, AdminContext } from './adminTypes'
 
 interface SummaryRow {
   id: string
@@ -37,271 +31,214 @@ interface SummariesTabProps {
   dark: boolean
   modules: AdminModule[]
   subjects: AdminSubject[]
-  lessons: AdminLesson[]
+  context: AdminContext
 }
 
 type PublishMode = 'link' | 'upload'
 
-export default function SummariesTab({ dark, modules, subjects, lessons }: SummariesTabProps) {
+const PUBLISH_MODES = [
+  { id: 'link', label: 'Paste a Link', Icon: LinkIcon },
+  { id: 'upload', label: 'Upload HTML', Icon: UploadIcon },
+] as const
+
+export default function SummariesTab({ dark, modules, subjects, context }: SummariesTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
-  const { message: msg, showMessage: showMsg } = useAdminMessage(4000)
+  const { message, showMessage } = useAdminMessage(4000)
+  const stageOptions = useStageOptions(context.moduleId)
+  const { rows: summaries, loading, error, refresh } = useAdminList<SummaryRow>({ table: 'summaries', moduleId: context.moduleId })
 
-  const [summaries, setSummaries] = useState<SummaryRow[]>([])
-  const [summariesLoading, setSummariesLoading] = useState(true)
-  const [summariesError, setSummariesError] = useState(false)
-  const [editingSummaryId, setEditingSummaryId] = useState<string | null>(null)
-  const [sumTitle, setSumTitle] = useState('')
-  const [sumUrl, setSumUrl] = useState('')
-  const [sumModuleId, setSumModuleId] = useState('')
-  const [sumSubjectId, setSumSubjectId] = useState('')
-  const [sumLessonId, setSumLessonId] = useState('')
-  const [sumExamStage, setSumExamStage] = useState('')
-  const [sumStageOptions, setSumStageOptions] = useState(EXAM_STAGES)
-  const [moduleFilter, setModuleFilter] = useState('all')
-
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [title, setTitle] = useState('')
+  const [url, setUrl] = useState('')
+  const [examStage, setExamStage] = useState('')
   const [publishMode, setPublishMode] = useState<PublishMode>('link')
   const [htmlFile, setHtmlFile] = useState<File | null>(null)
   const [imageFiles, setImageFiles] = useState<File[]>([])
+  const [fileInputKey, setFileInputKey] = useState(0)
   const [publishing, setPublishing] = useState(false)
 
-  useEffect(() => { fetchSummaries() }, [])
-  useEffect(() => {
-    fetchModuleStages(sumModuleId).then(list => setSumStageOptions(list.map(s => ({ value: s.value, label: s.title }))))
-  }, [sumModuleId])
-
-  async function fetchSummaries() {
-    setSummariesLoading(true)
-    setSummariesError(false)
-    const { data, error } = await supabase.from('summaries').select('*').order('created_at', { ascending: false }).limit(LIST_LIMIT)
-    if (data) setSummaries(data as SummaryRow[])
-    if (error) setSummariesError(true)
-    setSummariesLoading(false)
-  }
-
-  function editSummary(s: SummaryRow) {
-    setEditingSummaryId(s.id)
+  function editSummary(summary: SummaryRow) {
+    setEditingId(summary.id)
     setPublishMode('link')
-    setSumTitle(s.title); setSumUrl(s.url); setSumModuleId(s.module_id)
-    setSumSubjectId(s.subject_id || ''); setSumLessonId(s.lesson_id || '')
-    setSumExamStage(s.exam_stage || '')
+    setTitle(summary.title)
+    setUrl(summary.url)
+    setExamStage(summary.exam_stage || '')
+    context.setContext({ moduleId: summary.module_id, subjectId: summary.subject_id || '', lessonId: summary.lesson_id || '' })
   }
-  function resetSummaryForm() {
-    setEditingSummaryId(null); setSumTitle(''); setSumUrl('')
-    setSumSubjectId(''); setSumLessonId(''); setSumExamStage('')
-    setHtmlFile(null); setImageFiles([])
+
+  function resetForm() {
+    setEditingId(null)
+    setTitle('')
+    setUrl('')
+    setExamStage('')
+    setHtmlFile(null)
+    setImageFiles([])
+    setFileInputKey(k => k + 1)
   }
 
   const crud = useAdminEntityCrud({
-    table: 'summaries', label: 'Summary', editingId: editingSummaryId,
+    table: 'summaries',
+    label: 'Summary',
+    editingId,
     buildPayload: () => ({
-      title: sumTitle, url: sumUrl, module_id: sumModuleId,
-      subject_id: sumSubjectId || null,
-      lesson_id: sumLessonId || null,
-      exam_stage: sumExamStage || null
+      title,
+      url,
+      module_id: context.moduleId,
+      subject_id: context.subjectId || null,
+      lesson_id: context.lessonId || null,
+      exam_stage: examStage || null,
     }),
-    resetForm: resetSummaryForm, refresh: fetchSummaries, showMessage: showMsg
+    resetForm,
+    refresh,
+    showMessage,
   })
   const del = useConfirmDelete(crud.remove)
 
   function saveSummary() {
-    if (!sumTitle || !sumUrl || !sumModuleId || crud.saving) return
+    if (crud.saving) return
+    if (!context.moduleId) return showMessage(PICK_MODULE_MESSAGE)
+    if (!title || !url) return showMessage(REQUIRED_FIELDS_MESSAGE)
     crud.save()
   }
 
-  async function publishSummaryFromFile() {
-    if (!sumTitle || !sumModuleId || !htmlFile || publishing) {
-      return showMsg('❌ Title, module, and an HTML file are required')
-    }
+  async function publishFromFile() {
+    if (publishing) return
+    if (!context.moduleId) return showMessage(PICK_MODULE_MESSAGE)
+    if (!title || !htmlFile) return showMessage('❌ A title and an HTML file are required')
     setPublishing(true)
     try {
-      const mod = modules.find(m => m.id === sumModuleId)
-      const sub = subjects.find(s => s.id === sumSubjectId)
       const result = await publishSummary({
-        title: sumTitle,
+        title,
         htmlFile,
         imageFiles,
-        moduleId: sumModuleId,
-        moduleName: mod?.name || sumModuleId,
-        subjectId: sumSubjectId || null,
-        subjectName: sub?.name || null,
-        lessonId: sumLessonId || null,
-        examStage: sumExamStage || null,
+        moduleId: context.moduleId,
+        moduleName: modules.find(m => m.id === context.moduleId)?.name || context.moduleId,
+        subjectId: context.subjectId || null,
+        subjectName: subjects.find(s => s.id === context.subjectId)?.name || null,
+        lessonId: context.lessonId || null,
+        examStage: examStage || null,
       })
-      showMsg('✅ Summary published! URL: ' + result.url)
-      resetSummaryForm()
-      fetchSummaries()
+      showMessage('✅ Summary published! URL: ' + result.url)
+      resetForm()
+      refresh()
     } catch (e: any) {
-      showMsg('❌ ' + (e?.message || 'Could not publish summary'))
+      showMessage('❌ ' + (e?.message || 'Could not publish summary'))
+    } finally {
+      setPublishing(false)
     }
-    setPublishing(false)
   }
 
-  const filteredSubjects = (moduleId: string) => subjects.filter(s => s.module_id === moduleId)
-  const filteredLessons = (subjectId: string) => lessons.filter(l => l.subject_id === subjectId)
-  const visibleModules = moduleFilter === 'all' ? modules : modules.filter(m => m.id === moduleFilter)
-
-  const isBusy = crud.saving || publishing
-  const totalUploadBytes = (htmlFile?.size || 0) + imageFiles.reduce((a, f) => a + f.size, 0)
-  const totalUploadMb = (totalUploadBytes / (1024 * 1024)).toFixed(1)
+  const isLink = !!editingId || publishMode === 'link'
+  const totalUploadBytes = (htmlFile?.size || 0) + imageFiles.reduce((sum, f) => sum + f.size, 0)
   const overSizeLimit = totalUploadBytes > MAX_UPLOAD_BYTES
-  const publishBlocked = isBusy || overSizeLimit
 
   const form = (
-    <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
-      <h3 style={{ color: pt.cobalt, marginBottom: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
-        {editingSummaryId ? <><EditIcon color={pt.cobalt} size={16} /> Edit Summary</> : <><PlusIcon color={pt.cobalt} size={16} /> Add Summary</>}
-      </h3>
-
-      {!editingSummaryId && (
+    <AdminFormCard
+      dark={dark}
+      noun="Summary"
+      editing={!!editingId}
+      addLabel={isLink ? 'Add Summary' : 'Publish Summary'}
+      saving={crud.saving || publishing}
+      savingLabel={publishing ? 'Publishing...' : 'Saving...'}
+      disabled={!isLink && overSizeLimit}
+      onSave={isLink ? saveSummary : publishFromFile}
+      onCancel={editingId ? resetForm : undefined}
+    >
+      {!editingId && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <button
-            onClick={() => setPublishMode('link')}
-            style={{
-              flex: 1, padding: '9px', borderRadius: 10, cursor: 'pointer',
-              border: `1.5px solid ${publishMode === 'link' ? pt.cobalt : pt.border}`,
-              background: publishMode === 'link' ? `${pt.cobalt}18` : 'transparent',
-              color: publishMode === 'link' ? pt.cobalt : pt.sub, fontWeight: 700, fontSize: 12,
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6
-            }}
-          ><LinkIcon color={publishMode === 'link' ? pt.cobalt : pt.sub} size={13} /> Paste a Link</button>
-          <button
-            onClick={() => setPublishMode('upload')}
-            style={{
-              flex: 1, padding: '9px', borderRadius: 10, cursor: 'pointer',
-              border: `1.5px solid ${publishMode === 'upload' ? pt.cobalt : pt.border}`,
-              background: publishMode === 'upload' ? `${pt.cobalt}18` : 'transparent',
-              color: publishMode === 'upload' ? pt.cobalt : pt.sub, fontWeight: 700, fontSize: 12,
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6
-            }}
-          ><UploadIcon color={publishMode === 'upload' ? pt.cobalt : pt.sub} size={13} /> Upload HTML</button>
+          {PUBLISH_MODES.map(mode => {
+            const active = publishMode === mode.id
+            return (
+              <button
+                key={mode.id}
+                onClick={() => setPublishMode(mode.id)}
+                style={{
+                  flex: 1, padding: '9px', borderRadius: 10, cursor: 'pointer',
+                  border: `1.5px solid ${active ? pt.cobalt : pt.border}`,
+                  background: active ? `${pt.cobalt}18` : 'transparent',
+                  color: active ? pt.cobalt : pt.sub, fontWeight: 700, fontSize: 12,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6
+                }}
+              >
+                <mode.Icon color={active ? pt.cobalt : pt.sub} size={13} /> {mode.label}
+              </button>
+            )
+          })}
         </div>
       )}
 
-      <label style={fieldLabel(pt)}>Module</label>
-      <ModuleSelect modules={modules} value={sumModuleId} onChange={id => { setSumModuleId(id); setSumSubjectId(''); setSumLessonId('') }} dark={dark} />
+      <input placeholder="Title (e.g. End Module Exam)" value={title} onChange={e => setTitle(e.target.value)} style={inStyle} />
 
-      <label style={fieldLabel(pt)}>Subject (optional)</label>
-      <select value={sumSubjectId} onChange={e => { setSumSubjectId(e.target.value); setSumLessonId('') }} style={inStyle} disabled={!sumModuleId}>
-        <option value="">All Subjects</option>
-        {filteredSubjects(sumModuleId).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-      </select>
-
-      {sumSubjectId && filteredLessons(sumSubjectId).length > 0 && (
-        <>
-          <label style={fieldLabel(pt)}>Lesson (optional)</label>
-          <select value={sumLessonId} onChange={e => setSumLessonId(e.target.value)} style={inStyle}>
-            <option value="">No specific lesson</option>
-            {filteredLessons(sumSubjectId).map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
-          </select>
-        </>
-      )}
-
-      <label style={fieldLabel(pt)}>Exam Stage (optional)</label>
-      <select value={sumExamStage} onChange={e => setSumExamStage(e.target.value)} style={inStyle}>
-        <option value="">No specific stage</option>
-        {sumStageOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-      </select>
-
-      <input placeholder="Title (e.g. End Module Exam)" value={sumTitle} onChange={e => setSumTitle(e.target.value)} style={inStyle} />
-
-      {(editingSummaryId || publishMode === 'link') ? (
-        <>
-          <input placeholder="Summary URL" value={sumUrl} onChange={e => setSumUrl(e.target.value)} style={inStyle} />
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={saveSummary} disabled={isBusy} style={{ ...btnStyle(pt, dark), flex: 1, opacity: isBusy ? 0.7 : 1, cursor: isBusy ? 'not-allowed' : 'pointer' }}>
-              {crud.saving ? 'Saving...' : editingSummaryId ? 'Save Changes' : 'Add Summary'}
-            </button>
-            {editingSummaryId && <button onClick={resetSummaryForm} disabled={isBusy} style={cancelBtnStyle(pt, dark)}>Cancel</button>}
-          </div>
-        </>
+      {isLink ? (
+        <input placeholder="Summary URL" value={url} onChange={e => setUrl(e.target.value)} style={inStyle} />
       ) : (
         <>
           <label style={fieldLabel(pt)}>HTML File</label>
           <input
-            type="file" accept=".html,.htm"
+            key={`html-${fileInputKey}`}
+            type="file"
+            accept=".html,.htm"
             onChange={e => setHtmlFile(e.target.files?.[0] || null)}
             style={{ ...inStyle, padding: '10px 12px' }}
           />
           <label style={fieldLabel(pt)}>Images (optional — referenced by the HTML with relative paths)</label>
           <input
-            type="file" accept="image/*" multiple
+            key={`images-${fileInputKey}`}
+            type="file"
+            accept="image/*"
+            multiple
             onChange={e => setImageFiles(Array.from(e.target.files || []))}
             style={{ ...inStyle, padding: '10px 12px' }}
           />
-          {imageFiles.length > 0 && (
-            <div style={{ color: pt.textMuted, fontSize: 11, marginTop: -8, marginBottom: 12 }}>
-              {imageFiles.length} image{imageFiles.length === 1 ? '' : 's'} selected
-            </div>
-          )}
           {(htmlFile || imageFiles.length > 0) && (
             <div style={{ color: overSizeLimit ? pt.danger : pt.textMuted, fontSize: 11, marginBottom: 12 }}>
-              Total: {totalUploadMb} MB{overSizeLimit ? ' — too large to publish; compress images and keep the total under ~3 MB' : ''}
+              {imageFiles.length} image{imageFiles.length === 1 ? '' : 's'} · Total: {(totalUploadBytes / (1024 * 1024)).toFixed(1)} MB
+              {overSizeLimit ? ' — too large to publish; compress images and keep the total under ~3 MB' : ''}
             </div>
           )}
-          <button onClick={publishSummaryFromFile} disabled={publishBlocked} style={{ ...btnStyle(pt, dark), width: '100%', opacity: publishBlocked ? 0.7 : 1, cursor: publishBlocked ? 'not-allowed' : 'pointer' }}>
-            {publishing ? 'Publishing...' : 'Publish Summary'}
-          </button>
         </>
       )}
-    </LiquidGlassCard>
+
+      <label style={fieldLabel(pt)}>Exam Stage (optional)</label>
+      <select value={examStage} onChange={e => setExamStage(e.target.value)} style={inStyle}>
+        <option value="">No specific stage</option>
+        {stageOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+      </select>
+    </AdminFormCard>
   )
 
   const list = (
-    <div>
-      {summariesError && <ErrorBanner message="Couldn't load summaries — check your connection." />}
-      <AdminModuleFilterSelect modules={modules} value={moduleFilter} onChange={setModuleFilter} totalCount={summaries.length} inStyle={inStyle} />
-
-      {summaries.length === LIST_LIMIT && (
-        <p style={{ color: pt.textMuted, fontSize: 11, marginBottom: 12 }}>Showing the most recent {LIST_LIMIT} — older summaries aren't listed here.</p>
+    <AdminGroupedList
+      dark={dark}
+      modules={modules}
+      items={summaries}
+      moduleOf={s => s.module_id}
+      loading={loading}
+      error={error}
+      noun="summaries"
+      emptyMessage={<><ConstructionIcon color={pt.sub} size={14} /> No summaries yet — add one on the left</>}
+      renderItem={s => (
+        <AdminRow
+          key={s.id}
+          dark={dark}
+          noun="summary"
+          label={s.title}
+          active={editingId === s.id}
+          onEdit={() => editSummary(s)}
+          onDelete={() => del.requestDelete(s.id)}
+        >
+          <span style={{ color: pt.text, fontWeight: 600 }}>{s.title}</span>
+        </AdminRow>
       )}
-
-      {summariesLoading && <EmptyState dark={dark} message="Loading..." />}
-
-      {!summariesLoading && summaries.length === 0 && (
-        <EmptyState dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No summaries yet — add one on the left</>} />
-      )}
-
-      {!summariesLoading && visibleModules.map(mod => {
-        const modSummaries = summaries.filter(s => s.module_id === mod.id)
-        if (modSummaries.length === 0) return null
-        return (
-          <div key={mod.id} style={{ marginBottom: 20 }}>
-            <h4 style={groupHeading(mod.color)}>
-              <ModuleIcon value={mod.icon} size={18} color={mod.color} /> {mod.name}
-              <span style={{ color: pt.textMuted, fontSize: 12, fontWeight: 400 }}>({modSummaries.length})</span>
-            </h4>
-            <div className="admin-list-grid">
-              {modSummaries.map(s => (
-                <LiquidGlassCard key={s.id} dark={dark} delay={0} style={{ padding: '12px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-                  <span style={{ color: pt.text, fontWeight: 600 }}>{s.title}</span>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => editSummary(s)} aria-label={`Edit summary: ${s.title}`} style={{ ...miniBtn(pt, pt.cobalt), display: 'inline-flex', alignItems: 'center' }}><EditIcon color={pt.cobalt} size={12} /></button>
-                    <button onClick={() => del.requestDelete(s.id)} aria-label={`Delete summary: ${s.title}`} style={{ ...miniBtn(pt, pt.danger), display: 'inline-flex', alignItems: 'center' }}><TrashIcon color={pt.danger} size={12} /></button>
-                  </div>
-                </LiquidGlassCard>
-              ))}
-            </div>
-          </div>
-        )
-      })}
-    </div>
+    />
   )
 
   return (
     <div>
-      <InlineMessage message={msg} />
+      <InlineMessage message={message} />
       <AdminSplitLayout form={form} list={list} />
-      <ConfirmDialog
-        dark={dark}
-        open={del.open}
-        title="Delete summary?"
-        message="This cannot be undone."
-        confirmLabel="Delete"
-        confirmColor={pt.danger}
-        onCancel={del.cancel}
-        onConfirm={del.confirm}
-      />
+      <AdminDeleteDialog dark={dark} noun="summary" del={del} />
     </div>
   )
 }
