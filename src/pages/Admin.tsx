@@ -24,13 +24,13 @@ import { LIST_LIMIT } from './admin/adminStyles'
 import type { AdminModule, AdminSubject, AdminLesson, AdminIcon } from './admin/adminTypes'
 
 const TABS = [
+  { id: 'structure', label: 'Structure', Icon: PackageIcon },
+  { id: 'summaries', label: 'Summaries', Icon: NotesIcon },
   { id: 'questions', label: 'Questions', Icon: QuestionMarkIcon },
   { id: 'files', label: 'Files', Icon: FolderIcon },
-  { id: 'summaries', label: 'Summaries', Icon: NotesIcon },
   { id: 'schedules', label: 'Schedules', Icon: CalendarDotIcon },
-  { id: 'structure', label: 'Structure', Icon: PackageIcon },
-  { id: 'analytics', label: 'Analytics', Icon: ChartBarIcon },
   { id: 'settings', label: 'Settings', Icon: GearIcon },
+  { id: 'analytics', label: 'Analytics', Icon: ChartBarIcon },
 ] as const
 
 type AdminTab = typeof TABS[number]['id']

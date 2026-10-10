@@ -5,7 +5,6 @@ import InlineMessage from '../../components/InlineMessage'
 import QuestionSourceBadge from '../../components/QuestionSourceBadge'
 import AdminSplitLayout from './AdminSplitLayout'
 import AdminFormCard from './AdminFormCard'
-import AdminDetails from './AdminDetails'
 import AdminRow from './AdminRow'
 import AdminGroupedList from './AdminGroupedList'
 import AdminDeleteDialog from './AdminDeleteDialog'
@@ -95,7 +94,7 @@ const SOURCES = [
   { value: 'university', label: 'University Doctors' },
 ]
 
-const BULK_FORMAT_EXAMPLE = `Q: What is the powerhouse of the cell?
+const BULK_PLACEHOLDER = `Q: What is the powerhouse of the cell?
 A) Nucleus
 B) Mitochondria
 C) Ribosome
@@ -164,7 +163,7 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState<QuestionDraft>(EMPTY_DRAFT)
-  const [bulkMode, setBulkMode] = useState(false)
+  const [bulkMode, setBulkMode] = useState(true)
   const [bulkText, setBulkText] = useState('')
   const [bulkSaving, setBulkSaving] = useState(false)
 
@@ -192,7 +191,6 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
       source: full.source || '',
     })
     context.setContext({ moduleId: full.module_id, subjectId: full.subject_id || '', lessonId: full.lesson_id || '' })
-    setBulkMode(false)
   }
 
   function resetForm() {
@@ -276,11 +274,6 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
   }
 
   const stageLabel = (value: string) => stageOptions.find(s => s.value === value)?.label ?? value
-  const detailsSummary = [
-    draft.examType !== 'both' && EXAM_TYPES.find(t => t.value === draft.examType)?.label,
-    draft.examStage && stageLabel(draft.examStage),
-    draft.source && SOURCES.find(s => s.value === draft.source)?.label,
-  ].filter(Boolean).join(' · ')
 
   const form = (
     <AdminFormCard
@@ -301,23 +294,12 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
       )}
     >
       {bulkActive ? (
-        <>
-          <p style={{ color: pt.textMuted, fontSize: 12, marginBottom: 8, lineHeight: 1.6 }}>
-            Paste as many questions as you want, separated by an empty line. Every question in this box is added
-            to the module, subject and lesson selected above. Format:
-          </p>
-          <pre style={{
-            background: pt.surfaceFlat, border: `1px solid ${pt.border}`, borderRadius: 10,
-            padding: 12, fontSize: 11, color: pt.sub, marginBottom: 12,
-            whiteSpace: 'pre-wrap', lineHeight: 1.6, overflowX: 'auto'
-          }}>{BULK_FORMAT_EXAMPLE}</pre>
-          <textarea
-            placeholder="Paste your questions here..."
-            value={bulkText}
-            onChange={e => setBulkText(e.target.value)}
-            style={{ ...inStyle, minHeight: 240, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }}
-          />
-        </>
+        <textarea
+          placeholder={BULK_PLACEHOLDER}
+          value={bulkText}
+          onChange={e => setBulkText(e.target.value)}
+          style={{ ...inStyle, minHeight: 280, resize: 'vertical', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.6 }}
+        />
       ) : (
         <>
           <textarea
@@ -348,21 +330,25 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
         </>
       )}
 
-      <AdminDetails dark={dark} title="Details" summary={detailsSummary}>
-        <label style={fieldLabel(pt)}>Use In</label>
-        <select value={draft.examType} onChange={e => setField('examType', e.target.value)} style={inStyle}>
-          {EXAM_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-        </select>
-        <label style={fieldLabel(pt)}>Exam Stage (optional)</label>
-        <select value={draft.examStage} onChange={e => setField('examStage', e.target.value)} style={inStyle}>
-          <option value="">No specific stage</option>
-          {stageOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </select>
-        <label style={fieldLabel(pt)}>Source (optional)</label>
-        <select value={draft.source} onChange={e => setField('source', e.target.value)} style={inStyle}>
-          {SOURCES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </select>
-      </AdminDetails>
+      <div className="admin-form-row-2" style={{ marginBottom: 0 }}>
+        <div>
+          <label style={fieldLabel(pt)}>Use In</label>
+          <select value={draft.examType} onChange={e => setField('examType', e.target.value)} style={inStyle}>
+            {EXAM_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={fieldLabel(pt)}>Exam Stage (optional)</label>
+          <select value={draft.examStage} onChange={e => setField('examStage', e.target.value)} style={inStyle}>
+            <option value="">No specific stage</option>
+            {stageOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+        </div>
+      </div>
+      <label style={fieldLabel(pt)}>Source (optional)</label>
+      <select value={draft.source} onChange={e => setField('source', e.target.value)} style={inStyle}>
+        {SOURCES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+      </select>
     </AdminFormCard>
   )
 
