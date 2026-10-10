@@ -1,7 +1,9 @@
 // ZNU Future Doctors — minimal service worker: installable app + offline shell.
 
-const CACHE_NAME = 'znu-shell-v8'
+const CACHE_NAME = 'znu-shell-v9'
 const SHELL_URLS = ['/', '/favicon.svg', '/logo.svg', '/icon-192.png', '/icon-512.png']
+const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com']
+const IMMUTABLE_PREFIX = '/assets/'
 const MAX_CACHE_ENTRIES = 150
 
 self.addEventListener('install', (event) => {
@@ -27,36 +29,50 @@ async function trimCache(cache) {
   await Promise.all(removable.slice(0, keys.length - MAX_CACHE_ENTRIES).map((req) => cache.delete(req)))
 }
 
+function fetchAndCache(request) {
+  return fetch(request).then((response) => {
+    if (response && (response.ok || response.type === 'opaque')) {
+      const copy = response.clone()
+      caches.open(CACHE_NAME).then((cache) => cache.put(request, copy).then(() => trimCache(cache)))
+    }
+    return response
+  })
+}
+
+// Hashed build assets never change, so a cached copy is used as-is;
+// everything else is refreshed in the background.
+async function cachedAsset(request, revalidate) {
+  const cached = await caches.match(request)
+  if (cached && !revalidate) return cached
+  const network = fetchAndCache(request).catch(() => cached)
+  return cached || network
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event
   if (request.method !== 'GET') return
 
   const url = new URL(request.url)
-  if (url.origin !== self.location.origin) return
+  const isFont = FONT_HOSTS.includes(url.hostname)
+  if (url.origin !== self.location.origin && !isFont) return
 
   // Navigations: network first, cached shell when offline.
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match('/'))
+      fetch(request)
+        .then((response) => {
+          if (response.ok && response.headers.get('content-type')?.includes('text/html')) {
+            const copy = response.clone()
+            caches.open(CACHE_NAME).then((cache) => cache.put('/', copy))
+          }
+          return response
+        })
+        .catch(() => caches.match('/'))
     )
     return
   }
 
-  // Static assets: cache first, refreshed in the background.
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      const networkFetch = fetch(request)
-        .then((response) => {
-          if (response && response.ok) {
-            const clone = response.clone()
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone).then(() => trimCache(cache)))
-          }
-          return response
-        })
-        .catch(() => cached)
-      return cached || networkFetch
-    })
-  )
+  event.respondWith(cachedAsset(request, !url.pathname.startsWith(IMMUTABLE_PREFIX)))
 })
 
 // Shows the notification even when no tab is open.

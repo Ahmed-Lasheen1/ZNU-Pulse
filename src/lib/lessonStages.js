@@ -1,20 +1,21 @@
-// src/lib/lessonStages.js
 import { supabase } from '../supabase'
-import { createTableCache } from './createTableCache'
+import { cachedQuery, invalidateCache, REFERENCE_TTL } from './dataCache'
+
+const KEY = 'lesson-stages'
 
 // A lesson can be assigned several exam stages (lesson_exam_stages,
 // one row per lesson+stage pair). Everything tagged to that lesson
 // then also belongs to those stages, without copying any rows.
-const lessonStagesCache = createTableCache(() =>
-  supabase.from('lesson_exam_stages').select('lesson_id, stage')
-)
-
 // lesson_id -> array of stage values. On error the map is empty, so
 // pages simply fall back to each item's own exam_stage tag.
 export async function fetchLessonStageMap() {
-  const { data, error } = await lessonStagesCache.ensureLoaded()
+  const { data, error } = await cachedQuery(
+    KEY,
+    () => supabase.from('lesson_exam_stages').select('lesson_id, stage'),
+    { ttl: REFERENCE_TTL }
+  )
   const map = {}
-  data.forEach(row => {
+  ;(data || []).forEach(row => {
     if (!map[row.lesson_id]) map[row.lesson_id] = []
     map[row.lesson_id].push(row.stage)
   })
@@ -23,7 +24,7 @@ export async function fetchLessonStageMap() {
 
 // Called by Admin after any lesson-stage change.
 export function invalidateLessonStagesCache() {
-  lessonStagesCache.invalidate()
+  invalidateCache(KEY)
 }
 
 // All stages an item belongs to: its own tag plus its lesson's stages.

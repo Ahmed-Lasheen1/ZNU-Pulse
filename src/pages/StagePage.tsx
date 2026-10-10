@@ -1,7 +1,6 @@
 // src/pages/StagePage.tsx
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../supabase'
 import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PageShell from '../components/pulse/PageShell'
@@ -17,7 +16,7 @@ import { fetchSubjectsForModule } from '../lib/subjects'
 import { fetchLessonsForModule } from '../lib/lessons'
 import { fetchDriveUrl } from '../lib/siteSettings'
 import { fetchLessonStageMap, inStage } from '../lib/lessonStages'
-import { fetchAllRows } from '../lib/fetchAllRows'
+import { fetchModuleFacets, fetchModuleQuestions, fetchModuleSummaries } from '../lib/moduleContent'
 import { fetchSimulatorConfig, simulatorPool } from '../lib/stageSimulator'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
 import { getPreviewUrl } from '../lib/embedUrl'
@@ -77,14 +76,7 @@ export default function StagePage({ dark }: { dark: boolean }) {
       const { rows } = await fetchSimulatorConfig(moduleId!)
       const stageRows = rows.filter((r: any) => r.stage === stage && r.question_count > 0)
       if (ignore || stageRows.length === 0) return
-      const [qRes, mapRes] = await Promise.all([
-        fetchAllRows(() => supabase
-          .from('questions_public')
-          .select('id, subject_id, lesson_id, exam_type, exam_stage')
-          .eq('module_id', moduleId)
-          .order('id')),
-        fetchLessonStageMap(),
-      ])
+      const [qRes, mapRes] = await Promise.all([fetchModuleQuestions(moduleId!), fetchLessonStageMap()])
       if (ignore) return
       const questions = qRes.data || []
       let total = 0
@@ -106,8 +98,8 @@ export default function StagePage({ dark }: { dark: boolean }) {
     setHasStageQuestions(null)
 
     Promise.all([
-      supabase.rpc('get_module_content_facets', { p_module_id: moduleId }),
-      fetchAllRows(() => supabase.from('summaries').select('*').eq('module_id', moduleId).order('created_at').order('id')),
+      fetchModuleFacets(moduleId!),
+      fetchModuleSummaries(moduleId!),
       fetchLessonStageMap(),
       fetchLessonsForModule(moduleId!),
     ]).then(([facetsRes, summariesRes, stageMapRes, lessonsRes]) => {
@@ -129,14 +121,14 @@ export default function StagePage({ dark }: { dark: boolean }) {
         const stageSummaries = summariesRes.data.filter(here)
         setSummaries(stageSummaries)
         const byLesson: Record<string, Summary[]> = {}
-        stageSummaries.forEach(s => {
+        stageSummaries.forEach((s: Summary) => {
           if (s.lesson_id) { (byLesson[s.lesson_id] ||= []).push(s); stageLessonIds.add(s.lesson_id) }
         })
         setLessonSummaries(byLesson)
       }
       if (summariesRes.error) setLoadError(true)
 
-      if (lessonsRes.lessons) setLessons(lessonsRes.lessons.filter(l => stageLessonIds.has(l.id)))
+      if (lessonsRes.lessons) setLessons(lessonsRes.lessons.filter((l: StageLesson) => stageLessonIds.has(l.id)))
       if (lessonsRes.error) setLoadError(true)
 
       setSummariesLoaded(true)

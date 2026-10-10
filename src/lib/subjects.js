@@ -1,27 +1,29 @@
-// src/lib/subjects.js
 import { supabase } from '../supabase'
-import { createTableCache } from './createTableCache'
+import { cachedQuery, invalidateCache, REFERENCE_TTL } from './dataCache'
 
-// Subjects rarely change — cached in memory for the tab's lifetime so
-// ModulePage/StagePage/SubjectPage/LessonPage don't each re-fetch the
-// whole table on every navigation.
-const subjectsCache = createTableCache(() =>
-  supabase.from('subjects').select('*').order('name')
-)
+const KEY = 'subjects'
+
+export async function fetchAllSubjects() {
+  const { data, error } = await cachedQuery(
+    KEY,
+    () => supabase.from('subjects').select('*').order('name'),
+    { ttl: REFERENCE_TTL }
+  )
+  return { subjects: data || [], error }
+}
 
 export async function fetchSubjectsForModule(moduleId) {
-  const { data, error } = await subjectsCache.ensureLoaded()
-  return { subjects: data.filter(s => s.module_id === moduleId), error }
+  const { subjects, error } = await fetchAllSubjects()
+  return { subjects: subjects.filter(s => s.module_id === moduleId), error }
 }
 
 export async function fetchSubjectById(subjectId) {
-  const { data, error } = await subjectsCache.ensureLoaded()
+  const { subjects, error } = await fetchAllSubjects()
   if (error) return { subject: null, error }
-  return { subject: data.find(s => s.id === subjectId) || null, error: null }
+  return { subject: subjects.find(s => s.id === subjectId) || null, error: null }
 }
 
-// Called by Admin after any subject create/update/delete so the next
-// fetch gets fresh data instead of a stale in-memory copy.
+// Called by Admin after any subject create/update/delete.
 export function invalidateSubjectsCache() {
-  subjectsCache.invalidate()
+  invalidateCache(KEY)
 }

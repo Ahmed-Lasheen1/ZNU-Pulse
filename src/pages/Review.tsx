@@ -7,6 +7,7 @@ import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../premiu
 import { glassInput } from '../components/pulse/PulseUI'
 import { useToast } from '../components/ToastProvider'
 import ErrorBanner from '../components/ErrorBanner'
+import ConfirmDialog from '../components/ConfirmDialog'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PulseGlassRow from '../components/pulse/PulseGlassRow'
 import PageShell from '../components/pulse/PageShell'
@@ -14,6 +15,7 @@ import PageIntro from '../components/pulse/PageIntro'
 import LoadingText from '../components/pulse/LoadingText'
 import EmptyState from '../components/pulse/EmptyState'
 import { getGuestFlags, getGuestHistory, toggleGuestFlag } from '../lib/reviewStorage'
+import { listPendingAttempts, syncPendingAttempts, discardPendingAttempt, subscribePendingAttempts } from '../lib/offlineAttempts'
 import QuestionSourceBadge from '../components/QuestionSourceBadge'
 import { ModuleIcon } from '../lib/medicalIcons'
 import { wrapText } from '../lib/textStyles'
@@ -55,6 +57,7 @@ interface HistoryRow {
   time_sec?: number | null
   completed_at: string | number
   incorrect_questions?: IncorrectSnapshot[] | null
+  pending?: { id: string; error: string | null }
 }
 
 interface FlaggedItem {
@@ -75,17 +78,36 @@ interface FlaggedItem {
 
 type ReviewTab = 'history' | 'flagged'
 
+function pendingToHistoryRow(attempt: any): HistoryRow {
+  return {
+    id: `pending-${attempt.id}`,
+    module_id: attempt.moduleId,
+    quiz_type: attempt.quizType,
+    subject_id: attempt.subjectId,
+    total: attempt.total,
+    correct: attempt.correct,
+    score: attempt.score,
+    time_sec: attempt.timeSec,
+    completed_at: attempt.completedAt,
+    incorrect_questions: attempt.incorrectQuestions,
+    pending: { id: attempt.id, error: attempt.error },
+  }
+}
+
 export default function Review({ dark }: { dark: boolean }) {
   const { user } = useAuth() as { user: { id: string } | null }
   const { modules } = useModules() as { modules: ReviewModule[] }
   const navigate = useNavigate()
-  const showToast = useToast() as (message: string, type?: 'success' | 'error') => void
+  const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
   const pt = getPulseTheme(dark)
 
   const [tab, setTab] = useState<ReviewTab>('history')
 
   const [history, setHistory] = useState<HistoryRow[]>([])
   const [selectedHistory, setSelectedHistory] = useState<HistoryRow | null>(null)
+  const [syncTick, setSyncTick] = useState(0)
+  const [syncBusy, setSyncBusy] = useState(false)
+  const [confirmDiscardId, setConfirmDiscardId] = useState<string | null>(null)
 
   const [flaggedItems, setFlaggedItems] = useState<FlaggedItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -93,12 +115,14 @@ export default function Review({ dark }: { dark: boolean }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [moduleFilter, setModuleFilter] = useState('all')
 
+  useEffect(() => subscribePendingAttempts(() => { setSyncTick(t => t + 1); setSelectedHistory(null) }), [])
+
   useEffect(() => {
     let ignore = false
     fetchTab(() => ignore)
     return () => { ignore = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, user])
+  }, [tab, user, syncTick])
   useEffect(() => { setSearchQuery(''); setModuleFilter('all'); setSelectedHistory(null) }, [tab])
 
   async function fetchTab(isIgnored: () => boolean = () => false) {
@@ -113,9 +137,10 @@ export default function Review({ dark }: { dark: boolean }) {
           .eq('user_id', user.id)
           .order('completed_at', { ascending: false })
           .limit(50)
+        const pending = await listPendingAttempts(user.id)
         if (isIgnored()) return
         if (error) setLoadError(true)
-        setHistory((data || []) as HistoryRow[])
+        setHistory([...pending.reverse().map(pendingToHistoryRow), ...((data || []) as HistoryRow[])])
       } else {
         if (isIgnored()) return
         setHistory(getGuestHistory() as HistoryRow[])
@@ -145,6 +170,16 @@ export default function Review({ dark }: { dark: boolean }) {
     }
     if (isIgnored()) return
     setLoading(false)
+  }
+
+  async function retrySync() {
+    if (!user || syncBusy) return
+    setSyncBusy(true)
+    const { synced, rejected } = await syncPendingAttempts(user.id, { includeFailed: true })
+    setSyncBusy(false)
+    if (synced > 0) showToast('✅ Attempt synced')
+    else if (rejected > 0) showToast("❌ The server couldn't accept this attempt — see the message above", 'error')
+    else showToast("Still waiting — it will sync automatically once you're online", 'info')
   }
 
   // Only applies the local removal once the Supabase delete is confirmed
@@ -290,6 +325,11 @@ export default function Review({ dark }: { dark: boolean }) {
                         <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2 }}>
                           {new Date(h.completed_at).toLocaleDateString()} · {h.correct}/{h.total} correct
                           {h.time_sec ? ` · ${Math.floor(h.time_sec / 60)}m ${h.time_sec % 60}s` : ''}
+                          {h.pending && (
+                            <span style={{ color: h.pending.error ? pt.danger : pt.amber, fontWeight: 700 }}>
+                              {' '}· {h.pending.error ? 'Sync failed' : 'Pending sync'}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -309,6 +349,7 @@ export default function Review({ dark }: { dark: boolean }) {
       {tab === 'history' && !loading && selectedHistory && (() => {
         const mod = moduleFor(selectedHistory.module_id)
         const incorrectQs = selectedHistory.incorrect_questions || []
+        const pending = selectedHistory.pending
         return (
           <div>
             <div style={{ marginBottom: SECTION_GAP }}>
@@ -328,6 +369,32 @@ export default function Review({ dark }: { dark: boolean }) {
                 {new Date(selectedHistory.completed_at).toLocaleDateString()} · {selectedHistory.correct}/{selectedHistory.total} correct · {selectedHistory.score}%
               </div>
             </div>
+
+            {pending && (
+              <div style={{ marginBottom: SECTION_GAP }}>
+                <LiquidGlassCard dark={dark} delay={0} style={{ padding: '14px 18px', textAlign: 'center' }}>
+                  <div style={{ color: pending.error ? pt.danger : pt.amber, fontSize: 13, fontWeight: 700, marginBottom: 12, ...wrapText }}>
+                    {pending.error
+                      ? `Couldn't sync: ${pending.error}`
+                      : "Saved on this device — waiting to sync. Offline attempts don't earn points."}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
+                    <PulseGlassRow dark={dark} radius={999} hoverTint={hoverTint} onClick={retrySync}
+                      role="button" tabIndex={0}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); retrySync() } }}>
+                      <div style={{ padding: '8px 18px', ...pulseType.small, fontWeight: 700, color: pt.sub, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <RefreshIcon color={pt.sub} size={13} /> {syncBusy ? 'Syncing...' : 'Retry sync'}
+                      </div>
+                    </PulseGlassRow>
+                    <PulseGlassRow dark={dark} radius={999} hoverTint={hoverTint} onClick={() => setConfirmDiscardId(pending.id)}
+                      role="button" tabIndex={0}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setConfirmDiscardId(pending.id) } }}>
+                      <div style={{ padding: '8px 18px', ...pulseType.small, fontWeight: 700, color: pt.danger }}>Remove</div>
+                    </PulseGlassRow>
+                  </div>
+                </LiquidGlassCard>
+              </div>
+            )}
 
             {incorrectQs.length > 0 && (
               <div style={{ marginBottom: SECTION_GAP }}>
@@ -530,6 +597,17 @@ export default function Review({ dark }: { dark: boolean }) {
           })}
         </>
       )}
+
+      <ConfirmDialog
+        dark={dark}
+        open={!!confirmDiscardId}
+        title="Remove this attempt?"
+        message="It hasn't synced yet, so it will be lost permanently."
+        confirmLabel="Remove"
+        confirmColor={pt.danger}
+        onCancel={() => setConfirmDiscardId(null)}
+        onConfirm={() => { const id = confirmDiscardId; setConfirmDiscardId(null); if (id) discardPendingAttempt(id) }}
+      />
     </PageShell>
   )
 }

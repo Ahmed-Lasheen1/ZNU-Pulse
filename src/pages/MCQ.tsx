@@ -5,15 +5,22 @@ import { supabase } from '../supabase'
 import { useAuth, useModules } from '../contexts'
 import { useToast } from '../components/ToastProvider'
 import { fetchModuleStages } from '../lib/moduleStages'
+import { fetchAllSubjects } from '../lib/subjects'
+import { fetchAllLessons } from '../lib/lessons'
+import { fetchModuleAnswerKeys, fetchModuleQuestions, pruneModuleCaches } from '../lib/moduleContent'
+import { gradeLocally, isTransientFailure, savePendingAttempt } from '../lib/offlineAttempts'
 import { fetchLessonStageMap, inStage } from '../lib/lessonStages'
 import { getGuestFlags, toggleGuestFlag, enrichGuestFlagsWithResults, addGuestHistory } from '../lib/reviewStorage'
 import { loadSavedActiveExam, persistActiveExam, clearActiveExam } from '../lib/activeExam'
-import { fetchAllRows } from '../lib/fetchAllRows'
 import { storageGet, storageSet } from '../lib/safeStorage'
 import { fetchSimulatorConfig, drawSimulator, shuffle } from '../lib/stageSimulator'
 import { optionLabels } from './mcq/mcqShared'
 import MCQBrowse from './mcq/MCQBrowse'
 import MCQExamFlow from './mcq/MCQExamFlow'
+
+const OFFLINE_KEYS_MESSAGE = "Answer keys for this module aren't saved on this device — open it once while online."
+const OFFLINE_SAVED_MESSAGE = "Saved on this device — it will sync when you're back online. Offline attempts don't earn points."
+const OFFLINE_SAVE_FAILED_MESSAGE = "This device couldn't save the attempt — your results are shown here only."
 
 interface QuizConfig {
   type: string
@@ -23,12 +30,20 @@ interface QuizConfig {
   simulatorStage?: string | null
 }
 
+function toResultMap(graded: any[] | null) {
+  const map: Record<string, any> = {}
+  ;(graded || []).forEach(r => {
+    map[r.question_id] = { is_correct: r.is_correct, correct_answer: r.correct_answer, explanation: r.explanation }
+  })
+  return map
+}
+
 export default function MCQ({ dark }: { dark: boolean }) {
   const { user, fetchProfile } = useAuth() as any
   const { modules, modulesLoaded, modulesError } = useModules() as any
   const location = useLocation()
   const navigate = useNavigate()
-  const showToast = useToast() as (message: string, type?: 'success' | 'error') => void
+  const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
 
   const [subjects, setSubjects] = useState<any[]>([])
   const [lessons, setLessons] = useState<any[]>([])
@@ -117,10 +132,17 @@ export default function MCQ({ dark }: { dark: boolean }) {
   }, [])
 
   useEffect(() => {
-    fetchSubjects()
-    fetchLessons()
-    return () => clearInterval(timerRef.current)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let ignore = false
+    Promise.all([fetchAllSubjects(), fetchAllLessons()]).then(([subjectsRes, lessonsRes]) => {
+      if (ignore) return
+      setSubjects(subjectsRes.subjects)
+      setLessons(lessonsRes.lessons)
+      if (subjectsRes.error) setLoadError(true)
+    })
+    return () => {
+      ignore = true
+      clearInterval(timerRef.current)
+    }
   }, [])
 
   useEffect(() => {
@@ -138,17 +160,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   // Drops caches of deleted modules — only once the modules fetch succeeded.
   useEffect(() => {
     if (!modulesLoaded || modulesError) return
-    try {
-      const validIds = new Set(modules.map((m: any) => m.id))
-      const prefix = 'mcq_questions_cache_'
-      const toRemove: string[] = []
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i)
-        if (!key || !key.startsWith(prefix)) continue
-        if (!validIds.has(key.slice(prefix.length))) toRemove.push(key)
-      }
-      toRemove.forEach(k => localStorage.removeItem(k))
-    } catch { /* ignore */ }
+    pruneModuleCaches(new Set(modules.map((m: any) => m.id)))
   }, [modulesLoaded, modulesError, modules])
 
   useEffect(() => {
@@ -280,65 +292,24 @@ export default function MCQ({ dark }: { dark: boolean }) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [quizMode, submitted, grading, currentIndex, quizQuestions, results, flaggedIds])
 
-  async function fetchSubjects() {
-    const { data, error } = await supabase.from('subjects').select('*').order('name')
-    if (error) {
-      try {
-        const cached = storageGet('mcq_subjects_cache')
-        if (cached) setSubjects(JSON.parse(cached))
-        else setLoadError(true)
-      } catch { setLoadError(true) }
-    } else if (data) {
-      setSubjects(data)
-      storageSet('mcq_subjects_cache', JSON.stringify(data))
-    }
-  }
-
-  async function fetchLessons() {
-    const { data, error } = await supabase.from('lessons').select('id, title, subject_id')
-    if (error) {
-      try {
-        const cached = storageGet('mcq_lessons_cache')
-        if (cached) setLessons(JSON.parse(cached))
-      } catch { /* ignore corrupt cache */ }
-    } else if (data) {
-      setLessons(data)
-      storageSet('mcq_lessons_cache', JSON.stringify(data))
-    }
-  }
-
+  // Shows the saved copy right away; a background refresh replaces it when it
+  // succeeds, or flips the offline banner on when it can't.
   async function fetchQuestionsForModule(moduleId: string, isIgnored: () => boolean = () => false) {
-    const cacheKey = `mcq_questions_cache_${moduleId}`
-    const cached = storageGet(cacheKey)
-    let hadCache = false
-    if (cached) {
-      try {
-        if (!isIgnored()) {
-          setQuestions(JSON.parse(cached))
-          setUsingCache(false)
-        }
-        hadCache = true
-      } catch { /* ignore corrupt cache */ }
-    }
-    if (!isIgnored()) setLoading(!hadCache)
+    setLoading(true)
+    setUsingCache(false)
 
-    const { data, error } = await fetchAllRows(() => supabase
-      .from('questions_public')
-      .select('id, question, option_a, option_b, option_c, option_d, exam_type, exam_stage, module_id, subject_id, lesson_id, source, created_at')
-      .eq('module_id', moduleId)
-      .order('created_at')
-      .order('id'))
+    // Saves this module's answer keys so it can be graded offline.
+    fetchModuleAnswerKeys(moduleId)
+
+    const { data, error } = await fetchModuleQuestions(moduleId, ({ data: fresh, error: refreshError }) => {
+      if (isIgnored()) return
+      if (refreshError) setUsingCache(true)
+      else setQuestions(fresh)
+    })
 
     if (isIgnored()) return
-
-    if (error) {
-      if (hadCache) setUsingCache(true)
-      else setLoadError(true)
-    } else if (data) {
-      setQuestions(data)
-      setUsingCache(false)
-      storageSet(cacheKey, JSON.stringify(data))
-    }
+    if (error) setLoadError(true)
+    else setQuestions(data)
     setLoading(false)
   }
 
@@ -553,18 +524,25 @@ export default function MCQ({ dark }: { dark: boolean }) {
     const q = quizQuestions[qi]
     if (!q) return
     const sessionId = sessionIdRef.current
-    const { data, error } = await supabase.rpc('grade_mcq', { p_answers: [{ id: q.id, answer: opt }] })
+    const response = navigator.onLine ? await supabase.rpc('grade_mcq', { p_answers: [{ id: q.id, answer: opt }] }) : null
+
+    let result: any = null
+    let serverRejected = false
+    if (response && !response.error) {
+      const graded = response.data?.[0]
+      if (graded) result = { is_correct: graded.is_correct, correct_answer: graded.correct_answer, explanation: graded.explanation }
+      else serverRejected = true
+    } else if (!response || isTransientFailure(response)) {
+      result = (await gradeLocally([q], [opt]))?.[q.id] ?? null
+    } else {
+      serverRejected = true
+    }
+
     gradingInFlightRef.current.delete(qi)
     if (!isMountedRef.current || sessionId !== sessionIdRef.current) return
-    if (!error && data && data[0]) {
-      const r = data[0]
-      setResults(prev => ({
-        ...prev,
-        [q.id]: { is_correct: r.is_correct, correct_answer: r.correct_answer, explanation: r.explanation }
-      }))
-    } else {
-      showToast('⚠️ Could not grade that answer — check your connection and try again', 'error')
-    }
+    if (result) setResults(prev => ({ ...prev, [q.id]: result }))
+    else if (serverRejected) showToast('⚠️ Could not grade that answer — check your connection and try again', 'error')
+    else showToast(OFFLINE_KEYS_MESSAGE, 'info')
   }
 
   function selectAnswer(qi: number, opt: string) {
@@ -636,59 +614,45 @@ export default function MCQ({ dark }: { dark: boolean }) {
         ? (retrySubjectIsUniform ? (quizQuestions[0]?.subject_id || null) : null)
         : null
 
-    const resultMap: Record<string, any> = {}
+    let resultMap: Record<string, any> | null = null
 
-    if (user) {
-      const { data: graded, error } = await supabase.rpc('submit_quiz_attempt', {
-        p_answers: payload,
-        p_module_id: historyModuleId,
-        p_quiz_type: quizMode,
-        p_subject_id: historySubjectId,
-        p_time_sec: timeSec
-      })
+    if (navigator.onLine) {
+      const response = user
+        ? await supabase.rpc('submit_quiz_attempt', {
+            p_answers: payload,
+            p_module_id: historyModuleId,
+            p_quiz_type: quizMode,
+            p_subject_id: historySubjectId,
+            p_time_sec: timeSec
+          })
+        : await supabase.rpc('grade_mcq', { p_answers: payload })
 
       if (!isMountedRef.current) { submittingRef.current = false; return }
 
-      if (error) {
+      if (!response.error) {
+        resultMap = toResultMap(response.data)
+        if (user) fetchProfile(user.id)
+      } else if (!isTransientFailure(response)) {
         setGrading(false)
         showToast('⚠️ Could not submit — check your connection and try again', 'error')
         submittingRef.current = false
         return
       }
+    }
 
-      if (graded) {
-        graded.forEach((r: any) => {
-          resultMap[r.question_id] = {
-            is_correct: r.is_correct,
-            correct_answer: r.correct_answer,
-            explanation: r.explanation
-          }
-        })
-      }
-
-      fetchProfile(user.id)
-    } else {
-      const { data: graded, error } = await supabase.rpc('grade_mcq', { p_answers: payload })
-
+    const gradedOffline = !resultMap
+    if (!resultMap) {
+      resultMap = await gradeLocally(quizQuestions, quizQuestions.map((_, i) => answers[i] || null))
       if (!isMountedRef.current) { submittingRef.current = false; return }
-
-      if (error) {
+      if (!resultMap) {
         setGrading(false)
-        showToast('⚠️ Could not submit — check your connection and try again', 'error')
+        showToast(OFFLINE_KEYS_MESSAGE, 'error')
         submittingRef.current = false
         return
       }
+    }
 
-      if (graded) {
-        graded.forEach((r: any) => {
-          resultMap[r.question_id] = {
-            is_correct: r.is_correct,
-            correct_answer: r.correct_answer,
-            explanation: r.explanation
-          }
-        })
-      }
-
+    if (!user || gradedOffline) {
       const incorrectSnapshots = quizQuestions
         .filter(q => resultMap[q.id] && !resultMap[q.id].is_correct)
         .map(q => ({
@@ -702,15 +666,24 @@ export default function MCQ({ dark }: { dark: boolean }) {
           source: q.source || null,
         }))
 
-      const guestCorrectCount = quizQuestions.filter(q => resultMap[q.id]?.is_correct).length
-      const guestScorePercent = total > 0 ? Math.round((guestCorrectCount / total) * 100) : 0
+      const correctCount = quizQuestions.filter(q => resultMap[q.id]?.is_correct).length
+      const scorePercent = total > 0 ? Math.round((correctCount / total) * 100) : 0
 
-      enrichGuestFlagsWithResults(resultMap)
-      addGuestHistory({
-        module_id: historyModuleId, quiz_type: quizMode,
-        total, correct: guestCorrectCount, score: guestScorePercent, time_sec: timeSec,
-        incorrect_questions: incorrectSnapshots
-      })
+      if (user) {
+        const saved = await savePendingAttempt({
+          userId: user.id, moduleId: historyModuleId, subjectId: historySubjectId, quizType: quizMode,
+          timeSec, completedAt: Date.now(), answers: payload,
+          total, correct: correctCount, score: scorePercent, incorrectQuestions: incorrectSnapshots,
+        })
+        showToast(saved ? OFFLINE_SAVED_MESSAGE : OFFLINE_SAVE_FAILED_MESSAGE, saved ? 'info' : 'error')
+      } else {
+        enrichGuestFlagsWithResults(resultMap)
+        addGuestHistory({
+          module_id: historyModuleId, quiz_type: quizMode,
+          total, correct: correctCount, score: scorePercent, time_sec: timeSec,
+          incorrect_questions: incorrectSnapshots
+        })
+      }
     }
 
     if (!isMountedRef.current) { submittingRef.current = false; return }

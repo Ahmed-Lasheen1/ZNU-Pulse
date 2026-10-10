@@ -14,25 +14,37 @@ import ErrorBoundary from './components/ErrorBoundary'
 import ToastProvider from './components/ToastProvider'
 import HomeEntranceProvider from './components/HomeEntranceProvider'
 import PulseOverlayHeader from './components/pulse/PulseOverlayHeader'
+import OfflineStatus from './components/pulse/OfflineStatus'
 import { AuthContext, ModulesContext } from './contexts'
 import Home from './pages/Home'
-const Checklist = lazy(() => import('./pages/Checklist'))
-const Schedule = lazy(() => import('./pages/Schedule'))
-const FilesPage = lazy(() => import('./pages/FilesPage'))
-const Admin = lazy(() => import('./pages/Admin'))
-const MCQ = lazy(() => import('./pages/MCQ'))
-const Review = lazy(() => import('./pages/Review'))
-const Summaries = lazy(() => import('./pages/Summaries'))
-const ModulePage = lazy(() => import('./pages/ModulePage'))
-const StagePage = lazy(() => import('./pages/StagePage'))
-const Auth = lazy(() => import('./pages/Auth'))
-const Profile = lazy(() => import('./pages/Profile'))
-const AnonQuestions = lazy(() => import('./pages/AnonQuestions'))
-const ResetPassword = lazy(() => import('./pages/ResetPassword'))
-const NotFound = lazy(() => import('./pages/NotFound'))
-const Search = lazy(() => import('./pages/Search'))
 import PulseBackground from './components/pulse/PulseBackground'
 import Footer from './components/Footer'
+
+const pageLoaders = {
+  Checklist: () => import('./pages/Checklist'),
+  Schedule: () => import('./pages/Schedule'),
+  FilesPage: () => import('./pages/FilesPage'),
+  MCQ: () => import('./pages/MCQ'),
+  Review: () => import('./pages/Review'),
+  Summaries: () => import('./pages/Summaries'),
+  ModulePage: () => import('./pages/ModulePage'),
+  StagePage: () => import('./pages/StagePage'),
+  Auth: () => import('./pages/Auth'),
+  Profile: () => import('./pages/Profile'),
+  AnonQuestions: () => import('./pages/AnonQuestions'),
+  ResetPassword: () => import('./pages/ResetPassword'),
+  NotFound: () => import('./pages/NotFound'),
+  Search: () => import('./pages/Search'),
+}
+const Pages = Object.fromEntries(Object.entries(pageLoaders).map(([name, load]) => [name, lazy(load)]))
+const Admin = lazy(() => import('./pages/Admin'))
+
+// Downloads every student-facing page once the browser is idle so the
+// service worker has them cached before the connection drops.
+function prefetchPages() {
+  if (navigator.connection?.saveData) return
+  Object.values(pageLoaders).forEach(load => load().catch(() => {}))
+}
 
 const ensureProfileInFlight = new Set()
 
@@ -101,21 +113,21 @@ function RoutedContent({ dark }) {
       <Suspense fallback={<PageLoader dark={dark} />}>
         <Routes>
           <Route path="/" element={<Home dark={dark} />} />
-          <Route path="/module/:moduleId" element={<ModulePage dark={dark} />} />
-          <Route path="/module/:moduleId/stage/:stage" element={<StagePage dark={dark} />} />
-          <Route path="/checklist" element={<Checklist dark={dark} />} />
-          <Route path="/schedule" element={<Schedule dark={dark} />} />
-          <Route path="/files" element={<FilesPage dark={dark} />} />
-          <Route path="/summaries" element={<Summaries dark={dark} />} />
+          <Route path="/module/:moduleId" element={<Pages.ModulePage dark={dark} />} />
+          <Route path="/module/:moduleId/stage/:stage" element={<Pages.StagePage dark={dark} />} />
+          <Route path="/checklist" element={<Pages.Checklist dark={dark} />} />
+          <Route path="/schedule" element={<Pages.Schedule dark={dark} />} />
+          <Route path="/files" element={<Pages.FilesPage dark={dark} />} />
+          <Route path="/summaries" element={<Pages.Summaries dark={dark} />} />
           <Route path="/admin" element={<Admin dark={dark} />} />
-          <Route path="/mcq" element={<MCQ dark={dark} />} />
-          <Route path="/review" element={<Review dark={dark} />} />
-          <Route path="/auth" element={<Auth dark={dark} />} />
-          <Route path="/reset-password" element={<ResetPassword dark={dark} />} />
-          <Route path="/profile" element={<Profile dark={dark} />} />
-          <Route path="/anon-questions" element={<AnonQuestions dark={dark} />} />
-          <Route path="/search" element={<Search dark={dark} />} />
-          <Route path="*" element={<NotFound dark={dark} />} />
+          <Route path="/mcq" element={<Pages.MCQ dark={dark} />} />
+          <Route path="/review" element={<Pages.Review dark={dark} />} />
+          <Route path="/auth" element={<Pages.Auth dark={dark} />} />
+          <Route path="/reset-password" element={<Pages.ResetPassword dark={dark} />} />
+          <Route path="/profile" element={<Pages.Profile dark={dark} />} />
+          <Route path="/anon-questions" element={<Pages.AnonQuestions dark={dark} />} />
+          <Route path="/search" element={<Pages.Search dark={dark} />} />
+          <Route path="*" element={<Pages.NotFound dark={dark} />} />
         </Routes>
       </Suspense>
     </ErrorBoundary>
@@ -138,15 +150,29 @@ export default function App() {
 
   const lastHandledUserIdRef = useRef(null)
 
-  async function loadModules() {
-    const { modules: sorted, error } = await fetchModulesSorted()
-    setModules(sorted)
-    setModulesError(!!error)
+  async function loadModules(force = false) {
+    const result = await fetchModulesSorted({ force, onRevalidated: setModules })
+    setModules(result.modules)
+    setModulesError(!!result.error)
     setModulesLoaded(true)
-    return { modules: sorted, error }
+    return result
   }
 
-  useEffect(() => { loadModules() }, [])
+  useEffect(() => {
+    loadModules()
+    const revalidate = () => { if (document.visibilityState === 'visible') loadModules() }
+    document.addEventListener('visibilitychange', revalidate)
+    window.addEventListener('online', revalidate)
+    return () => {
+      document.removeEventListener('visibilitychange', revalidate)
+      window.removeEventListener('online', revalidate)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (window.requestIdleCallback) window.requestIdleCallback(prefetchPages)
+    else setTimeout(prefetchPages, 3000)
+  }, [])
 
   useEffect(() => {
     const unsubscribe = subscribeOnlinePresence()
@@ -206,7 +232,7 @@ export default function App() {
 
   return (
     <AuthContextProvider user={user} signOut={signOut} profile={profile} fetchProfile={fetchProfile} authLoaded={authLoaded}>
-      <ModulesContextProvider modules={modules} modulesLoaded={modulesLoaded} modulesError={modulesError} refreshModules={loadModules}>
+      <ModulesContextProvider modules={modules} modulesLoaded={modulesLoaded} modulesError={modulesError} refreshModules={() => loadModules(true)}>
       <ToastProvider>
       <Router>
         <HomeEntranceProvider>
@@ -222,6 +248,7 @@ export default function App() {
 
           <ScrollToTop />
           <SiteHeader dark={dark} toggleTheme={toggleTheme} />
+          <OfflineStatus dark={dark} />
           <main style={{ flex: 1, position: 'relative', zIndex: 1 }}>
             <RoutedContent dark={dark} />
           </main>

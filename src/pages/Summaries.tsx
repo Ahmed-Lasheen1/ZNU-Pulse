@@ -1,7 +1,6 @@
 // src/pages/Summaries.tsx
 import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { supabase } from '../supabase'
 import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
 import ErrorBanner from '../components/ErrorBanner'
 import SummaryOverlay from '../components/SummaryOverlay'
@@ -14,6 +13,7 @@ import { useModules } from '../contexts'
 import { fetchModuleStages } from '../lib/moduleStages'
 import { fetchSubjectsForModule } from '../lib/subjects'
 import { fetchLessonStageMap, stagesOf, inStage } from '../lib/lessonStages'
+import { fetchModuleSummaries } from '../lib/moduleContent'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
 import { getPreviewUrl } from '../lib/embedUrl'
 import { ModuleIcon, NotesIcon } from '../lib/medicalIcons'
@@ -71,7 +71,7 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
   useEffect(() => {
     let ignore = false
     setLoading(true)
-    supabase.from('summaries').select('*').eq('module_id', mod.id).order('created_at')
+    fetchModuleSummaries(mod.id, ({ data, error }) => { if (!ignore && !error) setSummaries(data) })
       .then(({ data, error }) => {
         if (ignore) return
         if (data) setSummaries(data)

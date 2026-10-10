@@ -23,13 +23,15 @@ function isTrustedEmbedHost(url) {
 
 // Shared full-screen "back + preview" viewer used by SummaryOverlay and
 // MediaOverlay. Portaled to document.body so its z-index always
-// competes globally against the site header.
-export default function FullscreenViewer({ dark, onClose, src, title, fileType, allow, allowFullScreen }) {
+// competes globally against the site header. `srcDoc` renders saved HTML
+// (always without allow-same-origin, since it would inherit the app's origin);
+// `notice` replaces the preview with a message.
+export default function FullscreenViewer({ dark, onClose, src, srcDoc, notice, title, fileType, allow, allowFullScreen }) {
   const pt = getPulseTheme(dark)
   const kind = previewKindFor(src, fileType)
   useBodyScrollLock(true)
 
-  const trustedHost = isTrustedEmbedHost(src)
+  const trustedHost = !srcDoc && isTrustedEmbedHost(src)
   const sandbox = trustedHost
     ? 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation'
     : 'allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation'
@@ -60,7 +62,13 @@ export default function FullscreenViewer({ dark, onClose, src, title, fileType, 
         }}
       >← Back</button>
 
-      {kind === 'image' ? (
+      {notice ? (
+        <div style={{
+          minHeight: '100dvh', padding: '80px 24px 24px', boxSizing: 'border-box',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center',
+          color: pt.sub, fontFamily: pulseFonts.body, fontSize: 14, lineHeight: 1.6
+        }}>{notice}</div>
+      ) : kind === 'image' ? (
         <div style={{
           minHeight: '100dvh',
           padding: '80px 20px 24px',
@@ -76,7 +84,8 @@ export default function FullscreenViewer({ dark, onClose, src, title, fileType, 
       ) : (
         <div style={{ height: '100dvh' }}>
           <iframe
-            src={src}
+            src={srcDoc ? undefined : src}
+            srcDoc={srcDoc}
             style={{ height: '100%', width: '100%', border: 'none', display: 'block' }}
             title={title}
             sandbox={sandbox}

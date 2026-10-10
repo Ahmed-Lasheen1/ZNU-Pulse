@@ -324,7 +324,7 @@ export default function MCQBrowse({
         <div style={{ marginBottom: 16 }}>
           <LiquidGlassCard dark={dark} delay={0} style={{ padding: '10px 16px', textAlign: 'center' }}>
             <span style={{ color: pt.amber, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <OfflineIcon color={pt.amber} size={14} /> You're offline — showing questions saved from your last visit. Submitting a quiz needs a connection.
+              <OfflineIcon color={pt.amber} size={14} /> You're offline — showing questions saved from your last visit. Quizzes still work and are saved on this device.
             </span>
           </LiquidGlassCard>
         </div>

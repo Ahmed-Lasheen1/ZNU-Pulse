@@ -1,7 +1,6 @@
 // src/pages/ModulePage.tsx
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../supabase'
 import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PageShell from '../components/pulse/PageShell'
@@ -17,6 +16,7 @@ import { fetchSubjectsForModule } from '../lib/subjects'
 import { fetchLessonsForModule } from '../lib/lessons'
 import { fetchDriveUrl } from '../lib/siteSettings'
 import { fetchLessonStageMap, stagesOf } from '../lib/lessonStages'
+import { fetchModuleFacets, fetchModuleSummaries } from '../lib/moduleContent'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
 import { getPreviewUrl } from '../lib/embedUrl'
 import { ModuleIcon, ExamIcon, NotesIcon } from '../lib/medicalIcons'
@@ -78,19 +78,18 @@ export default function ModulePage({ dark }: { dark: boolean }) {
     })
 
     // Lesson-linked summaries, for the accordion's inline "Summary" action.
-    supabase.from('summaries').select('id, title, url, lesson_id').eq('module_id', moduleId).not('lesson_id', 'is', null)
-      .then(({ data, error }) => {
-        if (ignore) return
-        if (data) {
-          const byLesson: Record<string, ModuleSummary[]> = {}
-          data.forEach((s: any) => { (byLesson[s.lesson_id] ||= []).push(s) })
-          setLessonSummaries(byLesson)
-        }
-        if (error) setLoadError(true)
-      })
+    fetchModuleSummaries(moduleId!).then(({ data, error }) => {
+      if (ignore) return
+      if (data) {
+        const byLesson: Record<string, ModuleSummary[]> = {}
+        data.forEach((s: any) => { if (s.lesson_id) (byLesson[s.lesson_id] ||= []).push(s) })
+        setLessonSummaries(byLesson)
+      }
+      if (error) setLoadError(true)
+    })
 
     Promise.all([
-      supabase.rpc('get_module_content_facets', { p_module_id: moduleId }),
+      fetchModuleFacets(moduleId!),
       fetchLessonStageMap(),
     ]).then(([facetsRes, stageMapRes]) => {
       if (ignore) return
