@@ -1,28 +1,32 @@
-import { useState, type CSSProperties } from 'react'
+import { useState, useEffect, Fragment, type CSSProperties } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { getPulseTheme } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import EmptyState from '../../components/pulse/EmptyState'
-import { ModuleIcon } from '../../lib/medicalIcons'
+import { ModuleIcon, NotesIcon } from '../../lib/medicalIcons'
 import AdminSplitLayout from './AdminSplitLayout'
+import AdminFormCard from './AdminFormCard'
+import AdminContextBar from './AdminContextBar'
+import AdminPill from './AdminPill'
 import AdminRow from './AdminRow'
 import ModuleForm from './ModuleForm'
 import SubjectForm from './SubjectForm'
 import LessonForm from './LessonForm'
 import StagesPanel from './StagesPanel'
-import { miniBtn } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
 import { deleteAdminEntity } from './useAdminEntityCrud'
-import { PlusIcon, TargetIcon, ConstructionIcon } from '../../components/ui/tool-icons'
-import type { AdminModule, AdminSubject, AdminLesson } from './adminTypes'
+import { PackageIcon, BookIcon, TargetIcon, ConstructionIcon } from '../../components/ui/tool-icons'
+import type { AdminModule, AdminSubject, AdminLesson, AdminContext, ContextSelection } from './adminTypes'
 
-type Editor =
-  | { kind: 'module'; id: string | null }
-  | { kind: 'subject'; id: string | null; moduleId: string }
-  | { kind: 'lesson'; id: string | null; moduleId: string; subjectId: string }
-  | { kind: 'stages'; moduleId: string }
+const MODES = [
+  { id: 'module', label: 'Module', Icon: PackageIcon, depth: 0 },
+  { id: 'subject', label: 'Subject', Icon: BookIcon, depth: 1 },
+  { id: 'lesson', label: 'Lesson', Icon: NotesIcon, depth: 2 },
+  { id: 'stages', label: 'Stages', Icon: TargetIcon, depth: 1 },
+] as const
 
+type StructureMode = typeof MODES[number]['id']
 type EntityKind = 'module' | 'subject' | 'lesson'
 
 interface DeleteTarget {
@@ -35,6 +39,7 @@ interface StructureTabProps {
   modules: AdminModule[]
   subjects: AdminSubject[]
   lessons: AdminLesson[]
+  context: AdminContext
   loading: boolean
   refresh: () => Promise<void>
 }
@@ -57,19 +62,101 @@ const DELETE_COPY: Record<EntityKind, { table: string; label: string; message: s
   },
 }
 
-const NEW_MODULE: Editor = { kind: 'module', id: null }
+const DEFAULT_SUBJECT_COLOR = '#34d399'
 
-const toggleStyle: CSSProperties = {
+const rowLeadStyle: CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 8, padding: 0,
-  background: 'transparent', border: 'none', cursor: 'pointer', font: 'inherit', color: 'inherit',
+  background: 'transparent', border: 'none', font: 'inherit', color: 'inherit',
 }
 
-export default function StructureTab({ dark, modules, subjects, lessons, loading, refresh }: StructureTabProps) {
+interface TreeRowProps {
+  dark: boolean
+  noun: string
+  label: string
+  icon?: string | null
+  fallbackIcon: string
+  color: string
+  indent: number
+  active: boolean
+  count?: number
+  open?: boolean
+  badge?: string
+  onToggle?: () => void
+  onEdit: () => void
+  onDelete: () => void
+}
+
+function TreeRow({ dark, noun, label, icon, fallbackIcon, color, indent, active, count, open, badge, onToggle, onEdit, onDelete }: TreeRowProps) {
+  const pt = getPulseTheme(dark)
+  const lead = (
+    <>
+      {onToggle
+        ? <ChevronDown size={14} color={pt.textMuted} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }} />
+        : <span style={{ width: 14 }} />}
+      <ModuleIcon value={icon || fallbackIcon} size={22} color={color} />
+      <span style={{ color, fontWeight: 700 }}>{label}</span>
+      {count !== undefined && <span style={{ color: pt.textMuted, fontSize: 12 }}>({count})</span>}
+    </>
+  )
+
+  return (
+    <div style={{ marginLeft: indent }}>
+      <AdminRow dark={dark} noun={noun} label={label} active={active} onEdit={onEdit} onDelete={onDelete}>
+        {onToggle
+          ? <button type="button" onClick={onToggle} aria-expanded={open} style={{ ...rowLeadStyle, cursor: 'pointer' }}>{lead}</button>
+          : <span style={rowLeadStyle}>{lead}</span>}
+        {badge && (
+          <span style={{
+            color: pt.textMuted, border: `1px solid ${pt.border}`, borderRadius: 999,
+            padding: '1px 8px', fontSize: 11, fontWeight: 700
+          }}>{badge}</span>
+        )}
+      </AdminRow>
+    </div>
+  )
+}
+
+export default function StructureTab({ dark, modules, subjects, lessons, context, loading, refresh }: StructureTabProps) {
   const pt = getPulseTheme(dark)
   const { message, showMessage } = useAdminMessage()
-  const [editor, setEditor] = useState<Editor>(NEW_MODULE)
+  const [mode, setMode] = useState<StructureMode>('module')
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [openModuleId, setOpenModuleId] = useState<string | null>(null)
+  const [openSubjectId, setOpenSubjectId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
+
+  useEffect(() => {
+    if (context.moduleId) setOpenModuleId(context.moduleId)
+  }, [context.moduleId])
+
+  useEffect(() => {
+    if (context.subjectId) setOpenSubjectId(context.subjectId)
+  }, [context.subjectId])
+
+  const depth = MODES.find(m => m.id === mode)?.depth ?? 0
+
+  function selectMode(next: StructureMode) {
+    setMode(next)
+    setEditingId(null)
+  }
+
+  function startEdit(kind: EntityKind, id: string, parents: ContextSelection) {
+    setMode(kind)
+    setEditingId(id)
+    context.setContext(parents)
+  }
+
+  function toggleModule(id: string) {
+    if (openModuleId === id) return setOpenModuleId(null)
+    context.setContext({ moduleId: id, subjectId: '', lessonId: '' })
+    setOpenModuleId(id)
+  }
+
+  function toggleSubject(subject: AdminSubject) {
+    if (openSubjectId === subject.id) return setOpenSubjectId(null)
+    context.setContext({ moduleId: subject.module_id, subjectId: subject.id, lessonId: '' })
+    setOpenSubjectId(subject.id)
+  }
 
   async function confirmDelete() {
     if (!deleteTarget) return
@@ -79,120 +166,97 @@ export default function StructureTab({ dark, modules, subjects, lessons, loading
     const error = await deleteAdminEntity(copy.table, id)
     showMessage(error ? '❌ ' + error.message : `✅ ${copy.label} deleted`)
     if (error) return
-    setEditor(NEW_MODULE)
-    if (kind === 'module' && openModuleId === id) setOpenModuleId(null)
+    if (editingId === id) setEditingId(null)
     await refresh()
   }
 
   function renderForm() {
-    if (editor.kind === 'module') {
+    const common = { dark, showMessage, onSaved: refresh, onDone: () => setEditingId(null) }
+
+    if (mode === 'module') {
       return (
         <ModuleForm
-          key={`module-${editor.id}`}
-          dark={dark}
-          module={modules.find(m => m.id === editor.id) ?? null}
+          key={`module-${editingId}`}
+          {...common}
+          module={modules.find(m => m.id === editingId) ?? null}
           modules={modules}
-          showMessage={showMessage}
-          onSaved={refresh}
-          onDone={() => setEditor(NEW_MODULE)}
         />
       )
     }
 
-    const parent = modules.find(m => m.id === editor.moduleId)
-    if (!parent) return null
-
-    if (editor.kind === 'stages') {
-      return (
-        <StagesPanel
-          key={`stages-${parent.id}`}
-          dark={dark}
-          module={parent}
-          subjects={subjects.filter(s => s.module_id === parent.id)}
-          showMessage={showMessage}
-        />
-      )
+    if (mode === 'subject') {
+      const subject = subjects.find(s => s.id === editingId) ?? null
+      const parent = modules.find(m => m.id === (subject ? subject.module_id : context.moduleId))
+      if (!parent) return <AdminFormCard dark={dark} noun="Subject" description="Pick a module above to add subjects to it." />
+      return <SubjectForm key={`subject-${editingId}`} {...common} subject={subject} module={parent} subjects={subjects} />
     }
 
-    if (editor.kind === 'subject') {
-      return (
-        <SubjectForm
-          key={`subject-${editor.id}-${parent.id}`}
-          dark={dark}
-          subject={subjects.find(s => s.id === editor.id) ?? null}
-          module={parent}
-          subjects={subjects}
-          showMessage={showMessage}
-          onSaved={refresh}
-          onDone={() => setEditor({ kind: 'subject', id: null, moduleId: parent.id })}
-        />
-      )
+    if (mode === 'lesson') {
+      const lesson = lessons.find(l => l.id === editingId) ?? null
+      const subject = subjects.find(s => s.id === (lesson ? lesson.subject_id : context.subjectId))
+      const parent = modules.find(m => m.id === subject?.module_id)
+      if (!subject || !parent) {
+        return <AdminFormCard dark={dark} noun="Lesson" description="Pick a module and a subject above to add lessons to it." />
+      }
+      return <LessonForm key={`lesson-${editingId}`} {...common} lesson={lesson} module={parent} subject={subject} />
     }
 
-    const subject = subjects.find(s => s.id === editor.subjectId)
-    if (!subject) return null
+    const parent = modules.find(m => m.id === context.moduleId)
+    if (!parent) {
+      return <AdminFormCard dark={dark} title="Exam Stages" Icon={TargetIcon} description="Pick a module above to edit its exam stages and simulator." />
+    }
     return (
-      <LessonForm
-        key={`lesson-${editor.id}-${subject.id}`}
+      <StagesPanel
+        key={`stages-${parent.id}`}
         dark={dark}
-        lesson={lessons.find(l => l.id === editor.id) ?? null}
         module={parent}
-        subject={subject}
+        subjects={subjects.filter(s => s.module_id === parent.id)}
         showMessage={showMessage}
-        onSaved={refresh}
-        onDone={() => setEditor({ kind: 'lesson', id: null, moduleId: parent.id, subjectId: subject.id })}
       />
     )
   }
 
-  function renderLesson(lesson: AdminLesson) {
+  function renderLesson(lesson: AdminLesson, color: string) {
     return (
-      <div key={lesson.id} style={{ marginLeft: 40 }}>
-        <AdminRow
-          dark={dark}
-          noun="lesson"
-          label={lesson.title}
-          active={editor.kind === 'lesson' && editor.id === lesson.id}
-          onEdit={() => setEditor({ kind: 'lesson', id: lesson.id, moduleId: lesson.module_id, subjectId: lesson.subject_id })}
-          onDelete={() => setDeleteTarget({ kind: 'lesson', id: lesson.id })}
-        >
-          <ModuleIcon value={lesson.icon || '📘'} size={16} color="#34d399" />
-          <span style={{ color: pt.text, fontWeight: 600 }}>{lesson.title}</span>
-        </AdminRow>
-      </div>
+      <TreeRow
+        key={lesson.id}
+        dark={dark}
+        noun="lesson"
+        label={lesson.title}
+        icon={lesson.icon}
+        fallbackIcon="📘"
+        color={color}
+        indent={48}
+        active={mode === 'lesson' && editingId === lesson.id}
+        onEdit={() => startEdit('lesson', lesson.id, { moduleId: lesson.module_id, subjectId: lesson.subject_id, lessonId: '' })}
+        onDelete={() => setDeleteTarget({ kind: 'lesson', id: lesson.id })}
+      />
     )
   }
 
   function renderSubject(subject: AdminSubject) {
+    const open = openSubjectId === subject.id
     const subjectLessons = lessons.filter(l => l.subject_id === subject.id)
+    const color = subject.color || DEFAULT_SUBJECT_COLOR
     return (
-      <div key={subject.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ marginLeft: 20 }}>
-          <AdminRow
-            dark={dark}
-            noun="subject"
-            label={subject.name}
-            active={editor.kind === 'subject' && editor.id === subject.id}
-            actions={
-              <button
-                onClick={() => setEditor({ kind: 'lesson', id: null, moduleId: subject.module_id, subjectId: subject.id })}
-                aria-label={`Add lesson to ${subject.name}`}
-                style={miniBtn(pt.cobalt)}
-              >
-                <PlusIcon color={pt.cobalt} size={12} /> Lesson
-              </button>
-            }
-            onEdit={() => setEditor({ kind: 'subject', id: subject.id, moduleId: subject.module_id })}
-            onDelete={() => setDeleteTarget({ kind: 'subject', id: subject.id })}
-          >
-            <span style={{ width: 18, height: 18, borderRadius: 5, flexShrink: 0, background: subject.color || '#34d399' }} />
-            <ModuleIcon value={subject.icon || '📖'} size={16} color={subject.color || '#34d399'} />
-            <span style={{ color: pt.text, fontWeight: 600 }}>{subject.name}</span>
-            <span style={{ color: pt.textMuted, fontSize: 12 }}>· {subject.type}</span>
-          </AdminRow>
-        </div>
-        {subjectLessons.map(renderLesson)}
-      </div>
+      <Fragment key={subject.id}>
+        <TreeRow
+          dark={dark}
+          noun="subject"
+          label={subject.name}
+          icon={subject.icon}
+          fallbackIcon="📖"
+          color={color}
+          indent={24}
+          count={subjectLessons.length}
+          open={open}
+          active={mode === 'subject' && editingId === subject.id}
+          onToggle={() => toggleSubject(subject)}
+          onEdit={() => startEdit('subject', subject.id, { moduleId: subject.module_id, subjectId: '', lessonId: '' })}
+          onDelete={() => setDeleteTarget({ kind: 'subject', id: subject.id })}
+        />
+        {open && subjectLessons.map(lesson => renderLesson(lesson, color))}
+      </Fragment>
     )
   }
 
@@ -200,65 +264,36 @@ export default function StructureTab({ dark, modules, subjects, lessons, loading
     const open = openModuleId === mod.id
     const moduleSubjects = subjects.filter(s => s.module_id === mod.id)
     return (
-      <div key={mod.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <AdminRow
+      <Fragment key={mod.id}>
+        <TreeRow
           dark={dark}
           noun="module"
           label={mod.name}
-          active={(editor.kind === 'module' && editor.id === mod.id) || (editor.kind === 'stages' && editor.moduleId === mod.id)}
-          actions={
-            <>
-              <button
-                onClick={() => setEditor({ kind: 'stages', moduleId: mod.id })}
-                aria-label={`Edit stages of ${mod.name}`}
-                style={miniBtn(pt.indigo)}
-              >
-                <TargetIcon color={pt.indigo} size={12} /> Stages
-              </button>
-              <button
-                onClick={() => { setOpenModuleId(mod.id); setEditor({ kind: 'subject', id: null, moduleId: mod.id }) }}
-                aria-label={`Add subject to ${mod.name}`}
-                style={miniBtn(pt.cobalt)}
-              >
-                <PlusIcon color={pt.cobalt} size={12} /> Subject
-              </button>
-            </>
-          }
-          onEdit={() => setEditor({ kind: 'module', id: mod.id })}
+          icon={mod.icon}
+          fallbackIcon="📚"
+          color={mod.color}
+          indent={0}
+          count={moduleSubjects.length}
+          open={open}
+          badge={mod.status === 'active' ? undefined : 'Completed'}
+          active={mode === 'module' && editingId === mod.id}
+          onToggle={() => toggleModule(mod.id)}
+          onEdit={() => startEdit('module', mod.id, { moduleId: mod.id, subjectId: '', lessonId: '' })}
           onDelete={() => setDeleteTarget({ kind: 'module', id: mod.id })}
-        >
-          <button type="button" onClick={() => setOpenModuleId(open ? null : mod.id)} aria-expanded={open} style={toggleStyle}>
-            <ChevronDown size={14} color={pt.textMuted} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }} />
-            <ModuleIcon value={mod.icon} size={22} color={mod.color} />
-            <span style={{ color: mod.color, fontWeight: 700 }}>{mod.name}</span>
-            <span style={{ color: pt.textMuted, fontSize: 12 }}>({moduleSubjects.length})</span>
-          </button>
-          {mod.status !== 'active' && (
-            <span style={{
-              color: pt.textMuted, border: `1px solid ${pt.border}`, borderRadius: 999,
-              padding: '1px 8px', fontSize: 11, fontWeight: 700
-            }}>Completed</span>
-          )}
-        </AdminRow>
+        />
         {open && moduleSubjects.map(renderSubject)}
-      </div>
+      </Fragment>
     )
   }
 
   const list = (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-        <button onClick={() => setEditor(NEW_MODULE)} style={miniBtn(pt.cobalt)}>
-          <PlusIcon color={pt.cobalt} size={12} /> Module
-        </button>
-      </div>
-
       {loading && <EmptyState dark={dark} message="Loading..." />}
       {!loading && modules.length === 0 && (
         <EmptyState dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No modules yet — add one on the left</>} />
       )}
       {!loading && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {modules.map(renderModule)}
         </div>
       )}
@@ -268,7 +303,19 @@ export default function StructureTab({ dark, modules, subjects, lessons, loading
   return (
     <div>
       <InlineMessage message={message} />
-      <AdminSplitLayout formWidth={420} form={renderForm()} list={list} />
+
+      <div className="admin-tabs" style={{ marginBottom: 8 }}>
+        {MODES.map(m => (
+          <AdminPill key={m.id} dark={dark} active={mode === m.id} label={m.label} Icon={m.Icon} onSelect={() => selectMode(m.id)} />
+        ))}
+      </div>
+
+      {depth > 0 && (
+        <AdminContextBar dark={dark} modules={modules} subjects={subjects} lessons={lessons} context={context} depth={depth} />
+      )}
+
+      <AdminSplitLayout form={renderForm()} list={list} />
+
       <ConfirmDialog
         dark={dark}
         open={!!deleteTarget}

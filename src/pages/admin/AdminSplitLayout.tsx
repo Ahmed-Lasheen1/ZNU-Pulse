@@ -3,12 +3,11 @@ import type { ReactNode } from 'react'
 interface AdminSplitLayoutProps {
   form: ReactNode
   list: ReactNode
-  formWidth?: number
 }
 
-export default function AdminSplitLayout({ form, list, formWidth = 380 }: AdminSplitLayoutProps) {
+export default function AdminSplitLayout({ form, list }: AdminSplitLayoutProps) {
   return (
-    <div className="admin-split" style={{ ['--admin-form-w' as any]: `${formWidth}px` }}>
+    <div className="admin-split">
       <style>{`
         .admin-split {
           display: grid;
@@ -18,15 +17,15 @@ export default function AdminSplitLayout({ form, list, formWidth = 380 }: AdminS
         }
         @media (min-width: 1000px) {
           .admin-split {
-            grid-template-columns: var(--admin-form-w) 1fr;
+            grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
             gap: 28px;
           }
           .admin-split-form {
             position: sticky;
-            top: 28px;
-            max-height: calc(100dvh - 48px);
+            top: 96px;
+            max-height: calc(100dvh - 116px);
             overflow-y: auto;
-            padding-bottom: 4px;
+            padding: 4px;
           }
         }
       `}</style>

@@ -37,28 +37,33 @@ export default function AdminFormCard({
     <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        flexWrap: 'wrap', gap: 8, marginBottom: description ? 8 : 16
+        flexWrap: 'wrap', gap: 10, marginBottom: description ? 8 : 16
       }}>
         <h3 style={{ color: pt.cobalt, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8, marginBottom: 0 }}>
           <HeadingIcon color={pt.cobalt} size={17} /> {heading}
         </h3>
-        {headerAction}
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+          {headerAction}
+          {onCancel && (
+            <button
+              onClick={onCancel}
+              disabled={saving}
+              style={{ ...cancelBtnStyle(pt, dark), padding: '9px 16px', fontSize: 13 }}
+            >{cancelLabel}</button>
+          )}
+          {onSave && (
+            <button
+              onClick={onSave}
+              disabled={blocked}
+              style={submitBtnStyle(pt, dark, blocked, { flex: 'none', width: 'auto', padding: '9px 20px', fontSize: 13 })}
+            >{saving ? savingLabel : editing ? 'Save Changes' : addLabel}</button>
+          )}
+        </div>
       </div>
 
       {description && <p style={{ color: pt.textMuted, fontSize: 13, marginBottom: 16 }}>{description}</p>}
 
       {children && <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>{children}</div>}
-
-      {onSave && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-          <button onClick={onSave} disabled={blocked} style={submitBtnStyle(pt, dark, blocked)}>
-            {saving ? savingLabel : editing ? 'Save Changes' : addLabel}
-          </button>
-          {onCancel && (
-            <button onClick={onCancel} disabled={saving} style={cancelBtnStyle(pt, dark)}>{cancelLabel}</button>
-          )}
-        </div>
-      )}
     </LiquidGlassCard>
   )
 }
