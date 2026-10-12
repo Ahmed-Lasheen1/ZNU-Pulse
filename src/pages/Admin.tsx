@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import { useAuth, useModules } from '../contexts'
 import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
-import PulseGlassRow from '../components/pulse/PulseGlassRow'
 import BackButton from '../components/pulse/BackButton'
 import ErrorBanner from '../components/ErrorBanner'
 import { invalidateSubjectsCache } from '../lib/subjects'
@@ -19,9 +18,10 @@ import StructureTab from './admin/StructureTab'
 import AnalyticsTab from './admin/AnalyticsTab'
 import SettingsTab from './admin/SettingsTab'
 import AdminContextBar from './admin/AdminContextBar'
+import AdminPill from './admin/AdminPill'
 import { useAdminContext } from './admin/useAdminContext'
 import { LIST_LIMIT } from './admin/adminStyles'
-import type { AdminModule, AdminSubject, AdminLesson, AdminIcon } from './admin/adminTypes'
+import type { AdminModule, AdminSubject, AdminLesson } from './admin/adminTypes'
 
 const TABS = [
   { id: 'structure', label: 'Structure', Icon: PackageIcon },
@@ -40,32 +40,6 @@ const CONTEXT_DEPTH: Partial<Record<AdminTab, number>> = {
   files: 3,
   questions: 3,
   summaries: 3,
-}
-
-interface AdminPillProps {
-  dark: boolean
-  active: boolean
-  label: string
-  Icon: AdminIcon
-  onSelect: () => void
-}
-
-function AdminPill({ dark, active, label, Icon, onSelect }: AdminPillProps) {
-  const pt = getPulseTheme(dark)
-  return (
-    <PulseGlassRow
-      dark={dark} radius={999} active={active}
-      activeTint={`${pt.cobalt}26`}
-      hoverTint={dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'}
-      onClick={onSelect} role="button" tabIndex={0}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
-      style={{ flexShrink: 0 }}
-    >
-      <div style={{ padding: '9px 16px', whiteSpace: 'nowrap', ...pulseType.button, color: active ? pt.cobalt : pt.sub, display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Icon color={active ? pt.cobalt : pt.sub} size={14} /> {label}
-      </div>
-    </PulseGlassRow>
-  )
 }
 
 export default function Admin({ dark }: { dark: boolean }) {
@@ -200,7 +174,7 @@ export default function Admin({ dark }: { dark: boolean }) {
         {activeTab === 'schedules' && <SchedulesTab dark={dark} modules={modules} context={context} />}
         {activeTab === 'structure' && (
           <StructureTab
-            dark={dark} modules={modules} subjects={subjects} lessons={lessons}
+            dark={dark} modules={modules} subjects={subjects} lessons={lessons} context={context}
             loading={refDataLoading} refresh={refreshStructure}
           />
         )}

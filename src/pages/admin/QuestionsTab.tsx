@@ -308,19 +308,17 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
             onChange={e => setField('question', e.target.value)}
             style={{ ...inStyle, minHeight: 80, resize: 'vertical' }}
           />
-          {OPTION_FIELDS.map(option => (
-            <input
-              key={option.key}
-              placeholder={`Option ${option.label}`}
-              value={draft[option.key]}
-              onChange={e => setField(option.key, e.target.value)}
-              style={inStyle}
-            />
-          ))}
-          <label style={fieldLabel(pt)}>Correct Answer</label>
-          <select value={draft.correct} onChange={e => setField('correct', e.target.value)} style={inStyle}>
-            {OPTION_FIELDS.map(option => <option key={option.key} value={option.label.toLowerCase()}>{option.label}</option>)}
-          </select>
+          <div className="admin-form-row-2" style={{ marginBottom: 0 }}>
+            {OPTION_FIELDS.map(option => (
+              <input
+                key={option.key}
+                placeholder={`Option ${option.label}`}
+                value={draft[option.key]}
+                onChange={e => setField(option.key, e.target.value)}
+                style={inStyle}
+              />
+            ))}
+          </div>
           <textarea
             placeholder="Explanation (optional)"
             value={draft.explanation}
@@ -331,6 +329,14 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
       )}
 
       <div className="admin-form-row-2" style={{ marginBottom: 0 }}>
+        {!bulkActive && (
+          <div>
+            <label style={fieldLabel(pt)}>Correct Answer</label>
+            <select value={draft.correct} onChange={e => setField('correct', e.target.value)} style={inStyle}>
+              {OPTION_FIELDS.map(option => <option key={option.key} value={option.label.toLowerCase()}>{option.label}</option>)}
+            </select>
+          </div>
+        )}
         <div>
           <label style={fieldLabel(pt)}>Use In</label>
           <select value={draft.examType} onChange={e => setField('examType', e.target.value)} style={inStyle}>
@@ -344,11 +350,13 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
             {stageOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </div>
+        <div>
+          <label style={fieldLabel(pt)}>Source (optional)</label>
+          <select value={draft.source} onChange={e => setField('source', e.target.value)} style={inStyle}>
+            {SOURCES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+        </div>
       </div>
-      <label style={fieldLabel(pt)}>Source (optional)</label>
-      <select value={draft.source} onChange={e => setField('source', e.target.value)} style={inStyle}>
-        {SOURCES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-      </select>
     </AdminFormCard>
   )
 
@@ -419,7 +427,7 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
   return (
     <div>
       <InlineMessage message={message} />
-      <AdminSplitLayout formWidth={420} form={form} list={list} />
+      <AdminSplitLayout form={form} list={list} />
       <AdminDeleteDialog dark={dark} noun="question" del={del} />
     </div>
   )

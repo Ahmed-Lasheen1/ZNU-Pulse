@@ -10,45 +10,49 @@ interface IconPickerProps {
   pt: PulseTheme
 }
 
-// Dropped into any admin form with an "emoji" field.
 export default function IconPicker({ value, onChange, inStyle, pt }: IconPickerProps) {
   const [query, setQuery] = useState('')
   const selectedKey = value && value.startsWith('icon:') ? value.slice(5) : null
+  const term = query.toLowerCase()
 
   const entries = Object.entries(MEDICAL_ICONS).filter(([key, { label }]) =>
-    !query || label.toLowerCase().includes(query.toLowerCase()) || key.includes(query.toLowerCase())
+    !term || label.toLowerCase().includes(term) || key.includes(term)
   )
 
   return (
     <div style={{ marginBottom: 12 }}>
-      <label style={{ color: pt.textMuted, fontSize: 12, display: 'block', marginBottom: 4 }}>Icon</label>
-      <input
-        placeholder="Emoji (e.g. heart) — or pick a custom icon below"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        style={{ ...inStyle, marginBottom: 8 }}
-      />
-      <div style={{ position: 'relative', marginBottom: 6 }}>
-        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-          <SearchIcon2 color={pt.textMuted} size={13} />
-        </span>
+      <label style={{ color: pt.textMuted, fontSize: 12, display: 'block', marginBottom: 4, fontWeight: 600 }}>Icon</label>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
         <input
-          placeholder="Search icons (e.g. cardio, brain, pill...)"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          style={{ ...inStyle, marginBottom: 0, fontSize: 12, padding: '8px 12px 8px 32px' }}
+          placeholder="Emoji, or pick below"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          style={{ ...inStyle, marginBottom: 0 }}
         />
+        <div style={{ position: 'relative' }}>
+          <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+            <SearchIcon2 color={pt.textMuted} size={13} />
+          </span>
+          <input
+            placeholder="Search icons..."
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            style={{ ...inStyle, marginBottom: 0, paddingLeft: 32 }}
+          />
+        </div>
       </div>
       <div style={{
         display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(44px, 1fr))', gap: 6,
         background: pt.surfaceFlat, border: `1px solid ${pt.border}`, borderRadius: 10,
-        padding: 8, maxHeight: 190, overflowY: 'auto'
+        padding: 8, maxHeight: 132, overflowY: 'auto'
       }}>
         {entries.map(([key, { label, Icon }]) => {
           const active = selectedKey === key
           return (
             <button
-              key={key} type="button" title={label}
+              key={key}
+              type="button"
+              title={label}
               onClick={() => onChange(`icon:${key}`)}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
