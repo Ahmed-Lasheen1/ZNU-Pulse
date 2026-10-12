@@ -5,11 +5,8 @@ import AdminFormCard from './AdminFormCard'
 import { inStyle as adminInStyle, fieldLabel } from './adminStyles'
 import { useAdminEntityCrud } from './useAdminEntityCrud'
 import { REQUIRED_FIELDS_MESSAGE } from './useAdminContext'
+import { SUBJECT_DEFAULTS, normalizeName } from './adminHelpers'
 import type { AdminModule, AdminSubject } from './adminTypes'
-
-const DEFAULT_ICON = '📖'
-const DEFAULT_COLOR = '#34d399'
-const DEFAULT_TYPE = 'both'
 
 interface SubjectFormProps {
   dark: boolean
@@ -27,15 +24,15 @@ export default function SubjectForm({ dark, subject, module, subjects, showMessa
   const editing = !!subject
 
   const [name, setName] = useState(subject?.name ?? '')
-  const [type, setType] = useState(subject?.type || DEFAULT_TYPE)
-  const [icon, setIcon] = useState(subject?.icon || DEFAULT_ICON)
-  const [color, setColor] = useState(subject?.color || DEFAULT_COLOR)
+  const [type, setType] = useState<string>(subject?.type || SUBJECT_DEFAULTS.type)
+  const [icon, setIcon] = useState<string>(subject?.icon || SUBJECT_DEFAULTS.icon)
+  const [color, setColor] = useState<string>(subject?.color || SUBJECT_DEFAULTS.color)
 
   function resetForm() {
     setName('')
-    setType(DEFAULT_TYPE)
-    setIcon(DEFAULT_ICON)
-    setColor(DEFAULT_COLOR)
+    setType(SUBJECT_DEFAULTS.type)
+    setIcon(SUBJECT_DEFAULTS.icon)
+    setColor(SUBJECT_DEFAULTS.color)
     onDone()
   }
 
@@ -43,7 +40,7 @@ export default function SubjectForm({ dark, subject, module, subjects, showMessa
     table: 'subjects',
     label: 'Subject',
     editingId: subject?.id ?? null,
-    buildPayload: () => ({ name, module_id: module.id, type, icon: icon || DEFAULT_ICON, color: color || DEFAULT_COLOR }),
+    buildPayload: () => ({ name, module_id: module.id, type, icon: icon || SUBJECT_DEFAULTS.icon, color: color || SUBJECT_DEFAULTS.color }),
     resetForm,
     refresh: onSaved,
     showMessage,
@@ -52,7 +49,7 @@ export default function SubjectForm({ dark, subject, module, subjects, showMessa
   function save() {
     if (crud.saving) return
     if (!name) return showMessage(REQUIRED_FIELDS_MESSAGE)
-    const duplicate = subjects.some(s => s.module_id === module.id && s.id !== subject?.id && s.name.trim().toLowerCase() === name.trim().toLowerCase())
+    const duplicate = subjects.some(s => s.module_id === module.id && s.id !== subject?.id && normalizeName(s.name) === normalizeName(name))
     if (duplicate) return showMessage('❌ This subject already exists in that module')
     crud.save()
   }

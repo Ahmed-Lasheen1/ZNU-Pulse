@@ -5,10 +5,8 @@ import AdminFormCard from './AdminFormCard'
 import { inStyle as adminInStyle, fieldLabel } from './adminStyles'
 import { useAdminEntityCrud } from './useAdminEntityCrud'
 import { REQUIRED_FIELDS_MESSAGE } from './useAdminContext'
+import { MODULE_DEFAULTS, normalizeName } from './adminHelpers'
 import type { AdminModule } from './adminTypes'
-
-const DEFAULT_COLOR = '#38bdf8'
-const DEFAULT_ICON = '📚'
 
 interface ModuleFormProps {
   dark: boolean
@@ -25,15 +23,15 @@ export default function ModuleForm({ dark, module, modules, showMessage, onSaved
   const editing = !!module
 
   const [name, setName] = useState(module?.name ?? '')
-  const [color, setColor] = useState(module?.color ?? DEFAULT_COLOR)
-  const [icon, setIcon] = useState(module?.icon || DEFAULT_ICON)
-  const [status, setStatus] = useState<AdminModule['status']>(module?.status ?? 'active')
+  const [color, setColor] = useState(module?.color ?? MODULE_DEFAULTS.color)
+  const [icon, setIcon] = useState(module?.icon || MODULE_DEFAULTS.icon)
+  const [status, setStatus] = useState<AdminModule['status']>(module?.status ?? MODULE_DEFAULTS.status)
 
   function resetForm() {
     setName('')
-    setColor(DEFAULT_COLOR)
-    setIcon(DEFAULT_ICON)
-    setStatus('active')
+    setColor(MODULE_DEFAULTS.color)
+    setIcon(MODULE_DEFAULTS.icon)
+    setStatus(MODULE_DEFAULTS.status)
     onDone()
   }
 
@@ -50,7 +48,7 @@ export default function ModuleForm({ dark, module, modules, showMessage, onSaved
   function save() {
     if (crud.saving) return
     if (!name) return showMessage(REQUIRED_FIELDS_MESSAGE)
-    const duplicate = modules.some(m => m.name.trim().toLowerCase() === name.trim().toLowerCase() && m.id !== module?.id)
+    const duplicate = modules.some(m => normalizeName(m.name) === normalizeName(name) && m.id !== module?.id)
     if (duplicate) return showMessage('❌ A module with this name already exists')
     crud.save()
   }
