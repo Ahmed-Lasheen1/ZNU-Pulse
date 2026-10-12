@@ -16,8 +16,6 @@ export function subscribePendingAttempts(listener) {
 
 export const isTransientFailure = ({ error, status }) => !!error && (status === 0 || status >= 500)
 
-// Same rule as the server: an unanswered question is never correct.
-// Returns null when an answer key for any question isn't available on this device.
 export async function gradeLocally(questions, answers) {
   const keys = await loadAnswerKeys(questions.map(question => question.module_id))
   const results = {}
@@ -54,9 +52,6 @@ export async function discardPendingAttempt(id) {
   notify()
 }
 
-// An attempt leaves local storage only after the server confirms it. Network and
-// server outages stop the run and keep everything for the next one; a rejection
-// is recorded on the attempt and only retried when `includeFailed` is set.
 export async function syncPendingAttempts(userId, { includeFailed = false } = {}) {
   if (syncing) return { synced: 0, rejected: 0 }
   syncing = true
@@ -73,6 +68,7 @@ export async function syncPendingAttempts(userId, { includeFailed = false } = {}
         p_subject_id: attempt.subjectId,
         p_time_sec: attempt.timeSec,
         p_completed_at: new Date(attempt.completedAt).toISOString(),
+        p_possible_duplicate: !!attempt.possibleDuplicate,
       })
       if (!response.error && response.data?.length) {
         await idbDelete(ATTEMPT_PREFIX + attempt.id)
