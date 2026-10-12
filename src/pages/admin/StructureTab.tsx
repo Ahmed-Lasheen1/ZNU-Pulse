@@ -1,33 +1,31 @@
-import { useState, useEffect, Fragment, type CSSProperties } from 'react'
+import { useState, useEffect, useCallback, Fragment, type CSSProperties, type ReactNode } from 'react'
 import { ChevronDown } from 'lucide-react'
+import { supabase } from '../../supabase'
 import { getPulseTheme } from '../../premiumTheme'
-import InlineMessage from '../../components/InlineMessage'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import EmptyState from '../../components/pulse/EmptyState'
-import { ModuleIcon, NotesIcon } from '../../lib/medicalIcons'
+import { useToast } from '../../components/ToastProvider'
+import { ModuleIcon } from '../../lib/medicalIcons'
 import AdminSplitLayout from './AdminSplitLayout'
-import AdminFormCard from './AdminFormCard'
-import AdminContextBar from './AdminContextBar'
-import AdminPill from './AdminPill'
 import AdminRow from './AdminRow'
 import ModuleForm from './ModuleForm'
 import SubjectForm from './SubjectForm'
 import LessonForm from './LessonForm'
 import StagesPanel from './StagesPanel'
-import { useAdminMessage } from './useAdminMessage'
+import QuickAddRow from './QuickAddRow'
+import { miniBtn } from './adminStyles'
 import { deleteAdminEntity } from './useAdminEntityCrud'
-import { PackageIcon, BookIcon, TargetIcon, ConstructionIcon } from '../../components/ui/tool-icons'
-import type { AdminModule, AdminSubject, AdminLesson, AdminContext, ContextSelection } from './adminTypes'
+import { SUBJECT_DEFAULTS, MODULE_DEFAULTS, LESSON_FALLBACK_ICON, normalizeName, freshNames, plural } from './adminHelpers'
+import { TargetIcon, ConstructionIcon } from '../../components/ui/tool-icons'
+import type { AdminModule, AdminSubject, AdminLesson, AdminContext } from './adminTypes'
 
-const MODES = [
-  { id: 'module', label: 'Module', Icon: PackageIcon, depth: 0 },
-  { id: 'subject', label: 'Subject', Icon: BookIcon, depth: 1 },
-  { id: 'lesson', label: 'Lesson', Icon: NotesIcon, depth: 2 },
-  { id: 'stages', label: 'Stages', Icon: TargetIcon, depth: 1 },
-] as const
-
-type StructureMode = typeof MODES[number]['id']
 type EntityKind = 'module' | 'subject' | 'lesson'
+
+type Editor =
+  | { kind: 'module'; id: string | null }
+  | { kind: 'subject'; id: string | null; moduleId: string }
+  | { kind: 'lesson'; id: string | null; subjectId: string }
+  | { kind: 'stages'; moduleId: string }
 
 interface DeleteTarget {
   kind: EntityKind
@@ -43,6 +41,8 @@ interface StructureTabProps {
   loading: boolean
   refresh: () => Promise<void>
 }
+
+const ADD_MODULE: Editor = { kind: 'module', id: null }
 
 const DELETE_COPY: Record<EntityKind, { table: string; label: string; message: string }> = {
   module: {
@@ -62,11 +62,16 @@ const DELETE_COPY: Record<EntityKind, { table: string; label: string; message: s
   },
 }
 
-const DEFAULT_SUBJECT_COLOR = '#34d399'
-
 const rowLeadStyle: CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 8, padding: 0,
   background: 'transparent', border: 'none', font: 'inherit', color: 'inherit',
+}
+
+function editorTouches(editor: Editor, id: string) {
+  if (editor.kind === 'module') return editor.id === id
+  if (editor.kind === 'subject') return editor.id === id || editor.moduleId === id
+  if (editor.kind === 'lesson') return editor.id === id || editor.subjectId === id
+  return editor.moduleId === id
 }
 
 interface TreeRowProps {
@@ -81,12 +86,13 @@ interface TreeRowProps {
   count?: number
   open?: boolean
   badge?: string
+  actions?: ReactNode
   onToggle?: () => void
   onEdit: () => void
   onDelete: () => void
 }
 
-function TreeRow({ dark, noun, label, icon, fallbackIcon, color, indent, active, count, open, badge, onToggle, onEdit, onDelete }: TreeRowProps) {
+function TreeRow({ dark, noun, label, icon, fallbackIcon, color, indent, active, count, open, badge, actions, onToggle, onEdit, onDelete }: TreeRowProps) {
   const pt = getPulseTheme(dark)
   const lead = (
     <>
@@ -101,7 +107,7 @@ function TreeRow({ dark, noun, label, icon, fallbackIcon, color, indent, active,
 
   return (
     <div style={{ marginLeft: indent }}>
-      <AdminRow dark={dark} noun={noun} label={label} active={active} onEdit={onEdit} onDelete={onDelete}>
+      <AdminRow dark={dark} noun={noun} label={label} active={active} actions={actions} onEdit={onEdit} onDelete={onDelete}>
         {onToggle
           ? <button type="button" onClick={onToggle} aria-expanded={open} style={{ ...rowLeadStyle, cursor: 'pointer' }}>{lead}</button>
           : <span style={rowLeadStyle}>{lead}</span>}
@@ -118,9 +124,12 @@ function TreeRow({ dark, noun, label, icon, fallbackIcon, color, indent, active,
 
 export default function StructureTab({ dark, modules, subjects, lessons, context, loading, refresh }: StructureTabProps) {
   const pt = getPulseTheme(dark)
-  const { message, showMessage } = useAdminMessage()
-  const [mode, setMode] = useState<StructureMode>('module')
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
+  const showMessage = useCallback(
+    (text: string) => showToast(text, text.startsWith('❌') ? 'error' : 'success'),
+    [showToast]
+  )
+  const [editor, setEditor] = useState<Editor>(ADD_MODULE)
   const [openModuleId, setOpenModuleId] = useState<string | null>(null)
   const [openSubjectId, setOpenSubjectId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
@@ -133,17 +142,28 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
     if (context.subjectId) setOpenSubjectId(context.subjectId)
   }, [context.subjectId])
 
-  const depth = MODES.find(m => m.id === mode)?.depth ?? 0
-
-  function selectMode(next: StructureMode) {
-    setMode(next)
-    setEditingId(null)
+  function finishEdit() {
+    setEditor(prev => prev.kind === 'subject' || prev.kind === 'lesson' ? { ...prev, id: null } : ADD_MODULE)
   }
 
-  function startEdit(kind: EntityKind, id: string, parents: ContextSelection) {
-    setMode(kind)
-    setEditingId(id)
-    context.setContext(parents)
+  function editModule(mod: AdminModule) {
+    setEditor({ kind: 'module', id: mod.id })
+    context.setContext({ moduleId: mod.id, subjectId: '', lessonId: '' })
+  }
+
+  function editStages(mod: AdminModule) {
+    setEditor({ kind: 'stages', moduleId: mod.id })
+    context.setContext({ moduleId: mod.id, subjectId: '', lessonId: '' })
+  }
+
+  function editSubject(subject: AdminSubject | null, moduleId: string) {
+    setEditor({ kind: 'subject', id: subject?.id ?? null, moduleId })
+    context.setContext({ moduleId, subjectId: '', lessonId: '' })
+  }
+
+  function editLesson(lesson: AdminLesson | null, subject: AdminSubject) {
+    setEditor({ kind: 'lesson', id: lesson?.id ?? null, subjectId: subject.id })
+    context.setContext({ moduleId: subject.module_id, subjectId: subject.id, lessonId: '' })
   }
 
   function toggleModule(id: string) {
@@ -158,6 +178,51 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
     setOpenSubjectId(subject.id)
   }
 
+  async function quickInsert(
+    table: 'subjects' | 'lessons',
+    noun: string,
+    names: string[],
+    existingNames: string[],
+    build: (name: string, createdAt: string) => Record<string, unknown>
+  ) {
+    const fresh = freshNames(names, new Set(existingNames.map(normalizeName)))
+    if (fresh.length === 0) {
+      showMessage('❌ Already exists here')
+      return false
+    }
+    const base = Date.now()
+    const { error } = await supabase.from(table).insert(fresh.map((name, i) => build(name, new Date(base + i).toISOString())))
+    if (error) {
+      showMessage('❌ ' + error.message)
+      return false
+    }
+    const skipped = names.length - fresh.length
+    showMessage(`✅ ${plural(fresh.length, noun)} added${skipped > 0 ? ` (${skipped} already existed)` : ''}`)
+    await refresh()
+    return true
+  }
+
+  function quickAddSubjects(mod: AdminModule, names: string[]) {
+    return quickInsert(
+      'subjects', 'subject', names,
+      subjects.filter(s => s.module_id === mod.id).map(s => s.name),
+      (name, createdAt) => ({
+        name, module_id: mod.id, type: SUBJECT_DEFAULTS.type,
+        icon: SUBJECT_DEFAULTS.icon, color: SUBJECT_DEFAULTS.color, created_at: createdAt,
+      })
+    )
+  }
+
+  function quickAddLessons(subject: AdminSubject, names: string[]) {
+    return quickInsert(
+      'lessons', 'lesson', names,
+      lessons.filter(l => l.subject_id === subject.id).map(l => l.title),
+      (title, createdAt) => ({
+        title, subject_id: subject.id, module_id: subject.module_id, icon: null, created_at: createdAt,
+      })
+    )
+  }
+
   async function confirmDelete() {
     if (!deleteTarget) return
     const { kind, id } = deleteTarget
@@ -166,45 +231,36 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
     const error = await deleteAdminEntity(copy.table, id)
     showMessage(error ? '❌ ' + error.message : `✅ ${copy.label} deleted`)
     if (error) return
-    if (editingId === id) setEditingId(null)
+    if (editorTouches(editor, id)) setEditor(ADD_MODULE)
     await refresh()
   }
 
   function renderForm() {
-    const common = { dark, showMessage, onSaved: refresh, onDone: () => setEditingId(null) }
+    const common = { dark, showMessage, onSaved: refresh, onDone: finishEdit }
+    const addModuleForm = <ModuleForm key="module-new" {...common} module={null} modules={modules} />
 
-    if (mode === 'module') {
-      return (
-        <ModuleForm
-          key={`module-${editingId}`}
-          {...common}
-          module={modules.find(m => m.id === editingId) ?? null}
-          modules={modules}
-        />
-      )
+    if (editor.kind === 'module') {
+      const module = editor.id ? modules.find(m => m.id === editor.id) ?? null : null
+      return <ModuleForm key={`module-${editor.id ?? 'new'}`} {...common} module={module} modules={modules} />
     }
 
-    if (mode === 'subject') {
-      const subject = subjects.find(s => s.id === editingId) ?? null
-      const parent = modules.find(m => m.id === (subject ? subject.module_id : context.moduleId))
-      if (!parent) return <AdminFormCard dark={dark} noun="Subject" description="Pick a module above to add subjects to it." />
-      return <SubjectForm key={`subject-${editingId}`} {...common} subject={subject} module={parent} subjects={subjects} />
+    if (editor.kind === 'subject') {
+      const subject = editor.id ? subjects.find(s => s.id === editor.id) ?? null : null
+      const parent = modules.find(m => m.id === (subject ? subject.module_id : editor.moduleId))
+      if (!parent) return addModuleForm
+      return <SubjectForm key={`subject-${editor.id ?? `new-${parent.id}`}`} {...common} subject={subject} module={parent} subjects={subjects} />
     }
 
-    if (mode === 'lesson') {
-      const lesson = lessons.find(l => l.id === editingId) ?? null
-      const subject = subjects.find(s => s.id === (lesson ? lesson.subject_id : context.subjectId))
+    if (editor.kind === 'lesson') {
+      const lesson = editor.id ? lessons.find(l => l.id === editor.id) ?? null : null
+      const subject = subjects.find(s => s.id === (lesson ? lesson.subject_id : editor.subjectId))
       const parent = modules.find(m => m.id === subject?.module_id)
-      if (!subject || !parent) {
-        return <AdminFormCard dark={dark} noun="Lesson" description="Pick a module and a subject above to add lessons to it." />
-      }
-      return <LessonForm key={`lesson-${editingId}`} {...common} lesson={lesson} module={parent} subject={subject} />
+      if (!subject || !parent) return addModuleForm
+      return <LessonForm key={`lesson-${editor.id ?? `new-${subject.id}`}`} {...common} lesson={lesson} module={parent} subject={subject} />
     }
 
-    const parent = modules.find(m => m.id === context.moduleId)
-    if (!parent) {
-      return <AdminFormCard dark={dark} title="Exam Stages" Icon={TargetIcon} description="Pick a module above to edit its exam stages and simulator." />
-    }
+    const parent = modules.find(m => m.id === editor.moduleId)
+    if (!parent) return addModuleForm
     return (
       <StagesPanel
         key={`stages-${parent.id}`}
@@ -216,7 +272,7 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
     )
   }
 
-  function renderLesson(lesson: AdminLesson, color: string) {
+  function renderLesson(lesson: AdminLesson, subject: AdminSubject, color: string) {
     return (
       <TreeRow
         key={lesson.id}
@@ -224,11 +280,11 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
         noun="lesson"
         label={lesson.title}
         icon={lesson.icon}
-        fallbackIcon="📘"
+        fallbackIcon={LESSON_FALLBACK_ICON}
         color={color}
         indent={48}
-        active={mode === 'lesson' && editingId === lesson.id}
-        onEdit={() => startEdit('lesson', lesson.id, { moduleId: lesson.module_id, subjectId: lesson.subject_id, lessonId: '' })}
+        active={editor.kind === 'lesson' && editor.id === lesson.id}
+        onEdit={() => editLesson(lesson, subject)}
         onDelete={() => setDeleteTarget({ kind: 'lesson', id: lesson.id })}
       />
     )
@@ -237,7 +293,7 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
   function renderSubject(subject: AdminSubject) {
     const open = openSubjectId === subject.id
     const subjectLessons = lessons.filter(l => l.subject_id === subject.id)
-    const color = subject.color || DEFAULT_SUBJECT_COLOR
+    const color = subject.color || SUBJECT_DEFAULTS.color
     return (
       <Fragment key={subject.id}>
         <TreeRow
@@ -245,17 +301,28 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
           noun="subject"
           label={subject.name}
           icon={subject.icon}
-          fallbackIcon="📖"
+          fallbackIcon={SUBJECT_DEFAULTS.icon}
           color={color}
           indent={24}
           count={subjectLessons.length}
           open={open}
-          active={mode === 'subject' && editingId === subject.id}
+          active={editor.kind === 'subject' && editor.id === subject.id}
           onToggle={() => toggleSubject(subject)}
-          onEdit={() => startEdit('subject', subject.id, { moduleId: subject.module_id, subjectId: '', lessonId: '' })}
+          onEdit={() => editSubject(subject, subject.module_id)}
           onDelete={() => setDeleteTarget({ kind: 'subject', id: subject.id })}
         />
-        {open && subjectLessons.map(lesson => renderLesson(lesson, color))}
+        {open && (
+          <>
+            <QuickAddRow
+              dark={dark}
+              indent={48}
+              placeholder={`Add lessons to ${subject.name} — Enter to add, paste a list for many`}
+              onAdd={names => quickAddLessons(subject, names)}
+              onDetails={() => editLesson(null, subject)}
+            />
+            {subjectLessons.map(lesson => renderLesson(lesson, subject, color))}
+          </>
+        )}
       </Fragment>
     )
   }
@@ -270,18 +337,34 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
           noun="module"
           label={mod.name}
           icon={mod.icon}
-          fallbackIcon="📚"
+          fallbackIcon={MODULE_DEFAULTS.icon}
           color={mod.color}
           indent={0}
           count={moduleSubjects.length}
           open={open}
           badge={mod.status === 'active' ? undefined : 'Completed'}
-          active={mode === 'module' && editingId === mod.id}
+          active={(editor.kind === 'module' && editor.id === mod.id) || (editor.kind === 'stages' && editor.moduleId === mod.id)}
+          actions={
+            <button type="button" onClick={() => editStages(mod)} aria-label={`Exam stages for ${mod.name}`} title="Exam stages" style={miniBtn(pt.sub)}>
+              <TargetIcon color={pt.sub} size={12} />
+            </button>
+          }
           onToggle={() => toggleModule(mod.id)}
-          onEdit={() => startEdit('module', mod.id, { moduleId: mod.id, subjectId: '', lessonId: '' })}
+          onEdit={() => editModule(mod)}
           onDelete={() => setDeleteTarget({ kind: 'module', id: mod.id })}
         />
-        {open && moduleSubjects.map(renderSubject)}
+        {open && (
+          <>
+            <QuickAddRow
+              dark={dark}
+              indent={24}
+              placeholder={`Add subjects to ${mod.name} — Enter to add, paste a list for many`}
+              onAdd={names => quickAddSubjects(mod, names)}
+              onDetails={() => editSubject(null, mod.id)}
+            />
+            {moduleSubjects.map(renderSubject)}
+          </>
+        )}
       </Fragment>
     )
   }
@@ -302,18 +385,6 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
 
   return (
     <div>
-      <InlineMessage message={message} />
-
-      <div className="admin-tabs" style={{ marginBottom: 8 }}>
-        {MODES.map(m => (
-          <AdminPill key={m.id} dark={dark} active={mode === m.id} label={m.label} Icon={m.Icon} onSelect={() => selectMode(m.id)} />
-        ))}
-      </div>
-
-      {depth > 0 && (
-        <AdminContextBar dark={dark} modules={modules} subjects={subjects} lessons={lessons} context={context} depth={depth} />
-      )}
-
       <AdminSplitLayout form={renderForm()} list={list} />
 
       <ConfirmDialog
