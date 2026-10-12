@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { supabase } from '../../supabase'
-import { getPulseTheme } from '../../premiumTheme'
+import { getPulseTheme, pulseFonts } from '../../premiumTheme'
 import InlineMessage from '../../components/InlineMessage'
 import QuestionSourceBadge from '../../components/QuestionSourceBadge'
 import AdminSplitLayout from './AdminSplitLayout'
@@ -8,7 +8,7 @@ import AdminFormCard from './AdminFormCard'
 import AdminRow from './AdminRow'
 import AdminGroupedList from './AdminGroupedList'
 import AdminDeleteDialog from './AdminDeleteDialog'
-import { inStyle as adminInStyle, fieldLabel, miniBtn, LIST_LIMIT } from './adminStyles'
+import { inStyle as adminInStyle, fieldLabel, miniBtn, LIST_LIMIT, type PulseTheme } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
 import { useAdminEntityCrud } from './useAdminEntityCrud'
 import { useConfirmDelete } from './useConfirmDelete'
@@ -82,9 +82,9 @@ const OPTION_FIELDS = [
 ] as const
 
 const EXAM_TYPES = [
-  { value: 'both', label: 'Practice + Mock Exam' },
-  { value: 'practice', label: 'Practice Only' },
-  { value: 'mock', label: 'Mock Exam Only' },
+  { value: 'both', label: 'Practice + Mock' },
+  { value: 'practice', label: 'Practice only' },
+  { value: 'mock', label: 'Mock only' },
 ]
 
 const SOURCES = [
@@ -147,9 +147,22 @@ function parseBulkQuestions(text: string) {
   return { questions, errors }
 }
 
+function correctBadge(pt: PulseTheme, active: boolean): CSSProperties {
+  return {
+    flexShrink: 0, width: 30, height: 30, borderRadius: '50%', cursor: 'pointer',
+    fontWeight: 800, fontSize: 12, fontFamily: pulseFonts.body,
+    border: `1.5px solid ${active ? pt.success : pt.border}`,
+    background: active ? `${pt.success}30` : 'transparent',
+    color: active ? pt.success : pt.sub,
+  }
+}
+
 export default function QuestionsTab({ dark, modules, context }: QuestionsTabProps) {
   const pt = getPulseTheme(dark)
-  const inStyle = adminInStyle(pt, dark)
+  const baseStyle = adminInStyle(pt, dark)
+  const inStyle: CSSProperties = { ...baseStyle, padding: '10px 14px', fontSize: 13, marginBottom: 8 }
+  const selectStyle: CSSProperties = { ...inStyle, marginBottom: 0 }
+  const compactLabel: CSSProperties = { ...fieldLabel(pt), fontSize: 11, marginBottom: 3 }
   const { message, showMessage } = useAdminMessage()
   const stageOptions = useStageOptions(context.moduleId)
 
@@ -298,7 +311,7 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
           placeholder={BULK_PLACEHOLDER}
           value={bulkText}
           onChange={e => setBulkText(e.target.value)}
-          style={{ ...inStyle, minHeight: 280, resize: 'vertical', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.6 }}
+          style={{ ...inStyle, minHeight: 'clamp(150px, 30vh, 260px)', resize: 'vertical', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.5 }}
         />
       ) : (
         <>
@@ -306,53 +319,58 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
             placeholder="Question"
             value={draft.question}
             onChange={e => setField('question', e.target.value)}
-            style={{ ...inStyle, minHeight: 80, resize: 'vertical' }}
+            style={{ ...inStyle, minHeight: 64, resize: 'vertical' }}
           />
-          <div className="admin-form-row-2" style={{ marginBottom: 0 }}>
-            {OPTION_FIELDS.map(option => (
-              <input
-                key={option.key}
-                placeholder={`Option ${option.label}`}
-                value={draft[option.key]}
-                onChange={e => setField(option.key, e.target.value)}
-                style={inStyle}
-              />
-            ))}
+          <label style={compactLabel}>Options — tap a letter to mark the correct answer</label>
+          <div className="admin-form-row-2" style={{ marginBottom: 0, rowGap: 0 }}>
+            {OPTION_FIELDS.map(option => {
+              const letter = option.label.toLowerCase()
+              const isCorrect = draft.correct === letter
+              return (
+                <div key={option.key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => setField('correct', letter)}
+                    aria-pressed={isCorrect}
+                    aria-label={`Mark option ${option.label} as the correct answer`}
+                    style={correctBadge(pt, isCorrect)}
+                  >{option.label}</button>
+                  <input
+                    placeholder={`Option ${option.label}`}
+                    value={draft[option.key]}
+                    onChange={e => setField(option.key, e.target.value)}
+                    style={{ ...inStyle, marginBottom: 0, flex: 1, minWidth: 0, width: 'auto' }}
+                  />
+                </div>
+              )
+            })}
           </div>
           <textarea
             placeholder="Explanation (optional)"
             value={draft.explanation}
             onChange={e => setField('explanation', e.target.value)}
-            style={{ ...inStyle, minHeight: 60, resize: 'vertical' }}
+            style={{ ...inStyle, minHeight: 48, resize: 'vertical' }}
           />
         </>
       )}
 
-      <div className="admin-form-row-2" style={{ marginBottom: 0 }}>
-        {!bulkActive && (
-          <div>
-            <label style={fieldLabel(pt)}>Correct Answer</label>
-            <select value={draft.correct} onChange={e => setField('correct', e.target.value)} style={inStyle}>
-              {OPTION_FIELDS.map(option => <option key={option.key} value={option.label.toLowerCase()}>{option.label}</option>)}
-            </select>
-          </div>
-        )}
+      <div className="admin-form-row-3">
         <div>
-          <label style={fieldLabel(pt)}>Use In</label>
-          <select value={draft.examType} onChange={e => setField('examType', e.target.value)} style={inStyle}>
+          <label style={compactLabel}>Use in</label>
+          <select value={draft.examType} onChange={e => setField('examType', e.target.value)} style={selectStyle}>
             {EXAM_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         </div>
         <div>
-          <label style={fieldLabel(pt)}>Exam Stage (optional)</label>
-          <select value={draft.examStage} onChange={e => setField('examStage', e.target.value)} style={inStyle}>
+          <label style={compactLabel}>Exam stage</label>
+          <select value={draft.examStage} onChange={e => setField('examStage', e.target.value)} style={selectStyle}>
             <option value="">No specific stage</option>
             {stageOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </div>
         <div>
-          <label style={fieldLabel(pt)}>Source (optional)</label>
-          <select value={draft.source} onChange={e => setField('source', e.target.value)} style={inStyle}>
+          <label style={compactLabel}>Source</label>
+          <select value={draft.source} onChange={e => setField('source', e.target.value)} style={selectStyle}>
             {SOURCES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </div>
@@ -369,7 +387,7 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
           placeholder="Search questions..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          style={{ ...inStyle, marginBottom: 0, paddingLeft: 34 }}
+          style={{ ...baseStyle, marginBottom: 0, paddingLeft: 34 }}
         />
         <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
           <SearchIcon2 color={pt.faint} size={14} />

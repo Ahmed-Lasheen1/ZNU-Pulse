@@ -6,6 +6,7 @@ import BackButton from '../components/pulse/BackButton'
 import ErrorBanner from '../components/ErrorBanner'
 import { invalidateSubjectsCache } from '../lib/subjects'
 import { invalidateLessonsCache } from '../lib/lessons'
+import { fetchAllRows } from '../lib/fetchAllRows'
 import NotFound from './NotFound'
 import { PackageIcon, FolderIcon, CalendarDotIcon, QuestionMarkIcon, ChartBarIcon, GearIcon } from '../components/ui/tool-icons'
 import { NotesIcon } from '../lib/medicalIcons'
@@ -20,7 +21,6 @@ import SettingsTab from './admin/SettingsTab'
 import AdminContextBar from './admin/AdminContextBar'
 import AdminPill from './admin/AdminPill'
 import { useAdminContext } from './admin/useAdminContext'
-import { LIST_LIMIT } from './admin/adminStyles'
 import type { AdminModule, AdminSubject, AdminLesson } from './admin/adminTypes'
 
 const TABS = [
@@ -65,14 +65,14 @@ export default function Admin({ dark }: { dark: boolean }) {
 
   async function fetchSubjects() {
     invalidateSubjectsCache()
-    const { data, error } = await supabase.from('subjects').select('*').order('created_at')
+    const { data, error } = await fetchAllRows(() => supabase.from('subjects').select('*').order('created_at').order('id'))
     if (data) setSubjects(data as AdminSubject[])
     if (error) setRefDataError(true)
   }
 
   async function fetchLessons() {
     invalidateLessonsCache()
-    const { data, error } = await supabase.from('lessons').select('*').order('created_at', { ascending: false }).limit(LIST_LIMIT)
+    const { data, error } = await fetchAllRows(() => supabase.from('lessons').select('*').order('created_at').order('id'))
     if (data) setLessons(data as AdminLesson[])
     if (error) setRefDataError(true)
   }
@@ -122,6 +122,12 @@ export default function Admin({ dark }: { dark: boolean }) {
           }
           @media (min-width: 640px) {
             .admin-form-row-2 { grid-template-columns: 1fr 1fr; gap: 12px; }
+          }
+          .admin-form-row-3 {
+            display: grid; grid-template-columns: 1fr; gap: 0 10px; margin-bottom: 8px;
+          }
+          @media (min-width: 560px) {
+            .admin-form-row-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
           }
           .admin-list-grid {
             display: grid; grid-template-columns: 1fr; gap: 10px;
