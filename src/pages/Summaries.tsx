@@ -1,4 +1,3 @@
-// src/pages/Summaries.tsx
 import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
@@ -42,8 +41,6 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
   const [subjects, setSubjects] = useState<SummarySubject[]>([])
   const [lessonStageMap, setLessonStageMap] = useState<Record<string, string[]>>({})
 
-  // Back button closes this open summary before falling through to a
-  // real page navigation.
   useHistoryOverlay(!!selected, () => setSelected(null))
 
   useEffect(() => {
@@ -81,8 +78,6 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
     return () => { ignore = true }
   }, [mod.id])
 
-  // Arriving from a Search result for a specific summary opens it
-  // directly and switches to its stage tab.
   useEffect(() => {
     if (!initialSummaryId || summaries.length === 0) return
     const match = summaries.find(s => s.id === initialSummaryId)
@@ -93,8 +88,6 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSummaryId, summaries])
 
-  // A stage tab only appears once this module has at least one summary in it,
-  // by the summary's own stage tag or its lesson's stages.
   const stagesWithSummaries = new Set(summaries.flatMap(s => stagesOf(s, lessonStageMap)))
   const visibleStages = stages.filter(s => stagesWithSummaries.has(s.value))
 
@@ -109,9 +102,35 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
 
   return (
     <PageShell dark={dark} backFallback={`/module/${mod.id}`}>
-      {/* Caps just the list at 900px — back button/title/TabRow stay full-width */}
       <style>{`
-        .summaries-list-wide { max-width: 900px; margin: 0 auto; }
+        .summaries-list-wide {
+          width: 100%; max-width: 900px; margin: 0 auto;
+          display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px;
+        }
+        .summary-card-inner {
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 14px; padding: 18px 22px; min-width: 0;
+        }
+        .summary-card-main { display: flex; align-items: center; gap: 14px; min-width: 0; flex: 1; }
+        .summary-card-icon {
+          width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+          display: flex; align-items: center; justify-content: center;
+        }
+        .summary-card-text { min-width: 0; flex: 1; }
+        .summary-card-title {
+          display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+          overflow: hidden; word-break: break-word; overflow-wrap: anywhere;
+        }
+        .summary-card-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .summary-card-open {
+          border-radius: 999px; padding: 6px 14px; font-size: 12px; font-weight: 700; flex-shrink: 0; white-space: nowrap;
+        }
+        @media (max-width: 480px) {
+          .summary-card-inner { padding: 14px; gap: 10px; }
+          .summary-card-main { gap: 10px; }
+          .summary-card-icon { width: 38px; height: 38px; border-radius: 10px; }
+          .summary-card-open { padding: 6px 11px; }
+        }
       `}</style>
 
       <div style={{ textAlign: 'center', padding: '10px 0 24px' }}>
@@ -161,31 +180,21 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
         <EmptyState dark={dark} icon={<ConstructionIcon color={pt.sub} size={14} />} message="No summaries here yet" />
       )}
 
-      <div className="summaries-list-wide" style={{ display: 'grid', gap: 12 }}>
+      <div className="summaries-list-wide">
         {filtered.map((sum, i) => (
-          <LiquidGlassCard key={sum.id} dark={dark} delay={i * 70} onClick={() => setSelected(sum)}
-            style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-              <div style={{
-                background: `${mod.color}20`, border: `1px solid ${mod.color}40`,
-                borderRadius: 12, width: 44, height: 44,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-              }}>
-                <NotesIcon color={mod.color} size={20} />
+          <LiquidGlassCard key={sum.id} dark={dark} delay={i * 70} onClick={() => setSelected(sum)} style={{ padding: 0 }}>
+            <div className="summary-card-inner">
+              <div className="summary-card-main">
+                <div className="summary-card-icon" style={{ background: `${mod.color}20`, border: `1px solid ${mod.color}40` }}>
+                  <NotesIcon color={mod.color} size={20} />
+                </div>
+                <div className="summary-card-text">
+                  <div className="summary-card-title" style={{ ...pulseType.cardTitle, color: pt.textPrimary, fontSize: 15 }}>{sum.title}</div>
+                  <div className="summary-card-sub" style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2 }}>{mod.name}</div>
+                </div>
               </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{
-                  ...pulseType.cardTitle, color: pt.textPrimary, fontSize: 15,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-                }}>{sum.title}</div>
-                <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2 }}>{mod.name}</div>
-              </div>
+              <div className="summary-card-open" style={{ background: mod.color, color: '#0f172a' }}>Open →</div>
             </div>
-            <div style={{
-              background: mod.color, color: '#0f172a',
-              borderRadius: 999, padding: '6px 14px',
-              fontSize: 12, fontWeight: 700, flexShrink: 0
-            }}>Open →</div>
           </LiquidGlassCard>
         ))}
       </div>
@@ -200,13 +209,8 @@ export default function Summaries({ dark }: { dark: boolean }) {
   const params = new URLSearchParams(location.search)
   const moduleParam = params.get('module')
   const initialStage = params.get('stage') || 'all'
-  // Specific summary id from Search.tsx (`?summary=<id>`), forwarded so
-  // ModuleSummaries can open that exact summary once its list loads.
   const initialSummaryId = params.get('summary') || undefined
 
-  // No module-picker grid page — goes straight into one module's
-  // summaries: whichever was passed via `?module=`, else the first
-  // active module, else the first module of any status.
   const resolvedModule: SummaryModule | null =
     (moduleParam && modules.find(m => m.id === moduleParam)) ||
     modules.find(m => m.status === 'active') ||
