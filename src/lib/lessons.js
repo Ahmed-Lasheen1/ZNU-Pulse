@@ -6,7 +6,7 @@ const KEY = 'lessons'
 export async function fetchAllLessons() {
   const { data, error } = await cachedQuery(
     KEY,
-    () => supabase.from('lessons').select('*'),
+    () => supabase.from('lessons').select('*').order('created_at').order('id'),
     { ttl: REFERENCE_TTL }
   )
   return { lessons: data || [], error }
@@ -15,13 +15,9 @@ export async function fetchAllLessons() {
 export async function fetchLessonsForSubject(subjectId) {
   const { lessons, error } = await fetchAllLessons()
   if (error) return { lessons: [], error }
-  const filtered = lessons
-    .filter(l => l.subject_id === subjectId)
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-  return { lessons: filtered, error: null }
+  return { lessons: lessons.filter(l => l.subject_id === subjectId), error: null }
 }
 
-// Used by ModulePage/StagePage's lesson accordion.
 export async function fetchLessonsForModule(moduleId) {
   const { lessons, error } = await fetchAllLessons()
   if (error) return { lessons: [], error }
