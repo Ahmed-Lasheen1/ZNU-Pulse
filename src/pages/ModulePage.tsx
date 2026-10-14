@@ -1,60 +1,74 @@
-// src/pages/ModulePage.tsx
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PageShell from '../components/pulse/PageShell'
 import ModuleNotFoundState from '../components/pulse/ModuleNotFoundState'
 import StudyMaterialsSection from '../components/pulse/StudyMaterialsSection'
 import StudyByLessonSection from '../components/pulse/StudyByLessonSection'
+import StageTabs from '../components/pulse/StageTabs'
 import { PageSectionsSkeleton } from '../components/pulse/Skeletons'
 import SummaryOverlay from '../components/SummaryOverlay'
-import AutoGrid from '../components/AutoGrid'
 import { useToast } from '../components/ToastProvider'
 import { useModules } from '../contexts'
-import { fetchModuleStages } from '../lib/moduleStages'
+import { fetchModuleStages, stageMetaFrom } from '../lib/moduleStages'
 import { fetchSubjectsForModule } from '../lib/subjects'
 import { fetchLessonsForModule } from '../lib/lessons'
 import { fetchDriveUrl } from '../lib/siteSettings'
-import { fetchLessonStageMap, stagesOf } from '../lib/lessonStages'
-import { fetchModuleFacets, fetchModuleSummaries } from '../lib/moduleContent'
+import { fetchLessonStageMap, inStage, stagesOf } from '../lib/lessonStages'
+import { fetchModuleFacets, fetchModuleQuestions, fetchModuleSummaries } from '../lib/moduleContent'
+import { fetchSimulatorConfig, simulatorPool } from '../lib/stageSimulator'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
 import { getPreviewUrl } from '../lib/embedUrl'
 import { ModuleIcon, ExamIcon, NotesIcon } from '../lib/medicalIcons'
-import { ExamStageIcon, SmartSummariesIcon, PracticeIcon } from '@/components/ui/tool-icons'
+import { ExamStageIcon, SmartSummariesIcon, PracticeIcon, TargetIcon } from '@/components/ui/tool-icons'
+import { MCQ_ACCENT } from './mcq/mcqShared'
 
 interface PageModule {
   id: string; name: string; icon?: string | null; color: string; status: 'active' | 'completed'
 }
 interface PageSubject { id: string; module_id: string; name: string; icon?: string | null; color?: string | null }
 interface PageLesson { id: string; title: string; icon?: string | null; subject_id: string }
-interface ModuleSummary { id: string; title: string; url: string }
+interface ModuleSummary { id: string; title: string; url: string; exam_stage?: string | null; lesson_id?: string | null }
 interface ExamStage { value: string; title: string; emoji?: string; Icon?: (p: { color: string; size?: number }) => JSX.Element; color: string }
 interface ContentFacet { kind: 'file' | 'question' | 'summary'; item_type: string | null; exam_stage: string | null; lesson_id: string | null }
+interface SimulatorRow { stage: string; subject_id: string; question_count: number }
+
+const countLabel = (n: number) => `${n} question${n === 1 ? '' : 's'}`
 
 export default function ModulePage({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const { moduleId } = useParams()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const showToast = useToast() as (message: string, type?: 'success' | 'error') => void
   const { modules, modulesLoaded, modulesError } = useModules() as { modules: PageModule[]; modulesLoaded: boolean; modulesError: boolean }
   const module = modules.find(m => m.id === moduleId) || null
 
-  const [presentFileTypes, setPresentFileTypes] = useState<Set<string>>(new Set())
   const [loadError, setLoadError] = useState(false)
   const [driveUrl, setDriveUrl] = useState('')
   const [examStages, setExamStages] = useState<ExamStage[]>([])
-  const [stagesWithContent, setStagesWithContent] = useState<Set<string>>(new Set())
   const [subjects, setSubjects] = useState<PageSubject[]>([])
   const [lessons, setLessons] = useState<PageLesson[]>([])
-  const [lessonQuestionIds, setLessonQuestionIds] = useState<Set<string>>(new Set())
-  const [lessonSummaries, setLessonSummaries] = useState<Record<string, ModuleSummary[]>>({})
+  const [facets, setFacets] = useState<ContentFacet[]>([])
+  const [summaries, setSummaries] = useState<ModuleSummary[]>([])
+  const [stageMap, setStageMap] = useState<Record<string, string[]>>({})
+  const [simRows, setSimRows] = useState<SimulatorRow[]>([])
+  const [simStats, setSimStats] = useState({ total: 0, subjects: 0 })
   const [selectedSummary, setSelectedSummary] = useState<ModuleSummary | null>(null)
-  const [hasModuleSummaries, setHasModuleSummaries] = useState<boolean | null>(null)
-  const [hasModuleQuestions, setHasModuleQuestions] = useState<boolean | null>(null)
   const [contentLoaded, setContentLoaded] = useState(false)
 
   useHistoryOverlay(!!selectedSummary, () => setSelectedSummary(null))
+
+  const stagesWithContent = new Set<string>()
+  facets.forEach(row => { stagesOf(row, stageMap).forEach((s: string) => stagesWithContent.add(s)) })
+  const visibleExamStages = examStages.filter(stage => stagesWithContent.has(stage.value))
+
+  const requestedStage = searchParams.get('stage') || 'all'
+  const activeStage = requestedStage !== 'all' && contentLoaded && !visibleExamStages.some(s => s.value === requestedStage)
+    ? 'all'
+    : requestedStage
+  const stageActive = activeStage !== 'all'
 
   useEffect(() => {
     let ignore = false
@@ -66,6 +80,10 @@ export default function ModulePage({ dark }: { dark: boolean }) {
     let ignore = false
 
     setContentLoaded(false)
+    setFacets([])
+    setSummaries([])
+    setSimRows([])
+
     fetchModuleStages(moduleId!).then(result => { if (!ignore) setExamStages(result) })
 
     fetchSubjectsForModule(moduleId!).then(({ subjects, error }) => {
@@ -80,38 +98,44 @@ export default function ModulePage({ dark }: { dark: boolean }) {
       if (error) setLoadError(true)
     })
 
-    // Lesson-linked summaries, for the accordion's inline "Summary" action.
-    fetchModuleSummaries(moduleId!).then(({ data, error }) => {
-      if (ignore) return
-      if (data) {
-        const byLesson: Record<string, ModuleSummary[]> = {}
-        data.forEach((s: any) => { if (s.lesson_id) (byLesson[s.lesson_id] ||= []).push(s) })
-        setLessonSummaries(byLesson)
-      }
-      if (error) setLoadError(true)
-    })
+    fetchSimulatorConfig(moduleId!).then(({ rows }) => { if (!ignore) setSimRows(rows as SimulatorRow[]) })
 
     Promise.all([
       fetchModuleFacets(moduleId!),
+      fetchModuleSummaries(moduleId!),
       fetchLessonStageMap(),
-    ]).then(([facetsRes, stageMapRes]) => {
+    ]).then(([facetsRes, summariesRes, stageMapRes]) => {
       if (ignore) return
+      if (facetsRes.error || summariesRes.error) setLoadError(true)
+      setFacets((facetsRes.data || []) as ContentFacet[])
+      setSummaries((summariesRes.data || []) as ModuleSummary[])
+      setStageMap(stageMapRes.map)
       setContentLoaded(true)
-      if (facetsRes.error) { setLoadError(true); return }
-
-      const rows = (facetsRes.data || []) as ContentFacet[]
-      setPresentFileTypes(new Set(rows.filter(r => r.kind === 'file').map(r => r.item_type as string)))
-      setHasModuleQuestions(rows.some(r => r.kind === 'question'))
-      setHasModuleSummaries(rows.some(r => r.kind === 'summary'))
-      setLessonQuestionIds(new Set(rows.filter(r => r.kind === 'question' && r.lesson_id).map(r => r.lesson_id as string)))
-
-      const stages = new Set<string>()
-      rows.forEach(row => { stagesOf(row, stageMapRes.map).forEach((s: string) => stages.add(s)) })
-      setStagesWithContent(stages)
     })
 
     return () => { ignore = true }
   }, [moduleId])
+
+  useEffect(() => {
+    let ignore = false
+    setSimStats({ total: 0, subjects: 0 })
+    if (!stageActive) return
+    const stageRows = simRows.filter(r => r.stage === activeStage && r.question_count > 0)
+    if (stageRows.length === 0) return
+    fetchModuleQuestions(moduleId!).then(({ data }) => {
+      if (ignore) return
+      const questions = data || []
+      let total = 0
+      let subjectCount = 0
+      stageRows.forEach(r => {
+        const pool = simulatorPool(questions, r.subject_id, activeStage, stageMap).length
+        total += Math.min(r.question_count, pool)
+        if (pool > 0) subjectCount++
+      })
+      setSimStats({ total, subjects: subjectCount })
+    })
+    return () => { ignore = true }
+  }, [moduleId, activeStage, stageActive, simRows, stageMap])
 
   if (!module) return (
     <ModuleNotFoundState
@@ -125,29 +149,56 @@ export default function ModulePage({ dark }: { dark: boolean }) {
     <SummaryOverlay dark={dark} onBack={() => setSelectedSummary(null)} title={selectedSummary.title} url={getPreviewUrl(selectedSummary.url)} />
   )
 
-  const visibleExamStages = examStages.filter(stage => stagesWithContent.has(stage.value))
+  const here = (row: any) => inStage(row, activeStage, stageMap)
+  const stageFacets = facets.filter(here)
+  const stageSummaries = summaries.filter(here)
 
-  function openAllSummaries() {
-    if (hasModuleSummaries === false) { showToast('No summaries added for this module yet'); return }
-    navigate(`/summaries?module=${moduleId}`)
+  const presentFileTypes = new Set(stageFacets.filter(r => r.kind === 'file').map(r => r.item_type as string))
+  const hasQuestions = stageFacets.some(r => r.kind === 'question')
+  const lessonQuestionIds = new Set(stageFacets.filter(r => r.kind === 'question' && r.lesson_id).map(r => r.lesson_id as string))
+
+  const lessonSummaries: Record<string, ModuleSummary[]> = {}
+  const stageLessonIds = new Set<string>()
+  stageSummaries.forEach(s => {
+    if (!s.lesson_id) return
+    ;(lessonSummaries[s.lesson_id] ||= []).push(s)
+    stageLessonIds.add(s.lesson_id)
+  })
+  stageFacets.forEach(r => { if (r.lesson_id) stageLessonIds.add(r.lesson_id) })
+  const visibleLessons = stageActive ? lessons.filter(l => stageLessonIds.has(l.id)) : lessons
+
+  const meta = stageActive ? stageMetaFrom(examStages, activeStage) : null
+  const stageName = meta ? meta.title : 'this module'
+
+  function selectStage(value: string) {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      if (value === 'all') next.delete('stage')
+      else next.set('stage', value)
+      return next
+    }, { replace: true })
+  }
+
+  function openSummaries() {
+    if (contentLoaded && stageSummaries.length === 0) { showToast(`No summaries added for ${stageName} yet`); return }
+    if (stageActive && stageSummaries.length === 1) { setSelectedSummary(stageSummaries[0]); return }
+    navigate(`/summaries?module=${moduleId}${stageActive ? `&stage=${activeStage}` : ''}`)
   }
   function openPractice() {
-    if (hasModuleQuestions === false) { showToast('No questions added for this module yet'); return }
-    navigate(`/mcq?module=${moduleId}`)
+    if (contentLoaded && !hasQuestions) { showToast(`No questions added for ${stageName} yet`); return }
+    navigate(`/mcq?module=${moduleId}${stageActive ? `&stage=${activeStage}` : ''}`)
+  }
+  function openSimulator() {
+    navigate(`/mcq?module=${moduleId}&stage=${activeStage}&simulator=1`)
   }
 
-  const renderStageCard = (stage: ExamStage, i: number) => (
-    <LiquidGlassCard key={stage.value} dark={dark} delay={i * 80}
-      onClick={() => navigate(`/module/${moduleId}/stage/${stage.value}`)}
-      style={{ padding: 'clamp(20px, 2vw, 28px)', textAlign: 'center' }}>
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-        {stage.Icon
-          ? <stage.Icon color={stage.color} size={38} />
-          : <span style={{ fontSize: 'clamp(28px, 3vw, 42px)' }}>{stage.emoji}</span>}
-      </div>
-      <div style={{ ...pulseType.cardTitle, fontSize: 'clamp(13px, 1.1vw, 16px)', color: pt.textPrimary }}>{stage.title}</div>
-    </LiquidGlassCard>
-  )
+  const simulatorVisible = stageActive && simStats.total > 0 && hasQuestions
+  const subjectText = `${simStats.subjects} subject${simStats.subjects === 1 ? '' : 's'}`
+
+  const tabItems = [
+    { value: 'all', title: 'All', color: module.color, Icon: ExamStageIcon },
+    ...visibleExamStages.map(s => ({ value: s.value, title: s.title, color: s.color, emoji: s.emoji, Icon: s.Icon })),
+  ]
 
   return (
     <PageShell dark={dark} backFallback="/" maxWidth={900}>
@@ -155,7 +206,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
           <ModuleIcon value={module.icon} size={52} color={module.color} />
         </div>
-        <h1 style={{ ...pulseType.pageTitle, fontSize: 26, color: module.color, marginBottom: 6 }}>{module.name}</h1>
+        <h1 style={{ ...pulseType.pageTitle, fontSize: 26, color: module.color, marginBottom: 6, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{module.name}</h1>
         <div style={{
           display: 'inline-block',
           background: module.status === 'active' ? 'rgba(74,222,128,0.14)' : (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
@@ -171,12 +222,10 @@ export default function ModulePage({ dark }: { dark: boolean }) {
 
       {visibleExamStages.length > 0 && (
         <div style={{ marginBottom: 32 }}>
-          <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             <ExamStageIcon color={ON_GRADIENT_TOP.muted} size={14} /> Exam Stage
           </h2>
-          <AutoGrid>
-            {visibleExamStages.map(renderStageCard)}
-          </AutoGrid>
+          <StageTabs dark={dark} items={tabItems} active={activeStage} onSelect={selectStage} />
         </div>
       )}
 
@@ -184,7 +233,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
         dark={dark}
         moduleId={moduleId as string}
         subjects={subjects}
-        lessons={lessons}
+        lessons={visibleLessons}
         lessonQuestionIds={lessonQuestionIds}
         lessonSummaries={lessonSummaries}
         onOpenSummary={setSelectedSummary}
@@ -192,17 +241,65 @@ export default function ModulePage({ dark }: { dark: boolean }) {
 
       <StudyMaterialsSection dark={dark} moduleId={moduleId as string} presentFileTypes={presentFileTypes} driveUrl={driveUrl} />
 
+      {simulatorVisible && meta && (
+        <div style={{ marginBottom: 32 }}>
+          <style>{`
+            .sim-sub-short { display: none; }
+            .sim-row { display: flex; align-items: center; gap: 18px; }
+            .sim-icon { width: 60px; height: 60px; border-radius: 18px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+            .sim-text { flex: 1; min-width: 0; }
+            .sim-btn { flex-shrink: 0; white-space: nowrap; padding: 12px 24px; }
+            @media (max-width: 480px) {
+              .sim-sub-full { display: none; }
+              .sim-sub-short { display: inline; }
+              .sim-row { gap: 12px; }
+              .sim-icon { width: 48px; height: 48px; border-radius: 14px; }
+              .sim-btn { padding: 10px 16px; font-size: 13px !important; }
+            }
+          `}</style>
+          <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <TargetIcon color={ON_GRADIENT_TOP.muted} size={14} /> Exam Simulator
+          </h2>
+          <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 24px' }}>
+            <div className="sim-row">
+              <div className="sim-icon" style={{ background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55` }}>
+                <TargetIcon color={MCQ_ACCENT} size={28} />
+              </div>
+              <div className="sim-text">
+                <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>{meta.title} Simulator</div>
+                <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>
+                  <span className="sim-sub-full">{countLabel(simStats.total)} · {subjectText} · new mix each time</span>
+                  <span className="sim-sub-short">{countLabel(simStats.total)} · {subjectText}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={openSimulator}
+                className="sim-btn glass-focus-ring"
+                style={{ background: MCQ_ACCENT, color: '#0f172a', border: 'none', borderRadius: 999, fontWeight: 800, fontSize: 14, fontFamily: pulseFonts.body, cursor: 'pointer' }}
+              >Start →</button>
+            </div>
+          </LiquidGlassCard>
+        </div>
+      )}
+
       <div className="summary-practice-row" style={{ marginBottom: 32 }}>
         <div>
           <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
             <SmartSummariesIcon color={ON_GRADIENT_TOP.muted} size={14} /> Smart Summaries
           </h2>
-          <LiquidGlassCard dark={dark} delay={0} onClick={openAllSummaries} style={{ padding: 24, textAlign: 'center' }}>
+          <LiquidGlassCard dark={dark} delay={0} onClick={openSummaries} style={{ padding: 24, textAlign: 'center' }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
               <NotesIcon color={pt.success} size={30} />
             </div>
-            <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>All Summaries</div>
-            <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>View summaries for this module</div>
+            <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>{stageActive ? 'Summaries' : 'All Summaries'}</div>
+            <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>
+              {!stageActive
+                ? 'View summaries for this module'
+                : stageSummaries.length === 0
+                  ? `${stageName} summaries`
+                  : stageSummaries.length === 1 ? stageSummaries[0].title : `${stageSummaries.length} available`}
+            </div>
           </LiquidGlassCard>
         </div>
 
@@ -215,7 +312,9 @@ export default function ModulePage({ dark }: { dark: boolean }) {
               <ExamIcon color="#e2725b" size={30} />
             </div>
             <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>MCQ Bank</div>
-            <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>Practice questions for this module</div>
+            <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>
+              {stageActive ? `Practice ${stageName} questions` : 'Practice questions for this module'}
+            </div>
           </LiquidGlassCard>
         </div>
       </div>
