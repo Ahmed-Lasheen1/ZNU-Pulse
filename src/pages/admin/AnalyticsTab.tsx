@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../supabase'
 import { getPulseTheme } from '../../premiumTheme'
 import { watchOnlineCount } from '../../lib/onlinePresence'
-import EmptyState from '../../components/pulse/EmptyState'
+import { CardGridSkeleton } from '../../components/pulse/Skeletons'
 import ErrorBanner from '../../components/ErrorBanner'
 import AdminPill from './AdminPill'
 import { StatCard } from './AnalyticsWidgets'
@@ -117,7 +117,7 @@ export default function AnalyticsTab({ dark, modules }: AnalyticsTabProps) {
         ))}
       </div>
 
-      {pending && <EmptyState dark={dark} message="Loading..." />}
+      {pending && <CardGridSkeleton />}
 
       {data && section === 'overview' && <OverviewSection dark={dark} data={data} />}
       {data && section === 'students' && <StudentsSection dark={dark} data={data} />}

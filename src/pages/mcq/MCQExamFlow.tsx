@@ -8,6 +8,7 @@ import QuestionRail from '../../components/QuestionRail'
 import QuestionSourceBadge from '../../components/QuestionSourceBadge'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PulseGlassRow from '../../components/pulse/PulseGlassRow'
+import { GradingSkeleton } from '../../components/pulse/Skeletons'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { FlagIcon, SearchIcon2, LightbulbIcon } from '../../components/ui/tool-icons'
 import { wrapText } from '../../lib/textStyles'
@@ -266,9 +267,7 @@ export default function MCQExamFlow({
           </div>
         )}
 
-        {grading && (
-          <div style={{ textAlign: 'center', padding: 24, color: EXAM_LOW_TEXT, textShadow: EXAM_LOW_SHADOW, fontSize: 14 }}>Grading...</div>
-        )}
+        {grading && <GradingSkeleton />}
 
         {!submitted && !grading && currentQuestion && (
           <>

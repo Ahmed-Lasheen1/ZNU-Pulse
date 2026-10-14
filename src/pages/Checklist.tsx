@@ -102,7 +102,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
 
   const [activeModule, setActiveModule] = useState<string | null>(null)
   const [tasks, setTasks] = useState<ChecklistTask[]>([])
-  const [tasksLoading, setTasksLoading] = useState(false)
+  const [tasksLoading, setTasksLoading] = useState(true)
   const [tasksError, setTasksError] = useState(false)
   const [newTask, setNewTask] = useState('')
   const [newDeadline, setNewDeadline] = useState('')
@@ -115,9 +115,9 @@ export default function Checklist({ dark }: { dark: boolean }) {
   const selectableModules = activeModulesList.length > 0 ? activeModulesList : (modules as any[])
 
   useEffect(() => {
-    if (modulesLoaded && selectableModules.length > 0 && !activeModule) {
-      setActiveModule(selectableModules[0].id)
-    }
+    if (!modulesLoaded) return
+    if (selectableModules.length === 0) setTasksLoading(false)
+    else if (!activeModule) setActiveModule(selectableModules[0].id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules])
 

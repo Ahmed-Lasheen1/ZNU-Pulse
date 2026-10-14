@@ -6,6 +6,10 @@ import { getPulseTheme } from './premiumTheme'
 import { fetchModulesSorted } from './lib/modules'
 import { subscribeOnlinePresence } from './lib/onlinePresence'
 import { migrateGuestDataIfNeeded } from './lib/migrateGuestData'
+import { syncContentVersions } from './lib/contentVersions'
+import { clearAnswerKeyCaches } from './lib/moduleContent'
+import { clearHomeHistory } from './lib/homeData'
+import { flushActiveExam } from './lib/activeExam'
 import { unsubscribeFromPush } from './lib/pushNotifications'
 import { useOncePerSession } from './lib/useOncePerSession'
 import { storageGet, storageSet } from './lib/safeStorage'
@@ -175,6 +179,18 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    const sync = force => syncContentVersions({ force }).then(refChanged => { if (refChanged) loadModules(true) })
+    const onVisible = () => { if (document.visibilityState === 'visible') sync(false) }
+    sync(true)
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('online', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('online', onVisible)
+    }
+  }, [])
+
+  useEffect(() => {
     const unsubscribe = subscribeOnlinePresence()
     return unsubscribe
   }, [])
@@ -222,10 +238,13 @@ export default function App() {
   }, [])
 
   async function signOut() {
+    await flushActiveExam().catch(() => {})
     await unsubscribeFromPush()
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
+    clearHomeHistory()
+    clearAnswerKeyCaches()
   }
 
   const toggleTheme = () => setDark(prev => !prev)

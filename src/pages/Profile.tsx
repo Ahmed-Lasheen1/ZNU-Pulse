@@ -12,7 +12,7 @@ import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import BackButton from '../components/pulse/BackButton'
 import PulseGlassRow from '../components/pulse/PulseGlassRow'
 import NotificationToggle from '../components/pulse/NotificationToggle'
-import LoadingText from '../components/pulse/LoadingText'
+import { ProfileSkeleton, LeaderboardSkeleton } from '../components/pulse/Skeletons'
 import ErrorBanner from '../components/ErrorBanner'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { LeaderboardIcon, ClockIcon } from '../components/ui/tool-icons'
@@ -233,7 +233,7 @@ export default function Profile({ dark }: { dark: boolean }) {
                 </button>
               </LiquidGlassCard>
             ) : loading ? (
-              <LoadingText />
+              <ProfileSkeleton />
             ) : profile ? (
               <div>
                 <div style={{ marginBottom: 16 }}>
@@ -323,7 +323,8 @@ export default function Profile({ dark }: { dark: boolean }) {
             <h2 style={{ ...pulseType.sectionTitle, color: pt.amber, textAlign: 'center', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
               <LeaderboardIcon color={pt.amber} size={20} /> Top 10 Students
             </h2>
-            {leaderboard.length === 0 && (
+            {loading && <LeaderboardSkeleton />}
+            {!loading && leaderboard.length === 0 && (
               <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
                 <p style={{ color: pt.sub }}>No data yet 🚧</p>
               </LiquidGlassCard>

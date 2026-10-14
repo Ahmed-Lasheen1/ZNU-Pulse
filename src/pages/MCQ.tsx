@@ -14,6 +14,7 @@ import { getGuestFlags, toggleGuestFlag, enrichGuestFlagsWithResults, addGuestHi
 import { loadSavedActiveExam, persistActiveExam, clearActiveExam } from '../lib/activeExam'
 import { storageGet, storageSet } from '../lib/safeStorage'
 import { fetchSimulatorConfig, drawSimulator, shuffle } from '../lib/stageSimulator'
+import { clearHomeHistory } from '../lib/homeData'
 import { optionLabels } from './mcq/mcqShared'
 import MCQBrowse from './mcq/MCQBrowse'
 import MCQExamFlow from './mcq/MCQExamFlow'
@@ -520,22 +521,20 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
   const isTutorMode = quizMode === 'practice' || quizMode === 'retry'
 
+  // Grades from the cached answer keys (no network). Falls back to the server only
+  // when the keys aren't available; final scoring and points are always server-side.
   async function tutorGradeAnswer(qi: number, opt: string) {
     const q = quizQuestions[qi]
     if (!q) return
     const sessionId = sessionIdRef.current
-    const response = navigator.onLine ? await supabase.rpc('grade_mcq', { p_answers: [{ id: q.id, answer: opt }] }) : null
 
-    let result: any = null
+    let result: any = (await gradeLocally([q], [opt]))?.[q.id] ?? null
     let serverRejected = false
-    if (response && !response.error) {
-      const graded = response.data?.[0]
+    if (!result && navigator.onLine) {
+      const response = await supabase.rpc('grade_mcq', { p_answers: [{ id: q.id, answer: opt }] })
+      const graded = response.error ? null : response.data?.[0]
       if (graded) result = { is_correct: graded.is_correct, correct_answer: graded.correct_answer, explanation: graded.explanation }
-      else serverRejected = true
-    } else if (!response || isTransientFailure(response)) {
-      result = (await gradeLocally([q], [opt]))?.[q.id] ?? null
-    } else {
-      serverRejected = true
+      else serverRejected = !isTransientFailure(response)
     }
 
     gradingInFlightRef.current.delete(qi)
@@ -631,7 +630,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
       if (!response.error) {
         resultMap = toResultMap(response.data)
-        if (user) fetchProfile(user.id)
+        if (user) { fetchProfile(user.id); clearHomeHistory() }
       } else if (!isTransientFailure(response)) {
         setGrading(false)
         showToast('⚠️ Could not submit — check your connection and try again', 'error')

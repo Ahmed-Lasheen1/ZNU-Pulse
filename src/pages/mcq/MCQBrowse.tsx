@@ -8,7 +8,7 @@ import TabRow from '../../components/TabRow'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PageShell from '../../components/pulse/PageShell'
 import PulseGlassRow from '../../components/pulse/PulseGlassRow'
-import LoadingText from '../../components/pulse/LoadingText'
+import { CardRowsSkeleton } from '../../components/pulse/Skeletons'
 import { ModuleIcon, ExamIcon } from '../../lib/medicalIcons'
 import { OfflineIcon, BookIcon, PauseIcon, PlayIcon, EmptyBoxIcon, GraduationCapIcon, TargetIcon } from '../../components/ui/tool-icons'
 import { MCQ_ACCENT, EXAM_LOW_SHADOW } from './mcqShared'
@@ -398,8 +398,6 @@ export default function MCQBrowse({
         />
       )}
 
-      {loading && <LoadingText />}
-
       {!mockHidden && (
         <div style={{ marginBottom: 32 }}>
           <LiquidGlassCard dark={dark} delay={0} style={{ padding: '22px 24px 20px' }}>
@@ -486,6 +484,7 @@ export default function MCQBrowse({
             onPracticeLesson={handlePracticeLesson}
           />
         ))}
+        {loading && subjectRows.length === 0 && <CardRowsSkeleton count={3} label="Loading subjects" />}
         {subjectRows.length === 0 && !loading && (
           <LiquidGlassCard dark={dark} delay={0} style={{ padding: 24, textAlign: 'center' }}>
             <p style={{ color: pt.sub, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>

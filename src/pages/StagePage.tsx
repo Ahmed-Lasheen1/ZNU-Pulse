@@ -8,6 +8,7 @@ import ModuleNotFoundState from '../components/pulse/ModuleNotFoundState'
 import EntityPageHeader from '../components/pulse/EntityPageHeader'
 import StudyMaterialsSection from '../components/pulse/StudyMaterialsSection'
 import StudyByLessonSection from '../components/pulse/StudyByLessonSection'
+import { PageSectionsSkeleton } from '../components/pulse/Skeletons'
 import SummaryOverlay from '../components/SummaryOverlay'
 import { useToast } from '../components/ToastProvider'
 import { useModules } from '../contexts'
@@ -185,6 +186,8 @@ export default function StagePage({ dark }: { dark: boolean }) {
         moduleIcon={module.icon}
         moduleName={module.name}
       />
+
+      {!summariesLoaded && <PageSectionsSkeleton tiles={2} />}
 
       <StudyMaterialsSection dark={dark} moduleId={moduleId as string} presentFileTypes={presentFileTypes} driveUrl={driveUrl} />
 

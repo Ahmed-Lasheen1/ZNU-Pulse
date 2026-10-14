@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { getPulseTheme } from '../../premiumTheme'
 import ErrorBanner from '../../components/ErrorBanner'
 import EmptyState from '../../components/pulse/EmptyState'
+import { CardRowsSkeleton } from '../../components/pulse/Skeletons'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import { groupHeading, LIST_LIMIT } from './adminStyles'
 import type { AdminModule } from './adminTypes'
@@ -34,7 +35,7 @@ export default function AdminGroupedList<T>({
         </p>
       )}
 
-      {loading && <EmptyState dark={dark} message="Loading..." />}
+      {loading && <CardRowsSkeleton count={3} label={`Loading ${noun}`} />}
       {!loading && items.length === 0 && <EmptyState dark={dark} message={emptyMessage} />}
 
       {!loading && modules.map(mod => {

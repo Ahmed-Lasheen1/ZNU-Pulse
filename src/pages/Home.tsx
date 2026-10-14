@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown } from 'lucide-react'
 import { useAuth, useModules, useHomeEntrance } from '../contexts'
 import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP, ON_GRADIENT_BOTTOM } from '../premiumTheme'
-import { supabase } from '../supabase'
 import ErrorBanner from '../components/ErrorBanner'
 import { computeStreak } from '../lib/streak'
 import { getGuestHistory } from '../lib/reviewStorage'
@@ -21,6 +20,8 @@ import { ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, PauseIcon, Li
 import { NumberTicker } from '@/components/ui/number-ticker'
 import { ModuleIcon } from '../lib/medicalIcons'
 import { accuracyTier, accuracyColor, type AccuracyTier } from './mcq/mcqShared'
+import { fetchHomeAnnouncement, fetchHomeHistory } from '../lib/homeData'
+import { ReportGridSkeleton, CardRowsSkeleton } from '../components/pulse/Skeletons'
 
 interface HomeModule {
   id: string; name: string; icon?: string | null; color: string; status: 'active' | 'completed'
@@ -89,6 +90,7 @@ export default function Home({ dark }: { dark: boolean }) {
   const [streak, setStreak] = useState(0)
   const [pausedExam, setPausedExam] = useState(false)
   const [weeklySummary, setWeeklySummary] = useState<WeeklySummary | null>(null)
+  const [reportLoading, setReportLoading] = useState(true)
 
   const [archiveOpen, setArchiveOpen] = useState(false)
 
@@ -104,28 +106,20 @@ export default function Home({ dark }: { dark: boolean }) {
   const [playEntrance] = useState(entranceNow)
 
   useEffect(() => {
-    supabase.from('site_settings').select('value').eq('key', 'home_announcement').maybeSingle()
-      .then(({ data }) => { if (data?.value) setAnnouncement(data.value) })
+    let ignore = false
+    fetchHomeAnnouncement(value => { if (!ignore) setAnnouncement(value) })
+      .then(({ data }) => { if (!ignore) setAnnouncement(data?.value || '') })
+    return () => { ignore = true }
   }, [])
 
   // One exam_history fetch serves both the streak and the weekly summary.
   useEffect(() => {
     let ignore = false
     async function loadStreakAndWeeklySummary() {
+      setReportLoading(true)
       const weekAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000
 
-      let rows: any[]
-      if (user) {
-        const { data } = await supabase
-          .from('exam_history')
-          .select('completed_at, total, correct, subject_id')
-          .eq('user_id', user.id)
-          .order('completed_at', { ascending: false })
-          .limit(HOME_HISTORY_LIMIT)
-        rows = data || []
-      } else {
-        rows = getGuestHistory()
-      }
+      const rows: any[] = user ? await fetchHomeHistory(user.id, HOME_HISTORY_LIMIT) : getGuestHistory()
       if (ignore) return
 
       setStreak(computeStreak(rows.map((r: any) => r.completed_at)))
@@ -135,7 +129,7 @@ export default function Home({ dark }: { dark: boolean }) {
         return ts >= weekAgoMs
       })
 
-      if (weeklyRows.length === 0) { setWeeklySummary(null); return }
+      if (weeklyRows.length === 0) { setWeeklySummary(null); setReportLoading(false); return }
 
       const totalAttempted = weeklyRows.reduce((a, h) => a + h.total, 0)
       const totalCorrect = weeklyRows.reduce((a, h) => a + h.correct, 0)
@@ -154,6 +148,7 @@ export default function Home({ dark }: { dark: boolean }) {
 
       if (ignore) return
       setWeeklySummary({ totalAttempted, accuracy, topSubjectName })
+      setReportLoading(false)
     }
     loadStreakAndWeeklySummary()
     return () => { ignore = true }
@@ -286,7 +281,8 @@ export default function Home({ dark }: { dark: boolean }) {
                       Weekly Report
                     </div>
                   </div>
-                  <div className="pulse-report-grid">
+                  {reportLoading && <ReportGridSkeleton />}
+                  <div className="pulse-report-grid" style={reportLoading ? { display: 'none' } : undefined}>
                     <div>
                       <div style={{
                         ...statNumStyle,
@@ -380,6 +376,7 @@ export default function Home({ dark }: { dark: boolean }) {
                   Active Modules
                 </motion.div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {!modulesLoaded && <CardRowsSkeleton count={2} pill label="Loading modules" />}
                   {modulesLoaded && activeModules.length === 0 && (
                     <motion.div
                       initial={playEntrance ? { opacity: 0, y: 16 } : false}

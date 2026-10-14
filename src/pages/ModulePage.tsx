@@ -7,6 +7,7 @@ import PageShell from '../components/pulse/PageShell'
 import ModuleNotFoundState from '../components/pulse/ModuleNotFoundState'
 import StudyMaterialsSection from '../components/pulse/StudyMaterialsSection'
 import StudyByLessonSection from '../components/pulse/StudyByLessonSection'
+import { PageSectionsSkeleton } from '../components/pulse/Skeletons'
 import SummaryOverlay from '../components/SummaryOverlay'
 import AutoGrid from '../components/AutoGrid'
 import { useToast } from '../components/ToastProvider'
@@ -51,6 +52,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   const [selectedSummary, setSelectedSummary] = useState<ModuleSummary | null>(null)
   const [hasModuleSummaries, setHasModuleSummaries] = useState<boolean | null>(null)
   const [hasModuleQuestions, setHasModuleQuestions] = useState<boolean | null>(null)
+  const [contentLoaded, setContentLoaded] = useState(false)
 
   useHistoryOverlay(!!selectedSummary, () => setSelectedSummary(null))
 
@@ -63,6 +65,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   useEffect(() => {
     let ignore = false
 
+    setContentLoaded(false)
     fetchModuleStages(moduleId!).then(result => { if (!ignore) setExamStages(result) })
 
     fetchSubjectsForModule(moduleId!).then(({ subjects, error }) => {
@@ -93,6 +96,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
       fetchLessonStageMap(),
     ]).then(([facetsRes, stageMapRes]) => {
       if (ignore) return
+      setContentLoaded(true)
       if (facetsRes.error) { setLoadError(true); return }
 
       const rows = (facetsRes.data || []) as ContentFacet[]
@@ -162,6 +166,8 @@ export default function ModulePage({ dark }: { dark: boolean }) {
           {module.status === 'active' ? '● Active' : '✓ Completed'}
         </div>
       </div>
+
+      {!contentLoaded && <PageSectionsSkeleton />}
 
       {visibleExamStages.length > 0 && (
         <div style={{ marginBottom: 32 }}>

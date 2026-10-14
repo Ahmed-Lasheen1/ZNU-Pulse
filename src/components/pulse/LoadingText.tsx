@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 
-const STYLES = `
+export const SKELETON_STYLES = `
   @keyframes skeletonFadeIn { from { opacity: 0 } to { opacity: 1 } }
   @keyframes skeletonPulse { 0%, 100% { opacity: 0.55 } 50% { opacity: 1 } }
   .pulse-skeleton { animation: skeletonFadeIn 0.25s ease 0.15s both; }
@@ -13,7 +13,7 @@ const block: CSSProperties = { background: 'rgba(255,255,255,0.28)', borderRadiu
 export default function LoadingText({ label = 'Loading...' }: { label?: string }) {
   return (
     <div className="pulse-skeleton" role="status" aria-label={label} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <style>{STYLES}</style>
+      <style>{SKELETON_STYLES}</style>
       {[0, 1, 2].map(i => (
         <div key={i} style={{
           display: 'flex', alignItems: 'center', gap: 14, padding: '16px 20px', borderRadius: 18,

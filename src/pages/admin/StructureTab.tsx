@@ -4,6 +4,7 @@ import { supabase } from '../../supabase'
 import { getPulseTheme } from '../../premiumTheme'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import EmptyState from '../../components/pulse/EmptyState'
+import { CardRowsSkeleton } from '../../components/pulse/Skeletons'
 import { useToast } from '../../components/ToastProvider'
 import { ModuleIcon } from '../../lib/medicalIcons'
 import AdminSplitLayout from './AdminSplitLayout'
@@ -371,7 +372,7 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
 
   const list = (
     <div>
-      {loading && <EmptyState dark={dark} message="Loading..." />}
+      {loading && <CardRowsSkeleton count={4} label="Loading structure" />}
       {!loading && modules.length === 0 && (
         <EmptyState dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No modules yet — add one on the left</>} />
       )}

@@ -1,6 +1,6 @@
 import { supabase } from '../supabase'
 import { fetchAllRows } from './fetchAllRows'
-import { cachedQuery, MINUTE } from './dataCache'
+import { cachedQuery, invalidateCache, MINUTE } from './dataCache'
 import { idbKeys, idbDelete } from './idb'
 import { storageRemove } from './safeStorage'
 
@@ -81,4 +81,13 @@ export async function pruneModuleCaches(validModuleIds) {
     const prefix = typeof key === 'string' ? KEY_PREFIXES.find(p => key.startsWith(p)) : null
     if (prefix && !validModuleIds.has(key.slice(prefix.length))) idbDelete(key)
   })
+}
+
+export function invalidateModuleContent(moduleId) {
+  KEY_PREFIXES.forEach(prefix => invalidateCache(`${prefix}${moduleId}`))
+}
+
+export async function clearAnswerKeyCaches() {
+  const keys = await idbKeys()
+  keys.forEach(key => { if (typeof key === 'string' && key.startsWith(ANSWER_KEYS)) invalidateCache(key) })
 }

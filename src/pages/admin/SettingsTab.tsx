@@ -8,6 +8,7 @@ import AdminFormCard from './AdminFormCard'
 import { inStyle as adminInStyle, fieldLabel } from './adminStyles'
 import { useAdminMessage } from './useAdminMessage'
 import { invalidateDriveUrlCache } from '../../lib/siteSettings'
+import { invalidateHomeAnnouncement } from '../../lib/homeData'
 import { MegaphoneIcon, SendIcon, LinkIcon } from '../../components/ui/tool-icons'
 
 interface SettingsTabProps {
@@ -43,6 +44,7 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
     setAnnouncementSaving(true)
     const { error } = await supabase.from('site_settings').upsert({ key: 'home_announcement', value: announcement.trim() })
     setAnnouncementSaving(false)
+    if (!error) invalidateHomeAnnouncement()
     showMessage(error ? '❌ ' + error.message : '✅ Announcement updated!')
   }
 

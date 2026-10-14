@@ -3,10 +3,16 @@ import { idbGet, idbSet, idbDelete } from './idb'
 import { getGuestActiveExam, saveGuestActiveExam, clearGuestActiveExam } from './reviewStorage'
 
 const localKey = user => `active-exam:${user.id}`
+const SERVER_SAVE_INTERVAL_MS = 15000
+
+let pending = null
+let timer = null
+let lastServerSave = 0
+let epoch = 0
 
 // Paused-exam persistence. Signed-in users keep a copy on the device so progress
-// survives reloads without a connection; it is uploaded whenever possible.
-// Guests use localStorage.
+// survives reloads without a connection; the server copy is uploaded at most every
+// 15s (and when the page is hidden). Guests use localStorage.
 export async function loadSavedActiveExam(user) {
   if (!user) return getGuestActiveExam()
 
@@ -48,23 +54,45 @@ export async function hasSavedActiveExam(user) {
   return error ? !!local : (count || 0) > 0
 }
 
-export async function persistActiveExam(user, payload) {
-  if (!user) {
-    saveGuestActiveExam(payload)
-    return
-  }
-  const key = localKey(user)
-  await idbSet(key, { payload, synced: false })
+async function uploadActiveExam({ user, payload }) {
+  lastServerSave = Date.now()
   const { error } = await supabase.from('active_exams').upsert(
     { user_id: user.id, exam_data: payload, updated_at: new Date().toISOString() },
     { onConflict: 'user_id' }
   )
   if (error) return
+  const key = localKey(user)
   const current = await idbGet(key)
   if (current?.payload?.savedAt === payload.savedAt) await idbSet(key, { payload, synced: true })
 }
 
+export function flushActiveExam() {
+  clearTimeout(timer)
+  timer = null
+  const job = pending
+  pending = null
+  return job ? uploadActiveExam(job) : Promise.resolve()
+}
+
+export async function persistActiveExam(user, payload) {
+  if (!user) {
+    saveGuestActiveExam(payload)
+    return
+  }
+  const mine = epoch
+  await idbSet(localKey(user), { payload, synced: false })
+  if (mine !== epoch) return
+  pending = { user, payload }
+  const wait = lastServerSave + SERVER_SAVE_INTERVAL_MS - Date.now()
+  if (wait <= 0) await flushActiveExam()
+  else if (!timer) timer = setTimeout(flushActiveExam, wait)
+}
+
 export async function clearActiveExam(user) {
+  clearTimeout(timer)
+  timer = null
+  pending = null
+  epoch++
   if (!user) {
     clearGuestActiveExam()
     return
@@ -73,4 +101,9 @@ export async function clearActiveExam(user) {
   await idbSet(key, { cleared: true, clearedAt: Date.now() })
   const { error } = await supabase.from('active_exams').delete().eq('user_id', user.id)
   if (!error) await idbDelete(key)
+}
+
+if (typeof window !== 'undefined') {
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushActiveExam() })
+  window.addEventListener('pagehide', () => { flushActiveExam() })
 }
