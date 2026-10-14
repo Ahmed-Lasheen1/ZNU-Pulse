@@ -10,12 +10,15 @@ import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PageShell from '../components/pulse/PageShell'
 import PageIntro from '../components/pulse/PageIntro'
 import LoadingText from '../components/pulse/LoadingText'
+import OfflineNote from '../components/pulse/OfflineNote'
 import ErrorBanner from '../components/ErrorBanner'
 import TabRow from '../components/TabRow'
 import NotifyPermissionButton from '../components/NotifyPermissionButton'
 import { useToast } from '../components/ToastProvider'
 import { showLocalNotification } from '../lib/localNotification'
 import { storageGet, storageSet } from '../lib/safeStorage'
+import { networkFirst, saveCached } from '../lib/dataCache'
+import { listChecklistOps, queueChecklistOp, applyChecklistOps, subscribeChecklistOutbox } from '../lib/checklistOutbox'
 import { ChecklistIcon, LightbulbIcon, CalendarDotIcon, WarningIcon, ClockIcon, CelebrationIcon, TrashIcon, BookIcon, CheckCircleIcon } from '../components/ui/tool-icons'
 import type { ChecklistTask } from '../types/checklist'
 
@@ -108,6 +111,9 @@ export default function Checklist({ dark }: { dark: boolean }) {
   const [newDeadline, setNewDeadline] = useState('')
   const [addingTask, setAddingTask] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
+  const [savedCopy, setSavedCopy] = useState(false)
+  const [pendingCount, setPendingCount] = useState(0)
+  const [syncTick, setSyncTick] = useState(0)
 
   const activeModulesList = (modules as any[]).filter(m => m.status === 'active')
   // Falls back to any module if none are active, so the page never gets
@@ -130,6 +136,8 @@ export default function Checklist({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modulesError])
 
+  useEffect(() => subscribeChecklistOutbox(() => setSyncTick(t => t + 1)), [])
+
   useEffect(() => {
     if (!activeModule) return
     let ignore = false
@@ -138,16 +146,29 @@ export default function Checklist({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeModule, user])
 
+  useEffect(() => {
+    if (syncTick === 0 || !activeModule || !user) return
+    let ignore = false
+    fetchTasks(() => ignore, true)
+    return () => { ignore = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncTick])
+
   useEffect(() => { setShowCompleted(false) }, [activeModule])
 
-  async function fetchTasks(isIgnored: () => boolean = () => false) {
+  const cacheKey = () => `user:${user?.id}:checklist:${activeModule}`
+
+  async function fetchTasks(isIgnored: () => boolean = () => false, silent = false) {
     setTasksError(false)
-    setTasksLoading(true)
+    if (!silent) setTasksLoading(true)
     if (user) {
-      const { data, error } = await supabase.from('user_checklist')
-        .select('*').eq('user_id', user.id).eq('module_id', activeModule).order('created_at')
+      const { data, error, fromCache } = await networkFirst(cacheKey(), () => supabase.from('user_checklist')
+        .select('*').eq('user_id', user.id).eq('module_id', activeModule).order('created_at'))
+      const ops = await listChecklistOps(user.id)
       if (isIgnored()) return
-      setTasks((data || []) as ChecklistTask[])
+      setTasks(applyChecklistOps((data || []) as ChecklistTask[], ops, activeModule as string))
+      setSavedCopy(fromCache)
+      setPendingCount(ops.length)
       if (error) setTasksError(true)
     } else {
       let saved: ChecklistTask[] = []
@@ -158,60 +179,69 @@ export default function Checklist({ dark }: { dark: boolean }) {
       }
       if (isIgnored()) return
       setTasks(saved)
+      setSavedCopy(false)
+      setPendingCount(0)
     }
     setTasksLoading(false)
   }
 
+  async function sendOp(op: any) {
+    const result = await queueChecklistOp(user!.id, op)
+    setPendingCount(result.pending)
+    if (result.rejected.length > 0) {
+      showToast("❌ Couldn't save that change — try again", 'error')
+      fetchTasks(() => false, true)
+    }
+    return result
+  }
+
   async function addTask() {
     if (!newTask.trim() || addingTask) return
-    setAddingTask(true)
-    if (user) {
-      const { data, error } = await supabase.from('user_checklist').insert([{
-        user_id: user.id, module_id: activeModule,
-        text: newTask.trim(), done: false,
-        deadline: newDeadline || null
-      }]).select().single()
-      setAddingTask(false)
-      if (error || !data) {
-        showToast('❌ Could not add task — try again', 'error')
-        return
-      }
-      setTasks(prev => [...prev, data as ChecklistTask])
-    } else {
-      const task: ChecklistTask = {
-        id: crypto.randomUUID(), text: newTask.trim(), done: false,
-        module_id: activeModule as string, deadline: newDeadline || null
-      }
-      setTasks(prev => {
-        const updated = [...prev, task]
-        storageSet(`checklist_${activeModule}`, JSON.stringify(updated))
-        return updated
-      })
-      setAddingTask(false)
+    const task: ChecklistTask = {
+      id: crypto.randomUUID(), text: newTask.trim(), done: false,
+      module_id: activeModule as string, deadline: newDeadline || null
     }
+    const updated = [...tasks, task]
+    setAddingTask(true)
+    setTasks(updated)
     setNewTask('')
     setNewDeadline('')
+
+    if (user) {
+      saveCached(cacheKey(), updated)
+      const result = await sendOp({ type: 'add', task })
+      setAddingTask(false)
+      if (result.rejected.length > 0) return
+      if (result.pending > 0) showToast("Saved on this device — it will sync when you're online", 'info')
+      else showToast('✅ Task added')
+      return
+    }
+
+    storageSet(`checklist_${activeModule}`, JSON.stringify(updated))
+    setAddingTask(false)
     showToast('✅ Task added')
   }
 
   async function toggleTask(task: ChecklistTask) {
-    if (user) {
-      const { error } = await supabase.from('user_checklist').update({ done: !task.done }).eq('id', task.id)
-      if (error) { showToast('❌ Could not update task — try again', 'error'); return }
-    }
     const updated = tasks.map(t => t.id === task.id ? { ...t, done: !t.done } : t)
     setTasks(updated)
-    if (!user) storageSet(`checklist_${activeModule}`, JSON.stringify(updated))
+    if (user) {
+      saveCached(cacheKey(), updated)
+      await sendOp({ type: 'toggle', id: task.id, done: !task.done })
+    } else {
+      storageSet(`checklist_${activeModule}`, JSON.stringify(updated))
+    }
   }
 
   async function deleteTask(task: ChecklistTask) {
-    if (user) {
-      const { error } = await supabase.from('user_checklist').delete().eq('id', task.id)
-      if (error) { showToast('❌ Could not delete task — try again', 'error'); return }
-    }
     const updated = tasks.filter(t => t.id !== task.id)
     setTasks(updated)
-    if (!user) storageSet(`checklist_${activeModule}`, JSON.stringify(updated))
+    if (user) {
+      saveCached(cacheKey(), updated)
+      await sendOp({ type: 'delete', id: task.id })
+    } else {
+      storageSet(`checklist_${activeModule}`, JSON.stringify(updated))
+    }
   }
 
   // Per-module key so one module's popup doesn't use up the day's slot for another.
@@ -322,6 +352,15 @@ export default function Checklist({ dark }: { dark: boolean }) {
       `}</style>
 
       {(modulesError || tasksError) && <ErrorBanner />}
+
+      {(pendingCount > 0 || savedCopy) && (
+        <OfflineNote
+          dark={dark}
+          message={pendingCount > 0
+            ? `${pendingCount} change${pendingCount === 1 ? '' : 's'} saved on this device — will sync when you're back online.`
+            : "You're offline — showing your last saved checklist."}
+        />
+      )}
 
       <PageIntro dark={dark} emoji={<ChecklistIcon color={ON_GRADIENT_TOP.primary} size={40} />} title="Checklist" subtitle="Track what's left before exam day" />
 

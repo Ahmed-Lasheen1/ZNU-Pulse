@@ -1,7 +1,7 @@
 // src/App.jsx
 import { useState, useEffect, useRef, Suspense, lazy } from 'react'
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
-import { supabase } from './supabase'
+import { supabase, AUTH_STORAGE_KEY } from './supabase'
 import { getPulseTheme } from './premiumTheme'
 import { fetchModulesSorted } from './lib/modules'
 import { subscribeOnlinePresence } from './lib/onlinePresence'
@@ -9,6 +9,7 @@ import { migrateGuestDataIfNeeded } from './lib/migrateGuestData'
 import { syncContentVersions } from './lib/contentVersions'
 import { clearAnswerKeyCaches } from './lib/moduleContent'
 import { clearHomeHistory } from './lib/homeData'
+import { networkFirst, clearUserCaches } from './lib/dataCache'
 import { flushActiveExam } from './lib/activeExam'
 import { unsubscribeFromPush } from './lib/pushNotifications'
 import { useOncePerSession } from './lib/useOncePerSession'
@@ -48,6 +49,15 @@ const Admin = lazy(() => import('./pages/Admin'))
 function prefetchPages() {
   if (navigator.connection?.saveData) return
   Object.values(pageLoaders).forEach(load => load().catch(() => {}))
+}
+
+// An expired token can't be refreshed offline, so getSession() returns nothing even though the student is signed in.
+function readStoredUser() {
+  try {
+    return JSON.parse(storageGet(AUTH_STORAGE_KEY) || 'null')?.user ?? null
+  } catch {
+    return null
+  }
 }
 
 const ensureProfileInFlight = new Set()
@@ -196,7 +206,10 @@ export default function App() {
   }, [])
 
   async function fetchProfile(userId) {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
+    const { data } = await networkFirst(
+      `user:${userId}:profile`,
+      () => supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
+    )
     if (data) setProfile(data)
   }
 
@@ -208,6 +221,10 @@ export default function App() {
 
   async function handleSignedIn(sessionUser) {
     if (lastHandledUserIdRef.current === sessionUser.id) return
+    if (!navigator.onLine) {
+      await fetchProfile(sessionUser.id)
+      return
+    }
     lastHandledUserIdRef.current = sessionUser.id
     await ensureProfile(sessionUser)
     await fetchProfile(sessionUser.id)
@@ -217,21 +234,23 @@ export default function App() {
   useEffect(() => {
     async function initSession() {
       const { data: { session } } = await supabase.auth.getSession()
-      setUser(session?.user ?? null)
-      if (session?.user) await handleSignedIn(session.user)
+      const sessionUser = session?.user ?? (!navigator.onLine ? readStoredUser() : null)
+      setUser(sessionUser)
+      if (sessionUser) await handleSignedIn(sessionUser)
       cleanUpAuthHash()
       setAuthLoaded(true)
     }
     initSession()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         setUser(session.user)
         setTimeout(() => { handleSignedIn(session.user).finally(cleanUpAuthHash) }, 0)
-      } else {
+      } else if (event === 'SIGNED_OUT') {
         lastHandledUserIdRef.current = null
         setUser(null)
         setProfile(null)
+        clearUserCaches()
       }
     })
     return () => subscription.unsubscribe()
@@ -245,6 +264,7 @@ export default function App() {
     setProfile(null)
     clearHomeHistory()
     clearAnswerKeyCaches()
+    clearUserCaches()
   }
 
   const toggleTheme = () => setDark(prev => !prev)

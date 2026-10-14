@@ -12,6 +12,9 @@ import PageShell from '../components/pulse/PageShell'
 import PageIntro from '../components/pulse/PageIntro'
 import EmptyState from '../components/pulse/EmptyState'
 import LoadingText from '../components/pulse/LoadingText'
+import OfflineNote from '../components/pulse/OfflineNote'
+import { useToast } from '../components/ToastProvider'
+import { networkFirst } from '../lib/dataCache'
 import { getDriveOrRawUrl } from '../lib/embedUrl'
 import { useModules } from '../contexts'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
@@ -46,6 +49,7 @@ type ScheduleType = 'study' | 'exam'
 export default function Schedule({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const location = useLocation()
+  const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
   const { modules, modulesLoaded, modulesError } = useModules() as {
     modules: ScheduleModule[]
     modulesLoaded: boolean
@@ -63,6 +67,7 @@ export default function Schedule({ dark }: { dark: boolean }) {
   const [loading, setLoading] = useState(true)
   const [viewer, setViewer] = useState<ScheduleRow | null>(null)
   const [loadError, setLoadError] = useState(false)
+  const [savedCopy, setSavedCopy] = useState(false)
 
   // Remember what's been applied so later re-renders can't revert a manual tab or reopen a closed viewer.
   const appliedModuleParamRef = useRef<string | null>(null)
@@ -96,9 +101,11 @@ export default function Schedule({ dark }: { dark: boolean }) {
     async function fetchData() {
       setLoading(true)
       setLoadError(false)
-      const { data, error } = await supabase.from('schedules').select('*').eq('module_id', activeModule).order('created_at')
+      const { data, error, fromCache } = await networkFirst(`schedules:${activeModule}`, () =>
+        supabase.from('schedules').select('*').eq('module_id', activeModule).order('created_at'))
       if (ignore) return
       if (data) setSchedules(data as ScheduleRow[])
+      setSavedCopy(fromCache)
       if (error) setLoadError(true)
       setLoading(false)
     }
@@ -116,12 +123,22 @@ export default function Schedule({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemParam, schedules])
 
+  // Schedule images are Drive links, so they can't load without a connection.
+  function openSchedule(sch: ScheduleRow) {
+    if (!navigator.onLine) {
+      showToast("Schedule images need a connection — try again when you're online", 'info')
+      return
+    }
+    setViewer(sch)
+  }
+
   const filtered = schedules.filter(s => s.type === activeType)
   const hoverTint = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'
 
   return (
     <PageShell dark={dark} backFallback="/" maxWidth={900}>
       {(loadError || modulesError) && <ErrorBanner />}
+      {savedCopy && <OfflineNote dark={dark} message="You're offline — showing the last saved schedules." />}
 
       {viewer && (
         <MediaOverlay
@@ -189,7 +206,7 @@ export default function Schedule({ dark }: { dark: boolean }) {
                 <LiquidGlassCard
                   dark={dark}
                   delay={i * 90}
-                  onClick={() => setViewer(sch)}
+                  onClick={() => openSchedule(sch)}
                   style={{ borderRadius: 999, padding: '10px 18px 10px 10px', display: 'flex', alignItems: 'center', gap: 14 }}
                 >
                   <div style={{
