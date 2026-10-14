@@ -1,5 +1,6 @@
 import { useOnlineStatus } from '../../lib/useOnlineStatus'
 import { useAttemptSync } from '../../lib/useAttemptSync'
+import { useChecklistSync } from '../../lib/useChecklistSync'
 import { pulseType, ON_GRADIENT_TOP } from '../../premiumTheme'
 import { OfflineIcon } from '../ui/tool-icons'
 import PulseGlassRow from './PulseGlassRow'
@@ -7,6 +8,7 @@ import PulseGlassRow from './PulseGlassRow'
 export default function OfflineStatus({ dark }: { dark: boolean }) {
   const online = useOnlineStatus()
   useAttemptSync()
+  useChecklistSync()
   if (online) return null
 
   return (
