@@ -9,6 +9,7 @@ import PageShell from '../components/pulse/PageShell'
 import PageIntro from '../components/pulse/PageIntro'
 import LoadingText from '../components/pulse/LoadingText'
 import EmptyState from '../components/pulse/EmptyState'
+import OfflineNote from '../components/pulse/OfflineNote'
 import ErrorBanner from '../components/ErrorBanner'
 import NotifyPermissionButton from '../components/NotifyPermissionButton'
 import { useToast } from '../components/ToastProvider'
@@ -17,6 +18,7 @@ import AutoDirText from '../components/AutoDirText'
 import { containsProfanity } from '../lib/moderation'
 import { isSuccessMessage } from '../lib/messageStyle'
 import { storageGet, storageSet } from '../lib/safeStorage'
+import { networkFirst } from '../lib/dataCache'
 import { getMyAnonTokens, addMyAnonToken, getNotifiedTokens, markTokensNotified } from '../lib/anonTracking'
 import { showLocalNotification } from '../lib/localNotification'
 import { AnonQAIcon, QuestionMarkIcon, ClockIcon, CheckCircleIcon, TrashIcon, LightbulbIcon, EmptyBoxIcon } from '../components/ui/tool-icons'
@@ -52,6 +54,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
   const [newQ, setNewQ] = useState('')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
+  const [savedCopy, setSavedCopy] = useState(false)
   const [msg, setMsg] = useState('')
   const [replyText, setReplyText] = useState<Record<string, string>>({})
   const [cooldownRemaining, setCooldownRemaining] = useState(0)
@@ -79,6 +82,12 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
     setCooldownRemaining(remaining)
   }
 
+  function requireOnline() {
+    if (navigator.onLine) return true
+    showToast("You're offline — try again when you're connected", 'info')
+    return false
+  }
+
   // Goes through showLocalNotification() (can't throw on Chrome for Android).
   // Tokens are marked first so a re-run can't announce them twice.
   useEffect(() => {
@@ -100,23 +109,24 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
 
   async function fetchQuestions(isIgnored: () => boolean = () => false) {
     setLoading(true)
-    const { data, error } = await supabase
+    const { data, error, fromCache } = await networkFirst('anon-questions', () => supabase
       .from('anonymous_questions')
       .select('id, question, answer, answered, created_at')
       .order('answered', { ascending: true })
       .order('created_at', { ascending: false })
-      .range(0, RECENT_QUESTIONS_LIMIT - 1)
+      .range(0, RECENT_QUESTIONS_LIMIT - 1))
     if (isIgnored()) return
     if (data) {
       setQuestions(data)
       setHasMore(data.length === RECENT_QUESTIONS_LIMIT)
     }
+    setSavedCopy(fromCache)
     if (error) setLoadError(true)
     setLoading(false)
   }
 
   async function loadMoreQuestions() {
-    if (loadingMore) return
+    if (loadingMore || !requireOnline()) return
     setLoadingMore(true)
     setLoadMoreError(false)
     const { data, error } = await supabase
@@ -136,7 +146,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
   async function fetchMyQuestions(isIgnored: () => boolean = () => false) {
     const myTokens = getMyAnonTokens()
     if (myTokens.length === 0) { if (!isIgnored()) setMyQuestions([]); return }
-    const { data, error } = await supabase.rpc('get_my_anon_questions', { p_tokens: myTokens })
+    const { data, error } = await networkFirst('anon-my-questions', () => supabase.rpc('get_my_anon_questions', { p_tokens: myTokens }))
     if (isIgnored()) return
     if (data) setMyQuestions(data)
     if (error) setLoadError(true)
@@ -146,6 +156,11 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
   // profanity server-side (the client pass is just fast feedback).
   async function submitQuestion() {
     if (!newQ.trim() || submittingRef.current) return
+    if (!navigator.onLine) {
+      setMsg("❌ You're offline — connect to submit your question")
+      setTimeout(() => setMsg(''), 3000)
+      return
+    }
     if (cooldownRemaining > 0) {
       const seconds = Math.ceil(cooldownRemaining / 1000)
       setMsg(`❌ Please wait ${seconds}s before submitting another question`)
@@ -183,7 +198,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
 
   async function submitReply(id: string) {
     const reply = replyText[id]
-    if (!reply?.trim()) return
+    if (!reply?.trim() || !requireOnline()) return
     const { error } = await supabase.from('anonymous_questions').update({ answer: reply, answered: true }).eq('id', id)
     if (error) { showToast('❌ Could not save reply — try again', 'error'); return }
     setReplyText(prev => ({ ...prev, [id]: '' }))
@@ -191,6 +206,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
   }
 
   async function deleteQuestion(id: string) {
+    if (!requireOnline()) return
     const { error } = await supabase.from('anonymous_questions').delete().eq('id', id)
     if (error) { showToast('❌ Could not delete — try again', 'error'); return }
     fetchQuestions()
@@ -209,6 +225,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
       <PageIntro dark={dark} emoji={<AnonQAIcon color={ON_GRADIENT_TOP.primary} size={40} />} title="Anonymous Questions" subtitle="Ask anything anonymously — no one knows who you are!" paddingBottom={16} />
 
       {loadError && <div style={{ marginBottom: 20 }}><ErrorBanner message="Couldn't load questions — check your connection." /></div>}
+      {savedCopy && <OfflineNote dark={dark} message="You're offline — showing the last saved questions." />}
 
       <div style={{ marginBottom: 20 }}>
         <NotifyPermissionButton dark={dark} label="Notify me when my question is answered" />

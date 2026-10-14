@@ -14,8 +14,10 @@ import PageShell from '../components/pulse/PageShell'
 import PageIntro from '../components/pulse/PageIntro'
 import LoadingText from '../components/pulse/LoadingText'
 import EmptyState from '../components/pulse/EmptyState'
+import OfflineNote from '../components/pulse/OfflineNote'
 import { getGuestFlags, getGuestHistory, toggleGuestFlag } from '../lib/reviewStorage'
 import { listPendingAttempts, syncPendingAttempts, discardPendingAttempt, subscribePendingAttempts } from '../lib/offlineAttempts'
+import { networkFirst, saveCached } from '../lib/dataCache'
 import QuestionSourceBadge from '../components/QuestionSourceBadge'
 import { ModuleIcon } from '../lib/medicalIcons'
 import { wrapText } from '../lib/textStyles'
@@ -112,6 +114,7 @@ export default function Review({ dark }: { dark: boolean }) {
   const [flaggedItems, setFlaggedItems] = useState<FlaggedItem[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
+  const [savedCopy, setSavedCopy] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [moduleFilter, setModuleFilter] = useState('all')
 
@@ -125,24 +128,30 @@ export default function Review({ dark }: { dark: boolean }) {
   }, [tab, user, syncTick])
   useEffect(() => { setSearchQuery(''); setModuleFilter('all'); setSelectedHistory(null) }, [tab])
 
+  const flaggedKey = (userId: string) => `user:${userId}:review-flagged`
+
   async function fetchTab(isIgnored: () => boolean = () => false) {
     setLoading(true)
     setLoadError(false)
 
     if (tab === 'history') {
       if (user) {
-        const { data, error } = await supabase
-          .from('exam_history')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('completed_at', { ascending: false })
-          .limit(50)
-        const pending = await listPendingAttempts(user.id)
+        const [historyRes, pending] = await Promise.all([
+          networkFirst(`user:${user.id}:review-history`, () => supabase
+            .from('exam_history')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('completed_at', { ascending: false })
+            .limit(50)),
+          listPendingAttempts(user.id),
+        ])
         if (isIgnored()) return
-        if (error) setLoadError(true)
-        setHistory([...pending.reverse().map(pendingToHistoryRow), ...((data || []) as HistoryRow[])])
+        if (historyRes.error) setLoadError(true)
+        setSavedCopy(historyRes.fromCache)
+        setHistory([...pending.reverse().map(pendingToHistoryRow), ...((historyRes.data || []) as HistoryRow[])])
       } else {
         if (isIgnored()) return
+        setSavedCopy(false)
         setHistory(getGuestHistory() as HistoryRow[])
       }
       if (isIgnored()) return
@@ -151,21 +160,21 @@ export default function Review({ dark }: { dark: boolean }) {
     }
 
     if (user) {
-      const { data, error } = await supabase.from('flagged_questions').select('question_id').eq('user_id', user.id)
+      const { data, error, fromCache } = await networkFirst(flaggedKey(user.id), async () => {
+        const flagRes = await supabase.from('flagged_questions').select('question_id').eq('user_id', user.id)
+        if (flagRes.error) return { data: null, error: flagRes.error }
+        const ids = (flagRes.data || []).map((r: any) => r.question_id)
+        if (ids.length === 0) return { data: [], error: null }
+        return supabase.rpc('get_review_questions', { p_question_ids: ids })
+      })
       if (isIgnored()) return
       if (error) setLoadError(true)
-      const ids = (data || []).map((r: any) => r.question_id)
-      if (ids.length === 0) {
-        setFlaggedItems([])
-      } else {
-        const { data: qData, error: qError } = await supabase.rpc('get_review_questions', { p_question_ids: ids })
-        if (isIgnored()) return
-        if (qError) setLoadError(true)
-        setFlaggedItems(qData || [])
-      }
+      setSavedCopy(fromCache)
+      setFlaggedItems((data || []) as FlaggedItem[])
     } else {
       const local = getGuestFlags()
       if (isIgnored()) return
+      setSavedCopy(false)
       setFlaggedItems(local.map((q: any) => ({ ...q, attempted: !!q.explanation })))
     }
     if (isIgnored()) return
@@ -187,12 +196,15 @@ export default function Review({ dark }: { dark: boolean }) {
   // while the row still exists server-side.
   async function unflag(questionId: string) {
     if (user) {
+      if (!navigator.onLine) { showToast("You're offline — try again when you're connected", 'info'); return }
       const { error } = await supabase.from('flagged_questions').delete().eq('user_id', user.id).eq('question_id', questionId)
       if (error) { showToast('❌ Could not remove flag — try again', 'error'); return }
     } else {
       toggleGuestFlag({ question_id: questionId })
     }
-    setFlaggedItems(prev => prev.filter(i => (i.question_id || i.id) !== questionId))
+    const next = flaggedItems.filter(i => (i.question_id || i.id) !== questionId)
+    setFlaggedItems(next)
+    if (user) saveCached(flaggedKey(user.id), next)
     showToast('Flag removed')
   }
 
@@ -270,6 +282,7 @@ export default function Review({ dark }: { dark: boolean }) {
       </div>
 
       {loadError && <ErrorBanner />}
+      {savedCopy && !loading && <OfflineNote dark={dark} message="You're offline — showing your last saved review data." />}
 
       {!user && (
         <div style={{ marginBottom: SECTION_GAP }}>

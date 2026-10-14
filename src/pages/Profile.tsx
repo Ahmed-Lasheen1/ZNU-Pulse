@@ -7,11 +7,13 @@ import { getPulseTheme, pulseFonts, pulseType } from '../premiumTheme'
 import { glassInput, glassPrimaryBtn, glassGhostBtn } from '../components/pulse/PulseUI'
 import { containsProfanity } from '../lib/moderation'
 import { isSuccessMessage } from '../lib/messageStyle'
+import { networkFirst, saveCached } from '../lib/dataCache'
 import { useToast } from '../components/ToastProvider'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import BackButton from '../components/pulse/BackButton'
 import PulseGlassRow from '../components/pulse/PulseGlassRow'
 import NotificationToggle from '../components/pulse/NotificationToggle'
+import OfflineNote from '../components/pulse/OfflineNote'
 import { ProfileSkeleton, LeaderboardSkeleton } from '../components/pulse/Skeletons'
 import ErrorBanner from '../components/ErrorBanner'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -20,6 +22,7 @@ import { Lock, User, Star, ClipboardList, Pencil, Award } from 'lucide-react'
 
 const MIN_PASSWORD_LENGTH = 8
 const MAX_NAME_LENGTH = 60
+const OFFLINE_MESSAGE = "❌ You're offline — try again when you're connected"
 
 interface Profile {
   id: string
@@ -68,6 +71,7 @@ function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
   const inStyle = { ...glassInput(pt, dark), padding: '13px 20px' }
 
   async function saveName() {
+    if (!navigator.onLine) return setMsg(OFFLINE_MESSAGE)
     if (!name.trim()) return setMsg('❌ Name cannot be empty')
     if (containsProfanity(name)) return setMsg('❌ Please choose an appropriate name — it contains inappropriate words')
     setSaving(true)
@@ -82,6 +86,7 @@ function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
   }
 
   async function savePassword() {
+    if (!navigator.onLine) return setMsg(OFFLINE_MESSAGE)
     if (!newPassword || newPassword.length < MIN_PASSWORD_LENGTH) return setMsg(`❌ Password must be at least ${MIN_PASSWORD_LENGTH} characters`)
     if (newPassword !== confirmPassword) return setMsg('❌ Passwords do not match')
     setSaving(true)
@@ -155,6 +160,7 @@ export default function Profile({ dark }: { dark: boolean }) {
   })
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
+  const [savedCopy, setSavedCopy] = useState(false)
   const [editing, setEditing] = useState(false)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
 
@@ -170,13 +176,14 @@ export default function Profile({ dark }: { dark: boolean }) {
     setLoadError(false)
     const [profileRes, lbRes] = await Promise.all([
       user
-        ? supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
-      supabase.from('profiles').select('name, points').order('points', { ascending: false }).limit(10),
+        ? networkFirst(`user:${user.id}:profile`, () => supabase.from('profiles').select('*').eq('id', user.id).maybeSingle())
+        : Promise.resolve({ data: null, error: null, fromCache: false }),
+      networkFirst('leaderboard', () => supabase.from('profiles').select('name, points').order('points', { ascending: false }).limit(10)),
     ])
     if (isIgnored()) return
     setProfile((profileRes.data as Profile) || null)
     if (lbRes.data) setLeaderboard(lbRes.data as Profile[])
+    setSavedCopy(profileRes.fromCache || lbRes.fromCache)
     if (profileRes.error || lbRes.error) setLoadError(true)
     setLoading(false)
   }
@@ -197,6 +204,7 @@ export default function Profile({ dark }: { dark: boolean }) {
         </div>
 
         {loadError && <div style={{ marginBottom: 16 }}><ErrorBanner message="Couldn't load some data — check your connection." /></div>}
+        {savedCopy && <OfflineNote dark={dark} message="You're offline — showing your last saved profile and leaderboard." />}
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginBottom: 24 }}>
           {(['profile', 'leaderboard'] as const).map(t => {
@@ -293,7 +301,10 @@ export default function Profile({ dark }: { dark: boolean }) {
                   <EditProfileForm
                     profile={profile}
                     dark={dark}
-                    onUpdated={(newName) => setProfile(prev => prev ? { ...prev, name: newName } : prev)}
+                    onUpdated={(newName) => {
+                      setProfile(prev => prev ? { ...prev, name: newName } : prev)
+                      saveCached(`user:${user.id}:profile`, { ...profile, name: newName })
+                    }}
                     onProfileRefresh={() => fetchProfile(user.id)}
                   />
                 )}
