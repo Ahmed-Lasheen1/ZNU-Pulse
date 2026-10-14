@@ -33,7 +33,6 @@ const pageLoaders = {
   Review: () => import('./pages/Review'),
   Summaries: () => import('./pages/Summaries'),
   ModulePage: () => import('./pages/ModulePage'),
-  StagePage: () => import('./pages/StagePage'),
   Auth: () => import('./pages/Auth'),
   Profile: () => import('./pages/Profile'),
   AnonQuestions: () => import('./pages/AnonQuestions'),
@@ -120,6 +119,11 @@ function SiteFooter({ dark }) {
   return <Footer dark={dark} animate={isHome && playEntrance} />
 }
 
+function StageRedirect() {
+  const { moduleId, stage } = useParams()
+  return <Navigate to={`/module/${moduleId}?stage=${encodeURIComponent(stage)}`} replace />
+}
+
 function RoutedContent({ dark }) {
   const location = useLocation()
   return (
@@ -128,7 +132,7 @@ function RoutedContent({ dark }) {
         <Routes>
           <Route path="/" element={<Home dark={dark} />} />
           <Route path="/module/:moduleId" element={<Pages.ModulePage dark={dark} />} />
-          <Route path="/module/:moduleId/stage/:stage" element={<Pages.StagePage dark={dark} />} />
+          <Route path="/module/:moduleId/stage/:stage" element={<StageRedirect />} />
           <Route path="/checklist" element={<Pages.Checklist dark={dark} />} />
           <Route path="/schedule" element={<Pages.Schedule dark={dark} />} />
           <Route path="/files" element={<Pages.FilesPage dark={dark} />} />
