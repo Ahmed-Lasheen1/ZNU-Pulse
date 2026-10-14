@@ -27,6 +27,13 @@ interface Summary {
 interface SummarySubject { id: string; module_id: string; name: string }
 interface ExamStage { value: string; title: string; emoji?: string; Icon?: (p: { color: string; size?: number }) => JSX.Element; color: string }
 
+const PAGE_MAX_WIDTH = 900
+
+// Centered, wrapping tab rows (same treatment as Checklist/Schedule).
+const TAB_ROW_STYLE = {
+  justifyContent: 'center', flexWrap: 'wrap', overflowX: 'visible', rowGap: 10, marginBottom: 16,
+} as const
+
 function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
   mod: SummaryModule; dark: boolean; initialStage?: string; initialSummaryId?: string
 }) {
@@ -88,6 +95,10 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSummaryId, summaries])
 
+  if (selected) return (
+    <SummaryOverlay dark={dark} onBack={() => setSelected(null)} title={selected.title} url={getPreviewUrl(selected.url)} />
+  )
+
   const stagesWithSummaries = new Set(summaries.flatMap(s => stagesOf(s, lessonStageMap)))
   const visibleStages = stages.filter(s => stagesWithSummaries.has(s.value))
 
@@ -96,43 +107,8 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
     (activeSubject === 'all' || s.subject_id === activeSubject)
   )
 
-  if (selected) return (
-    <SummaryOverlay dark={dark} onBack={() => setSelected(null)} title={selected.title} url={getPreviewUrl(selected.url)} />
-  )
-
   return (
-    <PageShell dark={dark} backFallback={`/module/${mod.id}`}>
-      <style>{`
-        .summaries-list-wide {
-          width: 100%; max-width: 900px; margin: 0 auto;
-          display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px;
-        }
-        .summary-card-inner {
-          display: flex; align-items: center; justify-content: space-between;
-          gap: 14px; padding: 18px 22px; min-width: 0;
-        }
-        .summary-card-main { display: flex; align-items: center; gap: 14px; min-width: 0; flex: 1; }
-        .summary-card-icon {
-          width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
-          display: flex; align-items: center; justify-content: center;
-        }
-        .summary-card-text { min-width: 0; flex: 1; }
-        .summary-card-title {
-          display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
-          overflow: hidden; word-break: break-word; overflow-wrap: anywhere;
-        }
-        .summary-card-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .summary-card-open {
-          border-radius: 999px; padding: 6px 14px; font-size: 12px; font-weight: 700; flex-shrink: 0; white-space: nowrap;
-        }
-        @media (max-width: 480px) {
-          .summary-card-inner { padding: 14px; gap: 10px; }
-          .summary-card-main { gap: 10px; }
-          .summary-card-icon { width: 38px; height: 38px; border-radius: 10px; }
-          .summary-card-open { padding: 6px 11px; }
-        }
-      `}</style>
-
+    <PageShell dark={dark} backFallback={`/module/${mod.id}`} maxWidth={PAGE_MAX_WIDTH}>
       <div style={{ textAlign: 'center', padding: '10px 0 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
           <ModuleIcon value={mod.icon} size={44} color={mod.color} />
@@ -159,7 +135,7 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
           onSelect={setActiveStage}
           dark={dark}
           accentColor={mod.color}
-          style={{ marginBottom: 16 }}
+          style={TAB_ROW_STYLE}
         />
       )}
 
@@ -170,7 +146,7 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
           onSelect={setActiveSubject}
           dark={dark}
           accentColor={mod.color}
-          style={{ marginBottom: 20 }}
+          style={{ ...TAB_ROW_STYLE, marginBottom: 20 }}
         />
       )}
 
@@ -180,21 +156,34 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
         <EmptyState dark={dark} icon={<ConstructionIcon color={pt.sub} size={14} />} message="No summaries here yet" />
       )}
 
-      <div className="summaries-list-wide">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {filtered.map((sum, i) => (
-          <LiquidGlassCard key={sum.id} dark={dark} delay={i * 70} onClick={() => setSelected(sum)} style={{ padding: 0 }}>
-            <div className="summary-card-inner">
-              <div className="summary-card-main">
-                <div className="summary-card-icon" style={{ background: `${mod.color}20`, border: `1px solid ${mod.color}40` }}>
-                  <NotesIcon color={mod.color} size={20} />
-                </div>
-                <div className="summary-card-text">
-                  <div className="summary-card-title" style={{ ...pulseType.cardTitle, color: pt.textPrimary, fontSize: 15 }}>{sum.title}</div>
-                  <div className="summary-card-sub" style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2 }}>{mod.name}</div>
-                </div>
-              </div>
-              <div className="summary-card-open" style={{ background: mod.color, color: '#0f172a' }}>Open →</div>
+          <LiquidGlassCard
+            key={sum.id} dark={dark} delay={i * 70} onClick={() => setSelected(sum)}
+            style={{
+              padding: 'clamp(14px, 3vw, 18px) clamp(14px, 3vw, 22px)',
+              display: 'flex', alignItems: 'center', gap: 12,
+            }}
+          >
+            <div style={{
+              width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+              background: `${mod.color}20`, border: `1px solid ${mod.color}40`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <NotesIcon color={mod.color} size={20} />
             </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{
+                ...pulseType.cardTitle, color: pt.textPrimary, fontSize: 15,
+                display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2,
+                overflow: 'hidden', wordBreak: 'break-word', overflowWrap: 'anywhere',
+              }}>{sum.title}</div>
+              <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mod.name}</div>
+            </div>
+            <div style={{
+              background: mod.color, color: '#0f172a', borderRadius: 999,
+              padding: '6px 14px', fontSize: 12, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap',
+            }}>Open →</div>
           </LiquidGlassCard>
         ))}
       </div>
@@ -204,12 +193,8 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
 
 export default function Summaries({ dark }: { dark: boolean }) {
   const { modules, modulesLoaded, modulesError } = useModules() as { modules: SummaryModule[]; modulesLoaded: boolean; modulesError: boolean }
-  const location = useLocation()
-
-  const params = new URLSearchParams(location.search)
+  const params = new URLSearchParams(useLocation().search)
   const moduleParam = params.get('module')
-  const initialStage = params.get('stage') || 'all'
-  const initialSummaryId = params.get('summary') || undefined
 
   const resolvedModule: SummaryModule | null =
     (moduleParam && modules.find(m => m.id === moduleParam)) ||
@@ -217,10 +202,17 @@ export default function Summaries({ dark }: { dark: boolean }) {
     modules[0] ||
     null
 
-  return resolvedModule ? (
-    <ModuleSummaries mod={resolvedModule} dark={dark} initialStage={initialStage} initialSummaryId={initialSummaryId} />
-  ) : (
-    <PageShell dark={dark} backFallback="/">
+  if (resolvedModule) return (
+    <ModuleSummaries
+      mod={resolvedModule}
+      dark={dark}
+      initialStage={params.get('stage') || 'all'}
+      initialSummaryId={params.get('summary') || undefined}
+    />
+  )
+
+  return (
+    <PageShell dark={dark} backFallback="/" maxWidth={PAGE_MAX_WIDTH}>
       <div style={{ textAlign: 'center', padding: 40, color: ON_GRADIENT_TOP.secondary }}>
         {modulesError
           ? <ErrorBanner message="Couldn't load modules — check your connection." />

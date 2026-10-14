@@ -229,17 +229,21 @@ export default function ModulePage({ dark }: { dark: boolean }) {
         </div>
       )}
 
-      <StudyByLessonSection
-        dark={dark}
-        moduleId={moduleId as string}
-        subjects={subjects}
-        lessons={visibleLessons}
-        lessonQuestionIds={lessonQuestionIds}
-        lessonSummaries={lessonSummaries}
-        onOpenSummary={setSelectedSummary}
-      />
+      {contentLoaded && (
+        <>
+          <StudyByLessonSection
+            dark={dark}
+            moduleId={moduleId as string}
+            subjects={subjects}
+            lessons={visibleLessons}
+            lessonQuestionIds={lessonQuestionIds}
+            lessonSummaries={lessonSummaries}
+            onOpenSummary={setSelectedSummary}
+          />
 
-      <StudyMaterialsSection dark={dark} moduleId={moduleId as string} presentFileTypes={presentFileTypes} driveUrl={driveUrl} />
+          <StudyMaterialsSection dark={dark} moduleId={moduleId as string} presentFileTypes={presentFileTypes} driveUrl={driveUrl} />
+        </>
+      )}
 
       {simulatorVisible && meta && (
         <div style={{ marginBottom: 32 }}>

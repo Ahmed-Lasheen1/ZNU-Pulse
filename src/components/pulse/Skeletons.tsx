@@ -50,20 +50,43 @@ export function ReportGridSkeleton() {
   )
 }
 
-export function PageSectionsSkeleton({ tiles = 3 }: { tiles?: number }) {
+export function PageSectionsSkeleton() {
   return (
     <Group label="Loading content" style={{ marginBottom: 32 }}>
-      <Skeleton w={110} h={12} style={{ marginBottom: 16 }} />
-      <div className="auto-grid" style={{ ['--auto-grid-cols' as string]: tiles, marginBottom: 32 } as CSSProperties}>
-        {Array.from({ length: tiles }, (_, i) => (
-          <div key={i} style={{ ...card, padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-            <Skeleton w={38} h={38} r="50%" />
-            <Skeleton w="55%" h={13} />
+      <Skeleton w={96} h={12} style={{ margin: '0 auto 14px' }} />
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 32 }}>
+        <div style={{ ...card, borderRadius: 999, padding: 8, display: 'flex', gap: 6, maxWidth: '100%' }}>
+          {[72, 104, 92].map((w, i) => <Skeleton key={i} w={w} h={50} r={999} />)}
+        </div>
+      </div>
+
+      <Skeleton w={120} h={12} style={{ marginBottom: 16 }} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 32 }}>
+        {[0, 1, 2].map(i => (
+          <div key={i} style={{ ...card, display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px' }}>
+            <Skeleton w={20} h={20} r={6} />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <Skeleton w="50%" h={14} />
+              <Skeleton w="22%" h={11} />
+            </div>
+            <Skeleton w={16} h={16} r={4} />
+            <Skeleton w={96} h={34} r={999} />
           </div>
         ))}
       </div>
+
       <Skeleton w={130} h={12} style={{ marginBottom: 16 }} />
-      <Rows count={2} />
+      <div className="summary-practice-row">
+        {[0, 1].map(i => (
+          <div key={i} style={{ ...card, display: 'flex', alignItems: 'center', gap: 14, padding: '16px 20px' }}>
+            <Skeleton w={44} h={44} r={12} />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <Skeleton w="45%" h={15} />
+              <Skeleton w="70%" h={11} />
+            </div>
+          </div>
+        ))}
+      </div>
     </Group>
   )
 }
