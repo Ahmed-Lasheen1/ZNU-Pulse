@@ -1,11 +1,14 @@
-import { idbGet, idbSet, idbDelete } from './idb'
+import { idbGet, idbSet, idbDelete, idbKeys } from './idb'
 
 export const MINUTE = 60 * 1000
 export const REFERENCE_TTL = 10 * MINUTE
 
+const USER_PREFIX = 'user:'
+
 const memory = new Map()
 const inFlight = new Map()
 const generations = new Map()
+let userEpoch = 0
 
 const generationOf = key => generations.get(key) ?? 0
 
@@ -54,4 +57,39 @@ export async function cachedQuery(key, fetcher, { ttl, onUpdate } = {}) {
     refresh(key, fetcher).then(result => onUpdate?.(result))
   }
   return { data: entry.data, error: null }
+}
+
+export function saveCached(key, data) {
+  const entry = { data, savedAt: Date.now() }
+  memory.set(key, entry)
+  idbSet(key, entry)
+}
+
+// Always fetches fresh when online; the saved copy is used only when offline or the request fails.
+export async function networkFirst(key, fetcher) {
+  const epoch = userEpoch
+  if (navigator.onLine) {
+    const result = await Promise.resolve().then(fetcher).catch(error => ({ data: null, error }))
+    if (!result.error) {
+      if (epoch === userEpoch) saveCached(key, result.data)
+      return { data: result.data, error: null, fromCache: false }
+    }
+    const saved = await readEntry(key)
+    if (saved) return { data: saved.data, error: null, fromCache: true }
+    return { data: null, error: result.error, fromCache: false }
+  }
+  const saved = await readEntry(key)
+  if (saved) return { data: saved.data, error: null, fromCache: true }
+  return { data: null, error: new Error('Offline'), fromCache: false }
+}
+
+export async function clearUserCaches() {
+  userEpoch++
+  for (const key of [...memory.keys()]) {
+    if (key.startsWith(USER_PREFIX)) memory.delete(key)
+  }
+  const keys = await idbKeys()
+  keys.forEach(key => {
+    if (typeof key === 'string' && key.startsWith(USER_PREFIX)) idbDelete(key)
+  })
 }
