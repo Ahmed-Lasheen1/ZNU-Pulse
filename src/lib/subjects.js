@@ -6,7 +6,7 @@ const KEY = 'subjects'
 export async function fetchAllSubjects() {
   const { data, error } = await cachedQuery(
     KEY,
-    () => supabase.from('subjects').select('*').order('name'),
+    () => supabase.from('subjects').select('*').order('created_at').order('id'),
     { ttl: REFERENCE_TTL }
   )
   return { subjects: data || [], error }
@@ -23,7 +23,6 @@ export async function fetchSubjectById(subjectId) {
   return { subject: subjects.find(s => s.id === subjectId) || null, error: null }
 }
 
-// Called by Admin after any subject create/update/delete.
 export function invalidateSubjectsCache() {
   invalidateCache(KEY)
 }
