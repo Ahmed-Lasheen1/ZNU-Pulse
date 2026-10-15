@@ -3,6 +3,7 @@ import { idbGet, idbSet, idbDelete } from './idb'
 const KEY_PREFIX = 'summary:'
 const INDEX_KEY = 'summary-index'
 const MAX_SAVED = 30
+const FORMAT = 3
 
 // Shared lesson files (CSS and JS) are saved inside each offline copy.
 // CSS_IMPORT finds the import lines in shared/znu-pulse.css.
@@ -29,6 +30,15 @@ function readAsDataUrl(blob) {
   })
 }
 
+async function hashText(text) {
+  try {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
+    return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('')
+  } catch {
+    return null
+  }
+}
+
 async function inlineImages(doc, baseUrl) {
   await Promise.all([...doc.querySelectorAll('img[src]')].map(async img => {
     const src = img.getAttribute('src')
@@ -42,8 +52,10 @@ async function inlineImages(doc, baseUrl) {
   }))
 }
 
+// no-cache: GitHub Pages sends a 10-minute max-age, so a plain fetch could
+// save old files under a newer version number.
 async function fetchText(url) {
-  const response = await fetch(url)
+  const response = await fetch(url, { cache: 'no-cache' })
   if (!response.ok) throw new Error(`Shared file failed to load: ${url}`)
   return response.text()
 }
@@ -137,21 +149,41 @@ async function trackSavedSummary(url) {
 
 async function saveSummary(url) {
   const baseUrl = new URL(url)
-  const response = await fetch(url)
+  const response = await fetch(url, { cache: 'no-cache' })
   if (!response.ok) throw new Error(`Summary failed to load (${response.status})`)
-  const doc = new DOMParser().parseFromString(await response.text(), 'text/html')
+  const source = await response.text()
+  const htmlHash = await hashText(source)
+  const doc = new DOMParser().parseFromString(source, 'text/html')
   const sharedVersion = await inlineShared(doc, baseUrl, url)
   await inlineImages(doc, baseUrl)
   const html = `<!DOCTYPE html>${doc.documentElement.outerHTML}`
-  await idbSet(KEY_PREFIX + url, { html, savedAt: Date.now(), sharedVersion })
+  await idbSet(KEY_PREFIX + url, { html, savedAt: Date.now(), sharedVersion, htmlHash, format: FORMAT })
   await trackSavedSummary(url)
   return html
 }
 
-// A saved copy is outdated only when it was saved with shared files
+async function fetchLessonHash(url) {
+  try {
+    const response = await fetch(url, { cache: 'no-cache' })
+    if (!response.ok) return null
+    return await hashText(await response.text())
+  } catch {
+    return null
+  }
+}
+
+// A saved copy is outdated when it was saved by an older version of this code,
+// when the lesson's own HTML has changed, or when it was saved with shared files
 // and the shared version number has changed since.
-// Any problem checking counts as "not outdated", so the saved copy is kept.
+// Any problem running a check counts as "not outdated", so the saved copy is kept.
 async function isOutdated(url, saved) {
+  if (saved.format !== FORMAT) return true
+
+  if (saved.htmlHash) {
+    const current = await fetchLessonHash(url)
+    if (current && current !== saved.htmlHash) return true
+  }
+
   if (!saved.sharedVersion) return false
   try {
     return (await fetchSharedVersion(url)) !== saved.sharedVersion
