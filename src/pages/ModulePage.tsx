@@ -170,11 +170,11 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   const meta = stageActive ? stageMetaFrom(examStages, activeStage) : null
   const stageName = meta ? meta.title : 'this module'
 
-  function selectStage(value: string) {
+  function selectStage(value: string | null) {
     setSearchParams(prev => {
       const next = new URLSearchParams(prev)
-      if (value === 'all') next.delete('stage')
-      else next.set('stage', value)
+      if (value) next.set('stage', value)
+      else next.delete('stage')
       return next
     }, { replace: true })
   }
@@ -195,10 +195,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   const simulatorVisible = stageActive && simStats.total > 0 && hasQuestions
   const subjectText = `${simStats.subjects} subject${simStats.subjects === 1 ? '' : 's'}`
 
-  const tabItems = [
-    { value: 'all', title: 'All', color: module.color, Icon: ExamStageIcon },
-    ...visibleExamStages.map(s => ({ value: s.value, title: s.title, color: s.color, emoji: s.emoji, Icon: s.Icon })),
-  ]
+  const tabItems = visibleExamStages.map(s => ({ value: s.value, title: s.title, color: s.color, emoji: s.emoji, Icon: s.Icon }))
 
   return (
     <PageShell dark={dark} backFallback="/" maxWidth={900}>
@@ -225,7 +222,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
           <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             <ExamStageIcon color={ON_GRADIENT_TOP.muted} size={14} /> Exam Stage
           </h2>
-          <StageTabs dark={dark} items={tabItems} active={activeStage} onSelect={selectStage} />
+          <StageTabs dark={dark} items={tabItems} active={stageActive ? activeStage : null} onSelect={selectStage} />
         </div>
       )}
 

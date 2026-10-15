@@ -15,8 +15,8 @@ export interface StageTabItem {
 interface StageTabsProps {
   dark: boolean
   items: StageTabItem[]
-  active: string
-  onSelect: (value: string) => void
+  active: string | null
+  onSelect: (value: string | null) => void
 }
 
 function readableOn(hex: string) {
@@ -27,18 +27,47 @@ function readableOn(hex: string) {
   return luminance > 0.55 ? '#0f172a' : '#ffffff'
 }
 
+function toRgba(hex: string, alpha: number) {
+  const match = /^#?([0-9a-f]{6})$/i.exec(hex || '')
+  if (!match) return `rgba(100,116,139,${alpha})`
+  const n = parseInt(match[1], 16)
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`
+}
+
+function glow(color: string) {
+  return `0 8px 24px ${toRgba(color, 0.4)}, inset 0 1px 0 rgba(255,255,255,0.45)`
+}
+
 export default function StageTabs({ dark, items, active, onSelect }: StageTabsProps) {
   const pt = getPulseTheme(dark)
   const reduced = usePrefersReducedMotion()
   const activeRef = useRef<HTMLButtonElement>(null)
+  const activeColor = items.find(item => item.value === active)?.color ?? null
+  const previousColor = useRef<string | null>(null)
+  const blendFrom = previousColor.current
 
   useEffect(() => {
+    previousColor.current = activeColor
+  }, [activeColor])
+
+  useEffect(() => {
+    if (!active) return
     activeRef.current?.scrollIntoView({
       inline: 'center',
       block: 'nearest',
       behavior: reduced ? 'auto' : 'smooth',
     })
   }, [active, reduced])
+
+  const colorFade = reduced ? { duration: 0 } : { duration: 0.7, ease: 'easeInOut' as const }
+  const highlightTransition = reduced
+    ? { duration: 0 }
+    : {
+        layout: { type: 'spring' as const, stiffness: 420, damping: 34 },
+        backgroundColor: colorFade,
+        boxShadow: colorFade,
+        opacity: { duration: 0.25 },
+      }
 
   return (
     <div className="stage-tabs-wrap">
@@ -55,10 +84,10 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
           border: none; border-radius: 999px; background: transparent;
           cursor: pointer; white-space: nowrap; scroll-snap-align: center;
           font-weight: 800; font-size: 14.5px; letter-spacing: 0.2px;
-          transition: color 0.2s ease, background 0.2s ease;
+          transition: color 0.5s ease, background 0.2s ease;
         }
         .stage-tab-label { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 9px; }
-        .stage-tab:not([aria-selected="true"]):hover { background: var(--stage-tab-hover); }
+        .stage-tab:not([aria-pressed="true"]):hover { background: var(--stage-tab-hover); }
         @media (max-width: 480px) {
           .stage-tab { height: 44px; padding: 0 16px; font-size: 13px; }
           .stage-tabs-track { padding: 6px; }
@@ -72,7 +101,7 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
         activeTint={`${pt.cobalt}1f`}
         style={{ maxWidth: '100%', minWidth: 0, ['--stage-tab-hover' as string]: dark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.55)' }}
       >
-        <div className="stage-tabs-track" role="tablist" aria-label="Exam stage">
+        <div className="stage-tabs-track" role="group" aria-label="Exam stage">
           {items.map(item => {
             const isActive = item.value === active
             const onColor = readableOn(item.color)
@@ -82,9 +111,8 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
                 key={item.value}
                 ref={isActive ? activeRef : undefined}
                 type="button"
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => onSelect(item.value)}
+                aria-pressed={isActive}
+                onClick={() => onSelect(isActive ? null : item.value)}
                 className="stage-tab glass-focus-ring"
                 style={{ color: isActive ? onColor : pt.textPrimary, fontFamily: pulseFonts.body }}
               >
@@ -92,11 +120,14 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
                   <motion.span
                     layoutId="stage-tab-active"
                     aria-hidden
-                    transition={reduced ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 34 }}
+                    initial={blendFrom
+                      ? { backgroundColor: blendFrom, boxShadow: glow(blendFrom) }
+                      : { opacity: 0 }}
+                    animate={{ opacity: 1, backgroundColor: item.color, boxShadow: glow(item.color) }}
+                    transition={highlightTransition}
                     style={{
                       position: 'absolute', inset: 0, borderRadius: 999,
-                      background: `linear-gradient(135deg, ${item.color}, ${item.color}d9)`,
-                      boxShadow: `0 8px 24px ${item.color}66, inset 0 1px 0 rgba(255,255,255,0.45)`,
+                      backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.22), rgba(255,255,255,0) 60%)',
                     }}
                   />
                 )}
