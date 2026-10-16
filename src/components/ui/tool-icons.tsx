@@ -393,9 +393,12 @@ export function SearchIcon2({ color, size = 16 }: IconProps) {
 export function OfflineIcon({ color, size = 14 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d="M3 3l18 18" stroke={color} strokeWidth="1.7" strokeLinecap="round" />
-      <path d="M5.5 9.5a12 12 0 0 1 4.6-2.6M8.5 12.7a7.7 7.7 0 0 1 3-1.6M18.5 9.5a12 12 0 0 0-2.9-2.1" stroke={color} strokeWidth="1.6" strokeLinecap="round" opacity="0.8" />
-      <circle cx="12" cy="17.5" r="1.3" fill={color} />
+      <g stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 3L21 21" />
+        <path d="M5.3 9.4a12 12 0 0 1 13.4 0" opacity="0.85" />
+        <path d="M8.5 12.7a7 7 0 0 1 4.2-1.9" opacity="0.85" />
+      </g>
+      <circle cx="12" cy="17.5" r="1.4" fill={color} />
     </svg>
   )
 }
