@@ -1,5 +1,5 @@
 // src/pages/Home.tsx
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown } from 'lucide-react'
@@ -104,6 +104,16 @@ export default function Home({ dark }: { dark: boolean }) {
   // Entrance flag comes from HomeEntranceProvider; captured once per mount.
   const { playEntrance: entranceNow } = useHomeEntrance() as { playEntrance: boolean }
   const [playEntrance] = useState(entranceNow)
+
+  const mountedAtRef = useRef(Date.now())
+  const remainingFor = (target: number) =>
+    playEntrance ? Math.max(0, target - (Date.now() - mountedAtRef.current) / 1000) : 0
+  const cardEntrance = (target: number) => {
+    const remaining = remainingFor(target)
+    return remaining <= 0
+      ? { instant: true, delay: 0 }
+      : { instant: false, delay: msFor(Math.max(remaining, ENTRANCE_PAUSE)) }
+  }
 
   useEffect(() => {
     let ignore = false
@@ -376,33 +386,44 @@ export default function Home({ dark }: { dark: boolean }) {
                   Active Modules
                 </motion.div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {!modulesLoaded && <CardRowsSkeleton count={2} pill label="Loading modules" />}
+                  {!modulesLoaded && (
+                    <motion.div
+                      initial={playEntrance ? { opacity: 0, y: 16 } : false}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.7, delay: remainingFor(ACTIVE_MODULES_START) }}
+                    >
+                      <CardRowsSkeleton count={2} pill label="Loading modules" />
+                    </motion.div>
+                  )}
                   {modulesLoaded && activeModules.length === 0 && (
                     <motion.div
                       initial={playEntrance ? { opacity: 0, y: 16 } : false}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.7, delay: ACTIVE_MODULES_START }}
+                      transition={{ duration: 0.7, delay: remainingFor(ACTIVE_MODULES_START) }}
                       style={{ ...pulseType.body, color: pt.textSecondary }}
                     >No active modules yet.</motion.div>
                   )}
-                  {activeModules.map((mod, i) => (
-                    <LiquidGlassCard key={mod.id} dark={dark} delay={msFor(ACTIVE_MODULES_START) + i * 110} instant={!playEntrance}
-                      onClick={() => navigate(`/module/${mod.id}`)}
-                      style={{ borderRadius: 999, padding: '10px 18px 10px 10px', display: 'flex', alignItems: 'center', gap: 14 }}>
-                      <div style={{
-                        width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
-                        background: `${mod.color}22`, border: `1px solid ${mod.color}55`,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center'
-                      }}>
-                        <ModuleIcon value={mod.icon} size={20} color={mod.color} />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>{mod.name}</div>
-                        <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{moduleBlurb(mod.name)}</div>
-                      </div>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: mod.color, display: 'inline-block', flexShrink: 0 }} />
-                    </LiquidGlassCard>
-                  ))}
+                  {activeModules.map((mod, i) => {
+                    const entrance = cardEntrance(ACTIVE_MODULES_START + i * 0.165)
+                    return (
+                      <LiquidGlassCard key={mod.id} dark={dark} delay={entrance.delay} instant={entrance.instant}
+                        onClick={() => navigate(`/module/${mod.id}`)}
+                        style={{ borderRadius: 999, padding: '10px 18px 10px 10px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                        <div style={{
+                          width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
+                          background: `${mod.color}22`, border: `1px solid ${mod.color}55`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}>
+                          <ModuleIcon value={mod.icon} size={20} color={mod.color} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>{mod.name}</div>
+                          <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{moduleBlurb(mod.name)}</div>
+                        </div>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: mod.color, display: 'inline-block', flexShrink: 0 }} />
+                      </LiquidGlassCard>
+                    )
+                  })}
                 </div>
               </div>
             </div>
@@ -453,112 +474,115 @@ export default function Home({ dark }: { dark: boolean }) {
           </motion.div>
         </div>
 
-        {completedModules.length > 0 && (
-          <div className="pulse-wide" style={{ paddingBottom: 40 }}>
-            <div style={{ maxWidth: 640, margin: '0 auto' }}>
-              <motion.div
-                initial={playEntrance ? { opacity: 0, y: 20 } : false}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.7, delay: COMPLETED_MODULES_START }}
-                style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}
-              >
-                <LiquidGlassCard
-                  dark={dark}
-                  delay={msFor(COMPLETED_MODULES_START)}
-                  instant={!playEntrance}
-                  style={{ padding: '10px 22px', borderRadius: 999 }}
+        {completedModules.length > 0 && (() => {
+          const completedEntrance = cardEntrance(COMPLETED_MODULES_START)
+          return (
+            <div className="pulse-wide" style={{ paddingBottom: 40 }}>
+              <div style={{ maxWidth: 640, margin: '0 auto' }}>
+                <motion.div
+                  initial={playEntrance ? { opacity: 0, y: 20 } : false}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.7, delay: remainingFor(COMPLETED_MODULES_START) }}
+                  style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}
                 >
-                  <button
-                    onClick={() => setArchiveOpen(o => !o)}
-                    aria-expanded={archiveOpen}
-                    aria-label={archiveOpen ? 'Collapse completed modules' : 'Expand completed modules'}
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                      background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
-                      ...pulseType.sectionLabel, color: pt.textSecondary,
-                    }}
+                  <LiquidGlassCard
+                    dark={dark}
+                    delay={completedEntrance.delay}
+                    instant={completedEntrance.instant}
+                    style={{ padding: '10px 22px', borderRadius: 999 }}
                   >
-                    ✓ Completed Modules
-                    <span style={{
-                      background: dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
-                      border: `1px solid ${pt.border}`,
-                      borderRadius: 999, padding: '1px 8px', fontSize: 10, fontWeight: 700,
-                      color: pt.textMuted,
-                    }}>{completedModules.length}</span>
-                    <motion.span
-                      animate={{ rotate: archiveOpen ? 180 : 0 }}
-                      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                      style={{ display: 'inline-flex' }}
+                    <button
+                      onClick={() => setArchiveOpen(o => !o)}
+                      aria-expanded={archiveOpen}
+                      aria-label={archiveOpen ? 'Collapse completed modules' : 'Expand completed modules'}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                        background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
+                        ...pulseType.sectionLabel, color: pt.textSecondary,
+                      }}
                     >
-                      <ChevronDown size={14} color={pt.textSecondary} />
-                    </motion.span>
-                  </button>
-                </LiquidGlassCard>
-              </motion.div>
+                      ✓ Completed Modules
+                      <span style={{
+                        background: dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
+                        border: `1px solid ${pt.border}`,
+                        borderRadius: 999, padding: '1px 8px', fontSize: 10, fontWeight: 700,
+                        color: pt.textMuted,
+                      }}>{completedModules.length}</span>
+                      <motion.span
+                        animate={{ rotate: archiveOpen ? 180 : 0 }}
+                        transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                        style={{ display: 'inline-flex' }}
+                      >
+                        <ChevronDown size={14} color={pt.textSecondary} />
+                      </motion.span>
+                    </button>
+                  </LiquidGlassCard>
+                </motion.div>
 
-              <AnimatePresence initial={false}>
-                {archiveOpen && (
-                  <motion.div
-                    key="completed-modules-list"
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                    onAnimationComplete={() => setArchiveOverflowVisible(true)}
-                    style={{ overflow: archiveOverflowVisible ? 'visible' : 'hidden' }}
-                  >
+                <AnimatePresence initial={false}>
+                  {archiveOpen && (
                     <motion.div
-                      initial="hidden"
-                      animate="visible"
-                      variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06, delayChildren: 0.05 } } }}
-                      style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 4 }}
+                      key="completed-modules-list"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                      onAnimationComplete={() => setArchiveOverflowVisible(true)}
+                      style={{ overflow: archiveOverflowVisible ? 'visible' : 'hidden' }}
                     >
-                      {completedModules.map((mod) => (
-                        <motion.div
-                          key={mod.id}
-                          variants={{
-                            hidden: { opacity: 0, y: 14 },
-                            visible: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } }
-                          }}
-                        >
-                          <LiquidGlassCard dark={dark} delay={0} instant
-                            onClick={() => navigate(`/module/${mod.id}`)}
-                            style={{
-                              borderRadius: 999, padding: '10px 18px 10px 10px',
-                              display: 'flex', alignItems: 'center', gap: 14, opacity: 0.85,
-                            }}>
-                            <div style={{
-                              width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
-                              background: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              filter: 'grayscale(0.6)',
-                            }}>
-                              <ModuleIcon value={mod.icon} size={20} color={pt.textMuted} />
-                            </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
+                      <motion.div
+                        initial="hidden"
+                        animate="visible"
+                        variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06, delayChildren: 0.05 } } }}
+                        style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 4 }}
+                      >
+                        {completedModules.map((mod) => (
+                          <motion.div
+                            key={mod.id}
+                            variants={{
+                              hidden: { opacity: 0, y: 14 },
+                              visible: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } }
+                            }}
+                          >
+                            <LiquidGlassCard dark={dark} delay={0} instant
+                              onClick={() => navigate(`/module/${mod.id}`)}
+                              style={{
+                                borderRadius: 999, padding: '10px 18px 10px 10px',
+                                display: 'flex', alignItems: 'center', gap: 14, opacity: 0.85,
+                              }}>
                               <div style={{
-                                ...pulseType.cardTitle, color: pt.textSecondary,
-                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                              }}>{mod.name}</div>
-                            </div>
-                            <span aria-label="Completed" style={{
-                              width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
-                              border: `1px solid ${pt.border}`,
-                            }}>
-                              <CheckCircleIcon color={pt.textMuted} size={12} />
-                            </span>
-                          </LiquidGlassCard>
-                        </motion.div>
-                      ))}
+                                width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
+                                background: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                filter: 'grayscale(0.6)',
+                              }}>
+                                <ModuleIcon value={mod.icon} size={20} color={pt.textMuted} />
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{
+                                  ...pulseType.cardTitle, color: pt.textSecondary,
+                                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                }}>{mod.name}</div>
+                              </div>
+                              <span aria-label="Completed" style={{
+                                width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                                border: `1px solid ${pt.border}`,
+                              }}>
+                                <CheckCircleIcon color={pt.textMuted} size={12} />
+                              </span>
+                            </LiquidGlassCard>
+                          </motion.div>
+                        ))}
+                      </motion.div>
                     </motion.div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
       </div>
     </div>
   )
