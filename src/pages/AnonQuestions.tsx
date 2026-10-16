@@ -107,6 +107,8 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
     }
   }, [myQuestions])
 
+  // The error banner reflects ONLY this main list, and it clears itself on the
+  // next successful load (it used to stay on forever once anything had failed).
   async function fetchQuestions(isIgnored: () => boolean = () => false) {
     setLoading(true)
     const { data, error, fromCache } = await networkFirst('anon-questions', () => supabase
@@ -121,7 +123,8 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
       setHasMore(data.length === RECENT_QUESTIONS_LIMIT)
     }
     setSavedCopy(fromCache)
-    if (error) setLoadError(true)
+    if (error) console.warn('[AnonQuestions] Could not load the questions list:', error)
+    setLoadError(!!error)
     setLoading(false)
   }
 
@@ -143,13 +146,15 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
     if (error) setLoadMoreError(true)
   }
 
+  // "My Questions" is a secondary section: if its request fails it must not
+  // show the main "couldn't load questions" banner, so it only logs.
   async function fetchMyQuestions(isIgnored: () => boolean = () => false) {
     const myTokens = getMyAnonTokens()
     if (myTokens.length === 0) { if (!isIgnored()) setMyQuestions([]); return }
     const { data, error } = await networkFirst('anon-my-questions', () => supabase.rpc('get_my_anon_questions', { p_tokens: myTokens }))
     if (isIgnored()) return
     if (data) setMyQuestions(data)
-    if (error) setLoadError(true)
+    if (error) console.warn('[AnonQuestions] Could not load "My Questions":', error)
   }
 
   // Submits via the submit_anon_question RPC, which re-checks cooldown and
