@@ -7,7 +7,7 @@ export async function fetchAllSubjects() {
   const { data, error } = await cachedQuery(
     KEY,
     () => supabase.from('subjects').select('*').order('created_at').order('id'),
-    { ttl: REFERENCE_TTL }
+    { ttl: REFERENCE_TTL, versioned: true }
   )
   return { subjects: data || [], error }
 }

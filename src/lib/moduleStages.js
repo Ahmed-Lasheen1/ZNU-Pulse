@@ -16,7 +16,7 @@ export async function fetchModuleStages(moduleId) {
       .from('module_exam_stages')
       .select('module_id, value, title, emoji, color, position')
       .order('position'),
-    { ttl: REFERENCE_TTL }
+    { ttl: REFERENCE_TTL, versioned: true }
   )
   if (error) return DEFAULT_STAGES
   const forModule = data.filter(r => r.module_id === moduleId)

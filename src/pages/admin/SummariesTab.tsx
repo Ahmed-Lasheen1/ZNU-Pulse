@@ -13,6 +13,7 @@ import { useConfirmDelete } from './useConfirmDelete'
 import { useAdminList } from './useAdminList'
 import { useStageOptions } from './useStageOptions'
 import { PICK_MODULE_MESSAGE, REQUIRED_FIELDS_MESSAGE } from './useAdminContext'
+import { syncContentVersions } from '../../lib/contentVersions'
 import { ConstructionIcon, LinkIcon, UploadIcon } from '../../components/ui/tool-icons'
 import { publishSummary, MAX_UPLOAD_BYTES } from '../../lib/publishSummary'
 import type { AdminModule, AdminSubject, AdminContext } from './adminTypes'
@@ -119,6 +120,7 @@ export default function SummariesTab({ dark, modules, subjects, context }: Summa
         lessonId: context.lessonId || null,
         examStage: examStage || null,
       })
+      syncContentVersions({ force: true })
       showMessage('✅ Summary published! URL: ' + result.url)
       resetForm()
       refresh()

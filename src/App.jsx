@@ -196,9 +196,11 @@ export default function App() {
     const sync = force => syncContentVersions({ force }).then(refChanged => { if (refChanged) loadModules(true) })
     const onVisible = () => { if (document.visibilityState === 'visible') sync(false) }
     sync(true)
+    const timer = setInterval(onVisible, 10 * 60 * 1000)
     document.addEventListener('visibilitychange', onVisible)
     window.addEventListener('online', onVisible)
     return () => {
+      clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('online', onVisible)
     }

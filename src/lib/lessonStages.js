@@ -12,7 +12,7 @@ export async function fetchLessonStageMap() {
   const { data, error } = await cachedQuery(
     KEY,
     () => supabase.from('lesson_exam_stages').select('lesson_id, stage'),
-    { ttl: REFERENCE_TTL }
+    { ttl: REFERENCE_TTL, versioned: true }
   )
   const map = {}
   ;(data || []).forEach(row => {

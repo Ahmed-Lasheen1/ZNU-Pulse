@@ -15,6 +15,7 @@ import { useConfirmDelete } from './useConfirmDelete'
 import { useAdminList } from './useAdminList'
 import { useStageOptions } from './useStageOptions'
 import { PICK_MODULE_MESSAGE, REQUIRED_FIELDS_MESSAGE } from './useAdminContext'
+import { syncContentVersions } from '../../lib/contentVersions'
 import { EditIcon, ListIcon, ConstructionIcon, SearchIcon2 } from '../../components/ui/tool-icons'
 import type { AdminModule, AdminContext } from './adminTypes'
 
@@ -281,6 +282,7 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
     setBulkSaving(false)
 
     if (insertError) return showMessage('❌ ' + insertError.message)
+    syncContentVersions({ force: true })
     showMessage(`✅ ${parsed.length} questions added!`)
     setBulkText('')
     refresh()

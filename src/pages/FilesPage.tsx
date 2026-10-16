@@ -1,7 +1,6 @@
 // src/pages/FilesPage.tsx
 import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
-import { supabase } from '../supabase'
 import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
 import { useModules } from '../contexts'
 import ErrorBanner from '../components/ErrorBanner'
@@ -15,7 +14,7 @@ import EmptyState from '../components/pulse/EmptyState'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
 import { useBodyScrollLock } from '../lib/useBodyScrollLock'
 import { fetchSubjectsForModule } from '../lib/subjects'
-import { fetchAllRows } from '../lib/fetchAllRows'
+import { fetchModuleFiles } from '../lib/moduleContent'
 import { getDriveOrRawUrl, getVideoEmbedUrl, isSafeExternalUrl } from '../lib/embedUrl'
 import { BookIcon, QuestionMarkIcon, VideoIcon, GraduationCapIcon, DocumentIcon, AudioIcon, FolderIcon, PlayIcon } from '../components/ui/tool-icons'
 
@@ -152,8 +151,9 @@ export default function FilesPage({ dark }: { dark: boolean }) {
     async function fetchFiles() {
       setLoading(true)
       setLoadError(false)
-      const { data, error } = await fetchAllRows(() => supabase
-        .from('files').select('*').eq('module_id', activeModule).order('created_at', { ascending: false }).order('id'))
+      const { data, error } = await fetchModuleFiles(activeModule, ({ data: fresh, error: refreshError }: any) => {
+        if (!ignore && !refreshError && fresh) setFiles(fresh)
+      })
       if (ignore) return
       if (data) setFiles(data)
       if (error) setLoadError(true)

@@ -1,12 +1,22 @@
 import { supabase } from '../supabase'
 import { inStage } from './lessonStages'
+import { cachedQuery, invalidateCache, MINUTE } from './dataCache'
+import { SIMULATOR_KEY } from './moduleContent'
 
 export async function fetchSimulatorConfig(moduleId) {
-  const { data, error } = await supabase
-    .from('stage_simulator_config')
-    .select('stage, subject_id, question_count')
-    .eq('module_id', moduleId)
+  const { data, error } = await cachedQuery(
+    `${SIMULATOR_KEY}${moduleId}`,
+    () => supabase
+      .from('stage_simulator_config')
+      .select('stage, subject_id, question_count')
+      .eq('module_id', moduleId),
+    { ttl: 5 * MINUTE }
+  )
   return { rows: data || [], error }
+}
+
+export function invalidateSimulatorConfig(moduleId) {
+  invalidateCache(`${SIMULATOR_KEY}${moduleId}`)
 }
 
 // Fisher-Yates (unbiased), returns a new array.

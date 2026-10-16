@@ -7,7 +7,7 @@ export async function fetchAllLessons() {
   const { data, error } = await cachedQuery(
     KEY,
     () => supabase.from('lessons').select('*').order('created_at').order('id'),
-    { ttl: REFERENCE_TTL }
+    { ttl: REFERENCE_TTL, versioned: true }
   )
   return { lessons: data || [], error }
 }

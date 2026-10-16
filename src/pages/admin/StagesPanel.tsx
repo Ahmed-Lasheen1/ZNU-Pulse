@@ -8,7 +8,7 @@ import { EXAM_STAGES as DEFAULT_STAGES } from '../../lib/examStages'
 import { invalidateModuleStagesCache } from '../../lib/moduleStages'
 import { fetchLessonStageMap } from '../../lib/lessonStages'
 import { fetchAllRows } from '../../lib/fetchAllRows'
-import { simulatorPool } from '../../lib/stageSimulator'
+import { simulatorPool, invalidateSimulatorConfig } from '../../lib/stageSimulator'
 import { TargetIcon, GearIcon, DotIcon, TrashIcon, PlusIcon } from '../../components/ui/tool-icons'
 import type { AdminModule, AdminSubject } from './adminTypes'
 
@@ -176,6 +176,7 @@ export default function StagesPanel({ dark, module, subjects, showMessage }: Sta
     setSimSaving(true)
     const { error } = await supabase.rpc('admin_replace_stage_simulator', { p_module_id: module.id, p_stage: simStage, p_rows: rows })
     setSimSaving(false)
+    if (!error) invalidateSimulatorConfig(module.id)
     showMessage(error ? '❌ ' + error.message : rows.length === 0 ? '✅ Simulator turned off for this stage' : '✅ Simulator saved for this stage!')
   }
 

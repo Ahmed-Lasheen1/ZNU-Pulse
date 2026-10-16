@@ -1,8 +1,17 @@
 import { useState } from 'react'
 import { supabase } from '../../supabase'
+import { syncContentVersions } from '../../lib/contentVersions'
+import { clearFileCaches } from '../../lib/moduleContent'
+
+// Lets this device notice an admin change right away and drop its stale caches.
+function afterWrite(table: string) {
+  syncContentVersions({ force: true })
+  if (table === 'files') clearFileCaches()
+}
 
 export async function deleteAdminEntity(table: string, id: string) {
   const { error } = await supabase.from(table).delete().eq('id', id)
+  if (!error) afterWrite(table)
   return error
 }
 
@@ -32,6 +41,7 @@ export function useAdminEntityCrud<T>({
       : insertFn ? await insertFn(payload) : await supabase.from(table).insert([payload])
     setSaving(false)
     if (error) { showMessage('❌ ' + error.message); return }
+    afterWrite(table)
     showMessage(`✅ ${label} ${editingId ? 'updated' : 'added'}!`)
     resetForm()
     refresh()

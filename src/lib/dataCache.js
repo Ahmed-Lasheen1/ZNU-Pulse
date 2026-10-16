@@ -5,12 +5,30 @@ export const REFERENCE_TTL = 10 * MINUTE
 
 const USER_PREFIX = 'user:'
 
+const VALIDATION_WINDOW = 30 * MINUTE
+const MAX_VALIDATED_AGE = 24 * 60 * MINUTE
+const VALIDATION_GRACE_MS = 3000
+
 const memory = new Map()
 const inFlight = new Map()
 const generations = new Map()
 let userEpoch = 0
+let validatedAt = 0
 
 const generationOf = key => generations.get(key) ?? 0
+
+// Called by contentVersions after a check that found nothing changed. `at` is when that check started.
+export function markContentValidated(at = Date.now()) {
+  if (at > validatedAt) validatedAt = at
+}
+
+function isValidated(entry) {
+  if (!validatedAt) return false
+  const now = Date.now()
+  return validatedAt >= entry.savedAt
+    && now - validatedAt < VALIDATION_WINDOW
+    && now - entry.savedAt < MAX_VALIDATED_AGE
+}
 
 export function invalidateCache(key) {
   generations.set(key, generationOf(key) + 1)
@@ -50,11 +68,21 @@ function refresh(key, fetcher) {
   return promise
 }
 
-export async function cachedQuery(key, fetcher, { ttl, onUpdate } = {}) {
+// Gives the version check a moment to confirm the entry before refetching.
+function refreshAfterCheck(key, fetcher, entry, onUpdate) {
+  setTimeout(() => {
+    if (memory.get(key) !== entry || isValidated(entry)) return
+    refresh(key, fetcher).then(result => onUpdate?.(result))
+  }, VALIDATION_GRACE_MS)
+}
+
+// `versioned` entries stay valid past their ttl while content_versions confirms nothing changed.
+export async function cachedQuery(key, fetcher, { ttl, onUpdate, versioned = false } = {}) {
   const entry = await readEntry(key)
   if (!entry) return refresh(key, fetcher)
   if (Date.now() - entry.savedAt >= ttl) {
-    refresh(key, fetcher).then(result => onUpdate?.(result))
+    if (!versioned) refresh(key, fetcher).then(result => onUpdate?.(result))
+    else if (!isValidated(entry)) refreshAfterCheck(key, fetcher, entry, onUpdate)
   }
   return { data: entry.data, error: null }
 }

@@ -15,6 +15,7 @@ export async function fetchModulesSorted({ force = false, onRevalidated } = {}) 
   if (force) invalidateCache(KEY)
   const { data, error } = await cachedQuery(KEY, fetchRows, {
     ttl: 5 * MINUTE,
+    versioned: true,
     onUpdate: result => { if (!result.error) onRevalidated?.(result.data) },
   })
   return { modules: data || [], error }

@@ -8,7 +8,9 @@ const QUESTIONS = 'questions:'
 const ANSWER_KEYS = 'answer-keys:'
 const SUMMARIES = 'summaries:'
 const FACETS = 'facets:'
-const KEY_PREFIXES = [QUESTIONS, ANSWER_KEYS, SUMMARIES, FACETS]
+const FILES = 'files:'
+export const SIMULATOR_KEY = 'simulator:'
+const KEY_PREFIXES = [QUESTIONS, ANSWER_KEYS, SUMMARIES, FACETS, FILES, SIMULATOR_KEY]
 
 const QUESTION_COLUMNS = 'id, question, option_a, option_b, option_c, option_d, exam_type, exam_stage, module_id, subject_id, lesson_id, source, created_at'
 
@@ -21,7 +23,7 @@ export function fetchModuleQuestions(moduleId, onUpdate) {
       .eq('module_id', moduleId)
       .order('created_at')
       .order('id')),
-    { ttl: 30 * MINUTE, onUpdate }
+    { ttl: 30 * MINUTE, onUpdate, versioned: true }
   )
 }
 
@@ -31,7 +33,7 @@ export function fetchModuleAnswerKeys(moduleId) {
     () => fetchAllRows(() => supabase
       .rpc('get_module_answer_keys', { p_module_id: moduleId })
       .order('question_id')),
-    { ttl: 30 * MINUTE }
+    { ttl: 30 * MINUTE, versioned: true }
   )
 }
 
@@ -52,7 +54,7 @@ export function fetchModuleSummaries(moduleId, onUpdate) {
       .eq('module_id', moduleId)
       .order('created_at')
       .order('id')),
-    { ttl: 10 * MINUTE, onUpdate }
+    { ttl: 10 * MINUTE, onUpdate, versioned: true }
   )
 }
 
@@ -60,7 +62,21 @@ export function fetchModuleFacets(moduleId, onUpdate) {
   return cachedQuery(
     `${FACETS}${moduleId}`,
     () => supabase.rpc('get_module_content_facets', { p_module_id: moduleId }),
-    { ttl: 5 * MINUTE, onUpdate }
+    { ttl: 5 * MINUTE, onUpdate, versioned: true }
+  )
+}
+
+// Plain TTL: file edits are not confirmed to bump content_versions.
+export function fetchModuleFiles(moduleId, onUpdate) {
+  return cachedQuery(
+    `${FILES}${moduleId}`,
+    () => fetchAllRows(() => supabase
+      .from('files')
+      .select('*')
+      .eq('module_id', moduleId)
+      .order('created_at', { ascending: false })
+      .order('id')),
+    { ttl: 10 * MINUTE, onUpdate }
   )
 }
 
@@ -90,4 +106,9 @@ export function invalidateModuleContent(moduleId) {
 export async function clearAnswerKeyCaches() {
   const keys = await idbKeys()
   keys.forEach(key => { if (typeof key === 'string' && key.startsWith(ANSWER_KEYS)) invalidateCache(key) })
+}
+
+export async function clearFileCaches() {
+  const keys = await idbKeys()
+  keys.forEach(key => { if (typeof key === 'string' && key.startsWith(FILES)) invalidateCache(key) })
 }
