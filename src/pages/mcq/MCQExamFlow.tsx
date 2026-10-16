@@ -46,6 +46,7 @@ interface MCQExamFlowProps {
   goNext: () => void
 }
 
+// Style for the translucent pill buttons on the results screens.
 function glassPillBtn(overrides: React.CSSProperties = {}): React.CSSProperties {
   return {
     background: 'rgba(1,12,74,0.28)',
@@ -55,6 +56,8 @@ function glassPillBtn(overrides: React.CSSProperties = {}): React.CSSProperties 
     ...overrides
   }
 }
+
+// Style for the solid cobalt "Done" pill on the results screens.
 function solidPillBtn(pt: ReturnType<typeof getPulseTheme>): React.CSSProperties {
   return {
     flex: 1, background: pt.cobalt, border: 'none', borderRadius: 999, padding: '13px',
@@ -71,7 +74,8 @@ const barBtnBase: React.CSSProperties = {
   fontFamily: pulseFonts.body, fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap',
 }
 
-function TopGlassButton({ dark, onClick, ariaLabel, style, children }: {
+// Glass pill button used in the exam header (text size, exit).
+function TopGlassButton({ dark, onClick, ariaLabel, children }: {
   dark: boolean; onClick: () => void; ariaLabel: string; children: React.ReactNode
 }) {
   const pt = getPulseTheme(dark)
@@ -91,6 +95,7 @@ function TopGlassButton({ dark, onClick, ariaLabel, style, children }: {
   )
 }
 
+// Full exam screen: question view, bottom navigation bar, results and answer review.
 export default function MCQExamFlow({
   dark, quizMode, submitted, grading, quizQuestions, answers, results,
   flaggedIds, struckOut, currentIndex, setCurrentIndex,
@@ -106,6 +111,7 @@ export default function MCQExamFlow({
   const barRef = useRef<HTMLDivElement>(null)
   const [barHeight, setBarHeight] = useState(96)
 
+  // Number of questions the server graded as correct.
   function getScore() {
     return quizQuestions.filter(q => results[q.id]?.is_correct).length
   }
@@ -133,11 +139,13 @@ export default function MCQExamFlow({
   const barVisible = !submitted && !grading && !!currentQuestion
   const currentFlagged = !!currentQuestion && flaggedIds.has(currentQuestion.id)
 
+  // Exits immediately, or asks for confirmation when answers would be lost.
   function requestExit() {
     if (!submitted && answeredCount > 0) setConfirmExitOpen(true)
     else stopQuiz()
   }
 
+  // Keeps the page padding and toast position clear of the fixed bottom bar.
   useEffect(() => {
     if (!barVisible) return
     const el = barRef.current
@@ -236,7 +244,7 @@ export default function MCQExamFlow({
                 <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1, color: EXAM_TOP_TEXT, marginTop: 8 }}>
                   QUESTION {safeIndex + 1} / {total}
                 </div>
-                {/* Stopwatch — counts up, same for every mode, no limit/auto-submit. */}
+                {/* Stopwatch: counts up in every mode, no limit or auto-submit. */}
                 <div style={{
                   fontFamily: 'monospace', fontWeight: 800, fontSize: 24, marginTop: 8,
                   color: EXAM_TOP_TEXT
@@ -353,6 +361,7 @@ export default function MCQExamFlow({
 
                         const hoverBgFinal = revealed ? 'transparent' : selected ? `${pt.cobalt}20` : hoverBg
 
+                        // Selects the option on Enter/Space (disabled once the answer is revealed).
                         function handleOptionKeyDown(e: React.KeyboardEvent) {
                           if (revealed) return
                           if (e.key === 'Enter' || e.key === ' ') {
