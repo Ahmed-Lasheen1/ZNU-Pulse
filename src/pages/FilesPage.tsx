@@ -10,7 +10,7 @@ import MediaOverlay from '../components/MediaOverlay'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PageShell from '../components/pulse/PageShell'
 import PageIntro from '../components/pulse/PageIntro'
-import LoadingText from '../components/pulse/LoadingText'
+import { FilesSkeleton } from '../components/pulse/Skeletons'
 import EmptyState from '../components/pulse/EmptyState'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
 import { useBodyScrollLock } from '../lib/useBodyScrollLock'
@@ -140,6 +140,8 @@ export default function FilesPage({ dark }: { dark: boolean }) {
       }
     } else if (modulesLoaded && selectableModules.length > 0 && !activeModule) {
       setActiveModule(selectableModules[0].id)
+    } else if (modulesLoaded && selectableModules.length === 0) {
+      setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules, moduleParam])
@@ -261,7 +263,7 @@ export default function FilesPage({ dark }: { dark: boolean }) {
         />
       )}
 
-      {loading && <LoadingText />}
+      {loading && <FilesSkeleton />}
 
       {!loading && availableTypes.length === 0 && (
         <EmptyState dark={dark} message="No files yet 🚧" />

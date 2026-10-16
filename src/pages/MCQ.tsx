@@ -147,14 +147,18 @@ export default function MCQ({ dark }: { dark: boolean }) {
   }, [])
 
   useEffect(() => {
-    if (modulesLoaded && modules.length > 0 && !activeModule) {
-      const params = new URLSearchParams(location.search)
-      const moduleParam = params.get('module')
-      const fromLink = moduleParam && modules.find((m: any) => m.id === moduleParam)
-      if (fromLink) { setActiveModule(fromLink.id); return }
-      const active = modules.find((m: any) => m.status === 'active')
-      setActiveModule(active ? active.id : modules[0].id)
+    if (!modulesLoaded) return
+    if (modules.length === 0) {
+      setLoading(false)
+      return
     }
+    if (activeModule) return
+    const params = new URLSearchParams(location.search)
+    const moduleParam = params.get('module')
+    const fromLink = moduleParam && modules.find((m: any) => m.id === moduleParam)
+    if (fromLink) { setActiveModule(fromLink.id); return }
+    const active = modules.find((m: any) => m.status === 'active')
+    setActiveModule(active ? active.id : modules[0].id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules])
 
@@ -614,8 +618,10 @@ export default function MCQ({ dark }: { dark: boolean }) {
         : null
 
     let resultMap: Record<string, any> | null = null
+    let attemptedOnline = false
 
     if (navigator.onLine) {
+      attemptedOnline = true
       const response = user
         ? await supabase.rpc('submit_quiz_attempt', {
             p_answers: payload,
@@ -673,6 +679,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
           userId: user.id, moduleId: historyModuleId, subjectId: historySubjectId, quizType: quizMode,
           timeSec, completedAt: Date.now(), answers: payload,
           total, correct: correctCount, score: scorePercent, incorrectQuestions: incorrectSnapshots,
+          possibleDuplicate: attemptedOnline,
         })
         showToast(saved ? OFFLINE_SAVED_MESSAGE : OFFLINE_SAVE_FAILED_MESSAGE, saved ? 'info' : 'error')
       } else {

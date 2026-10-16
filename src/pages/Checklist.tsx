@@ -9,7 +9,7 @@ import { glassInput } from '../components/pulse/PulseUI'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PageShell from '../components/pulse/PageShell'
 import PageIntro from '../components/pulse/PageIntro'
-import LoadingText from '../components/pulse/LoadingText'
+import { ChecklistSkeleton } from '../components/pulse/Skeletons'
 import OfflineNote from '../components/pulse/OfflineNote'
 import ErrorBanner from '../components/ErrorBanner'
 import TabRow from '../components/TabRow'
@@ -454,7 +454,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
         </LiquidGlassCard>
       </div>
 
-      {(!modulesLoaded || tasksLoading) && <LoadingText />}
+      {(!modulesLoaded || tasksLoading) && <ChecklistSkeleton />}
 
       {modulesLoaded && !tasksLoading && totalTasks === 0 && (
         <LiquidGlassCard dark={dark} delay={200} style={{ padding: 40, textAlign: 'center' }}>

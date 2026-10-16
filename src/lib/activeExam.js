@@ -1,18 +1,37 @@
 import { supabase } from '../supabase'
 import { idbGet, idbSet, idbDelete } from './idb'
+import { fetchModuleQuestions } from './moduleContent'
 import { getGuestActiveExam, saveGuestActiveExam, clearGuestActiveExam } from './reviewStorage'
 
 const localKey = user => `active-exam:${user.id}`
-const SERVER_SAVE_INTERVAL_MS = 15000
+const SERVER_SAVE_INTERVAL_MS = 30000
 
 let pending = null
 let timer = null
 let lastServerSave = 0
 let epoch = 0
 
-// Paused-exam persistence. Signed-in users keep a copy on the device so progress
-// survives reloads without a connection; the server copy is uploaded at most every
-// 15s (and when the page is hidden). Guests use localStorage.
+function toServerPayload(payload) {
+  const { quizQuestions, ...rest } = payload
+  return { ...rest, quizQuestionIds: (quizQuestions || []).map(q => q.id) }
+}
+
+async function hydrateExam(exam) {
+  if (!exam || exam.quizQuestions) return exam
+  const ids = exam.quizQuestionIds
+  if (!Array.isArray(ids) || !exam.activeModule) return null
+  const { data } = await fetchModuleQuestions(exam.activeModule)
+  const byId = new Map((data || []).map(q => [q.id, q]))
+  const quizQuestions = ids.map(id => byId.get(id))
+  if (quizQuestions.some(q => !q)) return null
+  const { quizQuestionIds, ...rest } = exam
+  return { ...rest, quizQuestions }
+}
+
+// Paused-exam persistence. Signed-in users keep a full copy on the device so progress
+// survives reloads without a connection; the server copy stores only question ids and
+// answers, is uploaded at most every 30s (and when the page is hidden), and is rebuilt
+// from the cached question bank on load. Guests use localStorage.
 export async function loadSavedActiveExam(user) {
   if (!user) return getGuestActiveExam()
 
@@ -24,12 +43,12 @@ export async function loadSavedActiveExam(user) {
   if (local?.cleared) {
     if (remote && remote.savedAt > local.clearedAt) {
       idbDelete(localKey(user))
-      return remote
+      return hydrateExam(remote)
     }
     await clearActiveExam(user)
     return null
   }
-  if (!local) return remote
+  if (!local) return hydrateExam(remote)
   if (!remote) {
     if (local.synced) {
       idbDelete(localKey(user))
@@ -37,7 +56,7 @@ export async function loadSavedActiveExam(user) {
     }
     return local.payload
   }
-  return local.payload.savedAt > remote.savedAt ? local.payload : remote
+  return local.payload.savedAt > remote.savedAt ? local.payload : hydrateExam(remote)
 }
 
 // Existence only (Home's "continue" card) — avoids downloading the whole exam.
@@ -57,7 +76,7 @@ export async function hasSavedActiveExam(user) {
 async function uploadActiveExam({ user, payload }) {
   lastServerSave = Date.now()
   const { error } = await supabase.from('active_exams').upsert(
-    { user_id: user.id, exam_data: payload, updated_at: new Date().toISOString() },
+    { user_id: user.id, exam_data: toServerPayload(payload), updated_at: new Date().toISOString() },
     { onConflict: 'user_id' }
   )
   if (error) return

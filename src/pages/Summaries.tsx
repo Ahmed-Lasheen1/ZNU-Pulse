@@ -6,7 +6,7 @@ import SummaryOverlay from '../components/SummaryOverlay'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PageShell from '../components/pulse/PageShell'
 import TabRow from '../components/TabRow'
-import LoadingText from '../components/pulse/LoadingText'
+import { SummaryListSkeleton } from '../components/pulse/Skeletons'
 import EmptyState from '../components/pulse/EmptyState'
 import { useModules } from '../contexts'
 import { fetchModuleStages } from '../lib/moduleStages'
@@ -150,7 +150,7 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
         />
       )}
 
-      {loading && <LoadingText />}
+      {loading && <SummaryListSkeleton />}
 
       {!loading && filtered.length === 0 && (
         <EmptyState dark={dark} icon={<ConstructionIcon color={pt.sub} size={14} />} message="No summaries here yet" />

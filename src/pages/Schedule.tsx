@@ -11,7 +11,7 @@ import PulseGlassRow from '../components/pulse/PulseGlassRow'
 import PageShell from '../components/pulse/PageShell'
 import PageIntro from '../components/pulse/PageIntro'
 import EmptyState from '../components/pulse/EmptyState'
-import LoadingText from '../components/pulse/LoadingText'
+import { ScheduleSkeleton } from '../components/pulse/Skeletons'
 import OfflineNote from '../components/pulse/OfflineNote'
 import { useToast } from '../components/ToastProvider'
 import { networkFirst } from '../lib/dataCache'
@@ -88,9 +88,12 @@ export default function Schedule({ dark }: { dark: boolean }) {
       }
       return
     }
-    if (!activeModule && modulesLoaded && selectableModules.length > 0) {
-      setActiveModule(selectableModules[0].id)
+    if (!modulesLoaded) return
+    if (selectableModules.length === 0) {
+      setLoading(false)
+      return
     }
+    if (!activeModule) setActiveModule(selectableModules[0].id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules, moduleParam])
 
@@ -193,7 +196,7 @@ export default function Schedule({ dark }: { dark: boolean }) {
       </div>
 
       {!modulesLoaded || loading ? (
-        <LoadingText />
+        <ScheduleSkeleton />
       ) : filtered.length === 0 ? (
         <EmptyState dark={dark} icon={<EmptyBoxIcon color={pt.sub} size={16} />} message="No schedules yet" />
       ) : (

@@ -1,6 +1,6 @@
 // src/App.jsx
 import { useState, useEffect, useRef, Suspense, lazy } from 'react'
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
 import { supabase, AUTH_STORAGE_KEY } from './supabase'
 import { getPulseTheme } from './premiumTheme'
 import { fetchModulesSorted } from './lib/modules'

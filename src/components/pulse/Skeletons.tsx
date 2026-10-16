@@ -37,6 +37,97 @@ export function CardRowsSkeleton({ count = 3, pill, label = 'Loading' }: { count
   return <Group label={label}><Rows count={count} pill={pill} /></Group>
 }
 
+export function ChecklistSkeleton({ count = 3 }: { count?: number }) {
+  return (
+    <Group label="Loading checklist" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} style={{ ...card, display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px' }}>
+          <Skeleton w={26} h={26} r="50%" />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Skeleton w={i % 2 === 0 ? '62%' : '48%'} />
+            <Skeleton w="28%" h={11} />
+          </div>
+          <Skeleton w={8} h={8} r="50%" />
+          <Skeleton w={40} h={40} r="50%" />
+        </div>
+      ))}
+    </Group>
+  )
+}
+
+export function ScheduleSkeleton({ count = 3 }: { count?: number }) {
+  return (
+    <Group label="Loading schedules" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} style={{ ...card, borderRadius: 999, display: 'flex', alignItems: 'center', gap: 14, padding: '10px 18px 10px 10px' }}>
+          <Skeleton w={46} h={46} r="50%" />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Skeleton w="50%" />
+            <Skeleton w="30%" h={11} />
+          </div>
+          <Skeleton w={76} h={34} r={10} />
+        </div>
+      ))}
+    </Group>
+  )
+}
+
+export function FilesSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <Group label="Loading files" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} style={{ ...card, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '16px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+            <Skeleton w={22} h={22} r={6} />
+            <Skeleton w={i % 2 === 0 ? '55%' : '40%'} h={15} />
+          </div>
+          <Skeleton w={84} h={34} r={999} />
+        </div>
+      ))}
+    </Group>
+  )
+}
+
+export function SummaryListSkeleton({ count = 3 }: { count?: number }) {
+  return (
+    <Group label="Loading summaries" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} style={{ ...card, display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px' }}>
+          <Skeleton w={40} h={40} r={12} />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Skeleton w={i % 2 === 0 ? '68%' : '52%'} h={15} />
+            <Skeleton w="28%" h={11} />
+          </div>
+          <Skeleton w={74} h={28} r={999} />
+        </div>
+      ))}
+    </Group>
+  )
+}
+
+export function QuestionCardsSkeleton({ count = 3 }: { count?: number }) {
+  return (
+    <Group label="Loading questions" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} style={{ ...card, padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            <Skeleton w={15} h={15} r={4} />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <Skeleton w="88%" h={15} />
+              <Skeleton w="55%" h={15} />
+            </div>
+          </div>
+          <div style={{ borderRadius: 10, padding: '12px 16px', background: 'rgba(255,255,255,0.14)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Skeleton w={64} h={11} />
+            <Skeleton w="92%" />
+            <Skeleton w="70%" />
+          </div>
+        </div>
+      ))}
+    </Group>
+  )
+}
+
 export function ReportGridSkeleton() {
   return (
     <Group label="Loading weekly report" className="pulse-report-grid">

@@ -7,7 +7,7 @@ import { glassInput } from '../components/pulse/PulseUI'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PageShell from '../components/pulse/PageShell'
 import PageIntro from '../components/pulse/PageIntro'
-import LoadingText from '../components/pulse/LoadingText'
+import { QuestionCardsSkeleton } from '../components/pulse/Skeletons'
 import EmptyState from '../components/pulse/EmptyState'
 import OfflineNote from '../components/pulse/OfflineNote'
 import ErrorBanner from '../components/ErrorBanner'
@@ -347,7 +347,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
         <h3 style={{ ...pulseType.sectionLabel, color: '#4ade80', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
           <CheckCircleIcon color="#4ade80" size={14} /> Answered Questions ({answeredQs.length})
         </h3>
-        {loading && <LoadingText />}
+        {loading && <QuestionCardsSkeleton />}
         {!loading && !loadError && answeredQs.length === 0 && (
           <EmptyState dark={dark} icon={<EmptyBoxIcon color={pt.sub} size={16} />} message="No answered questions yet" />
         )}
