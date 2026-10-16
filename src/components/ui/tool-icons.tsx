@@ -394,11 +394,12 @@ export function OfflineIcon({ color, size = 14 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <g stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 3L21 21" />
-        <path d="M5.3 9.4a12 12 0 0 1 13.4 0" opacity="0.85" />
-        <path d="M8.5 12.7a7 7 0 0 1 4.2-1.9" opacity="0.85" />
+        <path d="M5.5 9.5a12 12 0 0 1 13 0" />
+        <path d="M8.5 12.7a7 7 0 0 1 7 0" />
+        <path d="M11 16a2.5 2.5 0 0 1 2 0" />
+        <path d="M3 3L21 21" strokeWidth="2" />
       </g>
-      <circle cx="12" cy="17.5" r="1.4" fill={color} />
+      <circle cx="12" cy="18" r="1.2" fill={color} />
     </svg>
   )
 }
