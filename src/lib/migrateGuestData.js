@@ -9,7 +9,11 @@ import {
 async function safeInsert(table, row) {
   try {
     const { error } = await supabase.from(table).insert(row)
-    // 23505 = already exists = success.
+    // 23505 = already exists = success. 42501 = rejected by the table's rules, can never succeed.
+    if (error && error.code === '42501') {
+      console.warn(`[migrateGuestData] Dropped a row the ${table} rules reject:`, error.message)
+      return true
+    }
     if (error && error.code !== '23505') {
       console.warn(`[migrateGuestData] Could not migrate a row into ${table}:`, error.message)
       return false

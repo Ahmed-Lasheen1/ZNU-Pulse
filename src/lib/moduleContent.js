@@ -66,7 +66,6 @@ export function fetchModuleFacets(moduleId, onUpdate) {
   )
 }
 
-// Plain TTL: file edits are not confirmed to bump content_versions.
 export function fetchModuleFiles(moduleId, onUpdate) {
   return cachedQuery(
     `${FILES}${moduleId}`,
@@ -76,7 +75,7 @@ export function fetchModuleFiles(moduleId, onUpdate) {
       .eq('module_id', moduleId)
       .order('created_at', { ascending: false })
       .order('id')),
-    { ttl: 10 * MINUTE, onUpdate }
+    { ttl: 10 * MINUTE, onUpdate, versioned: true }
   )
 }
 

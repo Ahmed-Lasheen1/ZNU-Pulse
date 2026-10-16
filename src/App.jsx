@@ -10,7 +10,7 @@ import { syncContentVersions } from './lib/contentVersions'
 import { clearAnswerKeyCaches } from './lib/moduleContent'
 import { clearHomeHistory } from './lib/homeData'
 import { networkFirst, clearUserCaches } from './lib/dataCache'
-import { flushActiveExam } from './lib/activeExam'
+import { flushActiveExam, removeSyncedLocalExams } from './lib/activeExam'
 import { unsubscribeFromPush } from './lib/pushNotifications'
 import { useOncePerSession } from './lib/useOncePerSession'
 import { storageGet, storageSet } from './lib/safeStorage'
@@ -266,6 +266,7 @@ export default function App() {
     await flushActiveExam().catch(() => {})
     await unsubscribeFromPush()
     await supabase.auth.signOut()
+    await removeSyncedLocalExams().catch(() => {})
     setUser(null)
     setProfile(null)
     clearHomeHistory()

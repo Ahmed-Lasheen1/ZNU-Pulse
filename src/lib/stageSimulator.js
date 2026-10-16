@@ -10,7 +10,7 @@ export async function fetchSimulatorConfig(moduleId) {
       .from('stage_simulator_config')
       .select('stage, subject_id, question_count')
       .eq('module_id', moduleId),
-    { ttl: 5 * MINUTE }
+    { ttl: 30 * MINUTE, versioned: true }
   )
   return { rows: data || [], error }
 }
