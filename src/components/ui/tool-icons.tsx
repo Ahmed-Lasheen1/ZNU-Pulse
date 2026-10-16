@@ -392,19 +392,15 @@ export function SearchIcon2({ color, size = 16 }: IconProps) {
 
 export function OfflineIcon({ color, size = 14 }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <defs>
-        <mask id="offlineWifiMask">
-          <rect width="24" height="24" fill="white" />
-          <path d="M3 3L21 21" stroke="black" strokeWidth="3.2" strokeLinecap="round" />
-        </mask>
-      </defs>
-      <g fill={color} mask="url(#offlineWifiMask)">
-        <path d="M12 4a11.93 11.93 0 0 1 8.49 3.51c.39.39.39 1.02 0 1.41a1 1 0 0 1-1.42 0A9.95 9.95 0 0 0 12 6a9.95 9.95 0 0 0-7.07 2.92 1 1 0 0 1-1.42 0c-.39-.39-.39-1.02 0-1.41A11.93 11.93 0 0 1 12 4Z" />
-        <path d="M12 9a6.96 6.96 0 0 1 4.95 2.05c.39.39.39 1.02 0 1.41a1 1 0 0 1-1.42 0A4.97 4.97 0 0 0 12 11a4.97 4.97 0 0 0-3.53 1.46 1 1 0 0 1-1.42 0c-.39-.39-.39-1.02 0-1.41A6.96 6.96 0 0 1 12 9Z" />
-        <circle cx="12" cy="19.5" r="1.5" />
-      </g>
-      <path d="M3 3L21 21" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    <svg width={size} height={size} viewBox="0 0 48 48" fill={color}>
+      <path d="M19.9 27.3l-.2-1.7a15.6 15.6 0 0 0-7.4 4.9 1.9 1.9 0 0 0-.4 1.2 2 2 0 0 0 .4 1.3 2 2 0 0 0 3.1 0 11.2 11.2 0 0 1 5.3-3.5 3.5 3.5 0 0 1-.8-2.2Z" />
+      <path d="M28.3 25.6l-.2 1.7a3.5 3.5 0 0 1-.8 2.2 11.2 11.2 0 0 1 5.3 3.5 2 2 0 0 0 3.1 0 2.1 2.1 0 0 0 0-2.5 15.6 15.6 0 0 0-7.4-4.9Z" />
+      <path d="M19.1 17.5A23 23 0 0 0 7.5 23.9a2 2 0 0 0-.6 1.4 2.8 2.8 0 0 0 .4 1.2 1.9 1.9 0 0 0 3 .2 18.8 18.8 0 0 1 9.1-5.1Z" />
+      <path d="M28.9 17.5l-.3 4.1a18.8 18.8 0 0 1 9.1 5.1 1.9 1.9 0 0 0 3-.2 2 2 0 0 0-.2-2.6 23 23 0 0 0-11.6-6.4Z" />
+      <path d="M18.5 9.5a32 32 0 0 0-15.9 7.9 2.1 2.1 0 0 0-.2 2.7h0a2 2 0 0 0 3 .2 27.7 27.7 0 0 1 13.4-6.8Z" />
+      <path d="M45.4 17.4a32 32 0 0 0-15.9-7.9l-.3 4a27.7 27.7 0 0 1 13.4 6.8 2 2 0 0 0 3-.2h0a2.1 2.1 0 0 0-.2-2.7Z" />
+      <circle cx="24" cy="38" r="5" />
+      <path d="M23.9 29h.2a1.9 1.9 0 0 0 2-1.9L27.7 7a3.7 3.7 0 1 0-7.4 0l1.6 20.1a1.9 1.9 0 0 0 2 1.9Z" />
     </svg>
   )
 }
