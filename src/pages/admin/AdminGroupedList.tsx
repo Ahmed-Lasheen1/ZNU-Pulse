@@ -35,7 +35,7 @@ export default function AdminGroupedList<T>({
         </p>
       )}
 
-      {loading && <CardRowsSkeleton count={3} label={`Loading ${noun}`} />}
+      {loading && <CardRowsSkeleton count={3} variant="admin" label={`Loading ${noun}`} />}
       {!loading && items.length === 0 && <EmptyState dark={dark} message={emptyMessage} />}
 
       {!loading && modules.map(mod => {

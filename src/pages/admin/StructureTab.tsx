@@ -303,7 +303,7 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
       `}</style>
 
       {loading ? (
-        <CardRowsSkeleton count={4} label="Loading structure" />
+        <CardRowsSkeleton count={4} variant="tree" label="Loading structure" />
       ) : (
         <>
           <div style={{ position: 'relative', marginBottom: searchResults.length > 0 ? 8 : 16 }}>

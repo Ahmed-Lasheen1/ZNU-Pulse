@@ -29,9 +29,8 @@ interface ExamStage { value: string; title: string; emoji?: string; Icon?: (p: {
 
 const PAGE_MAX_WIDTH = 900
 
-// Centered, wrapping tab rows (same treatment as Checklist/Schedule).
 const TAB_ROW_STYLE = {
-  justifyContent: 'center', flexWrap: 'wrap', overflowX: 'visible', rowGap: 10, marginBottom: 16,
+  flexWrap: 'wrap', overflowX: 'visible', rowGap: 10, marginBottom: 16,
 } as const
 
 function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
