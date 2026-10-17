@@ -13,7 +13,7 @@ import { fetchLessonStageMap, inStage } from '../lib/lessonStages'
 import { getGuestFlags, toggleGuestFlag, enrichGuestFlagsWithResults, addGuestHistory } from '../lib/reviewStorage'
 import { loadSavedActiveExam, persistActiveExam, clearActiveExam } from '../lib/activeExam'
 import { storageGet, storageSet } from '../lib/safeStorage'
-import { fetchSimulatorConfig, drawSimulator, shuffle } from '../lib/stageSimulator'
+import { fetchSimulatorConfig, drawSimulator, drawProportional, simulatorTotal, shuffle, MOCK_MAX_QUESTIONS } from '../lib/stageSimulator'
 import { clearHomeHistory } from '../lib/homeData'
 import { optionLabels } from './mcq/mcqShared'
 import MCQBrowse from './mcq/MCQBrowse'
@@ -23,12 +23,23 @@ const OFFLINE_KEYS_MESSAGE = "Answer keys for this module aren't saved on this d
 const OFFLINE_SAVED_MESSAGE = "Saved on this device — it will sync when you're back online. Offline attempts don't earn points."
 const OFFLINE_SAVE_FAILED_MESSAGE = "This device couldn't save the attempt — your results are shown here only."
 
+type StartType = 'mock' | 'practice' | 'simulator'
+
 interface QuizConfig {
   type: string
   subjectId: string | null
   lessonId: string | null
   sourceFilter: string | null
   simulatorStage?: string | null
+}
+
+interface SourceChoice {
+  type: StartType
+  subjectId: string | null
+  lessonId: string | null
+  stage: string | null
+  allCount: number
+  doctorCount: number
 }
 
 // Converts graded rows from the server into a map keyed by question id.
@@ -80,6 +91,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [showReview, setShowReview] = useState(false)
   const [struckOut, setStruckOut] = useState<Record<number, Set<string>>>({})
+  const [sourceChoice, setSourceChoice] = useState<SourceChoice | null>(null)
 
   const FONT_SCALES = [0.9, 1, 1.15, 1.3]
   const [fontScale, setFontScale] = useState<number>(() => {
@@ -202,8 +214,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   useEffect(() => {
     if (lessonFilter && !quizMode && questions.length > 0 && !autoStartedLessonRef.current) {
       autoStartedLessonRef.current = true
-      const lessonQs = questions.filter(q => q.lesson_id === lessonFilter)
-      startRetryQuiz(lessonQs)
+      requestStart('practice', null, lessonFilter)
       clearAutoStartParams()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -212,8 +223,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   useEffect(() => {
     if (subjectFilter && !lessonFilter && !quizMode && questions.length > 0 && !autoStartedSubjectRef.current) {
       autoStartedSubjectRef.current = true
-      const subjectQs = questions.filter(q => q.subject_id === subjectFilter)
-      startRetryQuiz(subjectQs)
+      requestStart('practice', subjectFilter, null)
       clearAutoStartParams()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -224,7 +234,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     if (!activeModule || !simLoaded || !lessonStageMapLoaded || activeStage === 'all') return
     if (!questions.some(q => q.module_id === activeModule)) return
     autoStartedSimulatorRef.current = true
-    startSimulator(activeStage)
+    requestStart('simulator', null, null, activeStage)
     clearAutoStartParams()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [simulatorParam, quizMode, activeModule, activeStage, simLoaded, lessonStageMapLoaded, questions])
@@ -326,7 +336,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const moduleSubjects = subjects.filter(s => s.module_id === activeModule)
   const activeModuleObj = modules.find((m: any) => m.id === activeModule)
 
-  // Questions in the active module/stage/subject for a mock or practice run, optionally limited to one source.
+  // Questions in the active module/stage/subject for a mock run, optionally limited to one source.
   const getFilteredQuestions = (type: string, sourceOnly: string | null = null) => {
     return questions.filter(q => {
       const modMatch = q.module_id === activeModule
@@ -338,6 +348,16 @@ export default function MCQ({ dark }: { dark: boolean }) {
       const sourceMatch = !sourceOnly || q.source === sourceOnly
       return modMatch && typeMatch && subMatch && stageMatch && sourceMatch
     })
+  }
+
+  // Practice questions for one lesson (wins) or subject in the active stage, optionally limited to one source.
+  const getPracticeQuestions = (subjectId: string | null, lessonId: string | null, sourceOnly: string | null = null) => {
+    return questions.filter(q =>
+      (lessonId ? q.lesson_id === lessonId : q.subject_id === subjectId) &&
+      (q.exam_type === 'practice' || q.exam_type === 'both') &&
+      inStage(q, activeStage, lessonStageMap) &&
+      (!sourceOnly || q.source === sourceOnly)
+    )
   }
 
   // Returns the ids (from the given list) the current user or guest has flagged.
@@ -422,16 +442,11 @@ export default function MCQ({ dark }: { dark: boolean }) {
     window.scrollTo({ top: 0 })
   }
 
-  // Starts a mock or practice quiz; `lessonId` wins over `subjectId`, and `sourceFilter` is currently only 'university'.
+  // Starts a mock (capped, spread across subjects and lessons) or practice quiz; `lessonId` wins over `subjectId`.
   function startQuiz(type: string, subjectId: string | null = null, lessonId: string | null = null, sourceFilter: string | null = null) {
     const qs = type === 'mock'
-      ? shuffle(getFilteredQuestions('mock', sourceFilter))
-      : shuffle(questions.filter(q =>
-          (lessonId ? q.lesson_id === lessonId : q.subject_id === subjectId) &&
-          (q.exam_type === 'practice' || q.exam_type === 'both') &&
-          inStage(q, activeStage, lessonStageMap) &&
-          (!sourceFilter || q.source === sourceFilter)
-        ))
+      ? drawProportional(getFilteredQuestions('mock', sourceFilter), MOCK_MAX_QUESTIONS)
+      : shuffle(getPracticeQuestions(subjectId, lessonId, sourceFilter))
 
     if (qs.length === 0) {
       showToast('❌ No questions available for this selection yet', 'error')
@@ -441,15 +456,46 @@ export default function MCQ({ dark }: { dark: boolean }) {
     beginQuiz(qs, type, { type, subjectId, lessonId, sourceFilter, simulatorStage: null })
   }
 
-  // Starts a mock exam drawn at random from the admin's per-subject counts for this stage.
-  function startSimulator(stage: string) {
+  // Starts a simulator exam drawn at random from the admin's per-subject counts for this stage.
+  function startSimulator(stage: string, sourceFilter: string | null = null) {
     const rows = simRows.filter(r => r.stage === stage)
-    const qs = drawSimulator(questions, rows, stage, lessonStageMap)
+    const qs = drawSimulator(questions, rows, stage, lessonStageMap, sourceFilter)
     if (qs.length === 0) {
       showToast('❌ No simulator questions available for this stage yet', 'error')
       return
     }
-    beginQuiz(qs, 'mock', { type: 'mock', subjectId: null, lessonId: null, sourceFilter: null, simulatorStage: stage })
+    beginQuiz(qs, 'simulator', { type: 'simulator', subjectId: null, lessonId: null, sourceFilter, simulatorStage: stage })
+  }
+
+  function launch(type: StartType, subjectId: string | null, lessonId: string | null, stage: string | null, source: string | null) {
+    if (type === 'simulator') startSimulator(stage as string, source)
+    else startQuiz(type, subjectId, lessonId, source)
+  }
+
+  function scopeCount(type: StartType, subjectId: string | null, lessonId: string | null, stage: string | null, source: string | null) {
+    if (type === 'simulator') {
+      return simulatorTotal(questions, simRows.filter(r => r.stage === stage), stage as string, lessonStageMap, source)
+    }
+    return (type === 'mock' ? getFilteredQuestions('mock', source) : getPracticeQuestions(subjectId, lessonId, source)).length
+  }
+
+  // Starts right away, or first asks all-questions vs University Doctors only when that selection mixes both.
+  function requestStart(type: StartType, subjectId: string | null = null, lessonId: string | null = null, stage: string | null = null) {
+    const all = scopeCount(type, subjectId, lessonId, stage, null)
+    const doctors = scopeCount(type, subjectId, lessonId, stage, 'university')
+    if (doctors > 0 && doctors < all) {
+      const shown = (n: number) => type === 'mock' ? Math.min(n, MOCK_MAX_QUESTIONS) : n
+      setSourceChoice({ type, subjectId, lessonId, stage, allCount: shown(all), doctorCount: shown(doctors) })
+      return
+    }
+    launch(type, subjectId, lessonId, stage, null)
+  }
+
+  function chooseSource(source: string | null) {
+    if (!sourceChoice) return
+    const { type, subjectId, lessonId, stage } = sourceChoice
+    setSourceChoice(null)
+    launch(type, subjectId, lessonId, stage, source)
   }
 
   // Starts a retry quiz from a fixed question list (no saved config, never paused or resumed).
@@ -569,7 +615,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   function tryAgain() {
     if (quizMode === 'retry') { startRetryQuiz(quizQuestions); return }
     const config = lastQuizConfigRef.current
-    if (config?.simulatorStage) { startSimulator(config.simulatorStage); return }
+    if (config?.simulatorStage) { startSimulator(config.simulatorStage, config.sourceFilter); return }
     if (config) startQuiz(config.type, config.subjectId, config.lessonId, config.sourceFilter)
     else startQuiz(quizMode!)
   }
@@ -763,8 +809,13 @@ export default function MCQ({ dark }: { dark: boolean }) {
       simulatorRows={simRows}
       simulatorLoading={!simLoaded}
       getFilteredQuestions={getFilteredQuestions}
-      onStartQuiz={startQuiz}
-      onStartSimulator={startSimulator}
+      getPracticeQuestions={getPracticeQuestions}
+      onStartQuiz={requestStart}
+      onStartSimulator={stage => requestStart('simulator', null, null, stage)}
+      sourceChoice={sourceChoice}
+      onChooseAll={() => chooseSource(null)}
+      onChooseDoctors={() => chooseSource('university')}
+      onCancelChoice={() => setSourceChoice(null)}
     />
   )
 }

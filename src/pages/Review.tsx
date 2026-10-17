@@ -27,6 +27,8 @@ import { MCQ_ACCENT } from './mcq/mcqShared'
 const SECTION_GAP = 22
 const ITEM_GAP = 16
 
+const QUIZ_TYPE_LABELS: Record<string, string> = { mock: 'Mock', retry: 'Retry', simulator: 'Simulator' }
+
 interface ReviewModule {
   id: string
   name: string
@@ -333,7 +335,7 @@ export default function Review({ dark }: { dark: boolean }) {
                       {mod && <ModuleIcon value={mod.icon} size={20} color={mod.color} />}
                       <div style={{ minWidth: 0 }}>
                         <div style={{ ...pulseType.cardTitle, fontSize: 14, color: pt.textPrimary }}>
-                          {mod ? mod.name : 'Module'} · {h.quiz_type === 'mock' ? 'Mock' : h.quiz_type === 'retry' ? 'Retry' : 'Practice'}
+                          {mod ? mod.name : 'Module'} · {QUIZ_TYPE_LABELS[h.quiz_type] || 'Practice'}
                         </div>
                         <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2 }}>
                           {new Date(h.completed_at).toLocaleDateString()} · {h.correct}/{h.total} correct

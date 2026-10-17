@@ -1,34 +1,27 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { createPortal } from 'react-dom'
-import { supabase } from '../../supabase'
 import { getPulseTheme } from '../../premiumTheme'
 import ConfirmDialog from '../../components/ConfirmDialog'
-import LiquidGlassCard from '@/components/ui/liquid-glass-card'
+import EmptyState from '../../components/pulse/EmptyState'
 import { CardRowsSkeleton } from '../../components/pulse/Skeletons'
 import { useToast } from '../../components/ToastProvider'
 import { fetchLessonStageMap } from '../../lib/lessonStages'
-import { useBodyScrollLock } from '../../lib/useBodyScrollLock'
+import { ModuleIcon, NotesIcon } from '../../lib/medicalIcons'
+import { PackageIcon, BookIcon, TargetIcon, ConstructionIcon } from '../../components/ui/tool-icons'
+import AdminContextBar from './AdminContextBar'
+import AdminPill from './AdminPill'
+import AdminSplitLayout from './AdminSplitLayout'
+import AdminRow from './AdminRow'
 import ModuleForm from './ModuleForm'
 import SubjectForm from './SubjectForm'
 import LessonForm from './LessonForm'
 import StagesPanel from './StagesPanel'
-import QuickAddRow from './QuickAddRow'
-import TreeRow from './TreeRow'
 import { useStageOptions } from './useStageOptions'
-import { miniBtn, inStyle as adminInStyle } from './adminStyles'
+import { miniBtn, groupHeading } from './adminStyles'
 import { deleteAdminEntity } from './useAdminEntityCrud'
-import { SUBJECT_DEFAULTS, MODULE_DEFAULTS, LESSON_FALLBACK_ICON, normalizeName, freshNames, plural } from './adminHelpers'
-import { TargetIcon, SearchIcon2 } from '../../components/ui/tool-icons'
+import { SUBJECT_DEFAULTS, LESSON_FALLBACK_ICON, plural } from './adminHelpers'
 import type { AdminModule, AdminSubject, AdminLesson, AdminContext } from './adminTypes'
 
 type EntityKind = 'module' | 'subject' | 'lesson'
-
-type Editor =
-  | { kind: 'none' }
-  | { kind: 'module'; id: string | null }
-  | { kind: 'subject'; id: string | null; moduleId: string }
-  | { kind: 'lesson'; id: string | null; subjectId: string }
-  | { kind: 'stages'; moduleId: string }
 
 interface DeleteTarget { kind: EntityKind; id: string }
 
@@ -42,78 +35,43 @@ interface StructureTabProps {
   refresh: () => Promise<void>
 }
 
-const NONE: Editor = { kind: 'none' }
-const NO_SELECTION = { moduleId: '', subjectId: '', lessonId: '' }
+const SEGMENTS = [
+  { id: 'modules', label: 'Modules', Icon: PackageIcon, depth: 0 },
+  { id: 'subjects', label: 'Subjects', Icon: BookIcon, depth: 1 },
+  { id: 'lessons', label: 'Lessons', Icon: NotesIcon, depth: 2 },
+  { id: 'stages', label: 'Stages', Icon: TargetIcon, depth: 1 },
+] as const
 
-const ENTITY_COPY: Record<EntityKind, { table: string; field: 'name' | 'title'; label: string; deleteMessage: string }> = {
+type Segment = typeof SEGMENTS[number]['id']
+
+const FALLBACK_STAGE_COLOR = '#64748b'
+
+const ENTITY_COPY: Record<EntityKind, { table: string; label: string; deleteMessage: string }> = {
   module: {
-    table: 'modules', field: 'name', label: 'Module',
+    table: 'modules', label: 'Module',
     deleteMessage: 'This will also permanently delete all its subjects, files, schedules, questions and summaries. This cannot be undone.',
   },
   subject: {
-    table: 'subjects', field: 'name', label: 'Subject',
+    table: 'subjects', label: 'Subject',
     deleteMessage: 'Its files, lessons and questions will also be deleted. This cannot be undone.',
   },
   lesson: {
-    table: 'lessons', field: 'title', label: 'Lesson',
+    table: 'lessons', label: 'Lesson',
     deleteMessage: 'Questions tagged to it keep their module/subject tags but lose the lesson link. This cannot be undone.',
   },
 }
 
-function editorTouches(editor: Editor, id: string) {
-  if (editor.kind === 'none') return false
-  if (editor.kind === 'module') return editor.id === id
-  if (editor.kind === 'subject') return editor.id === id || editor.moduleId === id
-  if (editor.kind === 'lesson') return editor.id === id || editor.subjectId === id
-  return editor.moduleId === id
-}
-
-function EditorModal({ dark, onClose, children }: { dark: boolean; onClose: () => void; children: React.ReactNode }) {
-  const pt = getPulseTheme(dark)
-  useBodyScrollLock(true)
-
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
-
-  return createPortal(
-    <div
-      role="presentation"
-      onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 3500, overflowY: 'auto',
-        background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
-        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-        padding: 'clamp(12px, 4vh, 40px) 12px',
-      }}
-    >
-      <div role="dialog" aria-modal="true" style={{ width: '100%', maxWidth: 680 }}>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-          <button type="button" onClick={onClose} style={{ ...miniBtn(pt.sub), background: dark ? 'rgba(20,32,54,0.7)' : 'rgba(255,255,255,0.8)' }}>
-            Close
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>,
-    document.body
-  )
-}
-
 export default function StructureTab({ dark, modules, subjects, lessons, context, loading, refresh }: StructureTabProps) {
   const pt = getPulseTheme(dark)
-  const inStyle = adminInStyle(pt, dark)
   const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
   const showMessage = useCallback(
     (text: string) => showToast(text, text.startsWith('❌') ? 'error' : 'success'),
     [showToast]
   )
 
-  const [editor, setEditor] = useState<Editor>(NONE)
+  const [segment, setSegment] = useState<Segment>('lessons')
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
-  const [search, setSearch] = useState('')
   const [stageMap, setStageMap] = useState<Record<string, string[]>>({})
   const stageOptions = useStageOptions(context.moduleId)
 
@@ -123,9 +81,9 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
     return () => { ignore = true }
   }, [lessons])
 
-  // Which module/subject is open comes straight from the shared admin context,
-  // so the other admin tabs open on whatever was last expanded here.
-  const { moduleId, subjectId, lessonId } = context
+  const { moduleId, subjectId } = context
+  const currentModule = modules.find(m => m.id === moduleId) ?? null
+  const currentSubject = subjects.find(s => s.id === subjectId) ?? null
 
   const counts = useMemo(() => {
     const subjectsIn: Record<string, number> = {}
@@ -139,97 +97,20 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
     return { subjectsIn, lessonsInModule, lessonsInSubject }
   }, [subjects, lessons])
 
-  const searchTerm = normalizeName(search)
-  const searchResults = searchTerm.length >= 2
-    ? lessons.filter(l => normalizeName(l.title).includes(searchTerm)).slice(0, 8)
-    : []
-
-  function toggleModule(id: string) {
-    context.setContext(moduleId === id ? NO_SELECTION : { moduleId: id, subjectId: '', lessonId: '' })
-  }
-  function toggleSubject(subject: AdminSubject) {
-    context.setContext(
-      subjectId === subject.id
-        ? { moduleId: subject.module_id, subjectId: '', lessonId: '' }
-        : { moduleId: subject.module_id, subjectId: subject.id, lessonId: '' }
-    )
-  }
-  function selectLesson(lesson: AdminLesson) {
-    context.setContext({ moduleId: lesson.module_id, subjectId: lesson.subject_id, lessonId: lesson.id })
-  }
-  function jumpTo(lesson: AdminLesson) {
-    selectLesson(lesson)
-    setSearch('')
+  function changeSegment(next: Segment) {
+    setSegment(next)
+    setEditingId(null)
   }
 
-  async function renameEntity(kind: EntityKind, id: string, value: string) {
-    const copy = ENTITY_COPY[kind]
-    let siblings: { id: string; name: string }[] = []
-    let current = ''
-
-    if (kind === 'module') {
-      siblings = modules.map(m => ({ id: m.id, name: m.name }))
-      current = modules.find(m => m.id === id)?.name ?? ''
-    } else if (kind === 'subject') {
-      const subject = subjects.find(s => s.id === id)
-      siblings = subjects.filter(s => s.module_id === subject?.module_id).map(s => ({ id: s.id, name: s.name }))
-      current = subject?.name ?? ''
-    } else {
-      const lesson = lessons.find(l => l.id === id)
-      siblings = lessons.filter(l => l.subject_id === lesson?.subject_id).map(l => ({ id: l.id, name: l.title }))
-      current = lesson?.title ?? ''
-    }
-
-    if (value === current) return true
-    if (siblings.some(s => s.id !== id && normalizeName(s.name) === normalizeName(value))) {
-      showMessage(`❌ ${copy.label} name already exists here`)
-      return false
-    }
-
-    const { error } = await supabase.from(copy.table).update({ [copy.field]: value }).eq('id', id)
-    if (error) { showMessage('❌ ' + error.message); return false }
-    showMessage(`✅ ${copy.label} renamed`)
-    await refresh()
-    return true
+  function openSubjects(module: AdminModule) {
+    context.setContext({ moduleId: module.id, subjectId: '', lessonId: '' })
+    changeSegment('subjects')
   }
 
-  async function quickInsert(
-    table: 'modules' | 'subjects' | 'lessons',
-    noun: string,
-    names: string[],
-    existingNames: string[],
-    build: (name: string, createdAt: string) => Record<string, unknown>,
-    direction: 1 | -1 = 1
-  ) {
-    const fresh = freshNames(names, new Set(existingNames.map(normalizeName)))
-    if (fresh.length === 0) { showMessage('❌ Already exists here'); return false }
-    const base = Date.now()
-    const { error } = await supabase.from(table).insert(fresh.map((name, i) => build(name, new Date(base + i * direction).toISOString())))
-    if (error) { showMessage('❌ ' + error.message); return false }
-    const skipped = names.length - fresh.length
-    showMessage(`✅ ${plural(fresh.length, noun)} added${skipped > 0 ? ` (${skipped} already existed)` : ''}`)
-    await refresh()
-    return true
+  function openLessons(subject: AdminSubject) {
+    context.setContext({ moduleId: subject.module_id, subjectId: subject.id, lessonId: '' })
+    changeSegment('lessons')
   }
-
-  const quickAddModules = (names: string[]) => quickInsert(
-    'modules', 'module', names, modules.map(m => m.name),
-    (name, createdAt) => ({ name, color: MODULE_DEFAULTS.color, icon: MODULE_DEFAULTS.icon, status: MODULE_DEFAULTS.status, created_at: createdAt }),
-    -1
-  )
-
-  const quickAddSubjects = (module: AdminModule, names: string[]) => quickInsert(
-    'subjects', 'subject', names, subjects.filter(s => s.module_id === module.id).map(s => s.name),
-    (name, createdAt) => ({
-      name, module_id: module.id, type: SUBJECT_DEFAULTS.type,
-      icon: SUBJECT_DEFAULTS.icon, color: SUBJECT_DEFAULTS.color, created_at: createdAt,
-    })
-  )
-
-  const quickAddLessons = (subject: AdminSubject, names: string[]) => quickInsert(
-    'lessons', 'lesson', names, lessons.filter(l => l.subject_id === subject.id).map(l => l.title),
-    (title, createdAt) => ({ title, subject_id: subject.id, module_id: subject.module_id, icon: null, created_at: createdAt })
-  )
 
   async function confirmDelete() {
     if (!deleteTarget) return
@@ -239,237 +120,211 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
     const error = await deleteAdminEntity(copy.table, id)
     showMessage(error ? '❌ ' + error.message : `✅ ${copy.label} deleted`)
     if (error) return
-
-    if (editorTouches(editor, id)) setEditor(NONE)
-    if (kind === 'module' && moduleId === id) context.setContext(NO_SELECTION)
-    else if (kind === 'subject' && subjectId === id) context.setContext({ moduleId, subjectId: '', lessonId: '' })
-    else if (kind === 'lesson' && lessonId === id) context.setContext({ moduleId, subjectId, lessonId: '' })
+    if (editingId === id) setEditingId(null)
     await refresh()
   }
 
-  function renderForm() {
-    const common = { dark, showMessage, onSaved: refresh, onDone: () => setEditor(NONE) }
+  const common = { dark, showMessage, onSaved: refresh, onDone: () => setEditingId(null) }
 
-    if (editor.kind === 'module') {
-      const module = editor.id ? modules.find(m => m.id === editor.id) ?? null : null
-      return <ModuleForm key={`module-${editor.id ?? 'new'}`} {...common} module={module} modules={modules} />
-    }
+  const prompt = (text: string) => <EmptyState dark={dark} message={text} />
 
-    if (editor.kind === 'subject') {
-      const subject = editor.id ? subjects.find(s => s.id === editor.id) ?? null : null
-      const parent = modules.find(m => m.id === (subject ? subject.module_id : editor.moduleId))
-      if (parent) return <SubjectForm key={`subject-${editor.id ?? `new-${parent.id}`}`} {...common} subject={subject} module={parent} subjects={subjects} />
-    }
+  const emptyList = (noun: string) => (
+    <EmptyState dark={dark} message={<><ConstructionIcon color={pt.sub} size={14} /> No {noun} yet — add one on the left</>} />
+  )
 
-    if (editor.kind === 'lesson') {
-      const lesson = editor.id ? lessons.find(l => l.id === editor.id) ?? null : null
-      const subject = subjects.find(s => s.id === (lesson ? lesson.subject_id : editor.subjectId))
-      const parent = modules.find(m => m.id === subject?.module_id)
-      if (subject && parent) return <LessonForm key={`lesson-${editor.id ?? `new-${subject.id}`}`} {...common} lesson={lesson} module={parent} subject={subject} />
-    }
+  const muted = { color: pt.textMuted, fontSize: 12 }
 
-    if (editor.kind === 'stages') {
-      const parent = modules.find(m => m.id === editor.moduleId)
-      if (parent) {
-        return (
-          <StagesPanel
-            key={`stages-${parent.id}`}
-            dark={dark}
-            module={parent}
-            subjects={subjects.filter(s => s.module_id === parent.id)}
-            showMessage={showMessage}
-          />
-        )
-      }
-    }
-    return null
+  function renderModules() {
+    const module = editingId ? modules.find(m => m.id === editingId) ?? null : null
+
+    const form = <ModuleForm key={`module-${module?.id ?? 'new'}`} {...common} module={module} modules={modules} />
+
+    const list = (
+      <div>
+        <h4 style={groupHeading(pt.cobalt)}>Modules ({modules.length})</h4>
+        {modules.length === 0 ? emptyList('modules') : (
+          <div className="admin-list-grid">
+            {modules.map(m => (
+              <AdminRow
+                key={m.id}
+                dark={dark}
+                noun="module"
+                label={m.name}
+                active={editingId === m.id}
+                actions={<button type="button" onClick={() => openSubjects(m)} style={miniBtn(pt.sub)}>Subjects →</button>}
+                onEdit={() => setEditingId(m.id)}
+                onDelete={() => setDeleteTarget({ kind: 'module', id: m.id })}
+              >
+                <ModuleIcon value={m.icon} size={18} color={m.color} />
+                <span style={{ color: pt.text, fontWeight: 700 }}>{m.name}</span>
+                <span style={muted}>
+                  · {plural(counts.subjectsIn[m.id] || 0, 'subject')} · {plural(counts.lessonsInModule[m.id] || 0, 'lesson')}
+                  {m.status === 'completed' ? ' · Completed' : ''}
+                </span>
+              </AdminRow>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+
+    return <AdminSplitLayout form={form} list={list} />
   }
 
-  const form = renderForm()
-  const hover = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.45)'
+  function renderSubjects() {
+    if (!currentModule) return prompt('Pick a module above to manage its subjects')
+
+    const subject = editingId ? subjects.find(s => s.id === editingId) ?? null : null
+    const parent = subject ? modules.find(m => m.id === subject.module_id) ?? null : currentModule
+    if (!parent) return prompt('Pick a module above to manage its subjects')
+
+    const visible = subjects.filter(s => s.module_id === currentModule.id)
+
+    const form = (
+      <SubjectForm
+        key={`subject-${subject?.id ?? `new-${parent.id}`}`}
+        {...common}
+        subject={subject}
+        module={parent}
+        subjects={subjects}
+      />
+    )
+
+    const list = (
+      <div>
+        <h4 style={groupHeading(currentModule.color)}>Subjects in {currentModule.name} ({visible.length})</h4>
+        {visible.length === 0 ? emptyList('subjects') : (
+          <div className="admin-list-grid">
+            {visible.map(s => (
+              <AdminRow
+                key={s.id}
+                dark={dark}
+                noun="subject"
+                label={s.name}
+                active={editingId === s.id}
+                actions={<button type="button" onClick={() => openLessons(s)} style={miniBtn(pt.sub)}>Lessons →</button>}
+                onEdit={() => setEditingId(s.id)}
+                onDelete={() => setDeleteTarget({ kind: 'subject', id: s.id })}
+              >
+                <ModuleIcon value={s.icon} size={18} color={s.color || SUBJECT_DEFAULTS.color} fallbackEmoji={SUBJECT_DEFAULTS.icon} />
+                <span style={{ color: pt.text, fontWeight: 700 }}>{s.name}</span>
+                <span style={muted}>· {plural(counts.lessonsInSubject[s.id] || 0, 'lesson')}</span>
+              </AdminRow>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+
+    return <AdminSplitLayout form={form} list={list} />
+  }
+
+  function renderLessons() {
+    if (!currentModule) return prompt('Pick a module above to manage its lessons')
+
+    const lesson = editingId ? lessons.find(l => l.id === editingId) ?? null : null
+    const formSubject = subjects.find(s => s.id === (lesson ? lesson.subject_id : subjectId)) ?? null
+    const formModule = formSubject ? modules.find(m => m.id === formSubject.module_id) ?? null : null
+    const moduleHasSubjects = subjects.some(s => s.module_id === currentModule.id)
+
+    const form = formSubject && formModule ? (
+      <LessonForm
+        key={`lesson-${lesson?.id ?? `new-${formSubject.id}`}`}
+        {...common}
+        lesson={lesson}
+        module={formModule}
+        subject={formSubject}
+      />
+    ) : prompt(moduleHasSubjects ? 'Pick a subject above to add a lesson' : 'This module has no subjects yet — add one in the Subjects tab')
+
+    const visible = lessons.filter(l => (subjectId ? l.subject_id === subjectId : l.module_id === currentModule.id))
+    const scopeName = currentSubject ? currentSubject.name : currentModule.name
+
+    const list = (
+      <div>
+        <h4 style={groupHeading(currentModule.color)}>Lessons in {scopeName} ({visible.length})</h4>
+        {visible.length === 0 ? emptyList('lessons') : (
+          <div className="admin-list-grid">
+            {visible.map(l => (
+              <AdminRow
+                key={l.id}
+                dark={dark}
+                noun="lesson"
+                label={l.title}
+                active={editingId === l.id}
+                onEdit={() => setEditingId(l.id)}
+                onDelete={() => setDeleteTarget({ kind: 'lesson', id: l.id })}
+              >
+                <ModuleIcon value={l.icon} size={18} color={currentSubject?.color || SUBJECT_DEFAULTS.color} fallbackEmoji={LESSON_FALLBACK_ICON} />
+                <span style={{ color: pt.text, fontWeight: 600, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{l.title}</span>
+                {!subjectId && (
+                  <span style={muted}>· {subjects.find(s => s.id === l.subject_id)?.name ?? ''}</span>
+                )}
+                {(stageMap[l.id] || []).map(value => {
+                  const option = stageOptions.find(o => o.value === value)
+                  const color = option?.color ?? FALLBACK_STAGE_COLOR
+                  return (
+                    <span key={value} style={{
+                      background: `${color}22`, border: `1px solid ${color}55`, color,
+                      borderRadius: 999, padding: '1px 8px', fontSize: 10.5, fontWeight: 700
+                    }}>{option?.label ?? value}</span>
+                  )
+                })}
+              </AdminRow>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+
+    return <AdminSplitLayout form={form} list={list} />
+  }
+
+  function renderStages() {
+    if (!currentModule) return prompt('Pick a module above to manage its exam stages')
+    return (
+      <div style={{ maxWidth: 760, margin: '0 auto' }}>
+        <StagesPanel
+          key={`stages-${currentModule.id}`}
+          dark={dark}
+          module={currentModule}
+          subjects={subjects.filter(s => s.module_id === currentModule.id)}
+          showMessage={showMessage}
+        />
+      </div>
+    )
+  }
+
+  const depth = SEGMENTS.find(s => s.id === segment)?.depth ?? 0
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto' }}>
-      <style>{`
-        .st-row { border: 1px solid transparent; border-radius: 12px; padding: 4px 6px; transition: background 0.15s ease; }
-        .st-row:hover { background: ${hover}; }
-        .st-row-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-        .st-row-main {
-          display: flex; align-items: center; gap: 8px; flex: 1 1 200px; min-width: 0; padding: 6px 2px;
-          background: transparent; border: none; border-radius: 8px; text-align: left; cursor: pointer; font: inherit; color: inherit;
-        }
-        .st-row-actions { display: flex; gap: 6px; flex-shrink: 0; margin-left: auto; }
-        .st-children { margin: 2px 0 8px 18px; padding-left: 10px; border-left: 2px solid var(--st-line); }
-      `}</style>
+    <div>
+      <div className="admin-tabs" style={{ marginBottom: 16 }}>
+        {SEGMENTS.map(s => (
+          <AdminPill
+            key={s.id}
+            dark={dark}
+            active={segment === s.id}
+            label={s.label}
+            Icon={s.Icon}
+            onSelect={() => changeSegment(s.id)}
+          />
+        ))}
+      </div>
 
       {loading ? (
-        <CardRowsSkeleton count={4} variant="tree" label="Loading structure" />
+        <CardRowsSkeleton count={4} variant="admin" label="Loading structure" />
       ) : (
         <>
-          <div style={{ position: 'relative', marginBottom: searchResults.length > 0 ? 8 : 16 }}>
-            <input
-              placeholder="Jump to a lesson..."
-              aria-label="Search lessons"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{ ...inStyle, marginBottom: 0, paddingLeft: 34 }}
-            />
-            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-              <SearchIcon2 color={pt.faint} size={14} />
-            </span>
-          </div>
-
-          {searchTerm.length >= 2 && (
-            <div style={{ marginBottom: 16 }}>
-              <LiquidGlassCard dark={dark} delay={0} style={{ padding: '8px 10px' }}>
-                {searchResults.length === 0 && <p style={{ color: pt.textMuted, fontSize: 12.5, padding: 6 }}>No lessons match.</p>}
-                {searchResults.map(lesson => (
-                  <button
-                    key={lesson.id}
-                    type="button"
-                    className="st-row st-row-main glass-focus-ring"
-                    onClick={() => jumpTo(lesson)}
-                    style={{ display: 'block', width: '100%', flex: 'none' }}
-                  >
-                    <div style={{ color: pt.text, fontWeight: 700, fontSize: 13, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{lesson.title}</div>
-                    <div style={{ color: pt.textMuted, fontSize: 11, marginTop: 2 }}>
-                      {[modules.find(m => m.id === lesson.module_id)?.name, subjects.find(s => s.id === lesson.subject_id)?.name].filter(Boolean).join(' › ')}
-                    </div>
-                  </button>
-                ))}
-              </LiquidGlassCard>
-            </div>
+          {depth > 0 && (
+            <AdminContextBar dark={dark} modules={modules} subjects={subjects} lessons={lessons} context={context} depth={depth} />
           )}
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {modules.length === 0 && (
-              <p style={{ color: pt.textMuted, fontSize: 13, textAlign: 'center', padding: 16 }}>No modules yet. Add one below.</p>
-            )}
-
-            {modules.map(mod => {
-              const moduleOpen = mod.id === moduleId
-              const modSubjects = subjects.filter(s => s.module_id === mod.id)
-              return (
-                <LiquidGlassCard key={mod.id} dark={dark} delay={0} style={{ padding: '8px 10px' }}>
-                  <TreeRow
-                    dark={dark}
-                    noun="module"
-                    label={mod.name}
-                    icon={mod.icon}
-                    fallbackIcon={MODULE_DEFAULTS.icon}
-                    color={mod.color}
-                    expandable
-                    open={moduleOpen}
-                    meta={`${plural(counts.subjectsIn[mod.id] || 0, 'subject')} · ${plural(counts.lessonsInModule[mod.id] || 0, 'lesson')}`}
-                    badge={mod.status === 'active' ? undefined : 'Completed'}
-                    onToggle={() => toggleModule(mod.id)}
-                    onRename={name => renameEntity('module', mod.id, name)}
-                    onDetails={() => setEditor({ kind: 'module', id: mod.id })}
-                    onDelete={() => setDeleteTarget({ kind: 'module', id: mod.id })}
-                    extraActions={
-                      <button
-                        type="button"
-                        onClick={() => setEditor({ kind: 'stages', moduleId: mod.id })}
-                        aria-label={`Exam stages for ${mod.name}`}
-                        title="Exam stages"
-                        style={{ ...miniBtn(pt.sub), padding: '6px 8px' }}
-                      >
-                        <TargetIcon color={pt.sub} size={12} />
-                      </button>
-                    }
-                  />
-
-                  {moduleOpen && (
-                    <div className="st-children" style={{ ['--st-line' as string]: `${mod.color}55` } as React.CSSProperties}>
-                      {modSubjects.map(subject => {
-                        const subjectOpen = subject.id === subjectId
-                        const subjectLessons = lessons.filter(l => l.subject_id === subject.id)
-                        const subjectColor = subject.color || SUBJECT_DEFAULTS.color
-                        return (
-                          <div key={subject.id}>
-                            <TreeRow
-                              dark={dark}
-                              noun="subject"
-                              label={subject.name}
-                              icon={subject.icon}
-                              fallbackIcon={SUBJECT_DEFAULTS.icon}
-                              color={subjectColor}
-                              expandable
-                              open={subjectOpen}
-                              meta={plural(counts.lessonsInSubject[subject.id] || 0, 'lesson')}
-                              onToggle={() => toggleSubject(subject)}
-                              onRename={name => renameEntity('subject', subject.id, name)}
-                              onDetails={() => setEditor({ kind: 'subject', id: subject.id, moduleId: subject.module_id })}
-                              onDelete={() => setDeleteTarget({ kind: 'subject', id: subject.id })}
-                            />
-
-                            {subjectOpen && (
-                              <div className="st-children" style={{ ['--st-line' as string]: `${subjectColor}55` } as React.CSSProperties}>
-                                {subjectLessons.map(lesson => (
-                                  <TreeRow
-                                    key={lesson.id}
-                                    dark={dark}
-                                    noun="lesson"
-                                    label={lesson.title}
-                                    icon={lesson.icon}
-                                    fallbackIcon={LESSON_FALLBACK_ICON}
-                                    color={subjectColor}
-                                    expandable={false}
-                                    active={lesson.id === lessonId}
-                                    chips={(stageMap[lesson.id] || []).map(value => {
-                                      const option = stageOptions.find(o => o.value === value)
-                                      return { label: option?.label ?? value, color: option?.color ?? '#64748b' }
-                                    })}
-                                    onToggle={() => selectLesson(lesson)}
-                                    onRename={name => renameEntity('lesson', lesson.id, name)}
-                                    onDetails={() => setEditor({ kind: 'lesson', id: lesson.id, subjectId: lesson.subject_id })}
-                                    onDelete={() => setDeleteTarget({ kind: 'lesson', id: lesson.id })}
-                                  />
-                                ))}
-                                <div style={{ padding: '6px 6px 2px' }}>
-                                  <QuickAddRow
-                                    dark={dark}
-                                    indent={0}
-                                    placeholder="Add lesson"
-                                    onAdd={names => quickAddLessons(subject, names)}
-                                    onDetails={() => setEditor({ kind: 'lesson', id: null, subjectId: subject.id })}
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
-
-                      <div style={{ padding: '6px 6px 2px' }}>
-                        <QuickAddRow
-                          dark={dark}
-                          indent={0}
-                          placeholder="Add subject"
-                          onAdd={names => quickAddSubjects(mod, names)}
-                          onDetails={() => setEditor({ kind: 'subject', id: null, moduleId: mod.id })}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </LiquidGlassCard>
-              )
-            })}
-
-            <LiquidGlassCard dark={dark} delay={0} style={{ padding: '12px 14px' }}>
-              <QuickAddRow
-                dark={dark}
-                indent={0}
-                placeholder="Add module"
-                onAdd={quickAddModules}
-                onDetails={() => setEditor({ kind: 'module', id: null })}
-              />
-            </LiquidGlassCard>
-          </div>
+          {segment === 'modules' && renderModules()}
+          {segment === 'subjects' && renderSubjects()}
+          {segment === 'lessons' && renderLessons()}
+          {segment === 'stages' && renderStages()}
         </>
       )}
-
-      {form && <EditorModal dark={dark} onClose={() => setEditor(NONE)}>{form}</EditorModal>}
 
       <ConfirmDialog
         dark={dark}

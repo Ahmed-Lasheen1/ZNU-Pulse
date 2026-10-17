@@ -9,15 +9,3 @@ export function normalizeName(name: string) {
 export function plural(count: number, noun: string) {
   return `${count} ${noun}${count === 1 ? '' : 's'}`
 }
-
-export function freshNames(names: string[], taken: Set<string>) {
-  const seen = new Set(taken)
-  return names
-    .map(name => name.trim())
-    .filter(name => {
-      const key = normalizeName(name)
-      if (!key || seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
-}

@@ -13,7 +13,7 @@ interface LearningSectionProps extends AnalyticsSectionProps {
   difficulty: DifficultyState
 }
 
-const QUIZ_TYPE_LABELS: Record<string, string> = { practice: 'Practice', mock: 'Mock exam', retry: 'Retry' }
+const QUIZ_TYPE_LABELS: Record<string, string> = { practice: 'Practice', mock: 'Mock exam', simulator: 'Simulator', retry: 'Retry' }
 
 export default function LearningSection({ dark, data, modules, difficulty }: LearningSectionProps) {
   const pt = getPulseTheme(dark)

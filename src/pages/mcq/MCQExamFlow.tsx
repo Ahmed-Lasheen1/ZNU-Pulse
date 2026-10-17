@@ -106,6 +106,12 @@ export default function MCQExamFlow({
 }: MCQExamFlowProps) {
   const pt = getPulseTheme(dark)
   const isTutorMode = quizMode === 'practice' || quizMode === 'retry'
+  const showsSubjectTags = quizMode === 'mock' || quizMode === 'simulator'
+  const completeLabel = {
+    mock: 'MOCK EXAM COMPLETE',
+    simulator: 'SIMULATOR COMPLETE',
+    retry: 'RETRY COMPLETE',
+  }[quizMode] || 'PRACTICE COMPLETE'
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false)
   const [confirmExitOpen, setConfirmExitOpen] = useState(false)
   const barRef = useRef<HTMLDivElement>(null)
@@ -300,7 +306,7 @@ export default function MCQExamFlow({
               {(() => {
                 const subj = subjects.find(s => s.id === currentQuestion.subject_id)
                 const lesson = lessons.find(l => l.id === currentQuestion.lesson_id)
-                const showSubjectTag = quizMode === 'mock' && !!subj
+                const showSubjectTag = showsSubjectTags && !!subj
                 const showLessonTag = !lessonFilter && !!lesson
                 return (
                   <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 14, flexShrink: 0 }}>
@@ -456,7 +462,7 @@ export default function MCQExamFlow({
 
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: EXAM_LOW_SECONDARY, textShadow: EXAM_LOW_SHADOW, marginBottom: 2 }}>
-                {quizMode === 'mock' ? 'MOCK EXAM COMPLETE' : quizMode === 'retry' ? 'RETRY COMPLETE' : 'PRACTICE COMPLETE'}
+                {completeLabel}
               </div>
               <div style={{
                 fontFamily: pulseFonts.display, fontWeight: 800, fontSize: 'clamp(52px, 11vw, 104px)',
@@ -546,7 +552,7 @@ export default function MCQExamFlow({
               const isLast = qi === quizQuestions.length - 1
               const subj = subjects.find(s => s.id === q.subject_id)
               const lesson = lessons.find(l => l.id === q.lesson_id)
-              const showSubjectTag = quizMode === 'mock' && !!subj
+              const showSubjectTag = showsSubjectTags && !!subj
               const showLessonTag = !lessonFilter && !!lesson
               return (
                 <div key={qi} style={{ marginBottom: isLast ? 0 : 14 }}>

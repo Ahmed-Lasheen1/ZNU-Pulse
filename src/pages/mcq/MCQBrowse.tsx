@@ -13,12 +13,17 @@ import { ModuleIcon, ExamIcon } from '../../lib/medicalIcons'
 import { OfflineIcon, BookIcon, PauseIcon, PlayIcon, EmptyBoxIcon, GraduationCapIcon, TargetIcon } from '../../components/ui/tool-icons'
 import { MCQ_ACCENT, EXAM_LOW_SHADOW } from './mcqShared'
 import { stagesOf, inStage } from '../../lib/lessonStages'
-import { simulatorPool } from '../../lib/stageSimulator'
+import { simulatorPool, simulatorTotal, MOCK_MAX_QUESTIONS } from '../../lib/stageSimulator'
 
 interface SimulatorRow {
   stage: string
   subject_id: string
   question_count: number
+}
+
+interface SourceChoiceInfo {
+  allCount: number
+  doctorCount: number
 }
 
 interface MCQBrowseProps {
@@ -43,16 +48,13 @@ interface MCQBrowseProps {
   simulatorRows: SimulatorRow[]
   simulatorLoading: boolean
   getFilteredQuestions: (type: string, sourceOnly?: string | null) => any[]
-  onStartQuiz: (type: string, subjectId?: string | null, lessonId?: string | null, sourceFilter?: string | null) => void
+  getPracticeQuestions: (subjectId: string | null, lessonId: string | null, sourceOnly?: string | null) => any[]
+  onStartQuiz: (type: 'mock' | 'practice', subjectId?: string | null, lessonId?: string | null) => void
   onStartSimulator: (stage: string) => void
-}
-
-interface SourceChoice {
-  type: 'mock' | 'practice'
-  subjectId: string | null
-  lessonId: string | null
-  allCount: number
-  doctorCount: number
+  sourceChoice: SourceChoiceInfo | null
+  onChooseAll: () => void
+  onChooseDoctors: () => void
+  onCancelChoice: () => void
 }
 
 function CountText({ children }: { children: ReactNode }) {
@@ -225,12 +227,12 @@ export default function MCQBrowse({
   activeModuleObj, stages, activeStage, onSelectStage,
   moduleSubjects, activeSubject, onSelectSubject,
   loading, questions, lessons, lessonStageMap, simulatorRows, simulatorLoading,
-  getFilteredQuestions, onStartQuiz, onStartSimulator
+  getFilteredQuestions, getPracticeQuestions, onStartQuiz, onStartSimulator,
+  sourceChoice, onChooseAll, onChooseDoctors, onCancelChoice
 }: MCQBrowseProps) {
   const pt = getPulseTheme(dark)
   const navigate = useNavigate()
   const hoverTint = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'
-  const [sourceChoice, setSourceChoice] = useState<SourceChoice | null>(null)
   const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null)
 
   const tabAccentColor = activeModuleObj?.color || pt.cobalt
@@ -239,15 +241,7 @@ export default function MCQBrowse({
   const stagesWithQuestions = new Set(questions.flatMap(q => stagesOf(q, lessonStageMap)))
   const visibleStages = stages.filter(s => stagesWithQuestions.has(s.value))
 
-  const mockQuestions = getFilteredQuestions('mock')
-
-  function practiceScope(subjectId: string | null, lessonId: string | null) {
-    return questions.filter(q =>
-      (lessonId ? q.lesson_id === lessonId : q.subject_id === subjectId) &&
-      (q.exam_type === 'practice' || q.exam_type === 'both') &&
-      inStage(q, activeStage, lessonStageMap)
-    )
-  }
+  const mockCount = Math.min(getFilteredQuestions('mock').length, MOCK_MAX_QUESTIONS)
 
   // With a stage selected, only subjects/lessons that actually have questions in it are listed.
   const stageSubjectIds = new Set(
@@ -259,9 +253,9 @@ export default function MCQBrowse({
     .map(sub => {
       const lessonRows = lessons
         .filter(l => l.subject_id === sub.id)
-        .map(lesson => ({ lesson, count: practiceScope(null, lesson.id).length }))
+        .map(lesson => ({ lesson, count: getPracticeQuestions(null, lesson.id).length }))
         .filter(r => !stageActive || r.count > 0)
-      return { sub, count: practiceScope(sub.id, null).length, lessonRows }
+      return { sub, count: getPracticeQuestions(sub.id, null).length, lessonRows }
     })
     .filter(r => !stageActive || r.count > 0 || r.lessonRows.length > 0)
 
@@ -272,9 +266,7 @@ export default function MCQBrowse({
   }, [loading, activeStage, activeSubject, questions])
 
   const stageSimRows = stageActive ? simulatorRows.filter(r => r.stage === activeStage) : []
-  const simTotal = stageSimRows.reduce(
-    (sum, r) => sum + Math.min(r.question_count, simulatorPool(questions, r.subject_id, activeStage, lessonStageMap).length), 0
-  )
+  const simTotal = simulatorTotal(questions, stageSimRows, activeStage, lessonStageMap)
   const simSubjectCount = stageSimRows.filter(
     r => simulatorPool(questions, r.subject_id, activeStage, lessonStageMap).length > 0
   ).length
@@ -282,38 +274,6 @@ export default function MCQBrowse({
 
   const simulatorShown = stageActive && !loading && !simulatorLoading && simTotal > 0
   const mockHidden = stageActive && (loading || simulatorLoading || simulatorShown)
-
-  function requestStart(type: 'mock' | 'practice', subjectId: string | null, lessonId: string | null, scope: any[]) {
-    const doctorCount = scope.filter(q => q.source === 'university').length
-    if (doctorCount > 0 && doctorCount < scope.length) {
-      setSourceChoice({ type, subjectId, lessonId, allCount: scope.length, doctorCount })
-      return
-    }
-    onStartQuiz(type, subjectId, lessonId)
-  }
-
-  function handleStartMock() {
-    requestStart('mock', null, null, mockQuestions)
-  }
-  function handlePracticeSubject(subjectId: string) {
-    requestStart('practice', subjectId, null, practiceScope(subjectId, null))
-  }
-  function handlePracticeLesson(lessonId: string) {
-    requestStart('practice', null, lessonId, practiceScope(null, lessonId))
-  }
-
-  function chooseAll() {
-    if (!sourceChoice) return
-    const { type, subjectId, lessonId } = sourceChoice
-    setSourceChoice(null)
-    onStartQuiz(type, subjectId, lessonId)
-  }
-  function chooseDoctors() {
-    if (!sourceChoice) return
-    const { type, subjectId, lessonId } = sourceChoice
-    setSourceChoice(null)
-    onStartQuiz(type, subjectId, lessonId, 'university')
-  }
 
   const singleSubject = subjectRows.length === 1
 
@@ -354,7 +314,7 @@ export default function MCQBrowse({
             justifyContent: 'space-between', gap: 10, flexWrap: 'wrap'
           }}>
             <div style={{ color: MCQ_ACCENT, fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <PauseIcon color={MCQ_ACCENT} size={13} /> Paused {resumeData.quizMode === 'mock' ? 'mock exam' : 'practice quiz'} — {Object.keys(resumeData.answers || {}).length}/{(resumeData.quizQuestions || []).length} answered
+              <PauseIcon color={MCQ_ACCENT} size={13} /> Paused {resumeData.quizMode === 'mock' ? 'mock exam' : resumeData.quizMode === 'simulator' ? 'simulator' : 'practice quiz'} — {Object.keys(resumeData.answers || {}).length}/{(resumeData.quizQuestions || []).length} answered
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={onResume} style={{
@@ -411,9 +371,9 @@ export default function MCQBrowse({
               </div>
               <div style={{ flex: 1, minWidth: 160 }}>
                 <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: MCQ_ACCENT, marginBottom: 6 }}>Mock Exam</h3>
-                <CountText>{loading ? '…' : countLabel(mockQuestions.length)}</CountText>
+                <CountText>{loading ? '…' : countLabel(mockCount)}</CountText>
               </div>
-              <button onClick={handleStartMock} style={{
+              <button onClick={() => onStartQuiz('mock', null, null)} style={{
                 background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '12px 24px',
                 borderRadius: 999, fontWeight: 800, cursor: 'pointer', fontFamily: pulseFonts.body, flexShrink: 0
               }}>Start →</button>
@@ -480,8 +440,8 @@ export default function MCQBrowse({
             expanded={expandedSubjectId === sub.id}
             forceOpen={singleSubject}
             onToggle={() => setExpandedSubjectId(prev => prev === sub.id ? null : sub.id)}
-            onPracticeSubject={() => handlePracticeSubject(sub.id)}
-            onPracticeLesson={handlePracticeLesson}
+            onPracticeSubject={() => onStartQuiz('practice', sub.id, null)}
+            onPracticeLesson={lessonId => onStartQuiz('practice', null, lessonId)}
           />
         ))}
         {loading && subjectRows.length === 0 && <CardRowsSkeleton count={3} label="Loading subjects" />}
@@ -499,9 +459,9 @@ export default function MCQBrowse({
         open={!!sourceChoice}
         allCount={sourceChoice?.allCount ?? 0}
         doctorCount={sourceChoice?.doctorCount ?? 0}
-        onCancel={() => setSourceChoice(null)}
-        onChooseAll={chooseAll}
-        onChooseDoctors={chooseDoctors}
+        onCancel={onCancelChoice}
+        onChooseAll={onChooseAll}
+        onChooseDoctors={onChooseDoctors}
       />
     </PageShell>
   )

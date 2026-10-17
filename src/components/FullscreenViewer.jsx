@@ -31,10 +31,11 @@ export default function FullscreenViewer({ dark, onClose, src, srcDoc, notice, t
   const kind = previewKindFor(src, fileType)
   useBodyScrollLock(true)
 
+  // allow-modals lets a summary open the browser's print dialog (its "Print" button).
   const trustedHost = !srcDoc && isTrustedEmbedHost(src)
   const sandbox = trustedHost
-    ? 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation'
-    : 'allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation'
+    ? 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation allow-modals'
+    : 'allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation allow-modals'
 
   useEffect(() => {
     function onKeyDown(e) { if (e.key === 'Escape') onClose() }
