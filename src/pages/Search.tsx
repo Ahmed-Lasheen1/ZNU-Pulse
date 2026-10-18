@@ -40,6 +40,7 @@ const typeMeta: Record<SearchResult['type'], { Icon: (p: { color?: string; size?
   schedule: { Icon: CalendarDays, label: 'Schedule', color: '#a78bfa' },
 }
 
+const TYPE_ORDER: SearchResult['type'][] = ['module', 'file', 'summary', 'question', 'schedule']
 const MAX_RESULTS = 60
 
 // Escapes ilike wildcards so a literal "%" or "_" isn't treated as a pattern.
@@ -53,6 +54,14 @@ function includesText(value: string | null | undefined, needle: string) {
 
 function findModule(mods: SearchModule[], moduleId: string) {
   return mods.find(m => m.id === moduleId) || null
+}
+
+function sortByType(list: SearchResult[]) {
+  const rank = (t: SearchResult['type']) => TYPE_ORDER.indexOf(t)
+  return list
+    .map((r, i) => ({ r, i }))
+    .sort((a, b) => rank(a.r.type) - rank(b.r.type) || a.i - b.i)
+    .map(x => x.r)
 }
 
 // Returns null when the server can't be reached so the caller can fall back to saved content.
@@ -72,7 +81,7 @@ async function searchOnline(q: string, mods: SearchModule[]): Promise<SearchResu
   const summaries: SearchResult[] = (summaryRes.data || []).map((s: any) => ({ type: 'summary', id: s.id, title: s.title, module: findModule(mods, s.module_id), raw: s }))
   const schedules: SearchResult[] = (scheduleRes.data || []).map((s: any) => ({ type: 'schedule', id: s.id, title: s.title, module: findModule(mods, s.module_id), raw: s }))
 
-  return [...files, ...questions, ...summaries, ...schedules]
+  return [...files, ...summaries, ...questions, ...schedules]
 }
 
 // Searches the content already saved on this device, module by module.
@@ -87,14 +96,14 @@ async function searchSavedContent(q: string, mods: SearchModule[]): Promise<Sear
     ])
 
     const hits: SearchResult[] = []
-    for (const row of (questionsRes.data || []) as any[]) {
-      if (includesText(row.question, needle)) hits.push({ type: 'question', id: row.id, title: row.question, module: mod, raw: row })
-    }
     for (const row of (filesRes.data || []) as any[]) {
       if (includesText(row.name, needle)) hits.push({ type: 'file', id: row.id, title: row.name, module: mod, raw: row })
     }
     for (const row of (summariesRes.data || []) as any[]) {
       if (includesText(row.title, needle)) hits.push({ type: 'summary', id: row.id, title: row.title, module: mod, raw: row })
+    }
+    for (const row of (questionsRes.data || []) as any[]) {
+      if (includesText(row.question, needle)) hits.push({ type: 'question', id: row.id, title: row.question, module: mod, raw: row })
     }
     for (const row of (schedulesRes.data || []) as any[]) {
       if (includesText(row.title, needle)) hits.push({ type: 'schedule', id: row.id, title: row.title, module: mod, raw: row })
@@ -155,7 +164,7 @@ export default function Search({ dark }: { dark: boolean }) {
       .map((m): SearchResult => ({ type: 'module', id: m.id, title: m.name, module: m }))
 
     setSavedCopy(online === null)
-    setResults([...moduleMatches, ...content].slice(0, MAX_RESULTS))
+    setResults(sortByType([...moduleMatches, ...content]).slice(0, MAX_RESULTS))
     setLoading(false)
   }
 
@@ -179,7 +188,7 @@ export default function Search({ dark }: { dark: boolean }) {
     if (r.type === 'schedule') return navigate(`/schedule?module=${r.raw.module_id}&type=${r.raw.type}&item=${r.raw.id}`)
   }
 
-  const inStyle = { ...glassInput(pt, dark), padding: '15px 20px', marginBottom: 0, borderRadius: 999, fontSize: 15 }
+  const inStyle = { ...glassInput(pt, dark), padding: '15px 20px', marginBottom: 0, borderRadius: 999, fontSize: 16 }
 
   return (
     <PageShell dark={dark} backFallback="/" maxWidth={700}>
