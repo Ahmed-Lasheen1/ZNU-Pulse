@@ -12,7 +12,6 @@ import { clearHomeHistory } from './lib/homeData'
 import { networkFirst, clearUserCaches } from './lib/dataCache'
 import { flushActiveExam, removeSyncedLocalExams } from './lib/activeExam'
 import { unsubscribeFromPush } from './lib/pushNotifications'
-import { useOncePerSession } from './lib/useOncePerSession'
 import { storageGet, storageSet } from './lib/safeStorage'
 import { containsProfanity } from './lib/moderation'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -20,7 +19,7 @@ import ToastProvider from './components/ToastProvider'
 import HomeEntranceProvider from './components/HomeEntranceProvider'
 import PulseOverlayHeader from './components/pulse/PulseOverlayHeader'
 import OfflineStatus from './components/pulse/OfflineStatus'
-import { AuthContext, ModulesContext } from './contexts'
+import { AuthContext, ModulesContext, useHomeEntrance } from './contexts'
 import Home from './pages/Home'
 import PulseBackground from './components/pulse/PulseBackground'
 import Footer from './components/Footer'
@@ -113,10 +112,8 @@ function SiteHeader({ dark, toggleTheme }) {
 }
 
 function SiteFooter({ dark }) {
-  const location = useLocation()
-  const isHome = location.pathname === '/'
-  const playEntrance = useOncePerSession('znu_home_footer_entrance_played')
-  return <Footer dark={dark} animate={isHome && playEntrance} />
+  const { playEntrance } = useHomeEntrance()
+  return <Footer dark={dark} animate={playEntrance} />
 }
 
 function StageRedirect() {

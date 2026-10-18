@@ -1,5 +1,5 @@
 // src/components/Footer.jsx
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { motion, useInView } from 'framer-motion'
 import { getPulseTheme, pulseFonts, ON_GRADIENT_BOTTOM } from '../premiumTheme'
 import { HOME_ENTRANCE_END } from '../lib/pulseMotion'
@@ -13,35 +13,27 @@ const WHATSAPP_URL = 'https://wa.me/qr/AFP6XCVC2BJHO1'
 const HIDDEN = { opacity: 0, y: 20 }
 const VISIBLE = { opacity: 1, y: 0 }
 
-// `animate` gates whether this plays an entrance at all (Home, first
-// visit this session only — same rule as every other animated piece
-// of Home; every other page, or a repeat Home visit, just renders
-// straight into place with no motion, as before).
-//
-// The footer sits below the fold, so it reveals when scrolled into
-// view (`useInView`, once) — same 20px rise / 0.7s as Home's own
-// section-title reveals. BUT it must also be the LAST thing Home
-// reveals: on tall screens the footer is already in view at load, and
-// a bare whileInView fired it at t=0, before Home's staggered cascade
-// had even begun. So it now needs BOTH conditions — in view AND
-// HOME_ENTRANCE_END seconds elapsed (see lib/pulseMotion.js). Scroll
-// to it early and it simply waits for the cascade to finish; scroll
-// to it later and it plays instantly on arrival.
 export default function Footer({ dark, animate = false }) {
   const pt = getPulseTheme(dark)
   const year = new Date().getFullYear()
 
   const ref = useRef(null)
   const inView = useInView(ref, { once: true, amount: 0.2 })
+  const [armed, setArmed] = useState(animate)
   const [released, setReleased] = useState(!animate)
 
   useEffect(() => {
-    if (!animate) return
-    const t = setTimeout(() => setReleased(true), HOME_ENTRANCE_END * 1000)
-    return () => clearTimeout(t)
+    if (animate) setArmed(true)
   }, [animate])
 
-  const show = !animate || (released && inView)
+  useLayoutEffect(() => {
+    if (!armed) return
+    setReleased(false)
+    const t = setTimeout(() => setReleased(true), HOME_ENTRANCE_END * 1000)
+    return () => clearTimeout(t)
+  }, [armed])
+
+  const show = !armed || (released && inView)
 
   function backToTop() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -50,7 +42,7 @@ export default function Footer({ dark, animate = false }) {
   return (
     <motion.footer
       ref={ref}
-      initial={animate ? HIDDEN : false}
+      initial={armed ? HIDDEN : false}
       animate={show ? VISIBLE : HIDDEN}
       transition={{ duration: 0.7 }}
       style={{

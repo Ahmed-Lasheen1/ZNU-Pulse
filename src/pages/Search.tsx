@@ -5,15 +5,17 @@ import { supabase } from '../supabase'
 import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
 import { glassInput } from '../components/pulse/PulseUI'
 import { useModules } from '../contexts'
-import ErrorBanner from '../components/ErrorBanner'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import PageShell from '../components/pulse/PageShell'
 import PageIntro from '../components/pulse/PageIntro'
 import LoadingText from '../components/pulse/LoadingText'
 import EmptyState from '../components/pulse/EmptyState'
+import OfflineNote from '../components/pulse/OfflineNote'
 import { ModuleIcon } from '../lib/medicalIcons'
 import { SearchIcon2, DocumentIcon } from '../components/ui/tool-icons'
 import { Building2, FlaskConical, BookOpenText, CalendarDays } from 'lucide-react'
+import { fetchModuleQuestions, fetchModuleFiles, fetchModuleSummaries } from '../lib/moduleContent'
+import { networkFirst } from '../lib/dataCache'
 
 interface SearchModule {
   id: string
@@ -38,9 +40,68 @@ const typeMeta: Record<SearchResult['type'], { Icon: (p: { color?: string; size?
   schedule: { Icon: CalendarDays, label: 'Schedule', color: '#a78bfa' },
 }
 
+const MAX_RESULTS = 60
+
 // Escapes ilike wildcards so a literal "%" or "_" isn't treated as a pattern.
 function escapeLikePattern(value: string) {
   return value.replace(/[%_\\]/g, '\\$&')
+}
+
+function includesText(value: string | null | undefined, needle: string) {
+  return !!value && value.toLowerCase().includes(needle)
+}
+
+function findModule(mods: SearchModule[], moduleId: string) {
+  return mods.find(m => m.id === moduleId) || null
+}
+
+// Returns null when the server can't be reached so the caller can fall back to saved content.
+async function searchOnline(q: string, mods: SearchModule[]): Promise<SearchResult[] | null> {
+  const like = `%${escapeLikePattern(q)}%`
+  const [fileRes, questionRes, summaryRes, scheduleRes] = await Promise.all([
+    supabase.from('files').select('id, name, type, module_id').ilike('name', like).limit(20),
+    supabase.from('questions_public').select('id, question, option_a, option_b, option_c, option_d, module_id, subject_id, exam_type, exam_stage, created_at').ilike('question', like).limit(20),
+    supabase.from('summaries').select('id, title, module_id').ilike('title', like).limit(20),
+    supabase.from('schedules').select('id, title, type, module_id').ilike('title', like).limit(20),
+  ])
+
+  if (fileRes.error || questionRes.error || summaryRes.error || scheduleRes.error) return null
+
+  const files: SearchResult[] = (fileRes.data || []).map((f: any) => ({ type: 'file', id: f.id, title: f.name, module: findModule(mods, f.module_id), raw: f }))
+  const questions: SearchResult[] = (questionRes.data || []).map((r: any) => ({ type: 'question', id: r.id, title: r.question, module: findModule(mods, r.module_id), raw: r }))
+  const summaries: SearchResult[] = (summaryRes.data || []).map((s: any) => ({ type: 'summary', id: s.id, title: s.title, module: findModule(mods, s.module_id), raw: s }))
+  const schedules: SearchResult[] = (scheduleRes.data || []).map((s: any) => ({ type: 'schedule', id: s.id, title: s.title, module: findModule(mods, s.module_id), raw: s }))
+
+  return [...files, ...questions, ...summaries, ...schedules]
+}
+
+// Searches the content already saved on this device, module by module.
+async function searchSavedContent(q: string, mods: SearchModule[]): Promise<SearchResult[]> {
+  const needle = q.toLowerCase()
+  const groups = await Promise.all(mods.map(async mod => {
+    const [questionsRes, filesRes, summariesRes, schedulesRes] = await Promise.all([
+      fetchModuleQuestions(mod.id),
+      fetchModuleFiles(mod.id),
+      fetchModuleSummaries(mod.id),
+      networkFirst(`schedules:${mod.id}`, () => supabase.from('schedules').select('id, title, type, module_id').eq('module_id', mod.id)),
+    ])
+
+    const hits: SearchResult[] = []
+    for (const row of (questionsRes.data || []) as any[]) {
+      if (includesText(row.question, needle)) hits.push({ type: 'question', id: row.id, title: row.question, module: mod, raw: row })
+    }
+    for (const row of (filesRes.data || []) as any[]) {
+      if (includesText(row.name, needle)) hits.push({ type: 'file', id: row.id, title: row.name, module: mod, raw: row })
+    }
+    for (const row of (summariesRes.data || []) as any[]) {
+      if (includesText(row.title, needle)) hits.push({ type: 'summary', id: row.id, title: row.title, module: mod, raw: row })
+    }
+    for (const row of (schedulesRes.data || []) as any[]) {
+      if (includesText(row.title, needle)) hits.push({ type: 'schedule', id: row.id, title: row.title, module: mod, raw: row })
+    }
+    return hits
+  }))
+  return groups.flat()
 }
 
 export default function Search({ dark }: { dark: boolean }) {
@@ -51,12 +112,17 @@ export default function Search({ dark }: { dark: boolean }) {
   const [query, setQuery] = useState(() => (location.state as { initialQuery?: string } | null)?.initialQuery || '')
   const [results, setResults] = useState<SearchResult[] | null>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(false)
+  const [savedCopy, setSavedCopy] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>()
   const inputRef = useRef<HTMLInputElement>(null)
   const searchIdRef = useRef(0)
+  const modulesRef = useRef<SearchModule[]>(modules)
 
-  useEffect(() => { inputRef.current?.focus() }, [])
+  useEffect(() => { modulesRef.current = modules }, [modules])
+
+  useEffect(() => {
+    if (window.matchMedia('(pointer: fine)').matches) inputRef.current?.focus()
+  }, [])
 
   useEffect(() => {
     clearTimeout(debounceRef.current)
@@ -66,6 +132,7 @@ export default function Search({ dark }: { dark: boolean }) {
       searchIdRef.current++
       setResults(null)
       setLoading(false)
+      setSavedCopy(false)
       return
     }
     debounceRef.current = setTimeout(() => runSearch(q), 350)
@@ -73,38 +140,22 @@ export default function Search({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query])
 
-  function moduleFor(moduleId: string) {
-    return modules.find(m => m.id === moduleId)
-  }
-
   async function runSearch(q: string) {
     const requestId = ++searchIdRef.current
     setLoading(true)
-    setError(false)
-    const like = `%${escapeLikePattern(q)}%`
-    const [fileRes, questionRes, summaryRes, scheduleRes] = await Promise.all([
-      supabase.from('files').select('*').ilike('name', like).limit(20),
-      supabase.from('questions_public').select('id, question, option_a, option_b, option_c, option_d, module_id, subject_id, exam_type, exam_stage, created_at').ilike('question', like).limit(20),
-      supabase.from('summaries').select('*').ilike('title', like).limit(20),
-      supabase.from('schedules').select('*').ilike('title', like).limit(20),
-    ])
-
+    const mods = modulesRef.current
+    const online = navigator.onLine ? await searchOnline(q, mods) : null
+    if (requestId !== searchIdRef.current) return
+    const content = online ?? (await searchSavedContent(q, mods))
     if (requestId !== searchIdRef.current) return
 
-    if (fileRes.error || questionRes.error || summaryRes.error || scheduleRes.error) {
-      setError(true)
-    }
+    const needle = q.toLowerCase()
+    const moduleMatches: SearchResult[] = mods
+      .filter(m => includesText(m.name, needle))
+      .map((m): SearchResult => ({ type: 'module', id: m.id, title: m.name, module: m }))
 
-    const moduleMatches: SearchResult[] = modules
-      .filter(m => m.name.toLowerCase().includes(q.toLowerCase()))
-      .map(m => ({ type: 'module', id: m.id, title: m.name, module: m }))
-
-    const fileMatches: SearchResult[] = (fileRes.data || []).map((f: any) => ({ type: 'file', id: f.id, title: f.name, module: moduleFor(f.module_id), raw: f }))
-    const questionMatches: SearchResult[] = (questionRes.data || []).map((q2: any) => ({ type: 'question', id: q2.id, title: q2.question, module: moduleFor(q2.module_id), raw: q2 }))
-    const summaryMatches: SearchResult[] = (summaryRes.data || []).map((s: any) => ({ type: 'summary', id: s.id, title: s.title, module: moduleFor(s.module_id), raw: s }))
-    const scheduleMatches: SearchResult[] = (scheduleRes.data || []).map((s: any) => ({ type: 'schedule', id: s.id, title: s.title, module: moduleFor(s.module_id), raw: s }))
-
-    setResults([...moduleMatches, ...fileMatches, ...questionMatches, ...summaryMatches, ...scheduleMatches])
+    setSavedCopy(online === null)
+    setResults([...moduleMatches, ...content].slice(0, MAX_RESULTS))
     setLoading(false)
   }
 
@@ -144,7 +195,7 @@ export default function Search({ dark }: { dark: boolean }) {
         style={{ ...inStyle, marginBottom: 20, width: '100%' }}
       />
 
-      {error && <ErrorBanner message="Search failed — check your connection and try again." />}
+      {savedCopy && !loading && <OfflineNote dark={dark} message="Searching content saved on this device." />}
 
       {query.trim().length > 0 && query.trim().length < 2 && (
         <p style={{ color: ON_GRADIENT_TOP.secondary, textAlign: 'center', fontSize: 13 }}>Keep typing — at least 2 characters.</p>
@@ -176,13 +227,16 @@ export default function Search({ dark }: { dark: boolean }) {
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{
                     ...pulseType.cardTitle, color: pt.textPrimary,
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                    display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2,
+                    overflow: 'hidden', wordBreak: 'break-word', overflowWrap: 'anywhere'
                   }}>{r.title}</div>
-                  <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {meta.label}
+                  <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+                    <span style={{ flexShrink: 0 }}>{meta.label}</span>
                     {r.module && (
                       <>
-                        · <ModuleIcon value={r.module.icon} size={12} color={pt.textMuted} /> {r.module.name}
+                        <span style={{ flexShrink: 0 }}>·</span>
+                        <span style={{ flexShrink: 0, display: 'inline-flex' }}><ModuleIcon value={r.module.icon} size={12} color={pt.textMuted} /></span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{r.module.name}</span>
                       </>
                     )}
                   </div>
