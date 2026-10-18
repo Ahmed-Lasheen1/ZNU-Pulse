@@ -33,7 +33,6 @@ interface NavItem {
   accent: 'cobalt' | 'indigo' | 'amber'
 }
 
-// Nav destinations — icon/accent pairing mirrors Home's own tool cards.
 const navItems: NavItem[] = [
   { label: 'Home', href: '/', Icon: HomeIcon, accent: 'cobalt' },
   { label: 'Schedules', href: '/schedule', Icon: ScheduleIcon, accent: 'indigo' },
@@ -43,30 +42,18 @@ const navItems: NavItem[] = [
   { label: 'Review', href: '/review', Icon: BookIcon, accent: 'indigo' },
 ]
 
-// ── Layout constants ─────────────────────────────────────────────────
 const BUTTON_SIZE = 44
 const PANEL_WIDTH = 280
 const PANEL_RADIUS = 24
 const ROW_RADIUS = 16
-// Fixed-width icon column before "Dr. Name" / points, so both lines of
-// the profile row start their text at the same x offset.
 const PROFILE_ICON_COL = 16
-// Non-uniform scale target for the closed panel (matches BUTTON_SIZE on
-// width only — scaling both axes down to a square would distort the
-// panel's own border-radius into an ellipse mid-transition).
 const CLOSED_SCALE = BUTTON_SIZE / PANEL_WIDTH
-// Caps panel height on short viewports (landscape phones, foldables) so
-// content scrolls internally rather than being clipped by the outer
-// blur container's required `overflow: hidden`.
 const PANEL_MAX_HEIGHT = 'calc(100dvh - 140px)'
 
-// ── Animation constants ──────────────────────────────────────────────
 const morphEase = [0.22, 1, 0.36, 1] as const
 const OPEN_DURATION = 0.6
 const CLOSE_DURATION = 0.55
 
-// Single transition object shared by both the panel and content block's
-// animate() calls, so their scale/y and opacity move in exact lockstep.
 function useSyncedTransition(open: boolean, reducedMotion: boolean) {
   if (reducedMotion) return { duration: 0.15, ease: 'linear' as const }
   return open
@@ -80,8 +67,6 @@ interface LiquidBloomProps {
   align: Align
 }
 
-// Soft glass-tinted radial bloom behind the open panel — mounted only
-// while open, transform/opacity only.
 function LiquidBloom({ pt, open, align }: LiquidBloomProps) {
   return (
     <AnimatePresence>
@@ -120,11 +105,6 @@ interface GlassRowProps {
   'aria-label'?: string
 }
 
-// Local glass-row treatment (shadow/tint/hover) without its own
-// backdrop-filter — the panel already applies one real blur, so rows
-// don't each need their own independent blur layer. Renders a real
-// <button> when interactive for correct keyboard/focus/screen-reader
-// behavior.
 function GlassRow({ dark, radius = ROW_RADIUS, style = {}, children, onClick, ...rest }: GlassRowProps) {
   const [hovered, setHovered] = useState(false)
   const interactive = !!onClick
@@ -147,8 +127,6 @@ function GlassRow({ dark, radius = ROW_RADIUS, style = {}, children, onClick, ..
         ...style,
       }}
     >
-      {/* Outward glow lives outside the overflow:hidden layer below so
-          it isn't clipped by this row's own rounded-corner mask. */}
       <div aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', boxShadow: liquidGlassShadow(dark), pointerEvents: 'none' }} />
       <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 'inherit' }}>
         <div aria-hidden style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', background: liquidGlassTint(dark) }} />
@@ -168,8 +146,6 @@ interface NavSearchProps {
   onSubmit: (query: string) => void
 }
 
-// Search field kept as its own component so typing only re-renders
-// this input, not the whole menu panel.
 function NavSearch({ pt, dark, tabIndex, onSubmit }: NavSearchProps) {
   const [value, setValue] = useState('')
 
@@ -192,7 +168,7 @@ function NavSearch({ pt, dark, tabIndex, onSubmit }: NavSearchProps) {
           ...glassInput(pt, dark),
           padding: '13px 18px 13px 42px',
           marginBottom: 0,
-          fontSize: 14,
+          fontSize: 16,
         }}
       />
     </div>
@@ -208,8 +184,6 @@ interface NavMenuProps {
 export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuProps) {
   const [open, setOpen] = useState(false)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
-  // Tracks the animation window so `willChange` is only reserved on the
-  // GPU while the panel is actually mid-transition, not permanently.
   const [animating, setAnimating] = useState(false)
   const reducedMotion = usePrefersReducedMotion()
   const navigate = useNavigate()
@@ -221,18 +195,11 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
   const wrapperRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const triggerButtonRef = useRef<HTMLButtonElement>(null)
-  // BUG FIX: tracks whether this menu instance has actually been
-  // opened at least once. The focus-restoration effect below used to
-  // run on every value of `open`, including its initial `false` on
-  // mount — which meant the hamburger button silently stole keyboard
-  // focus the moment NavMenu rendered on ANY page load, not just when
-  // a person closed a menu they'd opened. Now focus is only restored
-  // when `open` transitions from true -> false.
   const hasOpenedRef = useRef(false)
+  const skipFocusRestoreRef = useRef(false)
   const pt = getPulseTheme(dark)
   const transition = useSyncedTransition(open, reducedMotion)
 
-  // Outside click/tap and Escape close the menu.
   useEffect(() => {
     if (!open) return
     function onClickOutside(e: MouseEvent | TouchEvent) {
@@ -249,11 +216,13 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
     }
   }, [open])
 
-  // Returns keyboard focus to the trigger button once the menu closes
-  // — but only if it was actually open before (see hasOpenedRef above).
   useEffect(() => {
     if (open) {
       hasOpenedRef.current = true
+      return
+    }
+    if (skipFocusRestoreRef.current) {
+      skipFocusRestoreRef.current = false
       return
     }
     if (hasOpenedRef.current) {
@@ -261,10 +230,6 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
     }
   }, [open])
 
-  // Closes the menu when focus genuinely leaves the panel (e.g. Tabbing
-  // past the last row) — skipped when focus is headed back to the
-  // trigger button itself, since that button's own onClick already
-  // owns the close/reopen toggle in that specific case.
   function handleContentBlur(e: React.FocusEvent<HTMLDivElement>) {
     const next = e.relatedTarget as Node | null
     if (!next) return
@@ -272,15 +237,23 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
     if (!e.currentTarget.contains(next)) setOpen(false)
   }
 
-  function goTo(path: string) { setOpen(false); navigate(path) }
+  function leaveMenu(path: string, state?: object) {
+    skipFocusRestoreRef.current = true
+    const active = document.activeElement as HTMLElement | null
+    if (active && wrapperRef.current?.contains(active)) active.blur()
+    setOpen(false)
+    navigate(path, state ? { state } : undefined)
+  }
+
+  function goTo(path: string) { leaveMenu(path) }
 
   function submitSearch(query: string) {
     const q = query.trim()
-    setOpen(false)
-    navigate('/search', q ? { state: { initialQuery: q } } : undefined)
+    leaveMenu('/search', q ? { initialQuery: q } : undefined)
   }
 
   async function handleSignOut() {
+    skipFocusRestoreRef.current = true
     setOpen(false)
     await signOut()
     navigate('/')
@@ -290,16 +263,6 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
 
   return (
     <div ref={wrapperRef} style={{ position: 'relative', width: BUTTON_SIZE, height: BUTTON_SIZE }}>
-      {/* Glass panel — always rendered at its true final size; only
-          `scale`/`opacity` animate (both compositor-only), so the
-          backdrop-blur is computed once and just re-composited under
-          the transform instead of re-blurring every frame.
-          `initial={false}` skips playing a bogus close animation on
-          mount, since this is unconditionally rendered rather than
-          conditionally mounted. Opacity uses a Material "Container
-          Transform" keyframe window (confined to the middle third of
-          the transition, its own linear curve) rather than tracking
-          scale's ease-in-out for the full duration. */}
       <motion.div
         initial={false}
         style={{
@@ -335,12 +298,8 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
 
         <LiquidBloom pt={pt} open={open && !reducedMotion} align={cornerSide} />
 
-        {/* Spacer matching the real trigger button's footprint */}
         <div style={{ height: BUTTON_SIZE }} />
 
-        {/* Content block — shares the panel's exact transition timing
-            for y/opacity, scrolls internally within PANEL_MAX_HEIGHT on
-            short viewports, and returns focus/closes via handleContentBlur. */}
         <motion.div
           ref={contentRef}
           id="nav-menu-panel"
@@ -367,7 +326,6 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
             willChange: animating ? 'transform, opacity' : 'auto',
           } as CSSProperties}
         >
-          {/* Profile / Sign In row */}
           {user ? (
             <GlassRow dark={dark} radius={18} onClick={() => goTo('/profile')} tabIndex={open ? 0 : -1}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px' }}>
@@ -400,10 +358,8 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
             </GlassRow>
           )}
 
-          {/* Search */}
           <NavSearch pt={pt} dark={dark} tabIndex={open ? 0 : -1} onSubmit={submitSearch} />
 
-          {/* Navigation items */}
           {navItems.map(item => {
             const Icon = item.Icon
             const iconColor = pt[item.accent] || pt.text
@@ -419,12 +375,10 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
             )
           })}
 
-          {/* Theme switch */}
           <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0' }}>
             <ThemeSwitch dark={dark} onToggle={toggleTheme} scale={0.62} stretchX={1.3} />
           </div>
 
-          {/* Sign out */}
           {user && (
             <GlassRow dark={dark} radius={16} onClick={() => setShowSignOutConfirm(true)} tabIndex={open ? 0 : -1}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px' }}>
@@ -450,8 +404,6 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
         }}
       />
 
-      {/* Real toggle button — fixed 44x44, stacked above the glass panel
-          so it stays crisp throughout the open/close motion. */}
       <div style={{
         position: 'absolute', top: 0, [cornerSide]: 0,
         width: BUTTON_SIZE, height: BUTTON_SIZE, zIndex: 2000,

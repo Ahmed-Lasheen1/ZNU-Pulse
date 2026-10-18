@@ -40,10 +40,9 @@ const typeMeta: Record<SearchResult['type'], { Icon: (p: { color?: string; size?
   schedule: { Icon: CalendarDays, label: 'Schedule', color: '#a78bfa' },
 }
 
-const TYPE_ORDER: SearchResult['type'][] = ['module', 'file', 'summary', 'question', 'schedule']
+const TYPE_ORDER: SearchResult['type'][] = ['module', 'file', 'summary', 'schedule', 'question']
 const MAX_RESULTS = 60
 
-// Escapes ilike wildcards so a literal "%" or "_" isn't treated as a pattern.
 function escapeLikePattern(value: string) {
   return value.replace(/[%_\\]/g, '\\$&')
 }
@@ -64,7 +63,6 @@ function sortByType(list: SearchResult[]) {
     .map(x => x.r)
 }
 
-// Returns null when the server can't be reached so the caller can fall back to saved content.
 async function searchOnline(q: string, mods: SearchModule[]): Promise<SearchResult[] | null> {
   const like = `%${escapeLikePattern(q)}%`
   const [fileRes, questionRes, summaryRes, scheduleRes] = await Promise.all([
@@ -81,10 +79,9 @@ async function searchOnline(q: string, mods: SearchModule[]): Promise<SearchResu
   const summaries: SearchResult[] = (summaryRes.data || []).map((s: any) => ({ type: 'summary', id: s.id, title: s.title, module: findModule(mods, s.module_id), raw: s }))
   const schedules: SearchResult[] = (scheduleRes.data || []).map((s: any) => ({ type: 'schedule', id: s.id, title: s.title, module: findModule(mods, s.module_id), raw: s }))
 
-  return [...files, ...summaries, ...questions, ...schedules]
+  return [...files, ...summaries, ...schedules, ...questions]
 }
 
-// Searches the content already saved on this device, module by module.
 async function searchSavedContent(q: string, mods: SearchModule[]): Promise<SearchResult[]> {
   const needle = q.toLowerCase()
   const groups = await Promise.all(mods.map(async mod => {
@@ -102,11 +99,11 @@ async function searchSavedContent(q: string, mods: SearchModule[]): Promise<Sear
     for (const row of (summariesRes.data || []) as any[]) {
       if (includesText(row.title, needle)) hits.push({ type: 'summary', id: row.id, title: row.title, module: mod, raw: row })
     }
-    for (const row of (questionsRes.data || []) as any[]) {
-      if (includesText(row.question, needle)) hits.push({ type: 'question', id: row.id, title: row.question, module: mod, raw: row })
-    }
     for (const row of (schedulesRes.data || []) as any[]) {
       if (includesText(row.title, needle)) hits.push({ type: 'schedule', id: row.id, title: row.title, module: mod, raw: row })
+    }
+    for (const row of (questionsRes.data || []) as any[]) {
+      if (includesText(row.question, needle)) hits.push({ type: 'question', id: row.id, title: row.question, module: mod, raw: row })
     }
     return hits
   }))
@@ -137,7 +134,6 @@ export default function Search({ dark }: { dark: boolean }) {
     clearTimeout(debounceRef.current)
     const q = query.trim()
     if (q.length < 2) {
-      // Invalidates any in-flight request so its results can't reappear.
       searchIdRef.current++
       setResults(null)
       setLoading(false)
@@ -168,7 +164,6 @@ export default function Search({ dark }: { dark: boolean }) {
     setLoading(false)
   }
 
-  // Each result deep-links to the exact item, not just its module.
   function openResult(r: SearchResult) {
     if (r.type === 'module') return navigate(`/module/${r.id}`)
     if (r.type === 'file') return navigate(`/files?type=${r.raw.type}&module=${r.raw.module_id}&file=${r.raw.id}`)
