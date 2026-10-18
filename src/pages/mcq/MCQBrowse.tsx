@@ -68,7 +68,6 @@ function CountText({ children }: { children: ReactNode }) {
 }
 
 const countLabel = (n: number) => `${n} question${n === 1 ? '' : 's'}`
-const capped = (n: number) => Math.min(n, QUIZ_MAX_QUESTIONS)
 
 function SourceChoiceDialog({
   dark, open, allCount, doctorCount, onCancel, onChooseAll, onChooseDoctors
@@ -176,7 +175,12 @@ function SubjectAccordionRow({
           <ModuleIcon value={sub.icon} size={18} color={sub.color || tabAccentColor} />
           <span style={{ minWidth: 0, flex: 1 }}>
             <div style={{ color: pt.textPrimary, fontWeight: 700, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub.name}</div>
-            <div style={{ color: pt.textMuted, fontSize: 11.5, marginTop: 1 }}>{countLabel(count)}</div>
+            <div style={{ color: pt.textMuted, fontSize: 11.5, marginTop: 1 }}>
+              {countLabel(count)}
+              {count > QUIZ_MAX_QUESTIONS && (
+                <span style={{ color: pt.faint }}> · quiz uses {QUIZ_MAX_QUESTIONS}</span>
+              )}
+            </div>
           </span>
           {canExpand && (
             <span style={{ display: 'inline-flex', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease', flexShrink: 0 }}>
@@ -243,9 +247,9 @@ export default function MCQBrowse({
   const stagesWithQuestions = new Set(questions.flatMap(q => stagesOf(q, lessonStageMap)))
   const visibleStages = stages.filter(s => stagesWithQuestions.has(s.value))
 
-  const mockCount = capped(getFilteredQuestions('mock').length)
+  const mockBank = getFilteredQuestions('mock').length
+  const mockCount = Math.min(mockBank, QUIZ_MAX_QUESTIONS)
 
-  // With a stage selected, only subjects/lessons that actually have questions in it are listed.
   const stageSubjectIds = new Set(
     questions.filter(q => inStage(q, activeStage, lessonStageMap)).map(q => q.subject_id)
   )
@@ -255,11 +259,13 @@ export default function MCQBrowse({
     .map(sub => {
       const lessonRows = lessons
         .filter(l => l.subject_id === sub.id)
-        .map(lesson => ({ lesson, count: capped(getPracticeQuestions(null, lesson.id).length) }))
+        .map(lesson => ({ lesson, count: getPracticeQuestions(null, lesson.id).length }))
         .filter(r => !stageActive || r.count > 0)
-      return { sub, count: capped(getPracticeQuestions(sub.id, null).length), lessonRows }
+      return { sub, count: getPracticeQuestions(sub.id, null).length, lessonRows }
     })
     .filter(r => !stageActive || r.count > 0 || r.lessonRows.length > 0)
+
+  const moduleTotal = questions.filter(q => q.module_id === activeModuleObj?.id).length
 
   useEffect(() => {
     if (loading || !stageActive || activeSubject === 'all') return
@@ -302,6 +308,11 @@ export default function MCQBrowse({
           <ExamIcon color={MCQ_ACCENT} size={40} />
         </div>
         <h1 style={{ fontFamily: pulseFonts.display, fontWeight: 800, fontSize: 24, color: ON_GRADIENT_TOP.primary, marginBottom: 4 }}>MCQ Bank</h1>
+        {!loading && moduleTotal > 0 && (
+          <div style={{ color: ON_GRADIENT_TOP.secondary, fontSize: 12, fontWeight: 600 }}>
+            {countLabel(moduleTotal)} · {moduleSubjects.length} subject{moduleSubjects.length === 1 ? '' : 's'}
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
@@ -378,7 +389,11 @@ export default function MCQBrowse({
               </div>
               <div style={{ flex: 1, minWidth: 160 }}>
                 <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: MCQ_ACCENT, marginBottom: 6 }}>Mock Exam</h3>
-                <CountText>{loading ? '…' : countLabel(mockCount)}</CountText>
+                <CountText>
+                  {loading ? '…' : mockBank > QUIZ_MAX_QUESTIONS
+                    ? `${mockCount} of ${mockBank} per exam`
+                    : countLabel(mockCount)}
+                </CountText>
               </div>
               <button onClick={() => onStartQuiz('mock', null, null)} style={{
                 background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '12px 24px',
