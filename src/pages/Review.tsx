@@ -18,6 +18,9 @@ import OfflineNote from '../components/pulse/OfflineNote'
 import { getGuestFlags, getGuestHistory, toggleGuestFlag } from '../lib/reviewStorage'
 import { listPendingAttempts, syncPendingAttempts, discardPendingAttempt, subscribePendingAttempts } from '../lib/offlineAttempts'
 import { networkFirst, saveCached } from '../lib/dataCache'
+import { getFullAttempt } from '../lib/fullHistory'
+import { fetchModuleStages } from '../lib/moduleStages'
+import { quizName } from '../lib/quizNames'
 import QuestionSourceBadge from '../components/QuestionSourceBadge'
 import { ModuleIcon } from '../lib/medicalIcons'
 import { wrapText } from '../lib/textStyles'
@@ -26,8 +29,6 @@ import { MCQ_ACCENT } from './mcq/mcqShared'
 
 const SECTION_GAP = 22
 const ITEM_GAP = 16
-
-const QUIZ_TYPE_LABELS: Record<string, string> = { mock: 'Mock', retry: 'Retry', simulator: 'Simulator' }
 
 interface ReviewModule {
   id: string
@@ -50,10 +51,22 @@ interface IncorrectSnapshot {
   source?: string | null
 }
 
+// An incorrect question from the server, or any question of a full copy saved on this device.
+interface ReviewItem extends IncorrectSnapshot {
+  answer?: string | null
+  is_correct?: boolean
+}
+
+interface FullAttempt {
+  id: string
+  questions: ReviewItem[]
+}
+
 interface HistoryRow {
   id?: string
   module_id?: string | null
   quiz_type: string
+  stage?: string | null
   subject_id?: string | null
   total: number
   correct: number
@@ -81,12 +94,14 @@ interface FlaggedItem {
 }
 
 type ReviewTab = 'history' | 'flagged'
+type DetailFilter = 'incorrect' | 'all'
 
 function pendingToHistoryRow(attempt: any): HistoryRow {
   return {
     id: `pending-${attempt.id}`,
     module_id: attempt.moduleId,
     quiz_type: attempt.quizType,
+    stage: attempt.stage,
     subject_id: attempt.subjectId,
     total: attempt.total,
     correct: attempt.correct,
@@ -112,6 +127,9 @@ export default function Review({ dark }: { dark: boolean }) {
   const [syncTick, setSyncTick] = useState(0)
   const [syncBusy, setSyncBusy] = useState(false)
   const [confirmDiscardId, setConfirmDiscardId] = useState<string | null>(null)
+  const [stageTitles, setStageTitles] = useState<Record<string, string>>({})
+  const [fullAttempt, setFullAttempt] = useState<FullAttempt | null>(null)
+  const [detailFilter, setDetailFilter] = useState<DetailFilter>('incorrect')
 
   const [flaggedItems, setFlaggedItems] = useState<FlaggedItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -129,6 +147,33 @@ export default function Review({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, user, syncTick])
   useEffect(() => { setSearchQuery(''); setModuleFilter('all'); setSelectedHistory(null) }, [tab])
+
+  // Stage names (TBL, Final, ...) for the attempts that belong to a stage.
+  useEffect(() => {
+    const moduleIds = [...new Set(history.filter(h => h.stage && h.module_id).map(h => h.module_id as string))]
+    if (moduleIds.length === 0) return
+    let ignore = false
+    Promise.all(moduleIds.map(async id => [id, await fetchModuleStages(id)] as const)).then(entries => {
+      if (ignore) return
+      const next: Record<string, string> = {}
+      entries.forEach(([id, list]) => list.forEach((s: any) => { next[`${id}:${s.value}`] = s.title }))
+      setStageTitles(next)
+    })
+    return () => { ignore = true }
+  }, [history])
+
+  // The full copy of an attempt only exists on the device it was taken on.
+  useEffect(() => {
+    setFullAttempt(null)
+    setDetailFilter('incorrect')
+    if (!selectedHistory) return
+    let ignore = false
+    getFullAttempt(selectedHistory.pending?.id || selectedHistory.id).then(found => { if (!ignore) setFullAttempt(found as FullAttempt | null) })
+    return () => { ignore = true }
+  }, [selectedHistory])
+
+  const historyName = (h: HistoryRow) =>
+    quizName(h.quiz_type, h.stage && h.module_id ? stageTitles[`${h.module_id}:${h.stage}`] : undefined)
 
   const flaggedKey = (userId: string) => `user:${userId}:review-flagged`
 
@@ -335,7 +380,7 @@ export default function Review({ dark }: { dark: boolean }) {
                       {mod && <ModuleIcon value={mod.icon} size={20} color={mod.color} />}
                       <div style={{ minWidth: 0 }}>
                         <div style={{ ...pulseType.cardTitle, fontSize: 14, color: pt.textPrimary }}>
-                          {mod ? mod.name : 'Module'} · {QUIZ_TYPE_LABELS[h.quiz_type] || 'Practice'}
+                          {mod ? mod.name : 'Module'} · {historyName(h)}
                         </div>
                         <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2 }}>
                           {new Date(h.completed_at).toLocaleDateString()} · {h.correct}/{h.total} correct
@@ -363,8 +408,15 @@ export default function Review({ dark }: { dark: boolean }) {
 
       {tab === 'history' && !loading && selectedHistory && (() => {
         const mod = moduleFor(selectedHistory.module_id)
-        const incorrectQs = selectedHistory.incorrect_questions || []
         const pending = selectedHistory.pending
+        const incorrectItems: ReviewItem[] = fullAttempt
+          ? fullAttempt.questions.filter(q => !q.is_correct)
+          : (selectedHistory.incorrect_questions || [])
+        const shownItems = fullAttempt && detailFilter === 'all' ? fullAttempt.questions : incorrectItems
+        const detailTabs = fullAttempt ? [
+          { id: 'incorrect' as const, label: `Incorrect (${incorrectItems.length})` },
+          { id: 'all' as const, label: `All (${fullAttempt.questions.length})` },
+        ] : []
         return (
           <div>
             <div style={{ marginBottom: SECTION_GAP }}>
@@ -380,6 +432,7 @@ export default function Review({ dark }: { dark: boolean }) {
                 {mod && <ModuleIcon value={mod.icon} size={20} color={mod.color} />}
                 <span style={{ ...pulseType.sectionTitle, color: mod?.color || MCQ_ACCENT, fontSize: 18 }}>{mod ? mod.name : 'Module'}</span>
               </div>
+              <div style={{ color: pt.sub, fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{historyName(selectedHistory)}</div>
               <div style={{ color: pt.textMuted, fontSize: 13 }}>
                 {new Date(selectedHistory.completed_at).toLocaleDateString()} · {selectedHistory.correct}/{selectedHistory.total} correct · {selectedHistory.score}%
               </div>
@@ -411,20 +464,44 @@ export default function Review({ dark }: { dark: boolean }) {
               </div>
             )}
 
-            {incorrectQs.length > 0 && (
+            {detailTabs.length > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginBottom: SECTION_GAP }}>
+                {detailTabs.map(t => {
+                  const active = detailFilter === t.id
+                  return (
+                    <PulseGlassRow
+                      key={t.id} dark={dark} radius={999} active={active}
+                      activeTint={`${pt.cobalt}26`} hoverTint={hoverTint}
+                      onClick={() => setDetailFilter(t.id)} role="button" tabIndex={0}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailFilter(t.id) } }}
+                    >
+                      <div style={{ padding: '8px 18px', ...pulseType.small, fontWeight: 700, color: active ? pt.cobalt : pt.sub }}>{t.label}</div>
+                    </PulseGlassRow>
+                  )
+                })}
+              </div>
+            )}
+
+            {!fullAttempt && incorrectItems.length > 0 && (
+              <p style={{ color: pt.textMuted, fontSize: 12, textAlign: 'center', marginBottom: SECTION_GAP, ...wrapText }}>
+                Only the incorrect questions are shown — full details are only saved on the device where the exam was taken.
+              </p>
+            )}
+
+            {incorrectItems.length > 0 && (
               <div style={{ marginBottom: SECTION_GAP }}>
-                <button onClick={() => retryAll(incorrectQs)} style={{
+                <button onClick={() => retryAll(incorrectItems)} style={{
                   width: '100%', padding: '14px', background: MCQ_ACCENT, color: '#0f172a',
                   border: 'none', borderRadius: 999, cursor: 'pointer', fontWeight: 700,
                   fontSize: 14, fontFamily: pulseFonts.body, boxShadow: `0 8px 28px ${MCQ_ACCENT}35`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
                 }}>
-                  <RefreshIcon color="#0f172a" size={15} /> Retry These {incorrectQs.length} Incorrect Question{incorrectQs.length === 1 ? '' : 's'}
+                  <RefreshIcon color="#0f172a" size={15} /> Retry These {incorrectItems.length} Incorrect Question{incorrectItems.length === 1 ? '' : 's'}
                 </button>
               </div>
             )}
 
-            {incorrectQs.length === 0 && (
+            {shownItems.length === 0 && (
               <EmptyState
                 dark={dark}
                 message={
@@ -435,14 +512,21 @@ export default function Review({ dark }: { dark: boolean }) {
               />
             )}
 
-            {incorrectQs.map((item, i) => {
-              const isLast = i === incorrectQs.length - 1
+            {shownItems.map((item, i) => {
+              const isLast = i === shownItems.length - 1
               return (
                 <div key={item.question_id || i} style={{ marginBottom: isLast ? 0 : ITEM_GAP }}>
                   <LiquidGlassCard dark={dark} delay={i * 60} style={{ padding: '20px 22px' }}>
-                    {item.source && (
-                      <div style={{ marginBottom: 10 }}>
-                        <QuestionSourceBadge source={item.source} />
+                    {(item.source || item.is_correct !== undefined) && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                        {item.is_correct !== undefined && (
+                          <span style={{
+                            fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: '2px 9px', borderRadius: 20,
+                            background: item.is_correct ? 'rgba(74,222,128,0.16)' : 'rgba(248,113,113,0.16)',
+                            color: item.is_correct ? '#4ade80' : '#f87171'
+                          }}>{item.is_correct ? '✓ CORRECT' : item.answer ? '✕ INCORRECT' : '— UNANSWERED'}</span>
+                        )}
+                        {item.source && <QuestionSourceBadge source={item.source} />}
                       </div>
                     )}
                     <p style={{ ...pulseType.cardTitle, color: pt.textPrimary, marginBottom: 12, ...wrapText }}>{item.question}</p>
@@ -450,12 +534,13 @@ export default function Review({ dark }: { dark: boolean }) {
                     {optionsOf(item).map((opt, ai) => {
                       const label = optionLabels[ai]
                       const isCorrect = label === item.correct_answer
+                      const isChosenWrong = !isCorrect && !!item.answer && item.answer === label
                       return (
                         <div key={ai} style={{
-                          background: isCorrect ? '#064e3b' : (dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
-                          border: `1px solid ${isCorrect ? '#4ade80' : pt.border}`,
+                          background: isCorrect ? '#064e3b' : isChosenWrong ? 'rgba(248,113,113,0.16)' : (dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
+                          border: `1px solid ${isCorrect ? '#4ade80' : isChosenWrong ? '#f87171' : pt.border}`,
                           borderRadius: 10, padding: '9px 14px', marginBottom: 6,
-                          color: isCorrect ? '#4ade80' : pt.sub, fontSize: 13, fontWeight: 600,
+                          color: isCorrect ? '#4ade80' : isChosenWrong ? '#f87171' : pt.sub, fontSize: 13, fontWeight: 600,
                           display: 'flex', alignItems: 'flex-start', gap: 6, ...wrapText
                         }}>
                           <span style={{ flexShrink: 0 }}>{label.toUpperCase()}.</span>

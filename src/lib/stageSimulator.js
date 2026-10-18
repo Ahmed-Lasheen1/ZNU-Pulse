@@ -3,7 +3,8 @@ import { inStage } from './lessonStages'
 import { cachedQuery, invalidateCache, MINUTE } from './dataCache'
 import { SIMULATOR_KEY } from './moduleContent'
 
-export const MOCK_MAX_QUESTIONS = 100
+// Most questions a mock or practice quiz will contain.
+export const QUIZ_MAX_QUESTIONS = 100
 
 export async function fetchSimulatorConfig(moduleId) {
   const { data, error } = await cachedQuery(
@@ -79,7 +80,7 @@ function allocate(sizes, cap) {
 }
 
 // Picks at most `cap` questions, spread across subjects and then lessons in proportion to how many each has.
-export function drawProportional(questions, cap = MOCK_MAX_QUESTIONS) {
+export function drawProportional(questions, cap = QUIZ_MAX_QUESTIONS) {
   if (questions.length <= cap) return shuffle(questions)
   const subjects = groupBy(questions, q => q.subject_id)
   const subjectQuotas = allocate(subjects.map(group => group.length), cap)

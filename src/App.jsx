@@ -11,6 +11,7 @@ import { clearAnswerKeyCaches } from './lib/moduleContent'
 import { clearHomeHistory } from './lib/homeData'
 import { networkFirst, clearUserCaches } from './lib/dataCache'
 import { flushActiveExam, removeSyncedLocalExams } from './lib/activeExam'
+import { removeFullAttempts } from './lib/fullHistory'
 import { unsubscribeFromPush } from './lib/pushNotifications'
 import { storageGet, storageSet } from './lib/safeStorage'
 import { containsProfanity } from './lib/moderation'
@@ -42,14 +43,11 @@ const pageLoaders = {
 const Pages = Object.fromEntries(Object.entries(pageLoaders).map(([name, load]) => [name, lazy(load)]))
 const Admin = lazy(() => import('./pages/Admin'))
 
-// Downloads every student-facing page once the browser is idle so the
-// service worker has them cached before the connection drops.
 function prefetchPages() {
   if (navigator.connection?.saveData) return
   Object.values(pageLoaders).forEach(load => load().catch(() => {}))
 }
 
-// An expired token can't be refreshed offline, so getSession() returns nothing even though the student is signed in.
 function readStoredUser() {
   try {
     return JSON.parse(storageGet(AUTH_STORAGE_KEY) || 'null')?.user ?? null
@@ -98,8 +96,6 @@ function ScrollToTop() {
   return null
 }
 
-// One persistent header on every page. Only the spacer differs:
-// Home has its own inside its content.
 function SiteHeader({ dark, toggleTheme }) {
   const location = useLocation()
   const isHome = location.pathname === '/'
@@ -250,10 +246,12 @@ export default function App() {
         setUser(session.user)
         setTimeout(() => { handleSignedIn(session.user).finally(cleanUpAuthHash) }, 0)
       } else if (event === 'SIGNED_OUT') {
+        const previousUserId = lastHandledUserIdRef.current
         lastHandledUserIdRef.current = null
         setUser(null)
         setProfile(null)
         clearUserCaches()
+        if (previousUserId) removeFullAttempts(previousUserId).catch(() => {})
       }
     })
     return () => subscription.unsubscribe()
@@ -262,6 +260,7 @@ export default function App() {
   async function signOut() {
     await flushActiveExam().catch(() => {})
     await unsubscribeFromPush()
+    if (user?.id) await removeFullAttempts(user.id).catch(() => {})
     await supabase.auth.signOut()
     await removeSyncedLocalExams().catch(() => {})
     setUser(null)
@@ -309,6 +308,7 @@ export default function App() {
 function AuthContextProvider({ user, signOut, profile, fetchProfile, authLoaded, children }) {
   return <AuthContext.Provider value={{ user, signOut, profile, fetchProfile, authLoaded }}>{children}</AuthContext.Provider>
 }
+
 function ModulesContextProvider({ modules, modulesLoaded, modulesError, refreshModules, children }) {
   return <ModulesContext.Provider value={{ modules, modulesLoaded, modulesError, refreshModules }}>{children}</ModulesContext.Provider>
 }

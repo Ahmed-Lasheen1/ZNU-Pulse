@@ -13,8 +13,10 @@ import { fetchLessonStageMap, inStage } from '../lib/lessonStages'
 import { getGuestFlags, toggleGuestFlag, enrichGuestFlagsWithResults, addGuestHistory } from '../lib/reviewStorage'
 import { loadSavedActiveExam, persistActiveExam, clearActiveExam } from '../lib/activeExam'
 import { storageGet, storageSet } from '../lib/safeStorage'
-import { fetchSimulatorConfig, drawSimulator, drawProportional, simulatorTotal, shuffle, MOCK_MAX_QUESTIONS } from '../lib/stageSimulator'
+import { fetchSimulatorConfig, drawSimulator, drawProportional, simulatorTotal, QUIZ_MAX_QUESTIONS } from '../lib/stageSimulator'
 import { clearHomeHistory } from '../lib/homeData'
+import { saveFullAttempt } from '../lib/fullHistory'
+import { quizName } from '../lib/quizNames'
 import { optionLabels } from './mcq/mcqShared'
 import MCQBrowse from './mcq/MCQBrowse'
 import MCQExamFlow from './mcq/MCQExamFlow'
@@ -31,6 +33,7 @@ interface QuizConfig {
   lessonId: string | null
   sourceFilter: string | null
   simulatorStage?: string | null
+  stage?: string | null
 }
 
 interface SourceChoice {
@@ -41,6 +44,9 @@ interface SourceChoice {
   allCount: number
   doctorCount: number
 }
+
+// The exam stage a quiz belongs to (older paused simulators only stored simulatorStage).
+const stageOf = (config: QuizConfig | null) => config?.stage || config?.simulatorStage || null
 
 // Converts graded rows from the server into a map keyed by question id.
 function toResultMap(graded: any[] | null) {
@@ -92,6 +98,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const [showReview, setShowReview] = useState(false)
   const [struckOut, setStruckOut] = useState<Record<number, Set<string>>>({})
   const [sourceChoice, setSourceChoice] = useState<SourceChoice | null>(null)
+  const [quizStage, setQuizStage] = useState<string | null>(null)
 
   const FONT_SCALES = [0.9, 1, 1.15, 1.3]
   const [fontScale, setFontScale] = useState<number>(() => {
@@ -420,6 +427,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   function beginQuiz(qs: any[], type: string, config: QuizConfig | null) {
     lastQuizConfigRef.current = config
 
+    setQuizStage(stageOf(config))
     setQuizQuestions(qs)
     setAnswers({})
     setResults({})
@@ -442,18 +450,19 @@ export default function MCQ({ dark }: { dark: boolean }) {
     window.scrollTo({ top: 0 })
   }
 
-  // Starts a mock (capped, spread across subjects and lessons) or practice quiz; `lessonId` wins over `subjectId`.
+  // Starts a mock or practice quiz (capped, spread across subjects and lessons); `lessonId` wins over `subjectId`.
   function startQuiz(type: string, subjectId: string | null = null, lessonId: string | null = null, sourceFilter: string | null = null) {
-    const qs = type === 'mock'
-      ? drawProportional(getFilteredQuestions('mock', sourceFilter), MOCK_MAX_QUESTIONS)
-      : shuffle(getPracticeQuestions(subjectId, lessonId, sourceFilter))
+    const qs = drawProportional(
+      type === 'mock' ? getFilteredQuestions('mock', sourceFilter) : getPracticeQuestions(subjectId, lessonId, sourceFilter),
+      QUIZ_MAX_QUESTIONS
+    )
 
     if (qs.length === 0) {
       showToast('❌ No questions available for this selection yet', 'error')
       return
     }
 
-    beginQuiz(qs, type, { type, subjectId, lessonId, sourceFilter, simulatorStage: null })
+    beginQuiz(qs, type, { type, subjectId, lessonId, sourceFilter, simulatorStage: null, stage: activeStage === 'all' ? null : activeStage })
   }
 
   // Starts a simulator exam drawn at random from the admin's per-subject counts for this stage.
@@ -464,7 +473,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
       showToast('❌ No simulator questions available for this stage yet', 'error')
       return
     }
-    beginQuiz(qs, 'simulator', { type: 'simulator', subjectId: null, lessonId: null, sourceFilter, simulatorStage: stage })
+    beginQuiz(qs, 'simulator', { type: 'simulator', subjectId: null, lessonId: null, sourceFilter, simulatorStage: stage, stage })
   }
 
   function launch(type: StartType, subjectId: string | null, lessonId: string | null, stage: string | null, source: string | null) {
@@ -484,7 +493,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     const all = scopeCount(type, subjectId, lessonId, stage, null)
     const doctors = scopeCount(type, subjectId, lessonId, stage, 'university')
     if (doctors > 0 && doctors < all) {
-      const shown = (n: number) => type === 'mock' ? Math.min(n, MOCK_MAX_QUESTIONS) : n
+      const shown = (n: number) => type === 'simulator' ? n : Math.min(n, QUIZ_MAX_QUESTIONS)
       setSourceChoice({ type, subjectId, lessonId, stage, allCount: shown(all), doctorCount: shown(doctors) })
       return
     }
@@ -514,6 +523,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
       ? Date.now() - (resumeData.savedAt - resumeData.startedAt)
       : resumeData.startedAt
     lastQuizConfigRef.current = resumeData.quizConfig || null
+    setQuizStage(stageOf(resumeData.quizConfig || null))
     setActiveModule(resumeData.activeModule)
     setQuizQuestions(resumeData.quizQuestions || [])
     setAnswers(resumeData.answers || {})
@@ -546,6 +556,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   function stopQuiz() {
     clearInterval(timerRef.current)
     setQuizMode(null)
+    setQuizStage(null)
     setQuizQuestions([])
     setAnswers({})
     setResults({})
@@ -645,6 +656,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     const payload = quizQuestions.map((q, i) => ({ id: q.id, answer: answers[i] || null }))
     const total = quizQuestions.length
     const timeSec = null
+    const attemptId = crypto.randomUUID()
 
     const retryModuleIsUniform = quizMode === 'retry' && quizQuestions.every(q => q.module_id === quizQuestions[0]?.module_id)
     const retrySubjectIsUniform = quizMode === 'retry' && quizQuestions.every(q => q.subject_id === quizQuestions[0]?.subject_id)
@@ -668,7 +680,9 @@ export default function MCQ({ dark }: { dark: boolean }) {
             p_module_id: historyModuleId,
             p_quiz_type: quizMode,
             p_subject_id: historySubjectId,
-            p_time_sec: timeSec
+            p_time_sec: timeSec,
+            p_stage: quizStage,
+            p_attempt_id: attemptId
           })
         : await supabase.rpc('grade_mcq', { p_answers: payload })
 
@@ -721,7 +735,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
       if (user) {
         const saved = await savePendingAttempt({
-          userId: user.id, moduleId: historyModuleId, subjectId: historySubjectId, quizType: quizMode,
+          id: attemptId, stage: quizStage, userId: user.id, moduleId: historyModuleId, subjectId: historySubjectId, quizType: quizMode,
           timeSec, completedAt: Date.now(), answers: payload,
           total, correct: correctCount, score: scorePercent, incorrectQuestions: incorrectSnapshots,
           possibleDuplicate: attemptedOnline,
@@ -730,12 +744,29 @@ export default function MCQ({ dark }: { dark: boolean }) {
       } else {
         enrichGuestFlagsWithResults(resultMap)
         addGuestHistory({
-          module_id: historyModuleId, quiz_type: quizMode, subject_id: historySubjectId,
+          id: attemptId, stage: quizStage, module_id: historyModuleId, quiz_type: quizMode, subject_id: historySubjectId,
           total, correct: correctCount, score: scorePercent, time_sec: timeSec,
           incorrect_questions: incorrectSnapshots
         })
       }
     }
+
+    saveFullAttempt(user?.id || null, {
+      id: attemptId,
+      questions: quizQuestions.map((q, i) => ({
+        question_id: q.id,
+        question: q.question,
+        option_a: q.option_a, option_b: q.option_b, option_c: q.option_c, option_d: q.option_d,
+        correct_answer: resultMap[q.id]?.correct_answer ?? null,
+        explanation: resultMap[q.id]?.explanation ?? null,
+        answer: answers[i] || null,
+        is_correct: !!resultMap[q.id]?.is_correct,
+        module_id: q.module_id || null,
+        subject_id: q.subject_id || null,
+        lesson_id: q.lesson_id || null,
+        source: q.source || null,
+      })),
+    }).catch(() => {})
 
     if (!isMountedRef.current) { submittingRef.current = false; return }
 
@@ -750,11 +781,14 @@ export default function MCQ({ dark }: { dark: boolean }) {
     submittingRef.current = false
   }
 
+  const quizTitle = quizName(quizMode || 'practice', quizStage ? stages.find((s: any) => s.value === quizStage)?.title : undefined)
+
   if (quizMode) {
     return (
       <MCQExamFlow
         dark={dark}
         quizMode={quizMode}
+        quizTitle={quizTitle}
         submitted={submitted}
         grading={grading}
         quizQuestions={quizQuestions}

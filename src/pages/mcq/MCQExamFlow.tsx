@@ -17,6 +17,7 @@ import { MCQ_ACCENT, EXAM_TOP_TEXT, EXAM_TOP_TEXT_MUTED, EXAM_LOW_TEXT, EXAM_LOW
 interface MCQExamFlowProps {
   dark: boolean
   quizMode: string
+  quizTitle: string
   submitted: boolean
   grading: boolean
   quizQuestions: any[]
@@ -97,7 +98,7 @@ function TopGlassButton({ dark, onClick, ariaLabel, children }: {
 
 // Full exam screen: question view, bottom navigation bar, results and answer review.
 export default function MCQExamFlow({
-  dark, quizMode, submitted, grading, quizQuestions, answers, results,
+  dark, quizMode, quizTitle, submitted, grading, quizQuestions, answers, results,
   flaggedIds, struckOut, currentIndex, setCurrentIndex,
   elapsedSeconds, finishTimeSec, fontScale, cycleFontScale,
   showReview, setShowReview, subjects, lessons, lessonFilter,
@@ -107,11 +108,7 @@ export default function MCQExamFlow({
   const pt = getPulseTheme(dark)
   const isTutorMode = quizMode === 'practice' || quizMode === 'retry'
   const showsSubjectTags = quizMode === 'mock' || quizMode === 'simulator'
-  const completeLabel = {
-    mock: 'MOCK EXAM COMPLETE',
-    simulator: 'SIMULATOR COMPLETE',
-    retry: 'RETRY COMPLETE',
-  }[quizMode] || 'PRACTICE COMPLETE'
+  const completeLabel = `${quizTitle.toUpperCase()} COMPLETE`
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false)
   const [confirmExitOpen, setConfirmExitOpen] = useState(false)
   const barRef = useRef<HTMLDivElement>(null)
@@ -243,7 +240,7 @@ export default function MCQExamFlow({
           </div>
 
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 3, color: EXAM_TOP_TEXT_MUTED }}>ZNU · EXAM MODE</div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, lineHeight: 1.4, maxWidth: 'min(56vw, 360px)', margin: '0 auto', color: EXAM_TOP_TEXT_MUTED }}>ZNU · {quizTitle.toUpperCase()}</div>
 
             {!submitted && !grading && total > 0 && (
               <>

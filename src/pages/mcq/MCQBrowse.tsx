@@ -13,7 +13,8 @@ import { ModuleIcon, ExamIcon } from '../../lib/medicalIcons'
 import { OfflineIcon, BookIcon, PauseIcon, PlayIcon, EmptyBoxIcon, GraduationCapIcon, TargetIcon } from '../../components/ui/tool-icons'
 import { MCQ_ACCENT, EXAM_LOW_SHADOW } from './mcqShared'
 import { stagesOf, inStage } from '../../lib/lessonStages'
-import { simulatorPool, simulatorTotal, MOCK_MAX_QUESTIONS } from '../../lib/stageSimulator'
+import { simulatorPool, simulatorTotal, QUIZ_MAX_QUESTIONS } from '../../lib/stageSimulator'
+import { quizName } from '../../lib/quizNames'
 
 interface SimulatorRow {
   stage: string
@@ -67,6 +68,7 @@ function CountText({ children }: { children: ReactNode }) {
 }
 
 const countLabel = (n: number) => `${n} question${n === 1 ? '' : 's'}`
+const capped = (n: number) => Math.min(n, QUIZ_MAX_QUESTIONS)
 
 function SourceChoiceDialog({
   dark, open, allCount, doctorCount, onCancel, onChooseAll, onChooseDoctors
@@ -241,7 +243,7 @@ export default function MCQBrowse({
   const stagesWithQuestions = new Set(questions.flatMap(q => stagesOf(q, lessonStageMap)))
   const visibleStages = stages.filter(s => stagesWithQuestions.has(s.value))
 
-  const mockCount = Math.min(getFilteredQuestions('mock').length, MOCK_MAX_QUESTIONS)
+  const mockCount = capped(getFilteredQuestions('mock').length)
 
   // With a stage selected, only subjects/lessons that actually have questions in it are listed.
   const stageSubjectIds = new Set(
@@ -253,9 +255,9 @@ export default function MCQBrowse({
     .map(sub => {
       const lessonRows = lessons
         .filter(l => l.subject_id === sub.id)
-        .map(lesson => ({ lesson, count: getPracticeQuestions(null, lesson.id).length }))
+        .map(lesson => ({ lesson, count: capped(getPracticeQuestions(null, lesson.id).length) }))
         .filter(r => !stageActive || r.count > 0)
-      return { sub, count: getPracticeQuestions(sub.id, null).length, lessonRows }
+      return { sub, count: capped(getPracticeQuestions(sub.id, null).length), lessonRows }
     })
     .filter(r => !stageActive || r.count > 0 || r.lessonRows.length > 0)
 
@@ -276,6 +278,11 @@ export default function MCQBrowse({
   const mockHidden = stageActive && (loading || simulatorLoading || simulatorShown)
 
   const singleSubject = subjectRows.length === 1
+
+  const resumeStage = resumeData?.quizConfig?.stage || resumeData?.quizConfig?.simulatorStage
+  const resumeStageTitle = resumeStage && resumeData.activeModule === activeModuleObj?.id
+    ? stages.find(s => s.value === resumeStage)?.title
+    : undefined
 
   return (
     <PageShell dark={dark} backFallback="/" maxWidth={900}>
@@ -314,7 +321,7 @@ export default function MCQBrowse({
             justifyContent: 'space-between', gap: 10, flexWrap: 'wrap'
           }}>
             <div style={{ color: MCQ_ACCENT, fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <PauseIcon color={MCQ_ACCENT} size={13} /> Paused {resumeData.quizMode === 'mock' ? 'mock exam' : resumeData.quizMode === 'simulator' ? 'simulator' : 'practice quiz'} — {Object.keys(resumeData.answers || {}).length}/{(resumeData.quizQuestions || []).length} answered
+              <PauseIcon color={MCQ_ACCENT} size={13} /> Paused {quizName(resumeData.quizMode, resumeStageTitle)} — {Object.keys(resumeData.answers || {}).length}/{(resumeData.quizQuestions || []).length} answered
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={onResume} style={{

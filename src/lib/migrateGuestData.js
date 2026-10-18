@@ -3,6 +3,7 @@ import {
   getGuestFlags, clearGuestFlags, setGuestFlags,
   getGuestHistory, clearGuestHistory, setGuestHistory,
 } from './reviewStorage'
+import { removeFullAttempts } from './fullHistory'
 
 // One-time handoff when a guest signs in on the same device.
 // The paused guest exam is not migrated.
@@ -39,6 +40,8 @@ async function migrateFlags(userId) {
   else clearGuestFlags()
 }
 
+// Migrated attempts reach the account with their incorrect questions only,
+// so their full guest copies are dropped instead of being handed to the account.
 async function migrateHistory(userId) {
   const history = getGuestHistory()
   if (history.length === 0) return
@@ -47,6 +50,7 @@ async function migrateHistory(userId) {
     module_id: h.module_id || null,
     quiz_type: h.quiz_type,
     subject_id: h.subject_id || null,
+    stage: h.stage || null,
     total: h.total,
     correct: h.correct,
     score: h.score,
@@ -54,8 +58,10 @@ async function migrateHistory(userId) {
     completed_at: new Date(h.completed_at).toISOString(),
   })))
   const failed = history.filter((_, i) => !results[i])
+  const migratedIds = history.filter((_, i) => results[i]).map(h => h.id).filter(Boolean)
   if (failed.length > 0) setGuestHistory(failed)
   else clearGuestHistory()
+  if (migratedIds.length > 0) removeFullAttempts(null, migratedIds).catch(() => {})
 }
 
 export async function migrateGuestDataIfNeeded(userId) {

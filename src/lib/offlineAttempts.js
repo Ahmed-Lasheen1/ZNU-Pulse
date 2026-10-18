@@ -31,8 +31,9 @@ export async function gradeLocally(questions, answers) {
   return results
 }
 
+// Keeps the caller's attempt id when given, so the server row and the device's full copy share one id.
 export async function savePendingAttempt(attempt) {
-  const record = { ...attempt, id: crypto.randomUUID(), error: null }
+  const record = { ...attempt, id: attempt.id || crypto.randomUUID(), error: null }
   Promise.resolve(navigator.storage?.persist?.()).catch(() => {})
   const saved = (await idbSet(ATTEMPT_PREFIX + record.id, record)) != null
   if (saved) notify()
@@ -69,6 +70,7 @@ export async function syncPendingAttempts(userId, { includeFailed = false } = {}
         p_time_sec: attempt.timeSec,
         p_completed_at: new Date(attempt.completedAt).toISOString(),
         p_possible_duplicate: !!attempt.possibleDuplicate,
+        p_stage: attempt.stage || null,
       })
       if (!response.error && response.data?.length) {
         await idbDelete(ATTEMPT_PREFIX + attempt.id)
