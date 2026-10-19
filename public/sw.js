@@ -5,6 +5,8 @@ const SHELL_URLS = ['/', '/favicon.svg', '/logo.svg', '/icon-192.png', '/icon-51
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com']
 const IMMUTABLE_PREFIX = '/assets/'
 const MAX_CACHE_ENTRIES = 150
+// How long a page load waits for the network before falling back to the saved shell.
+const NAV_TIMEOUT_MS = 2500
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
@@ -48,6 +50,25 @@ async function cachedAsset(request, revalidate) {
   return cached || network
 }
 
+// Page loads: prefer fresh HTML, but never keep the user waiting on a slow network.
+function handleNavigation(request) {
+  const network = fetch(request).then((response) => {
+    if (response.ok && response.headers.get('content-type')?.includes('text/html')) {
+      const copy = response.clone()
+      caches.open(CACHE_NAME).then((cache) => cache.put('/', copy))
+      return response
+    }
+    if (response.ok) return response
+    return Promise.reject(new Error('Navigation failed with status ' + response.status))
+  })
+
+  return caches.match('/').then((cached) => {
+    if (!cached) return network.catch(() => caches.match('/'))
+    const timeout = new Promise((resolve) => setTimeout(() => resolve(cached), NAV_TIMEOUT_MS))
+    return Promise.race([network.catch(() => cached), timeout])
+  })
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event
   if (request.method !== 'GET') return
@@ -56,19 +77,8 @@ self.addEventListener('fetch', (event) => {
   const isFont = FONT_HOSTS.includes(url.hostname)
   if (url.origin !== self.location.origin && !isFont) return
 
-  // Navigations: network first, cached shell when offline.
   if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response.ok && response.headers.get('content-type')?.includes('text/html')) {
-            const copy = response.clone()
-            caches.open(CACHE_NAME).then((cache) => cache.put('/', copy))
-          }
-          return response
-        })
-        .catch(() => caches.match('/'))
-    )
+    event.respondWith(handleNavigation(request))
     return
   }
 

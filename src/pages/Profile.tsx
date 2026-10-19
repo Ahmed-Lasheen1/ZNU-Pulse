@@ -7,7 +7,7 @@ import { getPulseTheme, pulseFonts, pulseType } from '../premiumTheme'
 import { glassInput, glassPrimaryBtn, glassGhostBtn } from '../components/pulse/PulseUI'
 import { containsProfanity } from '../lib/moderation'
 import { isSuccessMessage } from '../lib/messageStyle'
-import { networkFirst, saveCached } from '../lib/dataCache'
+import { cachedSnapshot, saveCached } from '../lib/dataCache'
 import { useToast } from '../components/ToastProvider'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
 import BackButton from '../components/pulse/BackButton'
@@ -55,6 +55,7 @@ function PointsBadge({ points, dark, size = 'md', borderColor }: {
   )
 }
 
+// Inline form for changing the display name and password.
 function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
   profile: Profile; dark: boolean; onUpdated: (name: string) => void; onProfileRefresh: () => void
 }) {
@@ -70,6 +71,7 @@ function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
   const isSuccess = isSuccessMessage(msg)
   const inStyle = { ...glassInput(pt, dark), padding: '13px 20px' }
 
+  // Saves the display name after checking connectivity and profanity.
   async function saveName() {
     if (!navigator.onLine) return setMsg(OFFLINE_MESSAGE)
     if (!name.trim()) return setMsg('❌ Name cannot be empty')
@@ -85,6 +87,7 @@ function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
     onProfileRefresh()
   }
 
+  // Changes the account password after checking connectivity and that both entries match.
   async function savePassword() {
     if (!navigator.onLine) return setMsg(OFFLINE_MESSAGE)
     if (!newPassword || newPassword.length < MIN_PASSWORD_LENGTH) return setMsg(`❌ Password must be at least ${MIN_PASSWORD_LENGTH} characters`)
@@ -141,6 +144,7 @@ function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
   )
 }
 
+// Profile page with two tabs: the signed-in student's own profile, and the top-10 leaderboard.
 export default function Profile({ dark }: { dark: boolean }) {
   const { user, signOut, fetchProfile } = useAuth() as {
     user: { id: string; email?: string } | null
@@ -171,15 +175,35 @@ export default function Profile({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
+  // Shows the saved profile and leaderboard at once, then refreshes them in the background.
   async function fetchData(isIgnored: () => boolean = () => false) {
     setLoading(true)
     setLoadError(false)
-    const [profileRes, lbRes] = await Promise.all([
-      user
-        ? networkFirst(`user:${user.id}:profile`, () => supabase.from('profiles').select('*').eq('id', user.id).maybeSingle())
-        : Promise.resolve({ data: null, error: null, fromCache: false }),
-      networkFirst('leaderboard', () => supabase.from('profiles').select('name, points').order('points', { ascending: false }).limit(10)),
-    ])
+    const profilePromise = user
+      ? cachedSnapshot(
+          `user:${user.id}:profile`,
+          () => supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+          {
+            onUpdate: fresh => {
+              if (isIgnored() || !fresh) return
+              setProfile(fresh as Profile)
+              setSavedCopy(false)
+            },
+          }
+        )
+      : Promise.resolve({ data: null, error: null, fromCache: false })
+    const lbPromise = cachedSnapshot(
+      'leaderboard',
+      () => supabase.from('profiles').select('name, points').order('points', { ascending: false }).limit(10),
+      {
+        onUpdate: fresh => {
+          if (isIgnored() || !fresh) return
+          setLeaderboard(fresh as Profile[])
+          setSavedCopy(false)
+        },
+      }
+    )
+    const [profileRes, lbRes] = await Promise.all([profilePromise, lbPromise])
     if (isIgnored()) return
     setProfile((profileRes.data as Profile) || null)
     if (lbRes.data) setLeaderboard(lbRes.data as Profile[])

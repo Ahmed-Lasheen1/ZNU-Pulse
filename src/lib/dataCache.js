@@ -22,6 +22,7 @@ export function markContentValidated(at = Date.now()) {
   if (at > validatedAt) validatedAt = at
 }
 
+// True when a version check has confirmed this entry is still current.
 function isValidated(entry) {
   if (!validatedAt) return false
   const now = Date.now()
@@ -30,6 +31,7 @@ function isValidated(entry) {
     && now - entry.savedAt < MAX_VALIDATED_AGE
 }
 
+// Removes a cached entry and cancels any in-flight refresh for it.
 export function invalidateCache(key) {
   generations.set(key, generationOf(key) + 1)
   memory.delete(key)
@@ -37,6 +39,7 @@ export function invalidateCache(key) {
   idbDelete(key)
 }
 
+// Reads an entry from memory, falling back to IndexedDB.
 async function readEntry(key) {
   const hit = memory.get(key)
   if (hit) return hit
@@ -47,6 +50,7 @@ async function readEntry(key) {
   return memory.get(key)
 }
 
+// Runs the fetcher once per key at a time and stores a successful result.
 function refresh(key, fetcher) {
   const running = inFlight.get(key)
   if (running) return running
@@ -76,7 +80,7 @@ function refreshAfterCheck(key, fetcher, entry, onUpdate) {
   }, VALIDATION_GRACE_MS)
 }
 
-// `versioned` entries stay valid past their ttl while content_versions confirms nothing changed.
+// Returns a cached result, refreshing it in the background once its TTL expires.
 export async function cachedQuery(key, fetcher, { ttl, onUpdate, versioned = false } = {}) {
   const entry = await readEntry(key)
   if (!entry) return refresh(key, fetcher)
@@ -87,6 +91,20 @@ export async function cachedQuery(key, fetcher, { ttl, onUpdate, versioned = fal
   return { data: entry.data, error: null }
 }
 
+// Shows the saved copy at once when one exists, then refreshes it in the background.
+export async function cachedSnapshot(key, fetcher, { onUpdate } = {}) {
+  const entry = await readEntry(key)
+  if (entry) {
+    if (navigator.onLine) {
+      refresh(key, fetcher).then(result => { if (!result.error) onUpdate?.(result.data) })
+    }
+    return { data: entry.data, error: null, fromCache: true }
+  }
+  const result = await refresh(key, fetcher)
+  return { ...result, fromCache: false }
+}
+
+// Stores a value directly as the saved copy for a key.
 export function saveCached(key, data) {
   const entry = { data, savedAt: Date.now() }
   memory.set(key, entry)
@@ -111,6 +129,7 @@ export async function networkFirst(key, fetcher) {
   return { data: null, error: new Error('Offline'), fromCache: false }
 }
 
+// Deletes every cached entry that belongs to a signed-in user.
 export async function clearUserCaches() {
   userEpoch++
   for (const key of [...memory.keys()]) {

@@ -43,18 +43,22 @@ const typeMeta: Record<SearchResult['type'], { Icon: (p: { color?: string; size?
 const TYPE_ORDER: SearchResult['type'][] = ['module', 'file', 'summary', 'schedule', 'question']
 const MAX_RESULTS = 60
 
+// Escapes LIKE wildcards so a typed % or _ is matched literally.
 function escapeLikePattern(value: string) {
   return value.replace(/[%_\\]/g, '\\$&')
 }
 
+// Case-insensitive substring check that tolerates missing values.
 function includesText(value: string | null | undefined, needle: string) {
   return !!value && value.toLowerCase().includes(needle)
 }
 
+// Finds the module record a search hit belongs to.
 function findModule(mods: SearchModule[], moduleId: string) {
   return mods.find(m => m.id === moduleId) || null
 }
 
+// Orders search results by type so modules and files appear before questions.
 function sortByType(list: SearchResult[]) {
   const rank = (t: SearchResult['type']) => TYPE_ORDER.indexOf(t)
   return list
@@ -63,6 +67,7 @@ function sortByType(list: SearchResult[]) {
     .map(x => x.r)
 }
 
+// Searches every content table directly on the server; returns null if any request fails.
 async function searchOnline(q: string, mods: SearchModule[]): Promise<SearchResult[] | null> {
   const like = `%${escapeLikePattern(q)}%`
   const [fileRes, questionRes, summaryRes, scheduleRes] = await Promise.all([
@@ -82,6 +87,7 @@ async function searchOnline(q: string, mods: SearchModule[]): Promise<SearchResu
   return [...files, ...summaries, ...schedules, ...questions]
 }
 
+// Searches content saved on this device when offline. Schedules use the same query and cache key as the Schedule page.
 async function searchSavedContent(q: string, mods: SearchModule[]): Promise<SearchResult[]> {
   const needle = q.toLowerCase()
   const groups = await Promise.all(mods.map(async mod => {
@@ -89,7 +95,7 @@ async function searchSavedContent(q: string, mods: SearchModule[]): Promise<Sear
       fetchModuleQuestions(mod.id),
       fetchModuleFiles(mod.id),
       fetchModuleSummaries(mod.id),
-      networkFirst(`schedules:${mod.id}`, () => supabase.from('schedules').select('id, title, type, module_id').eq('module_id', mod.id)),
+      networkFirst(`schedules:${mod.id}`, () => supabase.from('schedules').select('*').eq('module_id', mod.id).order('created_at')),
     ])
 
     const hits: SearchResult[] = []
@@ -110,6 +116,7 @@ async function searchSavedContent(q: string, mods: SearchModule[]): Promise<Sear
   return groups.flat()
 }
 
+// Search page: finds modules, files, summaries, schedules and questions, online or from the saved copy.
 export default function Search({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const navigate = useNavigate()
@@ -145,6 +152,7 @@ export default function Search({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query])
 
+  // Runs one search, discarding the result if a newer search has started since.
   async function runSearch(q: string) {
     const requestId = ++searchIdRef.current
     setLoading(true)
@@ -164,6 +172,7 @@ export default function Search({ dark }: { dark: boolean }) {
     setLoading(false)
   }
 
+  // Navigates to the page or item a search result refers to.
   function openResult(r: SearchResult) {
     if (r.type === 'module') return navigate(`/module/${r.id}`)
     if (r.type === 'file') return navigate(`/files?type=${r.raw.type}&module=${r.raw.module_id}&file=${r.raw.id}`)

@@ -14,7 +14,7 @@ import EmptyState from '../components/pulse/EmptyState'
 import { ScheduleSkeleton } from '../components/pulse/Skeletons'
 import OfflineNote from '../components/pulse/OfflineNote'
 import { useToast } from '../components/ToastProvider'
-import { networkFirst } from '../lib/dataCache'
+import { cachedSnapshot } from '../lib/dataCache'
 import { getDriveOrRawUrl } from '../lib/embedUrl'
 import { useModules } from '../contexts'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
@@ -46,6 +46,7 @@ interface ScheduleRow {
 
 type ScheduleType = 'study' | 'exam'
 
+// Schedules page: lists study and exam schedules per module, showing saved data first and refreshing it in the background.
 export default function Schedule({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const location = useLocation()
@@ -97,15 +98,24 @@ export default function Schedule({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules, moduleParam])
 
-  // Refetches on module switch instead of loading every schedule up front.
+  // Loads one module's schedules from the saved copy first, then refreshes them in the background.
   useEffect(() => {
     if (!activeModule) return
     let ignore = false
     async function fetchData() {
       setLoading(true)
       setLoadError(false)
-      const { data, error, fromCache } = await networkFirst(`schedules:${activeModule}`, () =>
-        supabase.from('schedules').select('*').eq('module_id', activeModule).order('created_at'))
+      const { data, error, fromCache } = await cachedSnapshot(
+        `schedules:${activeModule}`,
+        () => supabase.from('schedules').select('*').eq('module_id', activeModule).order('created_at'),
+        {
+          onUpdate: fresh => {
+            if (ignore || !fresh) return
+            setSchedules(fresh as ScheduleRow[])
+            setSavedCopy(false)
+          },
+        }
+      )
       if (ignore) return
       if (data) setSchedules(data as ScheduleRow[])
       setSavedCopy(fromCache)
@@ -126,7 +136,7 @@ export default function Schedule({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemParam, schedules])
 
-  // Schedule images are Drive links, so they can't load without a connection.
+  // Opens a schedule image, which is hosted on Drive and needs a connection to load.
   function openSchedule(sch: ScheduleRow) {
     if (!navigator.onLine) {
       showToast("Schedule images need a connection — try again when you're online", 'info')
