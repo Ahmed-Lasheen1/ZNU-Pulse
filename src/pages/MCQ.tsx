@@ -22,7 +22,7 @@ import MCQBrowse from './mcq/MCQBrowse'
 import MCQExamFlow from './mcq/MCQExamFlow'
 
 const OFFLINE_KEYS_MESSAGE = "Answer keys for this module aren't saved on this device — open it once while online."
-const OFFLINE_SAVED_MESSAGE = "Saved on this device — it will sync when you're back online. Offline attempts don't earn points."
+const OFFLINE_SAVED_MESSAGE = "Saved on this device — it will sync when you're back online. Points are added when it syncs."
 const OFFLINE_SAVE_FAILED_MESSAGE = "This device couldn't save the attempt — your results are shown here only."
 
 type StartType = 'mock' | 'practice' | 'simulator'
