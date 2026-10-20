@@ -8,6 +8,7 @@ import StudyMaterialsSection from '../components/pulse/StudyMaterialsSection'
 import StudyByLessonSection from '../components/pulse/StudyByLessonSection'
 import StageTabs from '../components/pulse/StageTabs'
 import { PageSectionsSkeleton } from '../components/pulse/Skeletons'
+import ErrorBanner from '../components/ErrorBanner'
 import SummaryOverlay from '../components/SummaryOverlay'
 import { useToast } from '../components/ToastProvider'
 import { useModules } from '../contexts'
@@ -214,6 +215,8 @@ export default function ModulePage({ dark }: { dark: boolean }) {
           {module.status === 'active' ? '● Active' : '✓ Completed'}
         </div>
       </div>
+
+      {loadError && <div style={{ marginBottom: 24 }}><ErrorBanner message="Some content couldn't load — check your connection." /></div>}
 
       {!contentLoaded && <PageSectionsSkeleton />}
 

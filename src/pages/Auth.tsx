@@ -74,7 +74,11 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
   const otpRef = useRef<HTMLInputElement>(null)
   const celebratedRef = useRef(false)
 
-  useEffect(() => { if (step === 'verify') setTimeout(() => otpRef.current?.focus(), 300) }, [step])
+  useEffect(() => {
+    if (step !== 'verify') return
+    const t = setTimeout(() => otpRef.current?.focus(), 300)
+    return () => clearTimeout(t)
+  }, [step])
   useEffect(() => {
     if (message.includes('✅') && message.toLowerCase().includes('verified') && !celebratedRef.current) {
       celebratedRef.current = true

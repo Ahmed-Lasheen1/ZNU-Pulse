@@ -1,4 +1,3 @@
-// src/pages/Profile.tsx
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
@@ -30,9 +29,6 @@ interface Profile {
   points: number
 }
 
-// Shared points pill (profile card + leaderboard). Number uses the primary text color
-// for contrast; amber is only the tint, border and star. 'md' is deliberately quiet
-// so a leaderboard row reads name first, points second.
 function PointsBadge({ points, dark, size = 'md', borderColor }: {
   points: number; dark: boolean; size?: 'md' | 'lg'; borderColor?: string
 }) {
@@ -55,7 +51,6 @@ function PointsBadge({ points, dark, size = 'md', borderColor }: {
   )
 }
 
-// Inline form for changing the display name and password.
 function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
   profile: Profile; dark: boolean; onUpdated: (name: string) => void; onProfileRefresh: () => void
 }) {
@@ -71,7 +66,6 @@ function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
   const isSuccess = isSuccessMessage(msg)
   const inStyle = { ...glassInput(pt, dark), padding: '13px 20px' }
 
-  // Saves the display name after checking connectivity and profanity.
   async function saveName() {
     if (!navigator.onLine) return setMsg(OFFLINE_MESSAGE)
     if (!name.trim()) return setMsg('❌ Name cannot be empty')
@@ -87,7 +81,6 @@ function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
     onProfileRefresh()
   }
 
-  // Changes the account password after checking connectivity and that both entries match.
   async function savePassword() {
     if (!navigator.onLine) return setMsg(OFFLINE_MESSAGE)
     if (!newPassword || newPassword.length < MIN_PASSWORD_LENGTH) return setMsg(`❌ Password must be at least ${MIN_PASSWORD_LENGTH} characters`)
@@ -144,7 +137,6 @@ function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
   )
 }
 
-// Profile page with two tabs: the signed-in student's own profile, and the top-10 leaderboard.
 export default function Profile({ dark }: { dark: boolean }) {
   const { user, signOut, fetchProfile } = useAuth() as {
     user: { id: string; email?: string } | null
@@ -175,7 +167,6 @@ export default function Profile({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
-  // Shows the saved profile and leaderboard at once, then refreshes them in the background.
   async function fetchData(isIgnored: () => boolean = () => false) {
     setLoading(true)
     setLoadError(false)
@@ -194,7 +185,7 @@ export default function Profile({ dark }: { dark: boolean }) {
       : Promise.resolve({ data: null, error: null, fromCache: false })
     const lbPromise = cachedSnapshot(
       'leaderboard',
-      () => supabase.from('profiles').select('name, points').order('points', { ascending: false }).limit(10),
+      () => supabase.from('leaderboard').select('name, points').order('points', { ascending: false }).limit(10),
       {
         onUpdate: fresh => {
           if (isIgnored() || !fresh) return

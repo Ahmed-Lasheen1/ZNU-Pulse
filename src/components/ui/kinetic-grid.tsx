@@ -20,6 +20,7 @@ const INFLUENCE_RADIUS = 260;
 const MAX_WARP = 24;
 const DOT_SPACING = 28;
 const LERP_SPEED = 0.08;
+const SNAP_DISTANCE = 0.05;
 
 const LINE_BASE = { r: 255, g: 255, b: 255, a: 0.13 };
 const NODE_BASE_RADIUS = 1.8;
@@ -53,22 +54,6 @@ function usePrefersReducedMotion() {
   return ref;
 }
 
-// Adapted from the standalone kinetic-grid demo for ZNU Pulse. `overlay`
-// mode skips the solid background + dot texture and renders only the
-// warping grid lines/nodes at reduced opacity, to sit on top of
-// PulseBackground.tsx instead of replacing it.
-//
-// Input is handled entirely through the Pointer Events API
-// (pointermove/pointerdown/pointerup/pointercancel) rather than
-// separate mouse/touch listeners — this unifies mouse, touch, and pen
-// into one code path and is the standard approach for canvas effects
-// that need to work on touch devices. All listeners are passive
-// (nothing here ever calls preventDefault), so page scrolling and
-// pinch-zoom are never affected — same as before. A touch has no
-// resting "hover" position the way a mouse cursor does, so on
-// pointerup/pointercancel for a touch pointer we relax the tracked
-// position back off-canvas; otherwise the grid would stay warped
-// toward wherever a finger last touched, forever, once lifted.
 export default function KineticGrid({
   children,
   className,
@@ -89,16 +74,13 @@ export default function KineticGrid({
   const ripplesRef = useRef<Ripple[]>([]);
   const rafRef = useRef<number>(0);
   const sizeRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
+  const dirtyRef = useRef(true);
   const reducedMotionRef = usePrefersReducedMotion();
 
-  // Reused across frames — only reallocated when the grid's col/row
-  // count actually changes (e.g. on resize), not on every tick.
   const gridRef = useRef<{ cols: number; rows: number; pts: Point[][]; prox: number[][] }>({
     cols: 0, rows: 0, pts: [], prox: [],
   });
 
-  // Mutates `outPt` in place and returns proximity, instead of
-  // allocating a new {x,y} object on every cell every frame.
   const getWarpedPoint = useCallback(
     (
       gx: number,
@@ -298,9 +280,22 @@ export default function KineticGrid({
     (now: number) => {
       const m = mouseRef.current;
       const t = targetMouseRef.current;
-      m.x = lerpN(m.x, t.x, LERP_SPEED);
-      m.y = lerpN(m.y, t.y, LERP_SPEED);
-      draw(now);
+      const dx = t.x - m.x;
+      const dy = t.y - m.y;
+      let moved = false;
+      if (Math.abs(dx) > SNAP_DISTANCE || Math.abs(dy) > SNAP_DISTANCE) {
+        m.x = lerpN(m.x, t.x, LERP_SPEED);
+        m.y = lerpN(m.y, t.y, LERP_SPEED);
+        moved = true;
+      } else if (dx !== 0 || dy !== 0) {
+        m.x = t.x;
+        m.y = t.y;
+        moved = true;
+      }
+      if (moved || dirtyRef.current || ripplesRef.current.length > 0) {
+        dirtyRef.current = false;
+        draw(now);
+      }
       rafRef.current = requestAnimationFrame(animate);
     },
     [draw],
@@ -316,6 +311,7 @@ export default function KineticGrid({
       canvas.width = w;
       canvas.height = h;
       sizeRef.current = { w, h };
+      dirtyRef.current = true;
     };
 
     let resizeTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -335,38 +331,27 @@ export default function KineticGrid({
       };
     }
 
-    // Pointer Events unify mouse, touch, and pen into one stream — the
-    // grid follows whatever pointer is active, whether that's a mouse
-    // moving or a finger dragging across the screen.
     const onPointerMove = (e: PointerEvent) => {
       targetMouseRef.current = { x: e.clientX, y: e.clientY };
     };
     const onPointerDown = (e: PointerEvent) => {
       ripplesRef.current.push({ x: e.clientX, y: e.clientY, radius: 0, opacity: 1, born: performance.now() });
     };
-    // A touch has no resting "hover" position the way a mouse cursor
-    // does — once the finger lifts, relax the tracked point back
-    // off-canvas so the warp eases away instead of freezing at the
-    // last touch location. Mouse pointers are left alone here since a
-    // mouse's position stays meaningful even without further movement.
     const onPointerEnd = (e: PointerEvent) => {
       if (e.pointerType === "touch") {
         targetMouseRef.current = { x: -9999, y: -9999 };
       }
     };
 
-    // Stops the rAF loop while the tab is backgrounded — no reason to
-    // keep redrawing a canvas nobody can see.
     const onVisibilityChange = () => {
       if (document.hidden) {
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
       } else {
+        dirtyRef.current = true;
         rafRef.current = requestAnimationFrame(animate);
       }
     };
 
-    // Passive: none of these ever call preventDefault, so normal page
-    // scrolling and pinch-zoom are untouched — same as before.
     window.addEventListener("pointermove", onPointerMove, { passive: true });
     window.addEventListener("pointerdown", onPointerDown, { passive: true });
     window.addEventListener("pointerup", onPointerEnd, { passive: true });
@@ -388,12 +373,6 @@ export default function KineticGrid({
   }, [animate, draw]);
 
   if (overlay) {
-    // Portaled straight to <body>, not returned in-place — makes this
-    // canvas a real DOM sibling of #root, same as the gradient's
-    // body::before. Otherwise any ancestor using transform/filter/
-    // backdrop-filter (glass cards, motion.div animations, etc.)
-    // can silently become this fixed element's containing block,
-    // which is what was clipping it under the safe area.
     return createPortal(
       <canvas
         ref={canvasRef}

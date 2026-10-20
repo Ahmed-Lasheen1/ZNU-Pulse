@@ -1,7 +1,15 @@
-// api/push/exam-reminders.js
 import { getAdminClient, sendToSubscriptions, requireCronSecret, fetchAllRows, safeHandler } from '../_lib/webpush.js'
 
-// Daily cron (.github/workflows/exam-reminders-push.yml).
+const DAY_MS = 24 * 60 * 60 * 1000
+const EGYPT_TIMEZONE = 'Africa/Cairo'
+
+const cairoDayFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: EGYPT_TIMEZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
 async function handler(req, res) {
   if (!requireCronSecret(req, res)) return
 
@@ -15,11 +23,10 @@ async function handler(req, res) {
     .not('dates', 'is', null)
   if (schedulesError) return res.status(500).json({ error: 'schedules query: ' + schedulesError.message })
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const todayMs = Date.parse(`${cairoDayFormatter.format(new Date())}T00:00:00Z`)
   const upcoming = (schedules || []).filter((s) =>
     (s.dates || []).some((d) => {
-      const diffDays = Math.round((new Date(d) - today) / (24 * 60 * 60 * 1000))
+      const diffDays = Math.round((Date.parse(`${d}T00:00:00Z`) - todayMs) / DAY_MS)
       return diffDays >= 0 && diffDays <= 2
     })
   )

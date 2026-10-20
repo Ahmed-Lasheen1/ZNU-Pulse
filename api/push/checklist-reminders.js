@@ -1,8 +1,5 @@
-// api/push/checklist-reminders.js
 import { getAdminClient, sendToSubscriptions, requireCronSecret, fetchAllRows, safeHandler } from '../_lib/webpush.js'
 
-// `deadline` is date-only, so "6 hours before" treats it as end-of-day Egypt time.
-// Egypt observes DST, so the offset comes from the IANA timezone.
 const EGYPT_TIMEZONE = 'Africa/Cairo'
 const REMINDER_WINDOW_HOURS = 6
 const MAX_OVERDUE_HOURS = 24
@@ -26,7 +23,6 @@ function cairoOffsetMs(instant) {
 function deadlineInstant(dateStr) {
   const [year, month, day] = dateStr.split('-').map(Number)
   const wallClockTime = Date.UTC(year, month - 1, day, 23, 59, 59)
-  // Resolve the offset at the resulting instant; twice handles DST boundaries.
   let timestamp = wallClockTime
   for (let i = 0; i < 2; i += 1) {
     timestamp = wallClockTime - cairoOffsetMs(new Date(timestamp))
@@ -34,7 +30,6 @@ function deadlineInstant(dateStr) {
   return new Date(timestamp)
 }
 
-// Hourly cron. Notifies only a task's own owner via its user_id, never a broadcast.
 async function handler(req, res) {
   if (!requireCronSecret(req, res)) return
 
@@ -57,7 +52,6 @@ async function handler(req, res) {
 
   const now = Date.now()
   const due = []
-  // Long-overdue tasks are marked reminder_sent (not counted as sent) so they stop being refetched.
   const staleIds = []
 
   tasks.forEach((t) => {
@@ -71,20 +65,27 @@ async function handler(req, res) {
   }
   if (due.length === 0) return res.status(200).json({ sent: 0, reason: 'nothing due within the reminder window' })
 
+  const userIds = [...new Set(due.map((t) => t.user_id))]
+  const { data: allSubs, error: subsError } = await fetchAllRows(() =>
+    supabase.from('push_subscriptions').select('*').in('user_id', userIds).order('id')
+  )
+  if (subsError) return res.status(500).json({ error: 'push_subscriptions query: ' + subsError.message })
+
+  const subsByUser = {}
+  ;(allSubs || []).forEach((s) => { (subsByUser[s.user_id] ||= []).push(s) })
+
   let sent = 0
   const remindedTaskIds = []
 
   await Promise.all(due.map(async (task) => {
-    const { data: subs } = await supabase.from('push_subscriptions').select('*').eq('user_id', task.user_id)
+    const subs = subsByUser[task.user_id]
 
-    // No push device — mark reminded so it isn't re-checked every hour.
     if (!subs || subs.length === 0) { remindedTaskIds.push(task.id); return }
 
     const moduleName = task.modules?.name ? `${task.modules.name} — ` : ''
     const body = `${moduleName}"${task.text}" is due soon and still not checked off. ⏰`
     const { sent: userSent } = await sendToSubscriptions(supabase, subs, { title: '🎯 Checklist Reminder', body, url: '/checklist' })
 
-    // A temporary push failure leaves the task eligible for the next run.
     if (userSent > 0) { sent += userSent; remindedTaskIds.push(task.id) }
   }))
 

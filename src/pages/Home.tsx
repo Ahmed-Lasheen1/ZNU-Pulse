@@ -34,7 +34,6 @@ const toolCards = [
   { Icon: LeaderboardIcon, title: 'Leaderboard', sub: 'See where you stand', to: '/profile?tab=leaderboard', accent: 'amber' },
 ] as const
 
-// Drawn directly on PULSE_BG, so these must not follow the theme toggle.
 const ACTIVE_MODULES_ACCENT = getPulseTheme(false).cobalt
 const FOOTER_LINE_COLOR = getPulseTheme(true).border
 
@@ -52,7 +51,6 @@ function moduleBlurb(name: string) {
   return key ? MODULE_BLURBS[key] : 'Master the essentials of this module.'
 }
 
-// Same tiers/colors as the MCQ results screen and the weekly push.
 function weeklyAccuracyFeedback(accuracy: number, pt: ReturnType<typeof getPulseTheme>) {
   const labels: Record<AccuracyTier, string> = {
     excellent: 'Outstanding week!',
@@ -66,7 +64,6 @@ function weeklyAccuracyFeedback(accuracy: number, pt: ReturnType<typeof getPulse
 
 const statNumStyle = { ...pulseType.display, fontSize: 28, lineHeight: 1.1 }
 
-// Entrance order. Header timings live in lib/pulseMotion.js.
 const HERO_DELAY = ENTRANCE_PAUSE
 const NOTIFY_DELAY = LOGO_DELAY + 0.3
 const WEEKLY_REPORT_START = LOGO_DELAY + 0.6
@@ -84,7 +81,8 @@ interface WeeklySummary { totalAttempted: number; accuracy: number; topSubjectNa
 export default function Home({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const navigate = useNavigate()
-  const { user, profile } = useAuth() as any
+  const { user } = useAuth() as { user: any }
+  const userId: string | undefined = user?.id
   const { modules, modulesLoaded, modulesError } = useModules() as { modules: HomeModule[]; modulesLoaded: boolean; modulesError: boolean }
   const [announcement, setAnnouncement] = useState('')
   const [streak, setStreak] = useState(0)
@@ -94,14 +92,12 @@ export default function Home({ dark }: { dark: boolean }) {
 
   const [archiveOpen, setArchiveOpen] = useState(false)
 
-  // Hidden during the height animation, then visible so hover effects aren't clipped.
   const [archiveOverflowVisible, setArchiveOverflowVisible] = useState(false)
 
   useEffect(() => {
     if (!archiveOpen) setArchiveOverflowVisible(false)
   }, [archiveOpen])
 
-  // Entrance flag comes from HomeEntranceProvider; captured once per mount.
   const { playEntrance: entranceNow } = useHomeEntrance() as { playEntrance: boolean }
   const [playEntrance] = useState(entranceNow)
 
@@ -122,14 +118,13 @@ export default function Home({ dark }: { dark: boolean }) {
     return () => { ignore = true }
   }, [])
 
-  // One exam_history fetch serves both the streak and the weekly summary.
   useEffect(() => {
     let ignore = false
     async function loadStreakAndWeeklySummary() {
       setReportLoading(true)
       const weekAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000
 
-      const rows: any[] = user ? await fetchHomeHistory(user.id, HOME_HISTORY_LIMIT) : getGuestHistory()
+      const rows: any[] = userId ? await fetchHomeHistory(userId, HOME_HISTORY_LIMIT) : getGuestHistory()
       if (ignore) return
 
       setStreak(computeStreak(rows.map((r: any) => r.completed_at)))
@@ -162,18 +157,19 @@ export default function Home({ dark }: { dark: boolean }) {
     }
     loadStreakAndWeeklySummary()
     return () => { ignore = true }
-  }, [user])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
 
   useEffect(() => {
     let ignore = false
     hasSavedActiveExam(user).then(has => { if (!ignore) setPausedExam(has) })
     return () => { ignore = true }
-  }, [user])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
 
   const activeModules = modules.filter(m => m.status === 'active')
   const completedModules = modules.filter(m => m.status === 'completed')
 
-  // Labels sit directly on the gradient, so color depends on page zone, not theme.
   const sectionTitle = (
     text: string,
     delaySeconds: number,
@@ -206,8 +202,6 @@ export default function Home({ dark }: { dark: boolean }) {
 
   return (
     <div style={{ position: 'relative', overflowX: 'hidden' }}>
-      {/* The header is the shared <PulseOverlayHeader /> in App.jsx. */}
-
       <div style={{
         position: 'relative', zIndex: 1,
         fontFamily: pulseFonts.body

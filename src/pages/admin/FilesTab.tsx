@@ -13,7 +13,8 @@ import { useConfirmDelete } from './useConfirmDelete'
 import { useAdminList } from './useAdminList'
 import { useStageOptions } from './useStageOptions'
 import { PICK_MODULE_MESSAGE, REQUIRED_FIELDS_MESSAGE } from './useAdminContext'
-import { ConstructionIcon, VideoIcon, AudioIcon, DocumentIcon } from '../../components/ui/tool-icons'
+import { ConstructionIcon } from '../../components/ui/tool-icons'
+import { FileTypeIcon } from '../../components/pulse/FileTypeIcon'
 import type { AdminModule, AdminContext } from './adminTypes'
 
 interface FileRow {
@@ -32,12 +33,6 @@ interface FilesTabProps {
   dark: boolean
   modules: AdminModule[]
   context: AdminContext
-}
-
-function FileTypeIcon({ type, color }: { type: FileRow['file_type']; color: string }) {
-  if (type === 'video') return <VideoIcon color={color} size={14} />
-  if (type === 'audio') return <AudioIcon color={color} size={14} />
-  return <DocumentIcon color={color} size={14} />
 }
 
 export default function FilesTab({ dark, modules, context }: FilesTabProps) {

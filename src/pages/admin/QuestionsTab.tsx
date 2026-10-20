@@ -435,7 +435,7 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
                     background: `${pt.indigo}18`, border: `1px solid ${pt.indigo}40`, color: pt.indigo
                   }}>{stageLabel(q.exam_stage)}</span>
                 )}
-                {q.source && <QuestionSourceBadge source={q.source} />}
+                {q.source && <QuestionSourceBadge source={q.source} dark={dark} />}
               </div>
             </div>
           </AdminRow>

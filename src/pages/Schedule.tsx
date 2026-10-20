@@ -46,7 +46,6 @@ interface ScheduleRow {
 
 type ScheduleType = 'study' | 'exam'
 
-// Schedules page: lists study and exam schedules per module, showing saved data first and refreshing it in the background.
 export default function Schedule({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const location = useLocation()
@@ -70,15 +69,12 @@ export default function Schedule({ dark }: { dark: boolean }) {
   const [loadError, setLoadError] = useState(false)
   const [savedCopy, setSavedCopy] = useState(false)
 
-  // Remember what's been applied so later re-renders can't revert a manual tab or reopen a closed viewer.
   const appliedModuleParamRef = useRef<string | null>(null)
   const openedItemRef = useRef<string | null>(null)
 
   useHistoryOverlay(!!viewer, () => setViewer(null))
 
   const activeModules = modules.filter(m => m.status === 'active')
-  // Falls back to any module if none are active, so the page never gets
-  // stuck with nothing selectable.
   const selectableModules = activeModules.length > 0 ? activeModules : modules
 
   useEffect(() => {
@@ -98,7 +94,6 @@ export default function Schedule({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules, moduleParam])
 
-  // Loads one module's schedules from the saved copy first, then refreshes them in the background.
   useEffect(() => {
     if (!activeModule) return
     let ignore = false
@@ -136,7 +131,6 @@ export default function Schedule({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemParam, schedules])
 
-  // Opens a schedule image, which is hosted on Drive and needs a connection to load.
   function openSchedule(sch: ScheduleRow) {
     if (!navigator.onLine) {
       showToast("Schedule images need a connection — try again when you're online", 'info')
@@ -208,7 +202,7 @@ export default function Schedule({ dark }: { dark: boolean }) {
       {!modulesLoaded || loading ? (
         <ScheduleSkeleton />
       ) : filtered.length === 0 ? (
-        <EmptyState dark={dark} icon={<EmptyBoxIcon color={pt.sub} size={16} />} message="No schedules yet" />
+        !loadError && <EmptyState dark={dark} icon={<EmptyBoxIcon color={pt.sub} size={16} />} message="No schedules yet" />
       ) : (
         <div>
           {filtered.map((sch, i) => {

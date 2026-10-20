@@ -32,12 +32,14 @@ export default function SettingsTab({ dark }: SettingsTabProps) {
   const [confirmBroadcastOpen, setConfirmBroadcastOpen] = useState(false)
 
   useEffect(() => {
+    let ignore = false
     supabase.from('site_settings').select('key, value').in('key', ['home_announcement', 'drive_url']).then(({ data }) => {
-      if (!data) return
+      if (ignore || !data) return
       const byKey = Object.fromEntries(data.map((r: any) => [r.key, r.value || '']))
       setAnnouncement(byKey['home_announcement'] || '')
       setDriveUrl(byKey['drive_url'] || '')
     })
+    return () => { ignore = true }
   }, [])
 
   async function saveAnnouncement() {

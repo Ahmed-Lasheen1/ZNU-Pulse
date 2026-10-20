@@ -3,7 +3,7 @@ import { getPulseTheme, pulseType } from '../../premiumTheme'
 import { useToast } from '../ToastProvider'
 import { useNotificationStatus } from '../../lib/useNotificationStatus'
 import { subscribeToPush, unsubscribeFromPush } from '../../lib/pushNotifications'
-import { NOTIFICATION_MESSAGES } from '../../lib/notificationMessages'
+import { NOTIFICATION_MESSAGES, subscribeErrorMessage } from '../../lib/notificationMessages'
 import LiquidGlassCard from '../ui/liquid-glass-card'
 import PulseSwitch from '../ui/pulse-switch'
 import { BellIcon } from '../ui/tool-icons'
@@ -18,9 +18,6 @@ export default function NotificationToggle({ dark, switchSize = 1 }: { dark: boo
 
   async function handleToggle() {
     if (busy) return
-    // Set immediately, before any other logic — a very fast double
-    // tap could otherwise slip past the `if (busy) return` check
-    // above before React re-renders with the new state.
     setBusy(true)
 
     if (!supported) {
@@ -59,13 +56,7 @@ export default function NotificationToggle({ dark, switchSize = 1 }: { dark: boo
 
     if (result.success) { showToast('✅ Notifications enabled!'); return }
 
-    const messages: Record<string, string> = {
-      unsupported: '❌ This browser does not support push notifications',
-      missing_vapid_key: '❌ Server misconfiguration (missing VAPID key) — contact admin',
-      db_insert_failed: '❌ Could not save your subscription — try again later',
-      subscribe_exception: '❌ Could not enable notifications on this device',
-    }
-    showToast(messages[result.reason as string] || '❌ Could not enable notifications', 'error')
+    showToast(subscribeErrorMessage(result.reason as string), 'error')
   }
 
   return (

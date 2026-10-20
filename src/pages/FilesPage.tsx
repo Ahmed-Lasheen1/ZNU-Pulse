@@ -11,12 +11,13 @@ import PageShell from '../components/pulse/PageShell'
 import PageIntro from '../components/pulse/PageIntro'
 import { FilesSkeleton } from '../components/pulse/Skeletons'
 import EmptyState from '../components/pulse/EmptyState'
+import { FileTypeIcon, FileActionIcon, fileActionLabel } from '../components/pulse/FileTypeIcon'
 import { useHistoryOverlay } from '../lib/useHistoryOverlay'
 import { useBodyScrollLock } from '../lib/useBodyScrollLock'
 import { fetchSubjectsForModule } from '../lib/subjects'
 import { fetchModuleFiles } from '../lib/moduleContent'
 import { getDriveOrRawUrl, getVideoEmbedUrl, isSafeExternalUrl } from '../lib/embedUrl'
-import { BookIcon, QuestionMarkIcon, VideoIcon, GraduationCapIcon, DocumentIcon, AudioIcon, FolderIcon, PlayIcon } from '../components/ui/tool-icons'
+import { BookIcon, QuestionMarkIcon, VideoIcon, GraduationCapIcon, DocumentIcon, AudioIcon, FolderIcon } from '../components/ui/tool-icons'
 
 interface FilesModule {
   id: string
@@ -45,20 +46,6 @@ interface FilesSubject {
 const FILE_ACCENT = '#38bdf8'
 
 const TYPE_ORDER = ['sharah', 'questions', 'lectures', 'courses'] as const
-
-function fileTypeIcon(type: string, color: string, size = 20) {
-  if (type === 'video') return <VideoIcon color={color} size={size} />
-  if (type === 'audio') return <AudioIcon color={color} size={size} />
-  return <DocumentIcon color={color} size={size} />
-}
-function openActionIcon(type: string, color: string, size = 12) {
-  if (type === 'video') return <PlayIcon color={color} size={size} />
-  if (type === 'audio') return <AudioIcon color={color} size={size} />
-  return <DocumentIcon color={color} size={size} />
-}
-function openActionLabel(type: string) {
-  return type === 'video' ? 'Play' : type === 'audio' ? 'Listen' : 'Open'
-}
 
 const TYPE_META: Record<string, { Icon: (p: { color?: string; size?: number }) => JSX.Element; label: string }> = {
   sharah: { Icon: BookIcon, label: 'Explanation Files' },
@@ -123,11 +110,8 @@ export default function FilesPage({ dark }: { dark: boolean }) {
   useHistoryOverlay(!!viewer, () => setViewer(null))
 
   const activeModules = modules.filter(m => m.status === 'active')
-  // Falls back to any module if none are active, so the page never gets
-  // stuck with nothing selectable.
   const selectableModules = activeModules.length > 0 ? activeModules : modules
 
-  // Remember what's been applied so later re-renders can't revert a manual tab or reopen a closed viewer.
   const appliedModuleParamRef = useRef<string | null>(null)
   const openedFileRef = useRef<string | null>(null)
 
@@ -265,12 +249,12 @@ export default function FilesPage({ dark }: { dark: boolean }) {
 
       {loading && <FilesSkeleton />}
 
-      {!loading && availableTypes.length === 0 && (
-        <EmptyState dark={dark} message="No files yet 🚧" />
+      {!loading && availableTypes.length === 0 && !loadError && (
+        <EmptyState dark={dark} message="No files yet" />
       )}
 
       {!loading && availableTypes.length > 0 && filtered.length === 0 && (
-        <EmptyState dark={dark} message="No files yet 🚧" />
+        <EmptyState dark={dark} message="No files yet" />
       )}
 
       {filtered.map((file, i) => {
@@ -281,7 +265,9 @@ export default function FilesPage({ dark }: { dark: boolean }) {
               padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-                <span style={{ flexShrink: 0, display: 'inline-flex' }}>{fileTypeIcon(file.file_type, pt.textPrimary, 22)}</span>
+                <span style={{ flexShrink: 0, display: 'inline-flex' }}>
+                  <FileTypeIcon type={file.file_type} color={pt.textPrimary} size={22} />
+                </span>
                 <span style={{ ...pulseType.cardTitle, color: pt.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {file.name}
                 </span>
@@ -292,7 +278,7 @@ export default function FilesPage({ dark }: { dark: boolean }) {
                 fontWeight: 700, fontSize: 13, fontFamily: pulseFonts.body, whiteSpace: 'nowrap', flexShrink: 0,
                 display: 'inline-flex', alignItems: 'center', gap: 6
               }}>
-                {openActionIcon(file.file_type, '#0f172a', 13)} {openActionLabel(file.file_type)}
+                <FileActionIcon type={file.file_type} color="#0f172a" size={13} /> {fileActionLabel(file.file_type)}
               </button>
             </LiquidGlassCard>
           </div>

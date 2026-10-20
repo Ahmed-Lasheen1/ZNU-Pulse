@@ -1,5 +1,4 @@
-// src/App.jsx
-import { useState, useEffect, useRef, Suspense, lazy } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback, Suspense, lazy } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
 import { supabase, AUTH_STORAGE_KEY } from './supabase'
 import { getPulseTheme } from './premiumTheme'
@@ -169,6 +168,8 @@ export default function App() {
     return result
   }
 
+  const refreshModules = useCallback(() => loadModules(true), [])
+
   useEffect(() => {
     loadModules()
     const revalidate = () => { if (document.visibilityState === 'visible') loadModules() }
@@ -204,13 +205,13 @@ export default function App() {
     return unsubscribe
   }, [])
 
-  async function fetchProfile(userId) {
+  const fetchProfile = useCallback(async (userId) => {
     const { data } = await networkFirst(
       `user:${userId}:profile`,
       () => supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
     )
     if (data) setProfile(data)
-  }
+  }, [])
 
   function cleanUpAuthHash() {
     if (window.location.hash && window.location.hash !== '#/') {
@@ -257,7 +258,7 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  async function signOut() {
+  const signOut = useCallback(async () => {
     await flushActiveExam().catch(() => {})
     await unsubscribeFromPush()
     if (user?.id) await removeFullAttempts(user.id).catch(() => {})
@@ -268,13 +269,13 @@ export default function App() {
     clearHomeHistory()
     clearAnswerKeyCaches()
     clearUserCaches()
-  }
+  }, [user])
 
   const toggleTheme = () => setDark(prev => !prev)
 
   return (
     <AuthContextProvider user={user} signOut={signOut} profile={profile} fetchProfile={fetchProfile} authLoaded={authLoaded}>
-      <ModulesContextProvider modules={modules} modulesLoaded={modulesLoaded} modulesError={modulesError} refreshModules={() => loadModules(true)}>
+      <ModulesContextProvider modules={modules} modulesLoaded={modulesLoaded} modulesError={modulesError} refreshModules={refreshModules}>
       <ToastProvider>
       <Router>
         <HomeEntranceProvider>
@@ -306,9 +307,17 @@ export default function App() {
 }
 
 function AuthContextProvider({ user, signOut, profile, fetchProfile, authLoaded, children }) {
-  return <AuthContext.Provider value={{ user, signOut, profile, fetchProfile, authLoaded }}>{children}</AuthContext.Provider>
+  const value = useMemo(
+    () => ({ user, signOut, profile, fetchProfile, authLoaded }),
+    [user, signOut, profile, fetchProfile, authLoaded]
+  )
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 function ModulesContextProvider({ modules, modulesLoaded, modulesError, refreshModules, children }) {
-  return <ModulesContext.Provider value={{ modules, modulesLoaded, modulesError, refreshModules }}>{children}</ModulesContext.Provider>
+  const value = useMemo(
+    () => ({ modules, modulesLoaded, modulesError, refreshModules }),
+    [modules, modulesLoaded, modulesError, refreshModules]
+  )
+  return <ModulesContext.Provider value={value}>{children}</ModulesContext.Provider>
 }

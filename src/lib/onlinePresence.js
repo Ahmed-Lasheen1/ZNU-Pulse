@@ -1,13 +1,10 @@
 import { supabase } from '../supabase'
 
-// "Who's online right now" for Admin Analytics, via Supabase Realtime
-// Presence — no table needed.
 const CHANNEL_NAME = 'znu-online-presence'
 
 let channel = null
 let refCount = 0
 let syncListeners = []
-let syncAttached = false
 
 function safeGetChannel() {
   try {
@@ -15,6 +12,7 @@ function safeGetChannel() {
       channel = supabase.channel(CHANNEL_NAME, {
         config: { presence: { key: crypto.randomUUID() } }
       })
+      channel.on('presence', { event: 'sync' }, () => syncListeners.forEach(fn => fn()))
     }
     return channel
   } catch (e) {
@@ -38,8 +36,6 @@ function safeSubscribe(ch, onStatus) {
   }
 }
 
-// Call once when the app mounts so every visitor — signed in or guest
-// — counts. Safe to call more than once; reuses the same channel.
 export function subscribeOnlinePresence() {
   try {
     const ch = safeGetChannel()
@@ -60,17 +56,11 @@ export function subscribeOnlinePresence() {
         supabase.removeChannel(channel)
         channel = null
         syncListeners = []
-        syncAttached = false
       }
     } catch { /* noop */ }
   }
 }
 
-// Used by Admin Analytics to read the live count and get notified on
-// every join/leave. Multiple callers share one real 'sync' subscription
-// on the channel; each caller just registers/unregisters its own
-// callback in syncListeners, so switching tabs repeatedly doesn't pile
-// up duplicate listeners on the shared channel.
 export function watchOnlineCount(onCount) {
   let cancelled = false
 
@@ -89,15 +79,6 @@ export function watchOnlineCount(onCount) {
     if (!ch) { onCount(0); return () => {} }
 
     syncListeners.push(report)
-    if (!syncAttached) {
-      syncAttached = true
-      try {
-        ch.on('presence', { event: 'sync' }, () => syncListeners.forEach(fn => fn()))
-      } catch (e) {
-        console.warn('[onlinePresence] Could not attach presence listener:', e)
-      }
-    }
-
     safeSubscribe(ch, report)
     report()
   } catch (e) {

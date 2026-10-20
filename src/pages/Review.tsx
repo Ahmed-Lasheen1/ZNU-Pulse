@@ -25,7 +25,7 @@ import QuestionSourceBadge from '../components/QuestionSourceBadge'
 import { ModuleIcon } from '../lib/medicalIcons'
 import { wrapText } from '../lib/textStyles'
 import { BookIcon, ClockIcon, FlagIcon, LightbulbIcon, TargetIcon, EmptyBoxIcon, CelebrationIcon, RefreshIcon, SearchIcon2 } from '../components/ui/tool-icons'
-import { MCQ_ACCENT } from './mcq/mcqShared'
+import { MCQ_ACCENT, optionLabels } from './mcq/mcqShared'
 
 const SECTION_GAP = 22
 const ITEM_GAP = 16
@@ -51,7 +51,6 @@ interface IncorrectSnapshot {
   source?: string | null
 }
 
-// An incorrect question from the server, or any question of a full copy saved on this device.
 interface ReviewItem extends IncorrectSnapshot {
   answer?: string | null
   is_correct?: boolean
@@ -96,7 +95,6 @@ interface FlaggedItem {
 type ReviewTab = 'history' | 'flagged'
 type DetailFilter = 'incorrect' | 'all'
 
-// Turns a queued offline attempt into a history row so it appears alongside synced attempts.
 function pendingToHistoryRow(attempt: any): HistoryRow {
   return {
     id: `pending-${attempt.id}`,
@@ -114,7 +112,6 @@ function pendingToHistoryRow(attempt: any): HistoryRow {
   }
 }
 
-// Review page: exam history (including offline attempts still syncing), a retry path for mistakes, and flagged questions.
 export default function Review({ dark }: { dark: boolean }) {
   const { user } = useAuth() as { user: { id: string } | null }
   const { modules } = useModules() as { modules: ReviewModule[] }
@@ -140,7 +137,6 @@ export default function Review({ dark }: { dark: boolean }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [moduleFilter, setModuleFilter] = useState('all')
 
-  // Time of the last local flag removal, so a background refresh that started earlier can't bring the flag back.
   const flagEditedAtRef = useRef(0)
 
   useEffect(() => subscribePendingAttempts(() => { setSyncTick(t => t + 1); setSelectedHistory(null) }), [])
@@ -153,7 +149,6 @@ export default function Review({ dark }: { dark: boolean }) {
   }, [tab, user, syncTick])
   useEffect(() => { setSearchQuery(''); setModuleFilter('all'); setSelectedHistory(null) }, [tab])
 
-  // Stage names (TBL, Final, ...) for the attempts that belong to a stage.
   useEffect(() => {
     const moduleIds = [...new Set(history.filter(h => h.stage && h.module_id).map(h => h.module_id as string))]
     if (moduleIds.length === 0) return
@@ -167,7 +162,6 @@ export default function Review({ dark }: { dark: boolean }) {
     return () => { ignore = true }
   }, [history])
 
-  // The full copy of an attempt only exists on the device it was taken on.
   useEffect(() => {
     setFullAttempt(null)
     setDetailFilter('incorrect')
@@ -177,14 +171,11 @@ export default function Review({ dark }: { dark: boolean }) {
     return () => { ignore = true }
   }, [selectedHistory])
 
-  // Quiz title for a history row, including its stage name when it has one.
   const historyName = (h: HistoryRow) =>
     quizName(h.quiz_type, h.stage && h.module_id ? stageTitles[`${h.module_id}:${h.stage}`] : undefined)
 
-  // Storage key for this user's saved flagged-question list.
   const flaggedKey = (userId: string) => `user:${userId}:review-flagged`
 
-  // Loads the current tab: history (saved copy first, refreshed in the background, offline attempts always included) or flagged questions.
   async function fetchTab(isIgnored: () => boolean = () => false) {
     setLoading(true)
     setLoadError(false)
@@ -246,7 +237,6 @@ export default function Review({ dark }: { dark: boolean }) {
     setLoading(false)
   }
 
-  // Retries sending queued offline attempts and tells the student the outcome.
   async function retrySync() {
     if (!user || syncBusy) return
     setSyncBusy(true)
@@ -257,9 +247,6 @@ export default function Review({ dark }: { dark: boolean }) {
     else showToast("Still waiting — it will sync automatically once you're online", 'info')
   }
 
-  // Only applies the local removal once the Supabase delete is confirmed
-  // (signed-in) — otherwise a failed request would show "Flag removed"
-  // while the row still exists server-side.
   async function unflag(questionId: string) {
     if (user) {
       if (!navigator.onLine) { showToast("You're offline — try again when you're connected", 'info'); return }
@@ -275,7 +262,6 @@ export default function Review({ dark }: { dark: boolean }) {
     showToast('Flag removed')
   }
 
-  // Opens the quiz screen with the chosen questions as a retry.
   function retryAll(list: any[]) {
     const retryQuestions = list.map((item: any) => ({
       id: item.question_id || item.id,
@@ -286,11 +272,8 @@ export default function Review({ dark }: { dark: boolean }) {
     navigate('/mcq', { state: { retryQuestions } })
   }
 
-  // Finds a module record by id.
   function moduleFor(id?: string | null) { return modules.find(m => m.id === id) }
 
-  const optionLabels = ['a', 'b', 'c', 'd']
-  // The four answer options of a question, in order.
   const optionsOf = (item: { option_a: string; option_b: string; option_c: string; option_d: string }) =>
     [item.option_a, item.option_b, item.option_c, item.option_d]
 
@@ -549,7 +532,7 @@ export default function Review({ dark }: { dark: boolean }) {
                             color: item.is_correct ? '#4ade80' : '#f87171'
                           }}>{item.is_correct ? '✓ CORRECT' : item.answer ? '✕ INCORRECT' : '— UNANSWERED'}</span>
                         )}
-                        {item.source && <QuestionSourceBadge source={item.source} />}
+                        {item.source && <QuestionSourceBadge source={item.source} dark={dark} />}
                       </div>
                     )}
                     <p style={{ ...pulseType.cardTitle, color: pt.textPrimary, marginBottom: 12, ...wrapText }}>{item.question}</p>
@@ -662,7 +645,7 @@ export default function Review({ dark }: { dark: boolean }) {
                           <ModuleIcon value={mod.icon} size={14} color={mod.color} /> {mod.name}
                         </div>
                       )}
-                      {item.source && <QuestionSourceBadge source={item.source} />}
+                      {item.source && <QuestionSourceBadge source={item.source} dark={dark} />}
                     </div>
                   )}
                   <p style={{ ...pulseType.cardTitle, color: pt.textPrimary, marginBottom: 12, ...wrapText }}>{item.question}</p>

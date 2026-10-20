@@ -45,10 +45,8 @@ interface SourceChoice {
   doctorCount: number
 }
 
-// The exam stage a quiz belongs to (older paused simulators only stored simulatorStage).
 const stageOf = (config: QuizConfig | null) => config?.stage || config?.simulatorStage || null
 
-// Converts graded rows from the server into a map keyed by question id.
 function toResultMap(graded: any[] | null) {
   const map: Record<string, any> = {}
   ;(graded || []).forEach(r => {
@@ -57,7 +55,6 @@ function toResultMap(graded: any[] | null) {
   return map
 }
 
-// MCQ page: loads questions, runs quizzes, grades them (server first, local answer keys offline) and pauses/resumes exams.
 export default function MCQ({ dark }: { dark: boolean }) {
   const { user, fetchProfile } = useAuth() as any
   const { modules, modulesLoaded, modulesError } = useModules() as any
@@ -108,7 +105,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
   })
   useEffect(() => { storageSet('znu_mcq_font_scale', String(fontScale)) }, [fontScale])
 
-  // Steps the exam text size to the next preset, wrapping around.
   function cycleFontScale() {
     setFontScale(prev => FONT_SCALES[(FONT_SCALES.indexOf(prev) + 1) % FONT_SCALES.length])
   }
@@ -134,7 +130,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     return () => { isMountedRef.current = false }
   }, [])
 
-  // Removes auto-start params from the URL so Back lands on the browse screen instead of restarting the quiz.
   function clearAutoStartParams() {
     const params = new URLSearchParams(location.search)
     params.delete('lesson')
@@ -184,7 +179,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules])
 
-  // Drops caches of deleted modules, but only once the modules fetch succeeded.
   useEffect(() => {
     if (!modulesLoaded || modulesError) return
     pruneModuleCaches(new Set(modules.map((m: any) => m.id)))
@@ -253,7 +247,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     return () => { cancelled = true }
   }, [user, quizMode])
 
-  // Debounced save of the in-progress exam; the pending snapshot lives in a ref so unmount can flush it.
   useEffect(() => {
     if (!quizMode || submitted || quizMode === 'retry') { pendingPersistRef.current = null; return }
     if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current)
@@ -273,9 +266,9 @@ export default function MCQ({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quizMode, quizQuestions, answers, submitted])
 
-  // On unmount, flushes the pending exam snapshot unless a submit is in flight (it would resurrect a finished exam).
   useEffect(() => {
     return () => {
+      if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current)
       if (pendingPersistRef.current && !submittingRef.current) {
         persistActiveExam(userRef.current, { ...pendingPersistRef.current, savedAt: Date.now() })
       }
@@ -290,7 +283,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
   useEffect(() => {
     if (!quizMode || submitted || grading) return
-    // Keyboard shortcuts: arrows navigate, 1-4 select an option, F flags the question.
     function handleKeyDown(e: KeyboardEvent) {
       const targetTag = (e.target as HTMLElement)?.tagName
       if (targetTag === 'INPUT' || targetTag === 'TEXTAREA') return
@@ -318,14 +310,13 @@ export default function MCQ({ dark }: { dark: boolean }) {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quizMode, submitted, grading, currentIndex, quizQuestions, results, flaggedIds])
 
-  // Loads a module's questions from the cache first, then refreshes in the background (or flips the offline banner).
   async function fetchQuestionsForModule(moduleId: string, isIgnored: () => boolean = () => false) {
     setLoading(true)
     setUsingCache(false)
 
-    // Saves this module's answer keys so it can be graded offline.
     fetchModuleAnswerKeys(moduleId)
 
     const { data, error } = await fetchModuleQuestions(moduleId, ({ data: fresh, error: refreshError }) => {
@@ -343,7 +334,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const moduleSubjects = subjects.filter(s => s.module_id === activeModule)
   const activeModuleObj = modules.find((m: any) => m.id === activeModule)
 
-  // Questions in the active module/stage/subject for a mock run, optionally limited to one source.
   const getFilteredQuestions = (type: string, sourceOnly: string | null = null) => {
     return questions.filter(q => {
       const modMatch = q.module_id === activeModule
@@ -357,7 +347,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     })
   }
 
-  // Practice questions for one lesson (wins) or subject in the active stage, optionally limited to one source.
   const getPracticeQuestions = (subjectId: string | null, lessonId: string | null, sourceOnly: string | null = null) => {
     return questions.filter(q =>
       (lessonId ? q.lesson_id === lessonId : q.subject_id === subjectId) &&
@@ -367,7 +356,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     )
   }
 
-  // Returns the ids (from the given list) the current user or guest has flagged.
   async function loadFlagsFor(ids: string[]) {
     if (ids.length === 0) return new Set<string>()
     if (user) {
@@ -378,7 +366,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     return new Set<string>(flags.filter((f: any) => ids.includes(f.question_id)).map((f: any) => f.question_id))
   }
 
-  // Flags or unflags a question (Supabase when signed in, local storage for guests) and updates the UI once saved.
   async function toggleFlagFor(q: any) {
     if (!q) return
     const isFlagged = flaggedIds.has(q.id)
@@ -415,7 +402,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     }
   }
 
-  // Runs the count-up stopwatch from the given start time (no limit, no auto-submit).
   function startTimer(startedAt: number) {
     clearInterval(timerRef.current)
     const tick = () => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000))
@@ -423,7 +409,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     timerRef.current = setInterval(tick, 1000)
   }
 
-  // Resets all quiz state and starts a fresh quiz with the given questions and config.
   function beginQuiz(qs: any[], type: string, config: QuizConfig | null) {
     lastQuizConfigRef.current = config
 
@@ -450,7 +435,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     window.scrollTo({ top: 0 })
   }
 
-  // Starts a mock or practice quiz (capped, spread across subjects and lessons); `lessonId` wins over `subjectId`.
   function startQuiz(type: string, subjectId: string | null = null, lessonId: string | null = null, sourceFilter: string | null = null) {
     const qs = drawProportional(
       type === 'mock' ? getFilteredQuestions('mock', sourceFilter) : getPracticeQuestions(subjectId, lessonId, sourceFilter),
@@ -465,7 +449,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     beginQuiz(qs, type, { type, subjectId, lessonId, sourceFilter, simulatorStage: null, stage: activeStage === 'all' ? null : activeStage })
   }
 
-  // Starts a simulator exam drawn at random from the admin's per-subject counts for this stage.
   function startSimulator(stage: string, sourceFilter: string | null = null) {
     const rows = simRows.filter(r => r.stage === stage)
     const qs = drawSimulator(questions, rows, stage, lessonStageMap, sourceFilter)
@@ -488,7 +471,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     return (type === 'mock' ? getFilteredQuestions('mock', source) : getPracticeQuestions(subjectId, lessonId, source)).length
   }
 
-  // Starts right away, or first asks all-questions vs University Doctors only when that selection mixes both.
   function requestStart(type: StartType, subjectId: string | null = null, lessonId: string | null = null, stage: string | null = null) {
     const all = scopeCount(type, subjectId, lessonId, stage, null)
     const doctors = scopeCount(type, subjectId, lessonId, stage, 'university')
@@ -507,7 +489,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     launch(type, subjectId, lessonId, stage, source)
   }
 
-  // Starts a retry quiz from a fixed question list (no saved config, never paused or resumed).
   function startRetryQuiz(list: any[]) {
     if (!list || list.length === 0) {
       showToast('❌ No questions to retry', 'error')
@@ -516,7 +497,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     beginQuiz(list, 'retry', null)
   }
 
-  // Restores a paused exam and its answers; time spent away is not counted.
   function resumeExam() {
     if (!resumeData) return
     const startedAt = resumeData.savedAt && resumeData.startedAt
@@ -546,13 +526,11 @@ export default function MCQ({ dark }: { dark: boolean }) {
     window.scrollTo({ top: 0 })
   }
 
-  // Deletes the paused exam from this device and the server.
   async function discardResume() {
     await clearActiveExam(user)
     setResumeData(null)
   }
 
-  // Leaves the quiz and resets all quiz state back to the browse screen.
   function stopQuiz() {
     clearInterval(timerRef.current)
     setQuizMode(null)
@@ -572,7 +550,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
   const isTutorMode = quizMode === 'practice' || quizMode === 'retry'
 
-  // Grades one answer from cached answer keys, falling back to the server only when keys are missing; final scoring and points stay server-side.
   async function tutorGradeAnswer(qi: number, opt: string) {
     const q = quizQuestions[qi]
     if (!q) return
@@ -594,7 +571,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     else showToast(OFFLINE_KEYS_MESSAGE, 'info')
   }
 
-  // Records the chosen option and, in tutor modes, reveals the answer right away.
   function selectAnswer(qi: number, opt: string) {
     if (submitted) return
     const q = quizQuestions[qi]
@@ -607,7 +583,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     }
   }
 
-  // Toggles the "eliminated" strike-through on one option.
   function toggleStrike(qi: number, label: string) {
     setStruckOut(prev => {
       const next = { ...prev }
@@ -622,7 +597,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
   function goPrev() { setCurrentIndex(i => Math.max(0, i - 1)) }
   function goNext() { setCurrentIndex(i => Math.min(quizQuestions.length - 1, i + 1)) }
 
-  // Restarts the same kind of quiz (retry list, simulator stage, or the last config).
   function tryAgain() {
     if (quizMode === 'retry') { startRetryQuiz(quizQuestions); return }
     const config = lastQuizConfigRef.current
@@ -631,7 +605,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     else startQuiz(quizMode!)
   }
 
-  // Starts a retry quiz of only the missed questions from one subject.
   function startTargetedPractice(subjectId: string) {
     const incorrectQs = quizQuestions
       .filter(q => q.subject_id === subjectId && results[q.id] && !results[q.id].is_correct)
@@ -644,7 +617,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     startRetryQuiz(incorrectQs)
   }
 
-  // Submits for server grading (points and history), or grades locally and stores the attempt for later sync when offline.
   async function submitQuiz() {
     if (submittingRef.current) return
     submittingRef.current = true
@@ -687,7 +659,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
         : await supabase.rpc('grade_mcq', { p_answers: payload })
 
       if (!isMountedRef.current) {
-        // The server already accepted it, so the paused copy must not stay resumable.
         if (!response.error && user) clearActiveExam(user)
         submittingRef.current = false
         return
