@@ -1,5 +1,5 @@
 // src/pages/Review.tsx
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import { useAuth, useModules } from '../contexts'
@@ -17,7 +17,7 @@ import EmptyState from '../components/pulse/EmptyState'
 import OfflineNote from '../components/pulse/OfflineNote'
 import { getGuestFlags, getGuestHistory, toggleGuestFlag } from '../lib/reviewStorage'
 import { listPendingAttempts, syncPendingAttempts, discardPendingAttempt, subscribePendingAttempts } from '../lib/offlineAttempts'
-import { networkFirst, saveCached } from '../lib/dataCache'
+import { cachedSnapshot, saveCached } from '../lib/dataCache'
 import { getFullAttempt } from '../lib/fullHistory'
 import { fetchModuleStages } from '../lib/moduleStages'
 import { quizName } from '../lib/quizNames'
@@ -96,6 +96,7 @@ interface FlaggedItem {
 type ReviewTab = 'history' | 'flagged'
 type DetailFilter = 'incorrect' | 'all'
 
+// Turns a queued offline attempt into a history row so it appears alongside synced attempts.
 function pendingToHistoryRow(attempt: any): HistoryRow {
   return {
     id: `pending-${attempt.id}`,
@@ -113,6 +114,7 @@ function pendingToHistoryRow(attempt: any): HistoryRow {
   }
 }
 
+// Review page: exam history (including offline attempts still syncing), a retry path for mistakes, and flagged questions.
 export default function Review({ dark }: { dark: boolean }) {
   const { user } = useAuth() as { user: { id: string } | null }
   const { modules } = useModules() as { modules: ReviewModule[] }
@@ -137,6 +139,9 @@ export default function Review({ dark }: { dark: boolean }) {
   const [savedCopy, setSavedCopy] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [moduleFilter, setModuleFilter] = useState('all')
+
+  // Time of the last local flag removal, so a background refresh that started earlier can't bring the flag back.
+  const flagEditedAtRef = useRef(0)
 
   useEffect(() => subscribePendingAttempts(() => { setSyncTick(t => t + 1); setSelectedHistory(null) }), [])
 
@@ -172,30 +177,37 @@ export default function Review({ dark }: { dark: boolean }) {
     return () => { ignore = true }
   }, [selectedHistory])
 
+  // Quiz title for a history row, including its stage name when it has one.
   const historyName = (h: HistoryRow) =>
     quizName(h.quiz_type, h.stage && h.module_id ? stageTitles[`${h.module_id}:${h.stage}`] : undefined)
 
+  // Storage key for this user's saved flagged-question list.
   const flaggedKey = (userId: string) => `user:${userId}:review-flagged`
 
+  // Loads the current tab: history (saved copy first, refreshed in the background, offline attempts always included) or flagged questions.
   async function fetchTab(isIgnored: () => boolean = () => false) {
     setLoading(true)
     setLoadError(false)
 
     if (tab === 'history') {
       if (user) {
-        const [historyRes, pending] = await Promise.all([
-          networkFirst(`user:${user.id}:review-history`, () => supabase
-            .from('exam_history')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('completed_at', { ascending: false })
-            .limit(50)),
-          listPendingAttempts(user.id),
-        ])
+        const pending = await listPendingAttempts(user.id)
+        const pendingRows = [...pending].reverse().map(pendingToHistoryRow)
+        const { data, error, fromCache } = await cachedSnapshot(`user:${user.id}:review-history`, () => supabase
+          .from('exam_history')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('completed_at', { ascending: false })
+          .limit(50), {
+            onUpdate: fresh => {
+              if (isIgnored() || !fresh) return
+              setHistory([...pendingRows, ...(fresh as HistoryRow[])])
+            },
+          })
         if (isIgnored()) return
-        if (historyRes.error) setLoadError(true)
-        setSavedCopy(historyRes.fromCache)
-        setHistory([...pending.reverse().map(pendingToHistoryRow), ...((historyRes.data || []) as HistoryRow[])])
+        if (error) setLoadError(true)
+        setSavedCopy(fromCache)
+        setHistory([...pendingRows, ...((data || []) as HistoryRow[])])
       } else {
         if (isIgnored()) return
         setSavedCopy(false)
@@ -207,12 +219,18 @@ export default function Review({ dark }: { dark: boolean }) {
     }
 
     if (user) {
-      const { data, error, fromCache } = await networkFirst(flaggedKey(user.id), async () => {
+      const startedAt = Date.now()
+      const { data, error, fromCache } = await cachedSnapshot(flaggedKey(user.id), async () => {
         const flagRes = await supabase.from('flagged_questions').select('question_id').eq('user_id', user.id)
         if (flagRes.error) return { data: null, error: flagRes.error }
         const ids = (flagRes.data || []).map((r: any) => r.question_id)
         if (ids.length === 0) return { data: [], error: null }
         return supabase.rpc('get_review_questions', { p_question_ids: ids })
+      }, {
+        onUpdate: fresh => {
+          if (isIgnored() || !fresh || startedAt < flagEditedAtRef.current) return
+          setFlaggedItems(fresh as FlaggedItem[])
+        },
       })
       if (isIgnored()) return
       if (error) setLoadError(true)
@@ -228,6 +246,7 @@ export default function Review({ dark }: { dark: boolean }) {
     setLoading(false)
   }
 
+  // Retries sending queued offline attempts and tells the student the outcome.
   async function retrySync() {
     if (!user || syncBusy) return
     setSyncBusy(true)
@@ -249,12 +268,14 @@ export default function Review({ dark }: { dark: boolean }) {
     } else {
       toggleGuestFlag({ question_id: questionId })
     }
+    flagEditedAtRef.current = Date.now()
     const next = flaggedItems.filter(i => (i.question_id || i.id) !== questionId)
     setFlaggedItems(next)
     if (user) saveCached(flaggedKey(user.id), next)
     showToast('Flag removed')
   }
 
+  // Opens the quiz screen with the chosen questions as a retry.
   function retryAll(list: any[]) {
     const retryQuestions = list.map((item: any) => ({
       id: item.question_id || item.id,
@@ -265,9 +286,11 @@ export default function Review({ dark }: { dark: boolean }) {
     navigate('/mcq', { state: { retryQuestions } })
   }
 
+  // Finds a module record by id.
   function moduleFor(id?: string | null) { return modules.find(m => m.id === id) }
 
   const optionLabels = ['a', 'b', 'c', 'd']
+  // The four answer options of a question, in order.
   const optionsOf = (item: { option_a: string; option_b: string; option_c: string; option_d: string }) =>
     [item.option_a, item.option_b, item.option_c, item.option_d]
 
@@ -444,7 +467,7 @@ export default function Review({ dark }: { dark: boolean }) {
                   <div style={{ color: pending.error ? pt.danger : pt.amber, fontSize: 13, fontWeight: 700, marginBottom: 12, ...wrapText }}>
                     {pending.error
                       ? `Couldn't sync: ${pending.error}`
-                      : "Saved on this device — waiting to sync. Points are added when it syncs."}
+                      : "Saved on this device — waiting to sync. Offline attempts don't earn points."}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
                     <PulseGlassRow dark={dark} radius={999} hoverTint={hoverTint} onClick={retrySync}

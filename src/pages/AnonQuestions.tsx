@@ -18,7 +18,7 @@ import AutoDirText from '../components/AutoDirText'
 import { containsProfanity } from '../lib/moderation'
 import { isSuccessMessage } from '../lib/messageStyle'
 import { storageGet, storageSet } from '../lib/safeStorage'
-import { networkFirst } from '../lib/dataCache'
+import { networkFirst, cachedSnapshot } from '../lib/dataCache'
 import { getMyAnonTokens, addMyAnonToken, getNotifiedTokens, markTokensNotified } from '../lib/anonTracking'
 import { showLocalNotification } from '../lib/localNotification'
 import { AnonQAIcon, QuestionMarkIcon, ClockIcon, CheckCircleIcon, TrashIcon, LightbulbIcon, EmptyBoxIcon } from '../components/ui/tool-icons'
@@ -40,6 +40,7 @@ interface AnonQuestion {
   created_at: string
 }
 
+// Anonymous Q&A page: students post questions anonymously and track replies; admins can answer or delete.
 export default function AnonQuestions({ dark }: { dark: boolean }) {
   const { user, profile } = useAuth() as { user: any; profile?: { role?: string } | null }
   const isAdmin = profile?.role === 'admin'
@@ -65,7 +66,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
 
   useEffect(() => {
     let ignore = false
-    fetchQuestions(() => ignore)
+    openQuestions(() => ignore)
     fetchMyQuestions(() => ignore)
     return () => { ignore = true }
   }, [])
@@ -76,12 +77,14 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
     return () => clearInterval(cooldownTimerRef.current)
   }, [])
 
+  // Recomputes how many seconds remain before this device may submit another question.
   function updateCooldownRemaining() {
     const lastSubmitAt = Number(storageGet(COOLDOWN_STORAGE_KEY) || 0)
     const remaining = Math.max(0, SUBMIT_COOLDOWN_MS - (Date.now() - lastSubmitAt))
     setCooldownRemaining(remaining)
   }
 
+  // Blocks an action when offline and shows a calm notice instead.
   function requireOnline() {
     if (navigator.onLine) return true
     showToast("You're offline — try again when you're connected", 'info')
@@ -107,8 +110,34 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
     }
   }, [myQuestions])
 
-  // The error banner reflects ONLY this main list, and it clears itself on the
-  // next successful load (it used to stay on forever once anything had failed).
+  // Loads the question list on page open: shows the saved copy at once, then refreshes it in the background.
+  async function openQuestions(isIgnored: () => boolean = () => false) {
+    setLoading(true)
+    const { data, error, fromCache } = await cachedSnapshot('anon-questions', () => supabase
+      .from('anonymous_questions')
+      .select('id, question, answer, answered, created_at')
+      .order('answered', { ascending: true })
+      .order('created_at', { ascending: false })
+      .range(0, RECENT_QUESTIONS_LIMIT - 1), {
+        onUpdate: fresh => {
+          if (isIgnored() || !fresh) return
+          setQuestions(fresh as AnonQuestion[])
+          setHasMore((fresh as AnonQuestion[]).length === RECENT_QUESTIONS_LIMIT)
+          setSavedCopy(false)
+        },
+      })
+    if (isIgnored()) return
+    if (data) {
+      setQuestions(data as AnonQuestion[])
+      setHasMore((data as AnonQuestion[]).length === RECENT_QUESTIONS_LIMIT)
+    }
+    setSavedCopy(fromCache)
+    if (error) console.warn('[AnonQuestions] Could not load the questions list:', error)
+    setLoadError(!!error)
+    setLoading(false)
+  }
+
+  // Fetches the newest questions from the server; used after submit and reply so the list is current.
   async function fetchQuestions(isIgnored: () => boolean = () => false) {
     setLoading(true)
     const { data, error, fromCache } = await networkFirst('anon-questions', () => supabase
@@ -128,6 +157,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
     setLoading(false)
   }
 
+  // Loads the next page of older questions.
   async function loadMoreQuestions() {
     if (loadingMore || !requireOnline()) return
     setLoadingMore(true)
@@ -201,6 +231,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
     }
   }
 
+  // Saves an admin's reply to a question and reloads the list.
   async function submitReply(id: string) {
     const reply = replyText[id]
     if (!reply?.trim() || !requireOnline()) return
@@ -210,6 +241,7 @@ export default function AnonQuestions({ dark }: { dark: boolean }) {
     fetchQuestions()
   }
 
+  // Deletes a question (admin action) and reloads the list.
   async function deleteQuestion(id: string) {
     if (!requireOnline()) return
     const { error } = await supabase.from('anonymous_questions').delete().eq('id', id)

@@ -17,7 +17,7 @@ import NotifyPermissionButton from '../components/NotifyPermissionButton'
 import { useToast } from '../components/ToastProvider'
 import { showLocalNotification } from '../lib/localNotification'
 import { storageGet, storageSet } from '../lib/safeStorage'
-import { networkFirst, saveCached } from '../lib/dataCache'
+import { cachedSnapshot, saveCached } from '../lib/dataCache'
 import { listChecklistOps, queueChecklistOp, applyChecklistOps, subscribeChecklistOutbox } from '../lib/checklistOutbox'
 import { ChecklistIcon, LightbulbIcon, CalendarDotIcon, WarningIcon, ClockIcon, CelebrationIcon, TrashIcon, BookIcon, CheckCircleIcon } from '../components/ui/tool-icons'
 import type { ChecklistTask } from '../types/checklist'
@@ -29,6 +29,7 @@ const TASK_GAP = 12
 
 const CHECKLIST_KEY_PREFIX = 'checklist_'
 
+// Removes guest checklists whose module no longer exists.
 function pruneOrphanedGuestChecklists(validModuleIds: Set<string>) {
   try {
     const keysToRemove: string[] = []
@@ -44,28 +45,38 @@ function pruneOrphanedGuestChecklists(validModuleIds: Set<string>) {
   }
 }
 
+// Parses a YYYY-MM-DD string as a local date, avoiding timezone shifts.
 function parseLocalDate(dateStr: string) {
   const [y, m, d] = dateStr.split('-').map(Number)
   return new Date(y, m - 1, d)
 }
+
+// Returns today's date at local midnight.
 function startOfToday() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   return today
 }
+
+// Whole days from today until the deadline (negative when overdue).
 function dayDiff(deadline: string) {
   return Math.round((parseLocalDate(deadline).getTime() - startOfToday().getTime()) / (24 * 60 * 60 * 1000))
 }
+
+// True when a task's deadline has already passed.
 function isOverdue(deadline: string | null) {
   if (!deadline) return false
   return dayDiff(deadline) < 0
 }
+
+// True when a task is due within the next two days.
 function isDueSoon(deadline: string | null) {
   if (!deadline) return false
   const diff = dayDiff(deadline)
   return diff >= 0 && diff <= 2
 }
 
+// Human-readable deadline text such as "Due tomorrow" or "3 days overdue".
 function formatDeadlineLabel(deadline: string) {
   const diff = dayDiff(deadline)
   if (diff === 0) return 'Due today'
@@ -78,6 +89,7 @@ function formatDeadlineLabel(deadline: string) {
   return `Due ${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: sameYear ? undefined : 'numeric' })}`
 }
 
+// Sort rank: overdue first, then due soon, then later, then tasks without a deadline.
 function urgencyRank(task: ChecklistTask) {
   if (!task.deadline) return 3
   if (isOverdue(task.deadline)) return 0
@@ -85,6 +97,7 @@ function urgencyRank(task: ChecklistTask) {
   return 2
 }
 
+// Orders tasks by urgency, then by how soon their deadline falls.
 function sortByUrgency(tasks: ChecklistTask[]) {
   return [...tasks].sort((a, b) => {
     const rankDiff = urgencyRank(a) - urgencyRank(b)
@@ -94,6 +107,7 @@ function sortByUrgency(tasks: ChecklistTask[]) {
   })
 }
 
+// Checklist page: per-module study tasks with deadlines, saved offline and synced to the account when online.
 export default function Checklist({ dark }: { dark: boolean }) {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -156,14 +170,24 @@ export default function Checklist({ dark }: { dark: boolean }) {
 
   useEffect(() => { setShowCompleted(false) }, [activeModule])
 
+  // Storage key for this user's saved checklist for the active module.
   const cacheKey = () => `user:${user?.id}:checklist:${activeModule}`
 
+  // Shows the saved list at once, then refreshes it from the server and re-applies queued offline changes.
   async function fetchTasks(isIgnored: () => boolean = () => false, silent = false) {
     setTasksError(false)
     if (!silent) setTasksLoading(true)
     if (user) {
-      const { data, error, fromCache } = await networkFirst(cacheKey(), () => supabase.from('user_checklist')
-        .select('*').eq('user_id', user.id).eq('module_id', activeModule).order('created_at'))
+      const { data, error, fromCache } = await cachedSnapshot(cacheKey(), () => supabase.from('user_checklist')
+        .select('*').eq('user_id', user.id).eq('module_id', activeModule).order('created_at'), {
+          onUpdate: async fresh => {
+            if (isIgnored() || !fresh) return
+            const ops = await listChecklistOps(user.id)
+            if (isIgnored()) return
+            setTasks(applyChecklistOps(fresh as ChecklistTask[], ops, activeModule as string))
+            setPendingCount(ops.length)
+          },
+        })
       const ops = await listChecklistOps(user.id)
       if (isIgnored()) return
       setTasks(applyChecklistOps((data || []) as ChecklistTask[], ops, activeModule as string))
@@ -185,6 +209,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
     setTasksLoading(false)
   }
 
+  // Queues a checklist change for the server and surfaces a failure if it is rejected.
   async function sendOp(op: any) {
     const result = await queueChecklistOp(user!.id, op)
     setPendingCount(result.pending)
@@ -195,6 +220,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
     return result
   }
 
+  // Adds a new task locally first, then queues it for sync (or saves it on the device for guests).
   async function addTask() {
     if (!newTask.trim() || addingTask) return
     const task: ChecklistTask = {
@@ -222,6 +248,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
     showToast('✅ Task added')
   }
 
+  // Flips a task's done state locally, then queues the change for sync.
   async function toggleTask(task: ChecklistTask) {
     const updated = tasks.map(t => t.id === task.id ? { ...t, done: !t.done } : t)
     setTasks(updated)
@@ -233,6 +260,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
     }
   }
 
+  // Removes a task locally, then queues the deletion for sync.
   async function deleteTask(task: ChecklistTask) {
     const updated = tasks.filter(t => t.id !== task.id)
     setTasks(updated)
@@ -276,6 +304,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
 
   const inStyle = { ...glassInput(pt, dark), padding: '13px 20px', marginBottom: 0 }
 
+  // Renders one task card with its checkbox, deadline label and delete button.
   function renderTaskRow(task: ChecklistTask, delay: number) {
     const overdue = isOverdue(task.deadline) && !task.done
     const dueSoon = isDueSoon(task.deadline) && !task.done && !overdue
