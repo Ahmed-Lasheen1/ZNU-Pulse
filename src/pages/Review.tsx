@@ -467,7 +467,7 @@ export default function Review({ dark }: { dark: boolean }) {
                   <div style={{ color: pending.error ? pt.danger : pt.amber, fontSize: 13, fontWeight: 700, marginBottom: 12, ...wrapText }}>
                     {pending.error
                       ? `Couldn't sync: ${pending.error}`
-                      : "Saved on this device — waiting to sync. Offline attempts don't earn points."}
+                      : "Saved on this device — waiting to sync. Points are added when it syncs."}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
                     <PulseGlassRow dark={dark} radius={999} hoverTint={hoverTint} onClick={retrySync}
