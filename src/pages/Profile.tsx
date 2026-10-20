@@ -185,7 +185,7 @@ export default function Profile({ dark }: { dark: boolean }) {
       : Promise.resolve({ data: null, error: null, fromCache: false })
     const lbPromise = cachedSnapshot(
       'leaderboard',
-      () => supabase.from('leaderboard').select('name, points').order('points', { ascending: false }).limit(10),
+      () => supabase.rpc('get_leaderboard'),
       {
         onUpdate: fresh => {
           if (isIgnored() || !fresh) return
