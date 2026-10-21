@@ -160,12 +160,13 @@ export default function Profile({ dark }: { dark: boolean }) {
   const [editing, setEditing] = useState(false)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
 
+  // Keyed on user id, not the session object, so token refreshes don't refetch.
   useEffect(() => {
     let ignore = false
     fetchData(() => ignore)
     return () => { ignore = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user])
+  }, [user?.id])
 
   async function fetchData(isIgnored: () => boolean = () => false) {
     setLoading(true)

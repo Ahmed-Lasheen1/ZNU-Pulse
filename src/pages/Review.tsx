@@ -143,12 +143,13 @@ export default function Review({ dark }: { dark: boolean }) {
 
   useEffect(() => subscribePendingAttempts(() => { setSyncTick(t => t + 1); setSelectedHistory(null) }), [])
 
+  // Keyed on user id, not the session object, so token refreshes don't refetch.
   useEffect(() => {
     let ignore = false
     fetchTab(() => ignore)
     return () => { ignore = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, user, syncTick, online])
+  }, [tab, user?.id, syncTick, online])
   useEffect(() => { setSearchQuery(''); setModuleFilter('all'); setSelectedHistory(null) }, [tab])
 
   useEffect(() => {

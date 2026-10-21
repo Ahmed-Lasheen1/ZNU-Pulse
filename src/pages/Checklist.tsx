@@ -30,6 +30,7 @@ const TASK_GAP = 12
 
 const CHECKLIST_KEY_PREFIX = 'checklist_'
 
+// Removes guest checklists for modules that no longer exist.
 function pruneOrphanedGuestChecklists(validModuleIds: Set<string>) {
   try {
     const keysToRemove: string[] = []
@@ -41,7 +42,7 @@ function pruneOrphanedGuestChecklists(validModuleIds: Set<string>) {
     }
     keysToRemove.forEach(key => localStorage.removeItem(key))
   } catch {
-    // localStorage can throw in private-browsing/storage-full cases.
+    // localStorage can throw in private-browsing or storage-full cases.
   }
 }
 
@@ -140,13 +141,14 @@ export default function Checklist({ dark }: { dark: boolean }) {
 
   useEffect(() => subscribeChecklistOutbox(() => setSyncTick(t => t + 1)), [])
 
+  // Keyed on user id, not the session object, so token refreshes don't refetch.
   useEffect(() => {
     if (!activeModule) return
     let ignore = false
     fetchTasks(() => ignore)
     return () => { ignore = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeModule, user, online])
+  }, [activeModule, user?.id, online])
 
   useEffect(() => {
     if (syncTick === 0 || !activeModule || !user) return

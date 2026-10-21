@@ -722,7 +722,8 @@ export default function MCQ({ dark }: { dark: boolean }) {
       }
     }
 
-    saveFullAttempt(user?.id || null, {
+    // Awaited so the device copy exists before the results screen opens.
+    await saveFullAttempt(user?.id || null, {
       id: attemptId,
       questions: quizQuestions.map((q, i) => ({
         question_id: q.id,

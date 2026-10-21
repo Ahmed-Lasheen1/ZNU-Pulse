@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '../premiumTheme'
 import LiquidGlassCard from '@/components/ui/liquid-glass-card'
@@ -61,9 +61,17 @@ export default function ModulePage({ dark }: { dark: boolean }) {
 
   useHistoryOverlay(!!selectedSummary, () => setSelectedSummary(null))
 
-  const stagesWithContent = new Set<string>()
-  facets.forEach(row => { stagesOf(row, stageMap).forEach((s: string) => stagesWithContent.add(s)) })
-  const visibleExamStages = examStages.filter(stage => stagesWithContent.has(stage.value))
+  // Memoized so the stage tabs keep a stable identity between renders.
+  const visibleExamStages = useMemo(() => {
+    const withContent = new Set<string>()
+    facets.forEach(row => { stagesOf(row, stageMap).forEach((s: string) => withContent.add(s)) })
+    return examStages.filter(stage => withContent.has(stage.value))
+  }, [examStages, facets, stageMap])
+
+  const tabItems = useMemo(
+    () => visibleExamStages.map(s => ({ value: s.value, title: s.title, color: s.color, emoji: s.emoji, Icon: s.Icon })),
+    [visibleExamStages]
+  )
 
   const requestedStage = searchParams.get('stage') || 'all'
   const activeStage = requestedStage !== 'all' && contentLoaded && !visibleExamStages.some(s => s.value === requestedStage)
@@ -195,8 +203,6 @@ export default function ModulePage({ dark }: { dark: boolean }) {
 
   const simulatorVisible = stageActive && simStats.total > 0 && hasQuestions
   const subjectText = `${simStats.subjects} subject${simStats.subjects === 1 ? '' : 's'}`
-
-  const tabItems = visibleExamStages.map(s => ({ value: s.value, title: s.title, color: s.color, emoji: s.emoji, Icon: s.Icon }))
 
   return (
     <PageShell dark={dark} backFallback="/" maxWidth={900}>

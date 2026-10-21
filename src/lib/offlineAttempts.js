@@ -14,7 +14,13 @@ export function subscribePendingAttempts(listener) {
   return () => { listeners.delete(listener) }
 }
 
-export const isTransientFailure = ({ error, status }) => !!error && (status === 0 || status >= 500)
+// Retryable: no connection, server errors, expired/invalid session, or permission denied
+// (the anon fallback when the token has expired). The attempt stays pending.
+export const isTransientFailure = ({ error, status }) => {
+  if (!error) return false
+  if (status === 0 || status >= 500) return true
+  return status === 401 || status === 403 || error.code === '42501'
+}
 
 export async function gradeLocally(questions, answers) {
   const keys = await loadAnswerKeys(questions.map(question => question.module_id))
@@ -31,7 +37,7 @@ export async function gradeLocally(questions, answers) {
   return results
 }
 
-// Keeps the caller's attempt id when given, so the server row and the device's full copy share one id.
+// Keeps the caller's attempt id so the server row and the device copy share one id.
 export async function savePendingAttempt(attempt) {
   const record = { ...attempt, id: attempt.id || crypto.randomUUID(), error: null }
   Promise.resolve(navigator.storage?.persist?.()).catch(() => {})
