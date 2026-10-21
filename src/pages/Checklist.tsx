@@ -19,6 +19,7 @@ import { showLocalNotification } from '../lib/localNotification'
 import { storageGet, storageSet } from '../lib/safeStorage'
 import { cachedSnapshot, saveCached } from '../lib/dataCache'
 import { listChecklistOps, queueChecklistOp, applyChecklistOps, subscribeChecklistOutbox } from '../lib/checklistOutbox'
+import { useOnlineStatus } from '../lib/useOnlineStatus'
 import { ChecklistIcon, LightbulbIcon, CalendarDotIcon, WarningIcon, ClockIcon, CelebrationIcon, TrashIcon, BookIcon, CheckCircleIcon } from '../components/ui/tool-icons'
 import type { ChecklistTask } from '../types/checklist'
 
@@ -29,7 +30,6 @@ const TASK_GAP = 12
 
 const CHECKLIST_KEY_PREFIX = 'checklist_'
 
-// Removes guest checklists whose module no longer exists.
 function pruneOrphanedGuestChecklists(validModuleIds: Set<string>) {
   try {
     const keysToRemove: string[] = []
@@ -45,38 +45,32 @@ function pruneOrphanedGuestChecklists(validModuleIds: Set<string>) {
   }
 }
 
-// Parses a YYYY-MM-DD string as a local date, avoiding timezone shifts.
 function parseLocalDate(dateStr: string) {
   const [y, m, d] = dateStr.split('-').map(Number)
   return new Date(y, m - 1, d)
 }
 
-// Returns today's date at local midnight.
 function startOfToday() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   return today
 }
 
-// Whole days from today until the deadline (negative when overdue).
 function dayDiff(deadline: string) {
   return Math.round((parseLocalDate(deadline).getTime() - startOfToday().getTime()) / (24 * 60 * 60 * 1000))
 }
 
-// True when a task's deadline has already passed.
 function isOverdue(deadline: string | null) {
   if (!deadline) return false
   return dayDiff(deadline) < 0
 }
 
-// True when a task is due within the next two days.
 function isDueSoon(deadline: string | null) {
   if (!deadline) return false
   const diff = dayDiff(deadline)
   return diff >= 0 && diff <= 2
 }
 
-// Human-readable deadline text such as "Due tomorrow" or "3 days overdue".
 function formatDeadlineLabel(deadline: string) {
   const diff = dayDiff(deadline)
   if (diff === 0) return 'Due today'
@@ -89,7 +83,6 @@ function formatDeadlineLabel(deadline: string) {
   return `Due ${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: sameYear ? undefined : 'numeric' })}`
 }
 
-// Sort rank: overdue first, then due soon, then later, then tasks without a deadline.
 function urgencyRank(task: ChecklistTask) {
   if (!task.deadline) return 3
   if (isOverdue(task.deadline)) return 0
@@ -97,7 +90,6 @@ function urgencyRank(task: ChecklistTask) {
   return 2
 }
 
-// Orders tasks by urgency, then by how soon their deadline falls.
 function sortByUrgency(tasks: ChecklistTask[]) {
   return [...tasks].sort((a, b) => {
     const rankDiff = urgencyRank(a) - urgencyRank(b)
@@ -107,11 +99,11 @@ function sortByUrgency(tasks: ChecklistTask[]) {
   })
 }
 
-// Checklist page: per-module study tasks with deadlines, saved offline and synced to the account when online.
 export default function Checklist({ dark }: { dark: boolean }) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const { modules, modulesLoaded, modulesError } = useModules()
+  const online = useOnlineStatus()
 
   const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
 
@@ -130,8 +122,6 @@ export default function Checklist({ dark }: { dark: boolean }) {
   const [syncTick, setSyncTick] = useState(0)
 
   const activeModulesList = (modules as any[]).filter(m => m.status === 'active')
-  // Falls back to any module if none are active, so the page never gets
-  // stuck with nothing selectable.
   const selectableModules = activeModulesList.length > 0 ? activeModulesList : (modules as any[])
 
   useEffect(() => {
@@ -141,8 +131,6 @@ export default function Checklist({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules])
 
-  // App.jsx sets modulesLoaded even when the fetch fails (modules = []), so
-  // pruning without the modulesError guard would wipe every guest checklist.
   useEffect(() => {
     if (!modulesLoaded || modulesError) return
     const validIds = new Set((modules as any[]).map(m => m.id))
@@ -158,7 +146,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
     fetchTasks(() => ignore)
     return () => { ignore = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeModule, user])
+  }, [activeModule, user, online])
 
   useEffect(() => {
     if (syncTick === 0 || !activeModule || !user) return
@@ -170,10 +158,8 @@ export default function Checklist({ dark }: { dark: boolean }) {
 
   useEffect(() => { setShowCompleted(false) }, [activeModule])
 
-  // Storage key for this user's saved checklist for the active module.
   const cacheKey = () => `user:${user?.id}:checklist:${activeModule}`
 
-  // Shows the saved list at once, then refreshes it from the server and re-applies queued offline changes.
   async function fetchTasks(isIgnored: () => boolean = () => false, silent = false) {
     setTasksError(false)
     if (!silent) setTasksLoading(true)
@@ -186,6 +172,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
             if (isIgnored()) return
             setTasks(applyChecklistOps(fresh as ChecklistTask[], ops, activeModule as string))
             setPendingCount(ops.length)
+            setSavedCopy(false)
           },
         })
       const ops = await listChecklistOps(user.id)
@@ -209,7 +196,6 @@ export default function Checklist({ dark }: { dark: boolean }) {
     setTasksLoading(false)
   }
 
-  // Queues a checklist change for the server and surfaces a failure if it is rejected.
   async function sendOp(op: any) {
     const result = await queueChecklistOp(user!.id, op)
     setPendingCount(result.pending)
@@ -220,7 +206,6 @@ export default function Checklist({ dark }: { dark: boolean }) {
     return result
   }
 
-  // Adds a new task locally first, then queues it for sync (or saves it on the device for guests).
   async function addTask() {
     if (!newTask.trim() || addingTask) return
     const task: ChecklistTask = {
@@ -248,7 +233,6 @@ export default function Checklist({ dark }: { dark: boolean }) {
     showToast('✅ Task added')
   }
 
-  // Flips a task's done state locally, then queues the change for sync.
   async function toggleTask(task: ChecklistTask) {
     const updated = tasks.map(t => t.id === task.id ? { ...t, done: !t.done } : t)
     setTasks(updated)
@@ -260,7 +244,6 @@ export default function Checklist({ dark }: { dark: boolean }) {
     }
   }
 
-  // Removes a task locally, then queues the deletion for sync.
   async function deleteTask(task: ChecklistTask) {
     const updated = tasks.filter(t => t.id !== task.id)
     setTasks(updated)
@@ -272,8 +255,6 @@ export default function Checklist({ dark }: { dark: boolean }) {
     }
   }
 
-  // Per-module key so one module's popup doesn't use up the day's slot for another.
-  // Goes through showLocalNotification(), which can't throw (see localNotification.js).
   useEffect(() => {
     if (!('Notification' in window) || Notification.permission !== 'granted') return
     if (tasks.length === 0) return
@@ -283,7 +264,6 @@ export default function Checklist({ dark }: { dark: boolean }) {
 
     const urgent = tasks.filter(t => !t.done && (isOverdue(t.deadline) || isDueSoon(t.deadline)))
     if (urgent.length > 0) {
-      // Marked before the async send so a quick re-run can't fire it twice.
       storageSet(notifyKey, todayStr)
       showLocalNotification('ZNU Future Doctors', {
         body: `You have ${urgent.length} checklist item(s) due soon or overdue.`,
@@ -293,7 +273,6 @@ export default function Checklist({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks])
 
-  // Nothing from the previous module shows while the new one loads.
   const shownTasks = tasksLoading ? [] : tasks
   const activeTasks = useMemo(() => sortByUrgency(shownTasks.filter(t => !t.done)), [shownTasks])
   const completedTasks = useMemo(() => shownTasks.filter(t => t.done), [shownTasks])
@@ -304,7 +283,6 @@ export default function Checklist({ dark }: { dark: boolean }) {
 
   const inStyle = { ...glassInput(pt, dark), padding: '13px 20px', marginBottom: 0 }
 
-  // Renders one task card with its checkbox, deadline label and delete button.
   function renderTaskRow(task: ChecklistTask, delay: number) {
     const overdue = isOverdue(task.deadline) && !task.done
     const dueSoon = isDueSoon(task.deadline) && !task.done && !overdue
@@ -386,8 +364,8 @@ export default function Checklist({ dark }: { dark: boolean }) {
         <OfflineNote
           dark={dark}
           message={pendingCount > 0
-            ? `${pendingCount} change${pendingCount === 1 ? '' : 's'} saved on this device — will sync when you're back online.`
-            : "You're offline — showing your last saved checklist."}
+            ? `${pendingCount} change${pendingCount === 1 ? '' : 's'} saved on this device. They'll sync automatically when you reconnect.`
+            : "You're offline. You can keep checking items and adding topics — everything syncs when you reconnect."}
         />
       )}
 
@@ -485,7 +463,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
 
       {(!modulesLoaded || tasksLoading) && <ChecklistSkeleton />}
 
-      {modulesLoaded && !tasksLoading && totalTasks === 0 && (
+      {modulesLoaded && !tasksLoading && totalTasks === 0 && !tasksError && (
         <LiquidGlassCard dark={dark} delay={200} style={{ padding: 40, textAlign: 'center' }}>
           <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             No tasks yet — add topics you need to study! <BookIcon color={pt.sub} size={15} />

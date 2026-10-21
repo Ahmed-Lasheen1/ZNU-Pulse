@@ -21,6 +21,7 @@ import { cachedSnapshot, saveCached } from '../lib/dataCache'
 import { getFullAttempt } from '../lib/fullHistory'
 import { fetchModuleStages } from '../lib/moduleStages'
 import { quizName } from '../lib/quizNames'
+import { useOnlineStatus } from '../lib/useOnlineStatus'
 import QuestionSourceBadge from '../components/QuestionSourceBadge'
 import { ModuleIcon } from '../lib/medicalIcons'
 import { wrapText } from '../lib/textStyles'
@@ -118,6 +119,7 @@ export default function Review({ dark }: { dark: boolean }) {
   const navigate = useNavigate()
   const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
   const pt = getPulseTheme(dark)
+  const online = useOnlineStatus()
 
   const [tab, setTab] = useState<ReviewTab>('history')
 
@@ -146,7 +148,7 @@ export default function Review({ dark }: { dark: boolean }) {
     fetchTab(() => ignore)
     return () => { ignore = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, user, syncTick])
+  }, [tab, user, syncTick, online])
   useEffect(() => { setSearchQuery(''); setModuleFilter('all'); setSelectedHistory(null) }, [tab])
 
   useEffect(() => {
@@ -193,6 +195,7 @@ export default function Review({ dark }: { dark: boolean }) {
             onUpdate: fresh => {
               if (isIgnored() || !fresh) return
               setHistory([...pendingRows, ...(fresh as HistoryRow[])])
+              setSavedCopy(false)
             },
           })
         if (isIgnored()) return
@@ -221,6 +224,7 @@ export default function Review({ dark }: { dark: boolean }) {
         onUpdate: fresh => {
           if (isIgnored() || !fresh || startedAt < flagEditedAtRef.current) return
           setFlaggedItems(fresh as FlaggedItem[])
+          setSavedCopy(false)
         },
       })
       if (isIgnored()) return
@@ -335,7 +339,7 @@ export default function Review({ dark }: { dark: boolean }) {
       </div>
 
       {loadError && <ErrorBanner />}
-      {savedCopy && !loading && <OfflineNote dark={dark} message="You're offline — showing your last saved review data." />}
+      {savedCopy && !loading && <OfflineNote dark={dark} message="You're offline. Showing your saved history. Exams you take now are kept on this device and sync when you reconnect." />}
 
       {!user && (
         <div style={{ marginBottom: SECTION_GAP }}>
@@ -369,7 +373,7 @@ export default function Review({ dark }: { dark: boolean }) {
               </div>
             )}
 
-            {history.length === 0 && (
+            {history.length === 0 && !loadError && (
               <EmptyState dark={dark} icon={<EmptyBoxIcon color={pt.sub} size={16} />} message="No exams attempted yet" />
             )}
 
@@ -585,7 +589,7 @@ export default function Review({ dark }: { dark: boolean }) {
 
       {tab === 'flagged' && !loading && (
         <>
-          {flaggedItems.length === 0 && (
+          {flaggedItems.length === 0 && !loadError && (
             <div style={{ marginBottom: SECTION_GAP }}>
               <EmptyState dark={dark} icon={<EmptyBoxIcon color={pt.sub} size={16} />} message="No flagged questions yet" />
             </div>

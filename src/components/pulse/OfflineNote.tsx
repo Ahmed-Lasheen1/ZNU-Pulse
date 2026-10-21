@@ -1,8 +1,22 @@
 import { getPulseTheme } from '../../premiumTheme'
 import LiquidGlassCard from '../ui/liquid-glass-card'
 import { OfflineIcon } from '../ui/tool-icons'
+import { useOnlineStatus } from '../../lib/useOnlineStatus'
 
-export default function OfflineNote({ dark, message = 'Showing your last saved copy.' }: { dark: boolean; message?: string }) {
+interface OfflineNoteProps {
+  dark: boolean
+  message?: string
+  alwaysShow?: boolean
+}
+
+export default function OfflineNote({
+  dark,
+  message = "You're offline — showing your saved copy.",
+  alwaysShow = false,
+}: OfflineNoteProps) {
+  const online = useOnlineStatus()
+  if (!alwaysShow && online) return null
+
   const pt = getPulseTheme(dark)
   return (
     <div style={{ marginBottom: 16 }}>

@@ -12,16 +12,12 @@ export function liquidGlassShadow(dark) {
   return dark ? LIQUID_GLASS_SHADOW_DARK : LIQUID_GLASS_SHADOW_LIGHT
 }
 
-// backdrop-filter isn't universally supported — checked once via
-// CSS.supports() so every glass surface falls back consistently.
 const SUPPORTS_BACKDROP_FILTER =
   typeof window !== 'undefined' &&
   typeof CSS !== 'undefined' &&
   typeof CSS.supports === 'function' &&
   (CSS.supports('backdrop-filter', 'blur(1px)') || CSS.supports('-webkit-backdrop-filter', 'blur(1px)'))
 
-// Real blur when supported; empty object otherwise (liquidGlassTint
-// compensates by becoming more opaque on unsupported browsers).
 export function liquidGlassBackdrop() {
   if (!SUPPORTS_BACKDROP_FILTER) return {}
   return {
@@ -30,9 +26,6 @@ export function liquidGlassBackdrop() {
   }
 }
 
-// Low-opacity neutral tint layered over the blur so glass reads as
-// grey/white instead of inheriting the page's hue. Falls back to a
-// more opaque flat tint when blur isn't supported.
 export function liquidGlassTint(dark) {
   if (!SUPPORTS_BACKDROP_FILTER) {
     return dark ? 'rgba(38, 44, 60, 0.82)' : 'rgba(255,255,255,0.82)'
@@ -40,17 +33,6 @@ export function liquidGlassTint(dark) {
   return dark ? 'rgba(60, 60, 70, 0.35)' : 'rgba(255,255,255,0.35)'
 }
 
-// Shared border color for glass containers that draw a real CSS
-// border directly (PulseGlassRow uses liquidGlassShadow instead).
 export function glassBorderColor(dark) {
   return dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.55)'
-}
-
-// Optional, more opaque plate for content over a busier-than-usual
-// background. Opt-in — not applied anywhere automatically today.
-export function liquidGlassPlate(dark) {
-  return {
-    background: dark ? 'rgba(10, 16, 28, 0.4)' : 'rgba(255,255,255,0.6)',
-    borderRadius: 10,
-  }
 }

@@ -17,9 +17,6 @@ export const pulseWeights = {
 }
 
 // Text rendered directly on PULSE_BG (no glass surface underneath).
-// PULSE_BG is a fixed gradient (pale blue top → dark navy bottom) in
-// both app themes, so text sitting straight on it needs colors tied
-// to gradient position, not the light/dark theme toggle.
 export const ON_GRADIENT_TOP = {
   primary: '#062B50',
   secondary: '#062B50',
@@ -44,7 +41,6 @@ export function getPulseTheme(dark) {
         border: '#3A527A66',
         borderStrong: '#4A6690',
 
-        // Dark Liquid Glass text: primary #FFFFFF, secondary .82, muted .62
         text: '#FFFFFF',
         sub: 'rgba(255,255,255,0.82)',
         faint: 'rgba(255,255,255,0.62)',
@@ -52,7 +48,6 @@ export function getPulseTheme(dark) {
         textSecondary: 'rgba(255,255,255,0.82)',
         textMuted: 'rgba(255,255,255,0.62)',
 
-        // Accents — cyan for links/tags/progress, orange reserved for streaks
         cobalt: '#38BDF8',
         cobaltSoft: 'rgba(56,189,248,0.16)',
         cobaltBorder: 'rgba(56,189,248,0.4)',
@@ -80,7 +75,6 @@ export function getPulseTheme(dark) {
         border: '#C7D3E3',
         borderStrong: '#AFC0D6',
 
-        // Light Liquid Glass text: primary #10243A, secondary #29445C, muted #405A70
         text: '#10243A',
         sub: '#29445C',
         faint: '#405A70',
@@ -88,7 +82,6 @@ export function getPulseTheme(dark) {
         textSecondary: '#29445C',
         textMuted: '#405A70',
 
-        // Accents — electric cyan/blue, vibrant crimson-orange for streaks
         cobalt: '#0284C7',
         cobaltSoft: 'rgba(2,132,199,0.10)',
         cobaltBorder: 'rgba(2,132,199,0.35)',
