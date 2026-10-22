@@ -25,22 +25,23 @@ import { networkFirst, cachedSnapshot } from '../lib/dataCache'
 import { getMyAnonTokens, addMyAnonToken, getNotifiedTokens, markTokensNotified } from '../lib/anonTracking'
 import { showLocalNotification } from '../lib/localNotification'
 import { getSwRegistration } from '../lib/pushNotifications'
+import { isArabicText, textDir, ARABIC_FONT } from '../lib/bidi'
 import { AnonQAIcon, QuestionMarkIcon, ClockIcon, CheckCircleIcon, TrashIcon, LightbulbIcon, EmptyBoxIcon, ChartBarIcon } from '../components/ui/tool-icons'
 import { Lock } from 'lucide-react'
 
-const ACCENT = '#a78bfa'
+const QUESTIONS_ACCENT = '#a78bfa'
+const POLLS_ACCENT = '#2dd4bf'
 
 const RECENT_QUESTIONS_LIMIT = 300
 
 const SUBMIT_COOLDOWN_MS = 30_000
 const COOLDOWN_STORAGE_KEY = 'anon_q_last_submit_at'
 
-type PulseTab = 'ask' | 'polls' | 'answered'
+type PulseTab = 'polls' | 'questions'
 
-const TABS: { id: PulseTab; label: string; Icon: (p: { color: string; size?: number }) => JSX.Element }[] = [
-  { id: 'ask', label: 'Ask', Icon: QuestionMarkIcon },
-  { id: 'polls', label: 'Polls', Icon: ChartBarIcon },
-  { id: 'answered', label: 'Answers', Icon: CheckCircleIcon },
+const TABS: { id: PulseTab; label: string; accent: string; Icon: (p: { color: string; size?: number }) => JSX.Element }[] = [
+  { id: 'polls', label: 'Polls', accent: POLLS_ACCENT, Icon: ChartBarIcon },
+  { id: 'questions', label: 'Questions', accent: QUESTIONS_ACCENT, Icon: QuestionMarkIcon },
 ]
 
 interface AnonQuestion {
@@ -93,9 +94,10 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
   const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
   const location = useLocation()
 
+  // Old links used ?tab=ask and ?tab=answered; both now land on Questions.
   const [tab, setTab] = useState<PulseTab>(() => {
     const requested = new URLSearchParams(location.search).get('tab')
-    return TABS.some(t => t.id === requested) ? (requested as PulseTab) : 'ask'
+    return requested === 'questions' || requested === 'ask' || requested === 'answered' ? 'questions' : 'polls'
   })
   const [questions, setQuestions] = useState<AnonQuestion[]>([])
   const [myQuestions, setMyQuestions] = useState<AnonQuestion[]>([])
@@ -160,7 +162,7 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
         body: newlyAnswered.length === 1
           ? 'Your question has been answered!'
           : `${newlyAnswered.length} of your questions have been answered!`,
-        data: { url: '/pulse-check' },
+        data: { url: '/pulse-check?tab=questions' },
       })
     }
   }, [myQuestions])
@@ -297,6 +299,7 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
 
   const isSuccess = isSuccessMessage(msg)
   const inStyle = { ...glassInput(pt, dark), padding: '13px 20px' }
+  const arabicFont = (text: string) => (isArabicText(text) ? { fontFamily: ARABIC_FONT } : {})
   const submitDisabled = cooldownRemaining > 0
   const cooldownSeconds = Math.ceil(cooldownRemaining / 1000)
   const hoverTint = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.35)'
@@ -307,7 +310,7 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
         dark={dark}
         emoji={<AnonQAIcon color={ON_GRADIENT_TOP.primary} size={40} />}
         title="Pulse Check"
-        subtitle="Ask, suggest and vote — all anonymous"
+        subtitle="Vote, ask and suggest — all anonymous"
         paddingBottom={16}
       />
 
@@ -315,15 +318,15 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
         {TABS.map(t => {
           const active = tab === t.id
           const color = active ? (dark ? '#ffffff' : '#062B50') : pt.sub
-          const badge = isAdmin && t.id === 'answered' ? unansweredQs.length : 0
+          const badge = isAdmin && t.id === 'questions' ? unansweredQs.length : 0
           return (
             <PulseGlassRow
               key={t.id} dark={dark} radius={999} active={active}
-              activeTint={`${ACCENT}33`} hoverTint={hoverTint}
+              activeTint={`${t.accent}33`} hoverTint={hoverTint}
               onClick={() => setTab(t.id)} role="button" tabIndex={0}
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTab(t.id) } }}
             >
-              <div style={{ padding: '10px 20px', ...pulseType.button, color, display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}>
+              <div style={{ padding: '10px 22px', ...pulseType.button, color, display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}>
                 <t.Icon color={color} size={15} /> {t.label}
                 {badge > 0 && (
                   <span style={{ background: pt.amber, color: '#0f172a', borderRadius: 999, padding: '0 7px', fontSize: 11, fontWeight: 800 }}>{badge}</span>
@@ -334,7 +337,9 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
         })}
       </div>
 
-      {tab === 'ask' && (
+      {tab === 'polls' && <PollsSection dark={dark} accent={POLLS_ACCENT} isAdmin={isAdmin} />}
+
+      {tab === 'questions' && (
         <>
           {loadError && <div style={{ marginBottom: 20 }}><ErrorBanner message="Couldn't load questions — check your connection." /></div>}
           {savedCopy && <OfflineNote dark={dark} message="You're offline — showing the last saved questions." />}
@@ -345,19 +350,19 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
 
           <div style={{ marginBottom: 24 }}>
             <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
-              <h3 style={{ ...pulseType.sectionLabel, color: ACCENT, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <QuestionMarkIcon color={ACCENT} size={14} /> Ask a question or share a suggestion
+              <h3 style={{ ...pulseType.sectionLabel, color: QUESTIONS_ACCENT, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <QuestionMarkIcon color={QUESTIONS_ACCENT} size={14} /> Ask a question or share a suggestion
               </h3>
               <textarea
                 dir="auto"
                 placeholder="Ask anything, or suggest an idea for the platform..."
                 value={newQ} onChange={e => setNewQ(e.target.value)}
-                style={{ ...inStyle, minHeight: 80, resize: 'vertical' }} />
+                style={{ ...inStyle, ...arabicFont(newQ), minHeight: 80, resize: 'vertical' }} />
               {msg && (
                 <div style={{ color: isSuccess ? '#4ade80' : pt.danger, fontSize: 13, marginBottom: 8 }}>{msg}</div>
               )}
               <button onClick={submitQuestion} disabled={submitDisabled} style={{
-                width: '100%', padding: '13px', background: ACCENT,
+                width: '100%', padding: '13px', background: QUESTIONS_ACCENT,
                 border: 'none', borderRadius: 999, cursor: submitDisabled ? 'not-allowed' : 'pointer',
                 opacity: submitDisabled ? 0.6 : 1,
                 fontWeight: 700, color: '#0f172a', fontFamily: pulseFonts.body, fontSize: 14,
@@ -369,8 +374,8 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
           </div>
 
           {myQuestions.length > 0 && (
-            <div>
-              <h3 style={{ ...pulseType.sectionLabel, color: ACCENT, marginBottom: 12 }}>🔎 My Messages (this device)</h3>
+            <div style={{ marginBottom: 24 }}>
+              <h3 style={{ ...pulseType.sectionLabel, color: QUESTIONS_ACCENT, marginBottom: 12 }}>🔎 My Messages (this device)</h3>
               {myQuestions.map((q, i) => {
                 const isLast = i === myQuestions.length - 1
                 return (
@@ -379,18 +384,20 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
                       padding: '16px 18px',
                       boxShadow: `inset 0 0 0 1px ${q.answered ? 'rgba(74,222,128,0.35)' : 'transparent'}`
                     }}>
-                      <AutoDirText text={q.question} style={{ color: pt.textPrimary, fontSize: 13, marginBottom: 8 }} />
-                      <span style={{
-                        fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
-                        background: q.answered ? 'rgba(74,222,128,0.16)' : `${pt.amber}20`,
-                        color: q.answered ? '#4ade80' : pt.amber,
-                        display: 'inline-flex', alignItems: 'center', gap: 5
-                      }}>
-                        {q.answered ? <CheckCircleIcon color="#4ade80" size={12} /> : <ClockIcon color={pt.amber} size={12} />}
-                        {q.answered ? 'Answered' : 'Waiting for an answer'}
-                      </span>
+                      <div dir={textDir(q.question)}>
+                        <AutoDirText text={q.question} style={{ color: pt.textPrimary, fontSize: 13, marginBottom: 8 }} />
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
+                          background: q.answered ? 'rgba(74,222,128,0.16)' : `${pt.amber}20`,
+                          color: q.answered ? '#4ade80' : pt.amber,
+                          display: 'inline-flex', alignItems: 'center', gap: 5
+                        }}>
+                          {q.answered ? <CheckCircleIcon color="#4ade80" size={12} /> : <ClockIcon color={pt.amber} size={12} />}
+                          {q.answered ? 'Answered' : 'Waiting for an answer'}
+                        </span>
+                      </div>
                       {q.answered && q.answer && (
-                        <div style={{
+                        <div dir={textDir(q.answer)} style={{
                           background: 'rgba(74,222,128,0.10)', border: '1px solid rgba(74,222,128,0.25)',
                           borderRadius: 10, padding: '10px 14px', marginTop: 10
                         }}>
@@ -403,15 +410,6 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
               })}
             </div>
           )}
-        </>
-      )}
-
-      {tab === 'polls' && <PollsSection dark={dark} accent={ACCENT} isAdmin={isAdmin} />}
-
-      {tab === 'answered' && (
-        <>
-          {loadError && <div style={{ marginBottom: 20 }}><ErrorBanner message="Couldn't load questions — check your connection." /></div>}
-          {savedCopy && <OfflineNote dark={dark} message="You're offline — showing the last saved questions." />}
 
           {isAdmin && (
             <div style={{ marginBottom: 24 }}>
@@ -430,19 +428,22 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
               </h3>
               {unansweredQs.map((q, i) => {
                 const isLast = i === unansweredQs.length - 1
+                const draft = replyText[q.id] || ''
                 return (
                   <div key={q.id} style={{ marginBottom: isLast ? 0 : 12 }}>
                     <LiquidGlassCard dark={dark} delay={i * 60} style={{ padding: 18 }}>
-                      <p style={{ color: pt.textPrimary, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                        <QuestionMarkIcon color={pt.textPrimary} size={15} />
-                        <AutoDirText text={q.question} wrapperStyle={{ flex: 1 }} />
-                      </p>
+                      <div dir={textDir(q.question)} style={{ color: pt.textPrimary, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                        <span style={{ flexShrink: 0, display: 'inline-flex', paddingTop: 3 }}>
+                          <QuestionMarkIcon color={pt.textPrimary} size={15} />
+                        </span>
+                        <AutoDirText text={q.question} wrapperStyle={{ flex: 1, minWidth: 0 }} />
+                      </div>
                       <textarea
                         dir="auto"
                         placeholder="Type your answer..."
-                        value={replyText[q.id] || ''}
+                        value={draft}
                         onChange={e => setReplyText(prev => ({ ...prev, [q.id]: e.target.value }))}
-                        style={{ ...inStyle, minHeight: 60, resize: 'vertical' }} />
+                        style={{ ...inStyle, ...arabicFont(draft), minHeight: 60, resize: 'vertical' }} />
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button onClick={() => submitReply(q.id)} style={{
                           flex: 1, padding: '10px', background: '#22c55e',
@@ -477,11 +478,13 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
               return (
                 <div key={q.id} style={{ marginBottom: isLast ? 0 : 12 }}>
                   <LiquidGlassCard dark={dark} delay={i * 60} style={{ padding: 20 }}>
-                    <p style={{ color: pt.textPrimary, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                      <QuestionMarkIcon color={pt.textPrimary} size={15} />
-                      <AutoDirText text={q.question} wrapperStyle={{ flex: 1 }} />
-                    </p>
-                    <div style={{
+                    <div dir={textDir(q.question)} style={{ color: pt.textPrimary, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <span style={{ flexShrink: 0, display: 'inline-flex', paddingTop: 3 }}>
+                        <QuestionMarkIcon color={pt.textPrimary} size={15} />
+                      </span>
+                      <AutoDirText text={q.question} wrapperStyle={{ flex: 1, minWidth: 0 }} />
+                    </div>
+                    <div dir={textDir(q.answer || '')} style={{
                       background: 'rgba(74,222,128,0.10)', border: '1px solid rgba(74,222,128,0.25)',
                       borderRadius: 10, padding: '12px 16px'
                     }}>

@@ -44,7 +44,7 @@ async function handler(req, res) {
   const { sent } = await sendToSubscriptions(supabase, subs, {
     title: '💬 Pulse Check',
     body: 'Your question was answered!',
-    url: '/pulse-check',
+    url: '/pulse-check?tab=questions',
   })
 
   return res.status(200).json({ sent })
