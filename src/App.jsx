@@ -142,7 +142,6 @@ function RoutedContent({ dark }) {
           <Route path="/reset-password" element={<Pages.ResetPassword dark={dark} />} />
           <Route path="/profile" element={<Pages.Profile dark={dark} />} />
           <Route path="/pulse-check" element={<Pages.PulseCheck dark={dark} />} />
-          <Route path="/anon-questions" element={<PulseCheckRedirect />} />
           <Route path="/search" element={<Pages.Search dark={dark} />} />
           <Route path="*" element={<Pages.NotFound dark={dark} />} />
         </Routes>
