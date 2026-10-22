@@ -37,7 +37,7 @@ const navItems: NavItem[] = [
   { label: 'Home', href: '/', Icon: HomeIcon, accent: 'cobalt' },
   { label: 'Schedules', href: '/schedule', Icon: ScheduleIcon, accent: 'indigo' },
   { label: 'Checklist', href: '/checklist', Icon: ChecklistIcon, accent: 'amber' },
-  { label: 'Anonymous Q&A', href: '/anon-questions', Icon: AnonQAIcon, accent: 'indigo' },
+  { label: 'Pulse Check', href: '/pulse-check', Icon: AnonQAIcon, accent: 'indigo' },
   { label: 'Leaderboard', href: '/profile?tab=leaderboard', Icon: LeaderboardIcon, accent: 'amber' },
   { label: 'Review', href: '/review', Icon: BookIcon, accent: 'indigo' },
 ]

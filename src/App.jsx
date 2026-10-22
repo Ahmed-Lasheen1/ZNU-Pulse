@@ -34,7 +34,7 @@ const pageLoaders = {
   ModulePage: () => import('./pages/ModulePage'),
   Auth: () => import('./pages/Auth'),
   Profile: () => import('./pages/Profile'),
-  AnonQuestions: () => import('./pages/AnonQuestions'),
+  PulseCheck: () => import('./pages/PulseCheck'),
   ResetPassword: () => import('./pages/ResetPassword'),
   NotFound: () => import('./pages/NotFound'),
   Search: () => import('./pages/Search'),
@@ -116,6 +116,12 @@ function StageRedirect() {
   return <Navigate to={`/module/${moduleId}?stage=${encodeURIComponent(stage)}`} replace />
 }
 
+// Old links and notifications still point at the previous URL.
+function PulseCheckRedirect() {
+  const { search } = useLocation()
+  return <Navigate to={`/pulse-check${search}`} replace />
+}
+
 function RoutedContent({ dark }) {
   const location = useLocation()
   return (
@@ -135,7 +141,8 @@ function RoutedContent({ dark }) {
           <Route path="/auth" element={<Pages.Auth dark={dark} />} />
           <Route path="/reset-password" element={<Pages.ResetPassword dark={dark} />} />
           <Route path="/profile" element={<Pages.Profile dark={dark} />} />
-          <Route path="/anon-questions" element={<Pages.AnonQuestions dark={dark} />} />
+          <Route path="/pulse-check" element={<Pages.PulseCheck dark={dark} />} />
+          <Route path="/anon-questions" element={<PulseCheckRedirect />} />
           <Route path="/search" element={<Pages.Search dark={dark} />} />
           <Route path="*" element={<Pages.NotFound dark={dark} />} />
         </Routes>

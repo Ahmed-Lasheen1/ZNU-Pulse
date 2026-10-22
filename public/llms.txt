@@ -8,5 +8,5 @@ ZNU Pulse is an integrated medical study platform for students at the Faculty of
 - [Schedule](https://znu-pulse.vercel.app/schedule): Study and exam schedules by module.
 - [Checklist](https://znu-pulse.vercel.app/checklist): Per-module study checklists with deadline reminders.
 - [MCQ Bank](https://znu-pulse.vercel.app/mcq): Practice questions and mock exams by module and subject.
-- [Anonymous Q&A](https://znu-pulse.vercel.app/anon-questions): Ask questions anonymously and browse answered questions.
+- [Pulse Check](https://znu-pulse.vercel.app/pulse-check): Ask questions or share suggestions anonymously, and vote in polls.
 - [Search](https://znu-pulse.vercel.app/search): Search across modules, files, questions, summaries, and schedules.
