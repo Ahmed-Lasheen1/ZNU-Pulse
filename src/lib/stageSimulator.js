@@ -48,6 +48,38 @@ export function simulatorTotal(questions, rows, stage, lessonStageMap, source = 
   )
 }
 
+// Decides whether the "All questions / University Doctors only" dialog should be offered
+// for a simulator run. It is offered only when a doctors-only quiz would still match the
+// admin's configuration, i.e. for every subject with a quota:
+//   min(quota, doctorPool) === min(quota, allPool)
+// and there is a real choice to make: at least one subject has non-doctor questions in its
+// pool, and at least one doctor question exists.
+// Returns { allCount, doctorCount } for the dialog, or null when the dialog should be skipped.
+export function simulatorSourceChoice(questions, rows, stage, lessonStageMap) {
+  let allCount = 0
+  let doctorCount = 0
+  let hasDoctor = false
+  let hasOther = false
+
+  for (const row of rows) {
+    if (!(row.question_count > 0)) continue
+    const allPool = simulatorPool(questions, row.subject_id, stage, lessonStageMap, null).length
+    const doctorPool = simulatorPool(questions, row.subject_id, stage, lessonStageMap, 'university').length
+    const allUsed = Math.min(row.question_count, allPool)
+    const doctorUsed = Math.min(row.question_count, doctorPool)
+
+    if (doctorUsed < allUsed) return null
+
+    allCount += allUsed
+    doctorCount += doctorUsed
+    if (doctorPool > 0) hasDoctor = true
+    if (allPool > doctorPool) hasOther = true
+  }
+
+  if (!hasDoctor || !hasOther) return null
+  return { allCount, doctorCount }
+}
+
 export function drawSimulator(questions, rows, stage, lessonStageMap, source = null) {
   return shuffle(
     rows.flatMap(r => shuffle(simulatorPool(questions, r.subject_id, stage, lessonStageMap, source)).slice(0, r.question_count))

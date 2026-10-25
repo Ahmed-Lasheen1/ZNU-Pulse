@@ -13,7 +13,7 @@ import { fetchLessonStageMap, inStage } from '../lib/lessonStages'
 import { getGuestFlags, toggleGuestFlag, enrichGuestFlagsWithResults, addGuestHistory } from '../lib/reviewStorage'
 import { loadSavedActiveExam, persistActiveExam, clearActiveExam } from '../lib/activeExam'
 import { storageGet, storageSet } from '../lib/safeStorage'
-import { fetchSimulatorConfig, drawSimulator, drawProportional, simulatorTotal, QUIZ_MAX_QUESTIONS } from '../lib/stageSimulator'
+import { fetchSimulatorConfig, drawSimulator, drawProportional, simulatorSourceChoice, simulatorTotal, QUIZ_MAX_QUESTIONS } from '../lib/stageSimulator'
 import { clearHomeHistory } from '../lib/homeData'
 import { saveFullAttempt } from '../lib/fullHistory'
 import { quizName } from '../lib/quizNames'
@@ -472,10 +472,22 @@ export default function MCQ({ dark }: { dark: boolean }) {
   }
 
   function requestStart(type: StartType, subjectId: string | null = null, lessonId: string | null = null, stage: string | null = null) {
+    if (type === 'simulator') {
+      // Offered only when a doctors-only simulator still fills every subject's admin-set quota
+      // and the pool really mixes University Doctors and other questions.
+      const choice = simulatorSourceChoice(questions, simRows.filter(r => r.stage === stage), stage as string, lessonStageMap)
+      if (choice) {
+        setSourceChoice({ type, subjectId, lessonId, stage, allCount: choice.allCount, doctorCount: choice.doctorCount })
+        return
+      }
+      launch(type, subjectId, lessonId, stage, null)
+      return
+    }
+
     const all = scopeCount(type, subjectId, lessonId, stage, null)
     const doctors = scopeCount(type, subjectId, lessonId, stage, 'university')
     if (doctors > 0 && doctors < all) {
-      const shown = (n: number) => type === 'simulator' ? n : Math.min(n, QUIZ_MAX_QUESTIONS)
+      const shown = (n: number) => Math.min(n, QUIZ_MAX_QUESTIONS)
       setSourceChoice({ type, subjectId, lessonId, stage, allCount: shown(all), doctorCount: shown(doctors) })
       return
     }
