@@ -1,0 +1,101 @@
+// src/components/FullscreenViewer.jsx
+import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
+import { previewKindFor } from '@/shared/utils/embedUrl'
+import { useBodyScrollLock } from '@/shared/hooks/useBodyScrollLock'
+import { getPulseTheme, pulseFonts } from '@/shared/theme/premiumTheme'
+
+const OVERLAY_Z = 2100
+
+// allow-same-origin is only granted to hosts we actually trust (Drive
+// previews, YouTube embeds, our own GitHub Pages summaries) — combined
+// with allow-scripts it would otherwise let any admin-pasted URL
+// escape the sandbox entirely.
+const TRUSTED_EMBED_HOSTS = /(^|\.)google\.com$|(^|\.)youtube\.com$|(^|\.)github\.io$/
+
+function isTrustedEmbedHost(url) {
+  try {
+    return TRUSTED_EMBED_HOSTS.test(new URL(url, window.location.origin).hostname)
+  } catch {
+    return false
+  }
+}
+
+// Shared full-screen "back + preview" viewer used by SummaryOverlay and
+// MediaOverlay. Portaled to document.body so its z-index always
+// competes globally against the site header. `srcDoc` renders saved HTML
+// (always without allow-same-origin, since it would inherit the app's origin);
+// `notice` replaces the preview with a message.
+export default function FullscreenViewer({ dark, onClose, src, srcDoc, notice, title, fileType, allow, allowFullScreen }) {
+  const pt = getPulseTheme(dark)
+  const kind = previewKindFor(src, fileType)
+  useBodyScrollLock(true)
+
+  // allow-modals lets a summary open the browser's print dialog (its "Print" button).
+  const trustedHost = !srcDoc && isTrustedEmbedHost(src)
+  const sandbox = trustedHost
+    ? 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation allow-modals'
+    : 'allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation allow-modals'
+
+  useEffect(() => {
+    function onKeyDown(e) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
+  return createPortal(
+    <div style={{
+      position: 'fixed', inset: 0, height: '100dvh',
+      background: pt.canvas, zIndex: OVERLAY_Z, overflowY: 'auto'
+    }}>
+      <button
+        onClick={onClose}
+        style={{
+          position: 'fixed',
+          top: 14, left: 16,
+          zIndex: 20,
+          background: dark ? 'rgba(8,16,32,0.65)' : 'rgba(255,255,255,0.85)',
+          backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+          border: `1px solid ${pt.border}`, borderRadius: 999,
+          cursor: 'pointer',
+          color: pt.text, fontFamily: pulseFonts.body, fontWeight: 700,
+          fontSize: 14, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6
+        }}
+      >← Back</button>
+
+      {notice ? (
+        <div style={{
+          minHeight: '100dvh', padding: '80px 24px 24px', boxSizing: 'border-box',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center',
+          color: pt.sub, fontFamily: pulseFonts.body, fontSize: 14, lineHeight: 1.6
+        }}>{notice}</div>
+      ) : kind === 'image' ? (
+        <div style={{
+          minHeight: '100dvh',
+          padding: '80px 20px 24px',
+          boxSizing: 'border-box',
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <img
+            src={src}
+            alt={title}
+            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+          />
+        </div>
+      ) : (
+        <div style={{ height: '100dvh' }}>
+          <iframe
+            src={srcDoc ? undefined : src}
+            srcDoc={srcDoc}
+            style={{ height: '100%', width: '100%', border: 'none', display: 'block' }}
+            title={title}
+            sandbox={sandbox}
+            allow={allow ?? (kind === 'video' ? 'autoplay; fullscreen' : undefined)}
+            allowFullScreen={allowFullScreen ?? (kind === 'video' || undefined)}
+          />
+        </div>
+      )}
+    </div>,
+    document.body
+  )
+}

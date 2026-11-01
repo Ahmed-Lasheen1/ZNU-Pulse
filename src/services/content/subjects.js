@@ -1,0 +1,32 @@
+import { supabase } from '@/core/supabase'
+import { cachedQuery, invalidateCache, REFERENCE_TTL } from '@/core/dataCache'
+
+const KEY = 'subjects'
+
+// Loads every subject, cached.
+export async function fetchAllSubjects() {
+  const { data, error } = await cachedQuery(
+    KEY,
+    () => supabase.from('subjects').select('*').order('created_at').order('id'),
+    { ttl: REFERENCE_TTL, versioned: true }
+  )
+  return { subjects: data || [], error }
+}
+
+// Loads the subjects of one module.
+export async function fetchSubjectsForModule(moduleId) {
+  const { subjects, error } = await fetchAllSubjects()
+  return { subjects: subjects.filter(s => s.module_id === moduleId), error }
+}
+
+// Finds one subject by id.
+export async function fetchSubjectById(subjectId) {
+  const { subjects, error } = await fetchAllSubjects()
+  if (error) return { subject: null, error }
+  return { subject: subjects.find(s => s.id === subjectId) || null, error: null }
+}
+
+// Clears the cached subjects.
+export function invalidateSubjectsCache() {
+  invalidateCache(KEY)
+}

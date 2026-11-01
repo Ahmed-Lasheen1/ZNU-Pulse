@@ -1,0 +1,13 @@
+const AR_RE = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/
+
+export const ARABIC_FONT = "'Cairo', 'Sora', sans-serif"
+
+// True when the text contains Arabic characters.
+export function isArabicText(text: string) {
+  return AR_RE.test(text)
+}
+
+// Returns 'rtl' for Arabic text and 'ltr' otherwise.
+export function textDir(text: string): 'rtl' | 'ltr' {
+  return isArabicText(text) ? 'rtl' : 'ltr'
+}

@@ -1,0 +1,289 @@
+// src/pages/FilesPage.tsx
+import { useState, useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
+import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
+import { useModules } from '@/core/contexts'
+import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
+import TabRow from '@/shared/ui/controls/TabRow'
+import MediaOverlay from '@/shared/ui/overlay/MediaOverlay'
+import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
+import PageShell from '@/shared/ui/layout/PageShell'
+import PageIntro from '@/shared/ui/layout/PageIntro'
+import { FilesSkeleton } from '@/shared/ui/feedback/Skeletons'
+import EmptyState from '@/shared/ui/feedback/EmptyState'
+import { FileTypeIcon, FileActionIcon, fileActionLabel } from '@/shared/icons/FileTypeIcon'
+import { useHistoryOverlay } from '@/shared/hooks/useHistoryOverlay'
+import { useBodyScrollLock } from '@/shared/hooks/useBodyScrollLock'
+import { fetchSubjectsForModule } from '@/services/content/subjects'
+import { fetchModuleFiles } from '@/services/content/moduleContent'
+import { getDriveOrRawUrl, getVideoEmbedUrl, isSafeExternalUrl } from '@/shared/utils/embedUrl'
+import { BookIcon, QuestionMarkIcon, VideoIcon, GraduationCapIcon, DocumentIcon, AudioIcon, FolderIcon } from '@/shared/icons/tool-icons'
+
+interface FilesModule {
+  id: string
+  name: string
+  icon?: string | null
+  color: string
+  status: 'active' | 'completed'
+}
+
+interface FileRow {
+  id: string
+  name: string
+  url: string
+  type: string
+  file_type: 'pdf' | 'video' | 'audio'
+  module_id: string
+  subject_id?: string | null
+}
+
+interface FilesSubject {
+  id: string
+  module_id: string
+  name: string
+}
+
+const FILE_ACCENT = '#38bdf8'
+
+const TYPE_ORDER = ['sharah', 'questions', 'lectures', 'courses'] as const
+
+const TYPE_META: Record<string, { Icon: (p: { color?: string; size?: number }) => JSX.Element; label: string }> = {
+  sharah: { Icon: BookIcon, label: 'Explanation Files' },
+  questions: { Icon: QuestionMarkIcon, label: 'Question Files' },
+  lectures: { Icon: VideoIcon, label: 'Lecture Recordings' },
+  courses: { Icon: GraduationCapIcon, label: 'Course Recordings' },
+}
+
+function AudioViewer({ url, name, onClose, dark }: { url: string; name: string; onClose: () => void; dark: boolean }) {
+  const pt = getPulseTheme(dark)
+  useBodyScrollLock(true)
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+      zIndex: 2000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
+    }}>
+      <div style={{ width: '90%', maxWidth: 400 }}>
+        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 32, textAlign: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+            <AudioIcon color={FILE_ACCENT} size={48} />
+          </div>
+          <h3 style={{ ...pulseType.sectionTitle, color: FILE_ACCENT, marginBottom: 20 }}>{name}</h3>
+          <audio controls src={url} style={{ width: '100%', marginBottom: 20 }} />
+          <button onClick={onClose} style={{
+            background: pt.danger, color: '#fff', border: 'none', borderRadius: 999,
+            padding: '10px 24px', cursor: 'pointer', fontWeight: 700, fontFamily: pulseFonts.body
+          }}>✕ Close</button>
+        </LiquidGlassCard>
+      </div>
+    </div>
+  )
+}
+
+export default function FilesPage({ dark }: { dark: boolean }) {
+  const pt = getPulseTheme(dark)
+  const [files, setFiles] = useState<FileRow[]>([])
+  const { modules, modulesLoaded, modulesError } = useModules() as {
+    modules: FilesModule[]; modulesLoaded: boolean; modulesError: boolean
+  }
+  const [moduleSubjects, setModuleSubjects] = useState<FilesSubject[]>([])
+  const [activeModule, setActiveModule] = useState<string | null>(null)
+  const [activeSubject, setActiveSubject] = useState('all')
+  const [activeType, setActiveType] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [viewer, setViewer] = useState<FileRow | null>(null)
+  const [loadError, setLoadError] = useState(false)
+  const location = useLocation()
+  const params = new URLSearchParams(location.search)
+  const moduleParam = params.get('module')
+  const typeParam = params.get('type')
+  const fileParam = params.get('file')
+  const typeMeta = activeType ? TYPE_META[activeType] : null
+
+  useHistoryOverlay(!!viewer, () => setViewer(null))
+
+  const activeModules = modules.filter(m => m.status === 'active')
+  const selectableModules = activeModules.length > 0 ? activeModules : modules
+
+  const appliedModuleParamRef = useRef<string | null>(null)
+  const openedFileRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (moduleParam) {
+      if (appliedModuleParamRef.current !== moduleParam) {
+        appliedModuleParamRef.current = moduleParam
+        setActiveModule(moduleParam)
+      }
+    } else if (modulesLoaded && selectableModules.length > 0 && !activeModule) {
+      setActiveModule(selectableModules[0].id)
+    } else if (modulesLoaded && selectableModules.length === 0) {
+      setLoading(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modulesLoaded, modules, moduleParam])
+
+  useEffect(() => {
+    if (!activeModule) return
+    let ignore = false
+    async function fetchFiles() {
+      setLoading(true)
+      setLoadError(false)
+      const { data, error } = await fetchModuleFiles(activeModule, ({ data: fresh, error: refreshError }: any) => {
+        if (!ignore && !refreshError && fresh) setFiles(fresh)
+      })
+      if (ignore) return
+      if (data) setFiles(data)
+      if (error) setLoadError(true)
+      setLoading(false)
+    }
+    fetchFiles()
+    return () => { ignore = true }
+  }, [activeModule])
+
+  const availableTypes = TYPE_ORDER.filter(t => files.some(f => f.type === t))
+
+  useEffect(() => {
+    if (loading) return
+    if (typeParam && availableTypes.includes(typeParam as typeof availableTypes[number])) {
+      setActiveType(typeParam)
+      return
+    }
+    setActiveType(availableTypes[0] || null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, activeModule, files])
+
+  useEffect(() => {
+    let ignore = false
+    fetchSubjectsForModule(activeModule || '').then(({ subjects, error }) => {
+      if (ignore) return
+      setModuleSubjects(subjects)
+      if (error) setLoadError(true)
+    })
+    return () => { ignore = true }
+  }, [activeModule])
+
+  useEffect(() => {
+    if (!fileParam || viewer || openedFileRef.current === fileParam) return
+    const match = files.find(f => f.id === fileParam)
+    if (match) {
+      openedFileRef.current = fileParam
+      setViewer(match)
+      setActiveType(match.type)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileParam, files])
+
+  const filtered = files.filter(f => {
+    const typeMatch = f.type === activeType
+    const subjectMatch = activeSubject === 'all' || f.subject_id === activeSubject
+    return typeMatch && subjectMatch
+  })
+
+  return (
+    <PageShell dark={dark} backFallback="/">
+      {(loadError || modulesError) && <ErrorBanner />}
+
+      {viewer && viewer.file_type === 'pdf' && (
+        <MediaOverlay
+          dark={dark}
+          onClose={() => setViewer(null)}
+          src={getDriveOrRawUrl(viewer.url)}
+          title="PDF Viewer"
+          fileType="pdf"
+        />
+      )}
+      {viewer && viewer.file_type === 'video' && (
+        <MediaOverlay
+          dark={dark}
+          onClose={() => setViewer(null)}
+          src={getVideoEmbedUrl(viewer.url)}
+          title="Video Player"
+          fileType="video"
+        />
+      )}
+      {viewer && viewer.file_type === 'audio' && (
+        <AudioViewer url={isSafeExternalUrl(viewer.url) ? viewer.url : ''} name={viewer.name} onClose={() => setViewer(null)} dark={dark} />
+      )}
+
+      <PageIntro
+        dark={dark}
+        emoji={typeMeta ? <typeMeta.Icon color={ON_GRADIENT_TOP.primary} size={40} /> : <FolderIcon color={ON_GRADIENT_TOP.primary} size={40} />}
+        title={typeMeta ? typeMeta.label : 'Files'}
+      />
+
+      <TabRow
+        items={selectableModules.map(m => ({ value: m.id, label: m.name, icon: m.icon, color: m.color, completed: m.status === 'completed' }))}
+        active={activeModule}
+        onSelect={(id) => { setActiveModule(id); setActiveSubject('all'); setActiveType(null) }}
+        dark={dark}
+      />
+
+      {!loading && availableTypes.length > 0 && (
+        <TabRow
+          items={availableTypes.map(t => ({ value: t, label: TYPE_META[t].label, Icon: TYPE_META[t].Icon }))}
+          active={activeType}
+          onSelect={setActiveType}
+          dark={dark}
+          accentColor={FILE_ACCENT}
+          style={{ marginBottom: 20 }}
+        />
+      )}
+
+      {moduleSubjects.length > 0 && (
+        <TabRow
+          items={[{ value: 'all', label: 'All' }, ...moduleSubjects.map(sub => ({ value: sub.id, label: sub.name }))]}
+          active={activeSubject}
+          onSelect={setActiveSubject}
+          dark={dark}
+          accentColor={FILE_ACCENT}
+          style={{ marginBottom: 20 }}
+        />
+      )}
+
+      {loading && <FilesSkeleton />}
+
+      {!loading && availableTypes.length === 0 && !loadError && (
+        <EmptyState dark={dark} message="No files yet" />
+      )}
+
+      {!loading && availableTypes.length > 0 && filtered.length === 0 && (
+        <EmptyState dark={dark} message="No files yet" />
+      )}
+
+      {filtered.map((file, i) => {
+        const isLast = i === filtered.length - 1
+        return (
+          <div key={file.id} style={{ marginBottom: isLast ? 0 : 12 }}>
+            <LiquidGlassCard dark={dark} delay={i * 70} style={{
+              padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                <span style={{ flexShrink: 0, display: 'inline-flex' }}>
+                  <FileTypeIcon type={file.file_type} color={pt.textPrimary} size={22} />
+                </span>
+                <span style={{ ...pulseType.cardTitle, color: pt.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {file.name}
+                </span>
+              </div>
+              <button onClick={() => setViewer(file)} style={{
+                background: FILE_ACCENT, color: '#0f172a', border: 'none',
+                padding: '8px 16px', borderRadius: 999, cursor: 'pointer',
+                fontWeight: 700, fontSize: 13, fontFamily: pulseFonts.body, whiteSpace: 'nowrap', flexShrink: 0,
+                display: 'inline-flex', alignItems: 'center', gap: 6
+              }}>
+                <FileActionIcon type={file.file_type} color="#0f172a" size={13} /> {fileActionLabel(file.file_type)}
+              </button>
+            </LiquidGlassCard>
+          </div>
+        )
+      })}
+    </PageShell>
+  )
+}

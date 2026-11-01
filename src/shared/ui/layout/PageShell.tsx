@@ -1,0 +1,42 @@
+// src/components/pulse/PageShell.tsx
+import type { ReactNode, CSSProperties } from 'react'
+import BackButton from '@/shared/ui/layout/BackButton'
+import { pulseFonts } from '@/shared/theme/premiumTheme'
+
+interface PageShellProps {
+  dark: boolean
+  children: ReactNode
+  backFallback?: string
+  onBack?: () => void
+  maxWidth?: number
+  containerClassName?: string
+  containerStyle?: CSSProperties
+}
+
+// Shared full-page chrome (container + "← Back" pill) used by
+// Schedule, Checklist, FilesPage, AnonQuestions, Search, and Review —
+// pages only supply their content.
+export default function PageShell({
+  dark, children, backFallback = '/', onBack,
+  maxWidth, containerClassName = 'pulse-wide', containerStyle = {},
+}: PageShellProps) {
+  return (
+    <div style={{ position: 'relative' }}>
+      <div
+        className={containerClassName}
+        style={{
+          position: 'relative', zIndex: 1,
+          padding: '24px 20px 100px',
+          fontFamily: pulseFonts.body,
+          ...(maxWidth ? { maxWidth, margin: '0 auto' } : {}),
+          ...containerStyle,
+        }}
+      >
+        <div style={{ marginBottom: 8 }}>
+          <BackButton dark={dark} fallback={backFallback} onClick={onBack} />
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
