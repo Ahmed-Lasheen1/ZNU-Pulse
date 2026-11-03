@@ -217,23 +217,25 @@ export default function MCQ({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state])
 
+  // Waits for the lesson-stage map so stage-filtered lesson practice counts every question.
   useEffect(() => {
-    if (lessonFilter && !quizMode && questions.length > 0 && !autoStartedLessonRef.current) {
+    if (lessonFilter && !quizMode && questions.length > 0 && lessonStageMapLoaded && !autoStartedLessonRef.current) {
       autoStartedLessonRef.current = true
       requestStart('practice', null, lessonFilter)
       clearAutoStartParams()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lessonFilter, questions])
+  }, [lessonFilter, questions, lessonStageMapLoaded])
 
+  // Waits for the lesson-stage map so stage-filtered subject practice counts every question.
   useEffect(() => {
-    if (subjectFilter && !lessonFilter && !quizMode && questions.length > 0 && !autoStartedSubjectRef.current) {
+    if (subjectFilter && !lessonFilter && !quizMode && questions.length > 0 && lessonStageMapLoaded && !autoStartedSubjectRef.current) {
       autoStartedSubjectRef.current = true
       requestStart('practice', subjectFilter, null)
       clearAutoStartParams()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subjectFilter, lessonFilter, questions])
+  }, [subjectFilter, lessonFilter, questions, lessonStageMapLoaded])
 
   useEffect(() => {
     if (!simulatorParam || autoStartedSimulatorRef.current || quizMode) return

@@ -30,6 +30,7 @@ interface AccordionSummary {
 interface StudyByLessonSectionProps {
   dark: boolean
   moduleId: string
+  stage?: string | null
   subjects: AccordionSubject[]
   lessons: AccordionLesson[]
   lessonQuestionIds: Set<string>
@@ -49,13 +50,16 @@ function pillBtn(color: string): CSSProperties {
 // Subject accordion — expands in place to lesson rows with inline
 // Summary/Practice actions, replacing the old Subject/Lesson pages.
 export default function StudyByLessonSection({
-  dark, moduleId, subjects, lessons, lessonQuestionIds, lessonSummaries, onOpenSummary
+  dark, moduleId, stage, subjects, lessons, lessonQuestionIds, lessonSummaries, onOpenSummary
 }: StudyByLessonSectionProps) {
   const pt = getPulseTheme(dark)
   const navigate = useNavigate()
   const [openSubjectId, setOpenSubjectId] = useState<string | null>(null)
   const [openPickerLessonId, setOpenPickerLessonId] = useState<string | null>(null)
   const hoverTint = glassHoverTint(dark)
+
+  // Carries the selected exam stage into the MCQ page, like the simulator link does.
+  const stageQuery = stage ? `&stage=${encodeURIComponent(stage)}` : ''
 
   const bySubject = subjects
     .map(sub => ({ sub, lessonsForSub: lessons.filter(l => l.subject_id === sub.id) }))
@@ -64,10 +68,10 @@ export default function StudyByLessonSection({
   if (bySubject.length === 0) return null
 
   function practiceLesson(lessonId: string) {
-    navigate(`/mcq?module=${moduleId}&lesson=${lessonId}`)
+    navigate(`/mcq?module=${moduleId}&lesson=${lessonId}${stageQuery}`)
   }
   function practiceSubject(subjectId: string) {
-    navigate(`/mcq?module=${moduleId}&subject=${subjectId}`)
+    navigate(`/mcq?module=${moduleId}&subject=${subjectId}${stageQuery}`)
   }
   function handleSummary(lessonId: string, list: AccordionSummary[]) {
     if (list.length === 1) { onOpenSummary(list[0]); return }

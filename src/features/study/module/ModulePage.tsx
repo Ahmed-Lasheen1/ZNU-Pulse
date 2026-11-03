@@ -239,6 +239,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
           <StudyByLessonSection
             dark={dark}
             moduleId={moduleId as string}
+            stage={stageActive ? activeStage : null}
             subjects={subjects}
             lessons={visibleLessons}
             lessonQuestionIds={lessonQuestionIds}
