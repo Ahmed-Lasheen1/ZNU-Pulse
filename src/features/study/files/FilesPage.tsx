@@ -1,4 +1,3 @@
-// src/pages/FilesPage.tsx
 import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'

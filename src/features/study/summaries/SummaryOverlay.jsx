@@ -1,4 +1,3 @@
-// src/components/SummaryOverlay.jsx
 import { useState, useEffect } from 'react'
 import FullscreenViewer from '@/shared/ui/overlay/FullscreenViewer'
 import { useOnlineStatus } from '@/shared/hooks/useOnlineStatus'

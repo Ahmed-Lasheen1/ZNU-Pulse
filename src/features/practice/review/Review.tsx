@@ -1,4 +1,3 @@
-// src/pages/Review.tsx
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/core/supabase'

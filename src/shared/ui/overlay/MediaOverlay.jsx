@@ -1,4 +1,3 @@
-// src/components/MediaOverlay.jsx
 import FullscreenViewer from '@/shared/ui/overlay/FullscreenViewer'
 
 // Full-screen file/video viewer — thin adapter over the shared

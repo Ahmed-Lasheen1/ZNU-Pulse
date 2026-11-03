@@ -1,4 +1,3 @@
-// src/components/ui/menu-toggle-icon.tsx
 import type { ComponentProps, CSSProperties } from 'react'
 
 type MenuToggleProps = ComponentProps<'svg'> & {

@@ -1,4 +1,3 @@
-// src/components/GuestSignInButton.jsx
 import { useNavigate } from 'react-router-dom'
 import { LogIn } from 'lucide-react'
 import { getPulseTheme, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'

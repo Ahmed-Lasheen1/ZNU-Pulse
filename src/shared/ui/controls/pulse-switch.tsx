@@ -1,4 +1,3 @@
-// src/components/ui/pulse-switch.tsx
 import { motion } from 'framer-motion'
 import { getPulseTheme } from '@/shared/theme/premiumTheme'
 

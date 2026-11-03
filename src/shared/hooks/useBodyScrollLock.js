@@ -1,4 +1,3 @@
-// src/lib/useBodyScrollLock.js
 import { useEffect } from 'react'
 
 // Prevents the real page behind a full-screen fixed overlay from being

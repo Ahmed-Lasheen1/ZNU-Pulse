@@ -1,4 +1,3 @@
-// src/pages/Search.tsx
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '@/core/supabase'

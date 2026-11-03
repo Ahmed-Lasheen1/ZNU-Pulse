@@ -1,4 +1,3 @@
-// src/components/Footer.jsx
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { motion, useInView } from 'framer-motion'
 import { getPulseTheme, pulseFonts, ON_GRADIENT_BOTTOM } from '@/shared/theme/premiumTheme'

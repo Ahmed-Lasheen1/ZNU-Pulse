@@ -1,4 +1,3 @@
-// src/pages/NotFound.jsx
 import { useNavigate, useLocation } from 'react-router-dom'
 import { getPulseTheme, pulseFonts } from '@/shared/theme/premiumTheme'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'

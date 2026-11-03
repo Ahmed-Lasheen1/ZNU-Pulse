@@ -1,4 +1,3 @@
-// src/pages/admin/useConfirmDelete.ts
 import { useState } from 'react'
 
 // Shared "pick an id → confirm → remove(id)" wiring for admin delete buttons.

@@ -1,4 +1,3 @@
-// src/components/pulse/ModuleNotFoundState.tsx
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import LoadingText from '@/shared/ui/feedback/LoadingText'
 import { ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'

@@ -1,4 +1,3 @@
-// src/components/pulse/PageShell.tsx
 import type { ReactNode, CSSProperties } from 'react'
 import BackButton from '@/shared/ui/layout/BackButton'
 import { pulseFonts } from '@/shared/theme/premiumTheme'

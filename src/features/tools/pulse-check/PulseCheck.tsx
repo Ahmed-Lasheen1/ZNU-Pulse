@@ -1,4 +1,3 @@
-// src/pages/PulseCheck.tsx
 import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '@/core/supabase'

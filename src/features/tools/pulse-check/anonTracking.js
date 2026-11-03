@@ -1,4 +1,3 @@
-// src/lib/anonTracking.js
 // Lets someone who submitted an anonymous question later check whether
 // it's been answered — without an account or revealing who they are.
 // A random token is generated client-side at submit time, saved once

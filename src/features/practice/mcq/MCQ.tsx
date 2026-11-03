@@ -1,4 +1,3 @@
-// src/pages/MCQ.tsx
 import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '@/core/supabase'
@@ -14,7 +13,7 @@ import { fetchLessonStageMap, inStage } from '@/services/content/lessonStages'
 import { getGuestFlags, toggleGuestFlag, enrichGuestFlagsWithResults, addGuestHistory } from '@/services/history/reviewStorage'
 import { loadSavedActiveExam, persistActiveExam, clearActiveExam } from '@/services/exam/activeExam'
 import { storageGet, storageSet } from '@/core/safeStorage'
-import { fetchSimulatorConfig, drawSimulator, drawProportional, simulatorTotal, QUIZ_MAX_QUESTIONS } from '@/services/exam/stageSimulator'
+import { fetchSimulatorConfig, drawSimulator, drawProportional, simulatorSourceChoice, simulatorTotal, QUIZ_MAX_QUESTIONS } from '@/services/exam/stageSimulator'
 import { clearHomeHistory } from '@/services/content/homeData'
 import { saveFullAttempt } from '@/services/history/fullHistory'
 import { quizName } from '@/features/practice/quizNames'
@@ -46,8 +45,10 @@ interface SourceChoice {
   doctorCount: number
 }
 
+// Returns the exam stage a quiz belongs to, if any.
 const stageOf = (config: QuizConfig | null) => config?.stage || config?.simulatorStage || null
 
+// Converts graded rows into a lookup keyed by question id.
 function toResultMap(graded: any[] | null) {
   const map: Record<string, any> = {}
   ;(graded || []).forEach(r => {
@@ -56,6 +57,7 @@ function toResultMap(graded: any[] | null) {
   return map
 }
 
+// MCQ page: browse quizzes, run them, grade and save attempts.
 export default function MCQ({ dark }: { dark: boolean }) {
   const { user, fetchProfile } = useAuth() as any
   const { modules, modulesLoaded, modulesError } = useModules() as any
@@ -106,6 +108,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   })
   useEffect(() => { storageSet('znu_mcq_font_scale', String(fontScale)) }, [fontScale])
 
+  // Cycles through the available exam text sizes.
   function cycleFontScale() {
     setFontScale(prev => FONT_SCALES[(FONT_SCALES.indexOf(prev) + 1) % FONT_SCALES.length])
   }
@@ -131,6 +134,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     return () => { isMountedRef.current = false }
   }, [])
 
+  // Removes one-shot auto-start parameters from the URL.
   function clearAutoStartParams() {
     const params = new URLSearchParams(location.search)
     params.delete('lesson')
@@ -284,6 +288,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
   useEffect(() => {
     if (!quizMode || submitted || grading) return
+    // Handles keyboard shortcuts during a quiz (arrows, 1-4, F).
     function handleKeyDown(e: KeyboardEvent) {
       const targetTag = (e.target as HTMLElement)?.tagName
       if (targetTag === 'INPUT' || targetTag === 'TEXTAREA') return
@@ -314,6 +319,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quizMode, submitted, grading, currentIndex, quizQuestions, results, flaggedIds])
 
+  // Loads a module's questions and answer keys, falling back to the saved copy offline.
   async function fetchQuestionsForModule(moduleId: string, isIgnored: () => boolean = () => false) {
     setLoading(true)
     setUsingCache(false)
@@ -335,6 +341,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const moduleSubjects = subjects.filter(s => s.module_id === activeModule)
   const activeModuleObj = modules.find((m: any) => m.id === activeModule)
 
+  // Questions matching the active module, subject, stage and mock/practice type.
   const getFilteredQuestions = (type: string, sourceOnly: string | null = null) => {
     return questions.filter(q => {
       const modMatch = q.module_id === activeModule
@@ -348,6 +355,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     })
   }
 
+  // Practice questions for one subject or lesson in the active stage.
   const getPracticeQuestions = (subjectId: string | null, lessonId: string | null, sourceOnly: string | null = null) => {
     return questions.filter(q =>
       (lessonId ? q.lesson_id === lessonId : q.subject_id === subjectId) &&
@@ -357,6 +365,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     )
   }
 
+  // Loads which of the given questions the user has flagged.
   async function loadFlagsFor(ids: string[]) {
     if (ids.length === 0) return new Set<string>()
     if (user) {
@@ -367,6 +376,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     return new Set<string>(flags.filter((f: any) => ids.includes(f.question_id)).map((f: any) => f.question_id))
   }
 
+  // Flags or unflags a question for the signed-in user or guest.
   async function toggleFlagFor(q: any) {
     if (!q) return
     const isFlagged = flaggedIds.has(q.id)
@@ -403,6 +413,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     }
   }
 
+  // Starts the elapsed-time counter from the given start timestamp.
   function startTimer(startedAt: number) {
     clearInterval(timerRef.current)
     const tick = () => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000))
@@ -410,6 +421,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     timerRef.current = setInterval(tick, 1000)
   }
 
+  // Resets quiz state and begins a new quiz with the given questions.
   function beginQuiz(qs: any[], type: string, config: QuizConfig | null) {
     lastQuizConfigRef.current = config
 
@@ -436,6 +448,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     window.scrollTo({ top: 0 })
   }
 
+  // Draws questions for a mock or practice quiz and starts it.
   function startQuiz(type: string, subjectId: string | null = null, lessonId: string | null = null, sourceFilter: string | null = null) {
     const qs = drawProportional(
       type === 'mock' ? getFilteredQuestions('mock', sourceFilter) : getPracticeQuestions(subjectId, lessonId, sourceFilter),
@@ -450,6 +463,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     beginQuiz(qs, type, { type, subjectId, lessonId, sourceFilter, simulatorStage: null, stage: activeStage === 'all' ? null : activeStage })
   }
 
+  // Draws the admin-configured question mix for a stage and starts the simulator.
   function startSimulator(stage: string, sourceFilter: string | null = null) {
     const rows = simRows.filter(r => r.stage === stage)
     const qs = drawSimulator(questions, rows, stage, lessonStageMap, sourceFilter)
@@ -460,11 +474,13 @@ export default function MCQ({ dark }: { dark: boolean }) {
     beginQuiz(qs, 'simulator', { type: 'simulator', subjectId: null, lessonId: null, sourceFilter, simulatorStage: stage, stage })
   }
 
+  // Starts the right kind of quiz for the chosen type and source.
   function launch(type: StartType, subjectId: string | null, lessonId: string | null, stage: string | null, source: string | null) {
     if (type === 'simulator') startSimulator(stage as string, source)
     else startQuiz(type, subjectId, lessonId, source)
   }
 
+  // Counts the questions a quiz of this type and source would draw from.
   function scopeCount(type: StartType, subjectId: string | null, lessonId: string | null, stage: string | null, source: string | null) {
     if (type === 'simulator') {
       return simulatorTotal(questions, simRows.filter(r => r.stage === stage), stage as string, lessonStageMap, source)
@@ -472,17 +488,31 @@ export default function MCQ({ dark }: { dark: boolean }) {
     return (type === 'mock' ? getFilteredQuestions('mock', source) : getPracticeQuestions(subjectId, lessonId, source)).length
   }
 
+  // Starts a quiz, first asking for the question source when the choice is meaningful.
   function requestStart(type: StartType, subjectId: string | null = null, lessonId: string | null = null, stage: string | null = null) {
+    if (type === 'simulator') {
+      // Offered only when a doctors-only simulator still fills every subject's admin-set quota
+      // and the pool really mixes University Doctors and other questions.
+      const choice = simulatorSourceChoice(questions, simRows.filter(r => r.stage === stage), stage as string, lessonStageMap)
+      if (choice) {
+        setSourceChoice({ type, subjectId, lessonId, stage, allCount: choice.allCount, doctorCount: choice.doctorCount })
+        return
+      }
+      launch(type, subjectId, lessonId, stage, null)
+      return
+    }
+
     const all = scopeCount(type, subjectId, lessonId, stage, null)
     const doctors = scopeCount(type, subjectId, lessonId, stage, 'university')
     if (doctors > 0 && doctors < all) {
-      const shown = (n: number) => type === 'simulator' ? n : Math.min(n, QUIZ_MAX_QUESTIONS)
+      const shown = (n: number) => Math.min(n, QUIZ_MAX_QUESTIONS)
       setSourceChoice({ type, subjectId, lessonId, stage, allCount: shown(all), doctorCount: shown(doctors) })
       return
     }
     launch(type, subjectId, lessonId, stage, null)
   }
 
+  // Launches the pending quiz with the source picked in the dialog.
   function chooseSource(source: string | null) {
     if (!sourceChoice) return
     const { type, subjectId, lessonId, stage } = sourceChoice
@@ -490,6 +520,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     launch(type, subjectId, lessonId, stage, source)
   }
 
+  // Starts a retry quiz from a list of previously missed or flagged questions.
   function startRetryQuiz(list: any[]) {
     if (!list || list.length === 0) {
       showToast('❌ No questions to retry', 'error')
@@ -498,6 +529,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     beginQuiz(list, 'retry', null)
   }
 
+  // Restores a paused exam and resumes its timer.
   function resumeExam() {
     if (!resumeData) return
     const startedAt = resumeData.savedAt && resumeData.startedAt
@@ -527,11 +559,13 @@ export default function MCQ({ dark }: { dark: boolean }) {
     window.scrollTo({ top: 0 })
   }
 
+  // Deletes the paused exam instead of resuming it.
   async function discardResume() {
     await clearActiveExam(user)
     setResumeData(null)
   }
 
+  // Leaves the current quiz and resets all quiz state.
   function stopQuiz() {
     clearInterval(timerRef.current)
     setQuizMode(null)
@@ -551,6 +585,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
   const isTutorMode = quizMode === 'practice' || quizMode === 'retry'
 
+  // Grades one answer immediately (local keys first, server as fallback) in tutor modes.
   async function tutorGradeAnswer(qi: number, opt: string) {
     const q = quizQuestions[qi]
     if (!q) return
@@ -572,6 +607,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     else showToast(OFFLINE_KEYS_MESSAGE, 'info')
   }
 
+  // Records the chosen option and grades it right away in tutor modes.
   function selectAnswer(qi: number, opt: string) {
     if (submitted) return
     const q = quizQuestions[qi]
@@ -584,6 +620,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     }
   }
 
+  // Toggles the strike-through (eliminated) state of an option.
   function toggleStrike(qi: number, label: string) {
     setStruckOut(prev => {
       const next = { ...prev }
@@ -595,9 +632,12 @@ export default function MCQ({ dark }: { dark: boolean }) {
     })
   }
 
+  // Moves to the previous question.
   function goPrev() { setCurrentIndex(i => Math.max(0, i - 1)) }
+  // Moves to the next question.
   function goNext() { setCurrentIndex(i => Math.min(quizQuestions.length - 1, i + 1)) }
 
+  // Restarts the same kind of quiz that was just finished.
   function tryAgain() {
     if (quizMode === 'retry') { startRetryQuiz(quizQuestions); return }
     const config = lastQuizConfigRef.current
@@ -606,6 +646,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     else startQuiz(quizMode!)
   }
 
+  // Starts a retry quiz from the missed questions of one subject.
   function startTargetedPractice(subjectId: string) {
     const incorrectQs = quizQuestions
       .filter(q => q.subject_id === subjectId && results[q.id] && !results[q.id].is_correct)
@@ -618,6 +659,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     startRetryQuiz(incorrectQs)
   }
 
+  // Grades and saves the finished quiz (server, or on-device when offline), then shows results.
   async function submitQuiz() {
     if (submittingRef.current) return
     submittingRef.current = true

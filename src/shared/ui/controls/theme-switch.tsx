@@ -1,4 +1,3 @@
-// src/components/ui/theme-switch.tsx
 'use client'
 
 import { Sun, Moon } from 'lucide-react'

@@ -1,4 +1,3 @@
-// src/components/pulse/PulseBrand.tsx
 import { motion } from 'framer-motion'
 import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
 

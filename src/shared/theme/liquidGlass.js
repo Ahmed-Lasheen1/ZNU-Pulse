@@ -1,4 +1,3 @@
-// src/lib/liquidGlass.js
 // Shared "liquid glass" recipe used by LiquidGlassCard, PulseGlassRow,
 // and NavMenu's own glass — tune the look only here.
 

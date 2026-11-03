@@ -1,6 +1,4 @@
-// src/lib/localNotification.js
 // Shows an in-page notification (used by Checklist and AnonQuestions).
-//
 // Why this exists: Chrome for Android doesn't allow `new Notification()`
 // from a page — it throws "Illegal constructor. Use
 // ServiceWorkerRegistration.showNotification() instead." Because that

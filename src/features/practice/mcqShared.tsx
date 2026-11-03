@@ -1,4 +1,3 @@
-// src/pages/mcq/mcqShared.tsx
 import { pulseFonts, ON_GRADIENT_TOP, ON_GRADIENT_BOTTOM } from '@/shared/theme/premiumTheme'
 
 export const EXAM_TOP_TEXT = ON_GRADIENT_TOP.primary

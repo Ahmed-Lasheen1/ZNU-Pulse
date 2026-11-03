@@ -1,4 +1,3 @@
-// src/components/pulse/AuthPrimitives.tsx
 import type { ReactNode, CSSProperties } from 'react'
 import { getPulseTheme, pulseFonts } from '@/shared/theme/premiumTheme'
 import { isSuccessMessage } from '@/shared/utils/messageStyle'

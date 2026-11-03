@@ -1,4 +1,3 @@
-// src/components/FullscreenViewer.jsx
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { previewKindFor } from '@/shared/utils/embedUrl'

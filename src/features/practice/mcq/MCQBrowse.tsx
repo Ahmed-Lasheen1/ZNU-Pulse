@@ -1,4 +1,3 @@
-// src/pages/mcq/MCQBrowse.tsx
 import { useState, useEffect, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
