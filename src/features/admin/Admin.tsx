@@ -10,8 +10,10 @@ import { fetchAllRows } from '@/core/fetchAllRows'
 import NotFound from '@/shared/ui/feedback/NotFound'
 import { PackageIcon, FolderIcon, CalendarDotIcon, QuestionMarkIcon, ChartBarIcon, GearIcon } from '@/shared/icons/tool-icons'
 import { NotesIcon } from '@/shared/icons/medicalIcons'
+import { FlashcardIcon } from '@/shared/icons/FlashcardIcon'
 
 import QuestionsTab from '@/features/admin/content/QuestionsTab'
+import FlashcardsTab from '@/features/admin/content/FlashcardsTab'
 import FilesTab from '@/features/admin/content/FilesTab'
 import SummariesTab from '@/features/admin/content/SummariesTab'
 import SchedulesTab from '@/features/admin/content/SchedulesTab'
@@ -26,6 +28,7 @@ import type { AdminModule, AdminSubject, AdminLesson } from '@/features/admin/co
 const TABS = [
   { id: 'structure', label: 'Structure', Icon: PackageIcon },
   { id: 'summaries', label: 'Summaries', Icon: NotesIcon },
+  { id: 'flashcards', label: 'Flashcards', Icon: FlashcardIcon },
   { id: 'questions', label: 'Questions', Icon: QuestionMarkIcon },
   { id: 'files', label: 'Files', Icon: FolderIcon },
   { id: 'schedules', label: 'Schedules', Icon: CalendarDotIcon },
@@ -40,8 +43,10 @@ const CONTEXT_DEPTH: Partial<Record<AdminTab, number>> = {
   files: 3,
   questions: 3,
   summaries: 3,
+  flashcards: 3,
 }
 
+// Admin panel shell: loads modules, subjects and lessons and shows the selected tab.
 export default function Admin({ dark }: { dark: boolean }) {
   const { profile, authLoaded } = useAuth() as { profile?: { role?: string } | null; authLoaded: boolean }
   const { refreshModules } = useModules() as { refreshModules: () => Promise<{ modules: AdminModule[]; error?: any }> }
@@ -57,12 +62,14 @@ export default function Admin({ dark }: { dark: boolean }) {
 
   const context = useAdminContext(modules, subjects, lessons)
 
+  // Reloads the module list.
   async function fetchModules() {
     const result = await refreshModules()
     setModules((result?.modules || []) as AdminModule[])
     if (result?.error) setRefDataError(true)
   }
 
+  // Reloads every subject.
   async function fetchSubjects() {
     invalidateSubjectsCache()
     const { data, error } = await fetchAllRows(() => supabase.from('subjects').select('*').order('created_at').order('id'))
@@ -70,6 +77,7 @@ export default function Admin({ dark }: { dark: boolean }) {
     if (error) setRefDataError(true)
   }
 
+  // Reloads every lesson.
   async function fetchLessons() {
     invalidateLessonsCache()
     const { data, error } = await fetchAllRows(() => supabase.from('lessons').select('*').order('created_at').order('id'))
@@ -77,6 +85,7 @@ export default function Admin({ dark }: { dark: boolean }) {
     if (error) setRefDataError(true)
   }
 
+  // Reloads modules, subjects and lessons together.
   async function refreshStructure() {
     setRefDataError(false)
     await Promise.all([fetchModules(), fetchSubjects(), fetchLessons()])
@@ -175,6 +184,7 @@ export default function Admin({ dark }: { dark: boolean }) {
         )}
 
         {activeTab === 'questions' && <QuestionsTab dark={dark} modules={modules} context={context} />}
+        {activeTab === 'flashcards' && <FlashcardsTab dark={dark} modules={modules} lessons={lessons} context={context} />}
         {activeTab === 'files' && <FilesTab dark={dark} modules={modules} context={context} />}
         {activeTab === 'summaries' && <SummariesTab dark={dark} modules={modules} subjects={subjects} context={context} />}
         {activeTab === 'schedules' && <SchedulesTab dark={dark} modules={modules} context={context} />}

@@ -23,7 +23,8 @@ import { useHistoryOverlay } from '@/shared/hooks/useHistoryOverlay'
 import { getPreviewUrl } from '@/shared/utils/embedUrl'
 import { ModuleIcon, ExamIcon, NotesIcon } from '@/shared/icons/medicalIcons'
 import { ExamStageIcon, SmartSummariesIcon, PracticeIcon, TargetIcon } from '@/shared/icons/tool-icons'
-import { MCQ_ACCENT } from '@/shared/theme/accents'
+import { FlashcardIcon } from '@/shared/icons/FlashcardIcon'
+import { MCQ_ACCENT, FLASHCARD_ACCENT } from '@/shared/theme/accents'
 import { countLabel } from '@/shared/utils/format'
 
 interface PageModule {
@@ -33,9 +34,10 @@ interface PageSubject { id: string; module_id: string; name: string; icon?: stri
 interface PageLesson { id: string; title: string; icon?: string | null; subject_id: string }
 interface ModuleSummary { id: string; title: string; url: string; exam_stage?: string | null; lesson_id?: string | null }
 interface ExamStage { value: string; title: string; emoji?: string; Icon?: (p: { color: string; size?: number }) => JSX.Element; color: string }
-interface ContentFacet { kind: 'file' | 'question' | 'summary'; item_type: string | null; exam_stage: string | null; lesson_id: string | null }
+interface ContentFacet { kind: 'file' | 'question' | 'summary' | 'flashcard'; item_type: string | null; exam_stage: string | null; lesson_id: string | null }
 interface SimulatorRow { stage: string; subject_id: string; question_count: number }
 
+// Module page: stage tabs, study by lesson, materials, simulator, summaries, flashcards and practice.
 export default function ModulePage({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const { moduleId } = useParams()
@@ -164,6 +166,8 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   const presentFileTypes = new Set(stageFacets.filter(r => r.kind === 'file').map(r => r.item_type as string))
   const hasQuestions = stageFacets.some(r => r.kind === 'question')
   const lessonQuestionIds = new Set(stageFacets.filter(r => r.kind === 'question' && r.lesson_id).map(r => r.lesson_id as string))
+  const lessonFlashcardIds = new Set(stageFacets.filter(r => r.kind === 'flashcard' && r.lesson_id).map(r => r.lesson_id as string))
+  const hasFlashcards = lessonFlashcardIds.size > 0
 
   const lessonSummaries: Record<string, ModuleSummary[]> = {}
   const stageLessonIds = new Set<string>()
@@ -178,6 +182,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   const meta = stageActive ? stageMetaFrom(examStages, activeStage) : null
   const stageName = meta ? meta.title : 'this module'
 
+  // Switches the exam stage by updating the URL query.
   function selectStage(value: string | null) {
     setSearchParams(prev => {
       const next = new URLSearchParams(prev)
@@ -187,15 +192,22 @@ export default function ModulePage({ dark }: { dark: boolean }) {
     }, { replace: true })
   }
 
+  // Opens the summary list, or the only summary of the stage directly.
   function openSummaries() {
     if (contentLoaded && stageSummaries.length === 0) { showToast(`No summaries added for ${stageName} yet`); return }
     if (stageActive && stageSummaries.length === 1) { setSelectedSummary(stageSummaries[0]); return }
     navigate(`/summaries?module=${moduleId}${stageActive ? `&stage=${activeStage}` : ''}`)
   }
+  // Opens the MCQ bank for this module and stage.
   function openPractice() {
     if (contentLoaded && !hasQuestions) { showToast(`No questions added for ${stageName} yet`); return }
     navigate(`/mcq?module=${moduleId}${stageActive ? `&stage=${activeStage}` : ''}`)
   }
+  // Opens the flashcards lesson list for this module and stage.
+  function openFlashcards() {
+    navigate(`/flashcards?module=${moduleId}${stageActive ? `&stage=${activeStage}` : ''}`)
+  }
+  // Starts the exam simulator of the active stage.
   function openSimulator() {
     navigate(`/mcq?module=${moduleId}&stage=${activeStage}&simulator=1`)
   }
@@ -243,6 +255,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
             subjects={subjects}
             lessons={visibleLessons}
             lessonQuestionIds={lessonQuestionIds}
+            lessonFlashcardIds={lessonFlashcardIds}
             lessonSummaries={lessonSummaries}
             onOpenSummary={setSelectedSummary}
           />
@@ -293,7 +306,13 @@ export default function ModulePage({ dark }: { dark: boolean }) {
         </div>
       )}
 
-      <div className="summary-practice-row" style={{ marginBottom: 32 }}>
+      <style>{`
+        .module-actions-row { display: grid; grid-template-columns: 1fr; gap: 20px; align-items: start; }
+        @media (min-width: 768px) {
+          .module-actions-row { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); grid-template-columns: none; }
+        }
+      `}</style>
+      <div className="module-actions-row" style={{ marginBottom: 32 }}>
         <div>
           <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
             <SmartSummariesIcon color={ON_GRADIENT_TOP.muted} size={14} /> Smart Summaries
@@ -312,6 +331,23 @@ export default function ModulePage({ dark }: { dark: boolean }) {
             </div>
           </LiquidGlassCard>
         </div>
+
+        {contentLoaded && hasFlashcards && (
+          <div>
+            <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <FlashcardIcon color={ON_GRADIENT_TOP.muted} size={14} /> Flashcards
+            </h2>
+            <LiquidGlassCard dark={dark} delay={0} onClick={openFlashcards} style={{ padding: 24, textAlign: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+                <FlashcardIcon color={FLASHCARD_ACCENT} size={30} />
+              </div>
+              <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>Flashcards</div>
+              <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>
+                {stageActive ? `Review ${stageName} cards` : 'Review with spaced repetition'}
+              </div>
+            </LiquidGlassCard>
+          </div>
+        )}
 
         <div>
           <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>

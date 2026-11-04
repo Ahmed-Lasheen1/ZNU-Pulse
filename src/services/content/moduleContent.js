@@ -9,8 +9,9 @@ const ANSWER_KEYS = 'answer-keys:'
 const SUMMARIES = 'summaries:'
 const FACETS = 'facets:'
 const FILES = 'files:'
+const FLASHCARDS = 'flashcards:'
 export const SIMULATOR_KEY = 'simulator:'
-const KEY_PREFIXES = [QUESTIONS, ANSWER_KEYS, SUMMARIES, FACETS, FILES, SIMULATOR_KEY]
+const KEY_PREFIXES = [QUESTIONS, ANSWER_KEYS, SUMMARIES, FACETS, FILES, FLASHCARDS, SIMULATOR_KEY]
 
 const QUESTION_COLUMNS = 'id, question, option_a, option_b, option_c, option_d, exam_type, exam_stage, module_id, subject_id, lesson_id, source, created_at'
 
@@ -21,6 +22,20 @@ export function fetchModuleQuestions(moduleId, onUpdate) {
     () => fetchAllRows(() => supabase
       .from('questions_public')
       .select(QUESTION_COLUMNS)
+      .eq('module_id', moduleId)
+      .order('created_at')
+      .order('id')),
+    { ttl: 30 * MINUTE, onUpdate, versioned: true }
+  )
+}
+
+// Loads a module's flashcards, cached for 30 minutes and refreshed when the module changes.
+export function fetchModuleFlashcards(moduleId, onUpdate) {
+  return cachedQuery(
+    `${FLASHCARDS}${moduleId}`,
+    () => fetchAllRows(() => supabase
+      .from('flashcards')
+      .select('id, lesson_id, front, back, created_at')
       .eq('module_id', moduleId)
       .order('created_at')
       .order('id')),

@@ -4,10 +4,11 @@ import { ChevronDown } from 'lucide-react'
 import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
 import { ModuleIcon, NotesIcon, ExamIcon } from '@/shared/icons/medicalIcons'
 import { StudyByLessonIcon, BookIcon } from '@/shared/icons/tool-icons'
+import { FlashcardIcon } from '@/shared/icons/FlashcardIcon'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import { glassHoverTint } from '@/shared/theme/liquidGlass'
-import { MCQ_ACCENT } from '@/shared/theme/accents'
+import { MCQ_ACCENT, FLASHCARD_ACCENT } from '@/shared/theme/accents'
 
 interface AccordionSubject {
   id: string
@@ -34,10 +35,12 @@ interface StudyByLessonSectionProps {
   subjects: AccordionSubject[]
   lessons: AccordionLesson[]
   lessonQuestionIds: Set<string>
+  lessonFlashcardIds: Set<string>
   lessonSummaries: Record<string, AccordionSummary[]>
   onOpenSummary: (summary: AccordionSummary) => void
 }
 
+// Style of the small colored action buttons on a lesson row.
 function pillBtn(color: string): CSSProperties {
   return {
     display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -48,9 +51,9 @@ function pillBtn(color: string): CSSProperties {
 }
 
 // Subject accordion — expands in place to lesson rows with inline
-// Summary/Practice actions, replacing the old Subject/Lesson pages.
+// Summary/Flashcards/Practice actions, replacing the old Subject/Lesson pages.
 export default function StudyByLessonSection({
-  dark, moduleId, stage, subjects, lessons, lessonQuestionIds, lessonSummaries, onOpenSummary
+  dark, moduleId, stage, subjects, lessons, lessonQuestionIds, lessonFlashcardIds, lessonSummaries, onOpenSummary
 }: StudyByLessonSectionProps) {
   const pt = getPulseTheme(dark)
   const navigate = useNavigate()
@@ -67,12 +70,19 @@ export default function StudyByLessonSection({
 
   if (bySubject.length === 0) return null
 
+  // Opens practice questions of one lesson.
   function practiceLesson(lessonId: string) {
     navigate(`/mcq?module=${moduleId}&lesson=${lessonId}${stageQuery}`)
   }
+  // Opens practice questions of one subject.
   function practiceSubject(subjectId: string) {
     navigate(`/mcq?module=${moduleId}&subject=${subjectId}${stageQuery}`)
   }
+  // Opens the flashcards study session of one lesson.
+  function studyFlashcards(lessonId: string) {
+    navigate(`/flashcards?module=${moduleId}&lesson=${lessonId}`)
+  }
+  // Opens the lesson's only summary, or toggles the picker when it has several.
   function handleSummary(lessonId: string, list: AccordionSummary[]) {
     if (list.length === 1) { onOpenSummary(list[0]); return }
     setOpenPickerLessonId(prev => prev === lessonId ? null : lessonId)
@@ -90,7 +100,7 @@ export default function StudyByLessonSection({
         .study-lesson-actions { display: flex; gap: 6px; flex-shrink: 0; }
         @media (max-width: 480px) {
           .study-lesson-main { min-width: 100%; }
-          .study-lesson-actions { min-width: 100%; justify-content: center; }
+          .study-lesson-actions { min-width: 100%; justify-content: center; flex-wrap: wrap; }
         }
       `}</style>
 
@@ -143,6 +153,7 @@ export default function StudyByLessonSection({
                     {lessonsForSub.map(lesson => {
                       const summaries = lessonSummaries[lesson.id] || []
                       const hasQuestions = lessonQuestionIds.has(lesson.id)
+                      const hasFlashcards = lessonFlashcardIds.has(lesson.id)
                       const pickerOpen = openPickerLessonId === lesson.id
                       return (
                         <div key={lesson.id}>
@@ -160,12 +171,17 @@ export default function StudyByLessonSection({
                                     <NotesIcon color={pt.success} size={12} /> Summary
                                   </button>
                                 )}
+                                {hasFlashcards && (
+                                  <button onClick={() => studyFlashcards(lesson.id)} style={pillBtn(FLASHCARD_ACCENT)}>
+                                    <FlashcardIcon color={FLASHCARD_ACCENT} size={12} /> Flashcards
+                                  </button>
+                                )}
                                 {hasQuestions && (
                                   <button onClick={() => practiceLesson(lesson.id)} style={pillBtn(MCQ_ACCENT)}>
                                     <ExamIcon color={MCQ_ACCENT} size={12} /> Practice
                                   </button>
                                 )}
-                                {!hasQuestions && summaries.length === 0 && (
+                                {!hasQuestions && !hasFlashcards && summaries.length === 0 && (
                                   <span style={{ color: pt.faint, fontSize: 11 }}>No content yet</span>
                                 )}
                               </div>

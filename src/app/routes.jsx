@@ -9,6 +9,7 @@ const pageLoaders = {
   Schedule: () => import('@/features/tools/schedule/Schedule'),
   FilesPage: () => import('@/features/study/files/FilesPage'),
   MCQ: () => import('@/features/practice/mcq/MCQ'),
+  Flashcards: () => import('@/features/practice/flashcards/Flashcards'),
   Review: () => import('@/features/practice/review/Review'),
   Summaries: () => import('@/features/study/summaries/Summaries'),
   ModulePage: () => import('@/features/study/module/ModulePage'),
@@ -24,11 +25,13 @@ const Pages = Object.fromEntries(Object.entries(pageLoaders).map(([name, load]) 
 
 const Admin = lazy(() => import('@/features/admin/Admin'))
 
+// Preloads every page in the background so navigation feels instant.
 export function prefetchPages() {
   if (navigator.connection?.saveData) return
   Object.values(pageLoaders).forEach(load => load().catch(() => {}))
 }
 
+// Placeholder shown while a lazy page is loading.
 function PageLoader({ dark }) {
   const pt = getPulseTheme(dark)
   return (
@@ -40,6 +43,7 @@ function PageLoader({ dark }) {
   )
 }
 
+// Redirects an old stage URL to the module page with the stage in the query.
 function StageRedirect() {
   const { moduleId, stage } = useParams()
   return <Navigate to={`/module/${moduleId}?stage=${encodeURIComponent(stage)}`} replace />
@@ -51,6 +55,7 @@ function PulseCheckRedirect() {
   return <Navigate to={`/pulse-check${search}`} replace />
 }
 
+// All routed pages inside the error boundary and suspense fallback.
 export function RoutedContent({ dark }) {
   const location = useLocation()
   return (
@@ -66,6 +71,7 @@ export function RoutedContent({ dark }) {
           <Route path="/summaries" element={<Pages.Summaries dark={dark} />} />
           <Route path="/admin" element={<Admin dark={dark} />} />
           <Route path="/mcq" element={<Pages.MCQ dark={dark} />} />
+          <Route path="/flashcards" element={<Pages.Flashcards dark={dark} />} />
           <Route path="/review" element={<Pages.Review dark={dark} />} />
           <Route path="/auth" element={<Pages.Auth dark={dark} />} />
           <Route path="/reset-password" element={<Pages.ResetPassword dark={dark} />} />

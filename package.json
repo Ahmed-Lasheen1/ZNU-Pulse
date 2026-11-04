@@ -19,7 +19,8 @@
     "canvas-confetti": "^1.9.0",
     "clsx": "^2.1.0",
     "framer-motion": "^11.0.0",
-    "tailwind-merge": "^2.2.0"
+    "tailwind-merge": "^2.2.0",
+    "ts-fsrs": "^5.4.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
