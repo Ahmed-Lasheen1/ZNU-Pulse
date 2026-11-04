@@ -19,7 +19,7 @@ import {
   buildSession, emptyCard, fromStored, isDue, newerProgress, reviewCard, toStored,
   type Answer, type ProgressMap,
 } from '@/services/flashcards/scheduler'
-import { FLASHCARD_ACCENT } from '@/shared/theme/accents'
+import { FLASHCARD_ACCENT, FLASHCARD_ACCENT_DEEP } from '@/shared/theme/accents'
 import FlashcardStudy from '@/features/practice/flashcards/FlashcardStudy'
 
 interface FlashcardModule { id: string; name: string; icon?: string | null; color: string; status: 'active' | 'completed' }
@@ -37,6 +37,7 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
   const { user } = useAuth() as { user: { id: string } | null }
   const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
   const userId = user?.id ?? null
+  const accent = dark ? FLASHCARD_ACCENT : FLASHCARD_ACCENT_DEEP
 
   const [cards, setCards] = useState<FlashcardRow[]>([])
   const [lessons, setLessons] = useState<FlashcardLesson[]>([])
@@ -48,7 +49,6 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
   const [session, setSession] = useState<Session | null>(null)
   const autoStartedRef = useRef(false)
 
-  // Loads the module's cards (cached), lessons and lesson stages.
   useEffect(() => {
     let ignore = false
     setLoading(true)
@@ -67,7 +67,7 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
     return () => { ignore = true }
   }, [mod.id])
 
-  // Loads saved progress from the device, then syncs with the server on open, reconnect, tab hide and leave.
+  // Loads progress from the device, then syncs on open, reconnect, tab hide and leave.
   useEffect(() => {
     let ignore = false
     setProgressLoaded(false)
@@ -77,13 +77,11 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
       setProgressLoaded(true)
     })
 
-    // Uploads pending reviews and applies newer server progress.
     function pull() {
       syncProgress(userId, mod.id).then(merged => {
         if (!ignore && merged) setProgress(prev => newerProgress(prev, merged))
       })
     }
-    // Uploads pending reviews when the tab is hidden.
     function onHidden() {
       if (document.visibilityState === 'hidden') syncProgress(userId, mod.id)
     }
@@ -127,7 +125,6 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
     saveReview(userId, mod.id, cardId, next)
   }
 
-  // Uploads reviews made in the session.
   function pushProgress() {
     syncProgress(userId, mod.id).then(merged => { if (merged) setProgress(prev => newerProgress(prev, merged)) })
   }
@@ -137,7 +134,6 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
       <FlashcardStudy
         key={`${session.lessonId}-${session.run}`}
         dark={dark}
-        accent={FLASHCARD_ACCENT}
         title={session.title}
         queue={session.queue}
         onRate={rate}
@@ -193,10 +189,10 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
           >
             <div style={{
               width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-              background: `${FLASHCARD_ACCENT}20`, border: `1px solid ${FLASHCARD_ACCENT}40`,
+              background: `${accent}20`, border: `1px solid ${accent}55`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <FlashcardIcon color={FLASHCARD_ACCENT} size={20} />
+              <FlashcardIcon color={accent} size={20} />
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{
@@ -207,8 +203,8 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
               <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2 }}>{total} card{total === 1 ? '' : 's'}</div>
             </div>
             <div style={{
-              background: toStudy > 0 ? FLASHCARD_ACCENT : 'transparent',
-              color: toStudy > 0 ? '#0f172a' : pt.textMuted,
+              background: toStudy > 0 ? FLASHCARD_ACCENT_DEEP : 'transparent',
+              color: toStudy > 0 ? '#fff' : pt.textMuted,
               border: toStudy > 0 ? 'none' : `1px solid ${pt.border}`,
               borderRadius: 999, padding: '6px 14px', fontSize: 12, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap',
             }}>{toStudy > 0 ? `${toStudy} to study` : '✓ Caught up'}</div>

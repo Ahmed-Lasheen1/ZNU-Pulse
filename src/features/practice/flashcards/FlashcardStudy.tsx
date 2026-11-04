@@ -1,9 +1,12 @@
-import { useState, useEffect, useRef } from 'react'
-import { getPulseTheme, pulseFonts, pulseType } from '@/shared/theme/premiumTheme'
+import { useState, useEffect, useRef, type CSSProperties } from 'react'
+import { motion } from 'framer-motion'
+import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import AutoDirText from '@/shared/ui/display/AutoDirText'
 import { wrapText } from '@/shared/utils/textStyles'
-import { CheckCircleIcon } from '@/shared/icons/tool-icons'
+import { CheckCircleIcon, RefreshIcon } from '@/shared/icons/tool-icons'
+import { usePrefersReducedMotion } from '@/shared/hooks/usePrefersReducedMotion'
+import { FLASHCARD_ACCENT, FLASHCARD_ACCENT_DEEP } from '@/shared/theme/accents'
 import type { Answer } from '@/services/flashcards/scheduler'
 
 export interface StudyCard {
@@ -14,7 +17,6 @@ export interface StudyCard {
 
 interface FlashcardStudyProps {
   dark: boolean
-  accent: string
   title: string
   queue: StudyCard[]
   onRate: (cardId: string, answer: Answer) => void
@@ -23,21 +25,26 @@ interface FlashcardStudyProps {
   onExit: () => void
 }
 
-// Runs one study session: shows a card, reveals the answer, and records "Again" or "Got it".
-export default function FlashcardStudy({ dark, accent, title, queue: initialQueue, onRate, onFinish, onMore, onExit }: FlashcardStudyProps) {
+const AGAIN_COLOR = '#DC2626'
+
+// One study session: a flippable card, then "Again" or "Got it".
+export default function FlashcardStudy({ dark, title, queue: initialQueue, onRate, onFinish, onMore, onExit }: FlashcardStudyProps) {
   const pt = getPulseTheme(dark)
+  const reduced = usePrefersReducedMotion()
   const [queue, setQueue] = useState(initialQueue)
   const [flipped, setFlipped] = useState(false)
   const [mastered, setMastered] = useState(0)
+  const [turn, setTurn] = useState(0)
   const finishedRef = useRef(false)
   const total = initialQueue.length
   const current = queue[0] ?? null
 
-  // Records the answer; "Again" sends the card to the back of the queue, "Got it" removes it.
+  // "Again" sends the card to the back of the queue, "Got it" removes it.
   function answer(result: Answer) {
     if (!current || !flipped) return
     onRate(current.id, result)
     setFlipped(false)
+    setTurn(t => t + 1)
     setQueue(prev => (result === 'again' ? [...prev.slice(1), prev[0]] : prev.slice(1)))
     if (result === 'good') setMastered(n => n + 1)
   }
@@ -45,9 +52,8 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
   const answerRef = useRef(answer)
   answerRef.current = answer
   const flipRef = useRef(() => {})
-  flipRef.current = () => { if (current && !flipped) setFlipped(true) }
+  flipRef.current = () => { if (current) setFlipped(f => !f) }
 
-  // Tells the page once when the queue is empty so it can upload progress.
   useEffect(() => {
     if (queue.length === 0 && !finishedRef.current) {
       finishedRef.current = true
@@ -56,9 +62,8 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queue.length])
 
-  // Keyboard shortcuts: Space/Enter reveals, 1 = Again, 2 = Got it.
+  // Space/Enter flips, 1 = Again, 2 = Got it.
   useEffect(() => {
-    // Handles one key press while studying.
     function onKeyDown(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON') return
@@ -70,52 +75,143 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  const textStyle = { ...pulseType.cardTitle, fontSize: 20, lineHeight: 1.55, color: pt.textPrimary, ...wrapText }
-  const pill = (background: string, color: string, border = 'none') => ({
-    flex: 1, padding: '14px', borderRadius: 999, background, color, border,
+  const accent = dark ? FLASHCARD_ACCENT : FLASHCARD_ACCENT_DEEP
+  const frontBg = dark ? pt.surfaceRaised : '#FFFFFF'
+  const backBg = dark ? '#123D3C' : '#F0FDFA'
+  const edge = dark ? 'rgba(255,255,255,0.14)' : 'rgba(6,43,80,0.12)'
+  const stackLayers = Math.max(0, Math.min(2, queue.length - 1))
+
+  const textStyle: CSSProperties = {
+    ...pulseType.cardTitle,
+    fontSize: 'clamp(19px, 4.4vw, 26px)',
+    fontWeight: 600,
+    lineHeight: 1.5,
+    textAlign: 'center',
+    color: pt.textPrimary,
+    ...wrapText,
+  }
+
+  const faceLabel: CSSProperties = {
+    ...pulseType.sectionLabel,
+    color: accent,
+    textAlign: 'center',
+    marginBottom: 14,
+  }
+
+  const pill = (background: string): CSSProperties => ({
+    flex: 1, padding: '15px', borderRadius: 999, background, color: '#fff',
+    border: '1.5px solid rgba(255,255,255,0.85)', boxShadow: '0 8px 22px rgba(1,12,74,0.35)',
     fontWeight: 800, fontSize: 14, fontFamily: pulseFonts.body, cursor: 'pointer',
-  } as const)
+  })
+
+  const quietPill: CSSProperties = {
+    flex: 1, padding: '14px', borderRadius: 999, background: 'transparent', color: pt.sub,
+    border: `1px solid ${pt.border}`, fontWeight: 800, fontSize: 14, fontFamily: pulseFonts.body, cursor: 'pointer',
+  }
 
   return (
     <div>
+      <style>{`
+        .fc-scene {
+          position: relative; height: clamp(300px, 52vh, 500px); perspective: 1400px;
+          border-radius: 24px; cursor: pointer; box-shadow: 0 18px 40px rgba(1,12,74,0.35);
+        }
+        .fc-scene:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+        .fc-inner {
+          position: relative; width: 100%; height: 100%; transform-style: preserve-3d;
+          transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+        }
+        .fc-inner.fc-flipped { transform: rotateY(180deg); }
+        .fc-face {
+          position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden;
+          border-radius: 24px; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+        }
+        .fc-back { transform: rotateY(180deg); }
+        .fc-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; padding: 24px 24px 8px; }
+        .fc-center { margin: auto 0; width: 100%; }
+        .fc-kbd { display: none; }
+        @media (hover: hover) and (pointer: fine) { .fc-kbd { display: block; } }
+        @media (prefers-reduced-motion: reduce) { .fc-inner { transition: none; } }
+      `}</style>
+
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
-        <div style={{ ...pulseType.sectionLabel, color: accent, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
+        <div style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.primary, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
         <button onClick={onExit} style={{
-          background: 'transparent', border: `1px solid ${pt.border}`, color: pt.sub, borderRadius: 999,
-          padding: '6px 14px', cursor: 'pointer', fontWeight: 700, fontSize: 12, fontFamily: pulseFonts.body, flexShrink: 0,
+          background: 'rgba(1,12,74,0.45)', border: '1px solid rgba(255,255,255,0.35)', color: '#fff', borderRadius: 999,
+          padding: '7px 16px', cursor: 'pointer', fontWeight: 700, fontSize: 12, fontFamily: pulseFonts.body, flexShrink: 0,
         }}>✕ Exit</button>
       </div>
 
-      <div style={{ height: 5, borderRadius: 999, overflow: 'hidden', background: dark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.10)', marginBottom: 6 }}>
-        <div style={{ height: '100%', width: `${total > 0 ? (mastered / total) * 100 : 0}%`, background: accent, borderRadius: 999, transition: 'width 0.3s ease' }} />
+      <div style={{ height: 6, borderRadius: 999, overflow: 'hidden', background: 'rgba(1,12,74,0.18)', marginBottom: 6 }}>
+        <div style={{ height: '100%', width: `${total > 0 ? (mastered / total) * 100 : 0}%`, background: FLASHCARD_ACCENT_DEEP, borderRadius: 999, transition: 'width 0.3s ease' }} />
       </div>
-      <div style={{ ...pulseType.small, color: pt.textMuted, textAlign: 'right', marginBottom: 14 }}>{queue.length} left</div>
+      <div style={{ ...pulseType.small, color: ON_GRADIENT_TOP.secondary, textAlign: 'right', marginBottom: 18 }}>{queue.length} left</div>
 
       {current ? (
         <>
-          <div onClick={() => { if (!flipped) setFlipped(true) }}>
-            <LiquidGlassCard dark={dark} delay={0} style={{ padding: 'clamp(22px, 4vw, 36px)', minHeight: 'clamp(240px, 42vh, 420px)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <AutoDirText text={current.front} style={textStyle} />
-              {flipped && (
-                <div style={{ marginTop: 22, paddingTop: 22, borderTop: `1px solid ${pt.border}` }}>
-                  <AutoDirText text={current.back} style={{ ...textStyle, color: accent }} />
+          <div style={{ position: 'relative', marginBottom: 22 }}>
+            {Array.from({ length: stackLayers }, (_, i) => {
+              const level = i + 1
+              return (
+                <div key={level} aria-hidden style={{
+                  position: 'absolute', inset: 0, borderRadius: 24, background: frontBg, border: `1px solid ${edge}`,
+                  transform: `translateY(${level * 14}px) scale(${1 - level * 0.045})`,
+                  opacity: 1 - level * 0.25, zIndex: 0,
+                }} />
+              )
+            })}
+
+            <motion.div
+              key={turn}
+              initial={reduced ? false : { opacity: 0, y: 16, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.28, ease: 'easeOut' }}
+              style={{ position: 'relative', zIndex: 1 }}
+            >
+              <div
+                className="fc-scene"
+                role="button"
+                tabIndex={0}
+                aria-label={flipped ? 'Flip back to the question' : 'Show the answer'}
+                onClick={() => setFlipped(f => !f)}
+              >
+                <div className={`fc-inner${flipped ? ' fc-flipped' : ''}`}>
+                  <div className="fc-face" aria-hidden={flipped} style={{ background: frontBg, border: `1px solid ${edge}` }}>
+                    <div style={{ height: 6, background: `${accent}55`, flexShrink: 0 }} />
+                    <div className="fc-body">
+                      <div style={faceLabel}>Question</div>
+                      <div className="fc-center"><AutoDirText text={current.front} style={textStyle} /></div>
+                    </div>
+                    <div style={{ ...pulseType.small, color: pt.textMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0 16px', flexShrink: 0 }}>
+                      <RefreshIcon color={pt.textMuted} size={13} /> Tap to flip
+                    </div>
+                  </div>
+
+                  <div className="fc-face fc-back" aria-hidden={!flipped} style={{ background: backBg, border: `1px solid ${edge}` }}>
+                    <div style={{ height: 6, background: accent, flexShrink: 0 }} />
+                    <div className="fc-body">
+                      <div style={faceLabel}>Answer</div>
+                      <div className="fc-center"><AutoDirText text={current.back} style={textStyle} /></div>
+                    </div>
+                    <div style={{ height: 16, flexShrink: 0 }} />
+                  </div>
                 </div>
-              )}
-            </LiquidGlassCard>
+              </div>
+            </motion.div>
           </div>
 
-          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+          <div style={{ display: 'flex', gap: 10 }}>
             {!flipped ? (
-              <button onClick={() => setFlipped(true)} style={pill(accent, '#0f172a')}>Show answer</button>
+              <button onClick={() => setFlipped(true)} style={pill(FLASHCARD_ACCENT_DEEP)}>Show answer</button>
             ) : (
               <>
-                <button onClick={() => answer('again')} style={pill('transparent', pt.danger, `1.5px solid ${pt.danger}`)}>Again</button>
-                <button onClick={() => answer('good')} style={pill(accent, '#0f172a')}>Got it</button>
+                <button onClick={() => answer('again')} style={pill(AGAIN_COLOR)}>Again</button>
+                <button onClick={() => answer('good')} style={pill(FLASHCARD_ACCENT_DEEP)}>Got it</button>
               </>
             )}
           </div>
-          <div className="kbd-hint" style={{ ...pulseType.small, color: pt.textMuted, textAlign: 'center', marginTop: 10 }}>
-            Space to reveal · 1 Again · 2 Got it
+          <div className="fc-kbd" style={{ ...pulseType.small, color: ON_GRADIENT_TOP.secondary, textAlign: 'center', marginTop: 12 }}>
+            Space to flip · 1 Again · 2 Got it
           </div>
         </>
       ) : (
@@ -126,8 +222,8 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
           <div style={{ ...pulseType.sectionTitle, color: pt.textPrimary, marginBottom: 4 }}>Session complete</div>
           <div style={{ ...pulseType.small, color: pt.textMuted, marginBottom: 20 }}>{total} card{total === 1 ? '' : 's'} reviewed</div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={onExit} style={pill('transparent', pt.sub, `1px solid ${pt.border}`)}>Done</button>
-            <button onClick={onMore} style={pill(accent, '#0f172a')}>Study more</button>
+            <button onClick={onExit} style={quietPill}>Done</button>
+            <button onClick={onMore} style={pill(FLASHCARD_ACCENT_DEEP)}>Study more</button>
           </div>
         </LiquidGlassCard>
       )}
