@@ -15,7 +15,14 @@ export type ProgressMap = Record<string, StoredProgress>
 // Most cards a single study session contains.
 export const SESSION_SIZE = 20
 
-const scheduler = fsrs(generatorParameters({ enable_fuzz: true }))
+// Most never-studied cards introduced per lesson per day.
+export const NEW_CARDS_PER_DAY = 20
+
+// Most cards a "review anyway" practice session contains.
+export const PRACTICE_SIZE = 50
+
+// Short-term steps are off: with only Again/Good buttons, "Got it" should schedule a real day-based interval.
+const scheduler = fsrs(generatorParameters({ enable_fuzz: true, enable_short_term: false }))
 
 // Creates the scheduler state of a card that was never studied.
 export function emptyCard(now: Date): Card {
@@ -61,11 +68,23 @@ export function newerProgress(a: ProgressMap, b: ProgressMap): ProgressMap {
   return merged
 }
 
-// Picks the cards for one session: due cards first (oldest due first), then new cards.
-export function buildSession<T extends { id: string }>(cards: T[], progress: ProgressMap, now: Date, size = SESSION_SIZE): T[] {
+// Picks the cards for one session: due cards first (oldest due first), then at most `newLimit` new cards.
+export function buildSession<T extends { id: string }>(
+  cards: T[], progress: ProgressMap, now: Date, size = SESSION_SIZE, newLimit = Infinity
+): T[] {
   const due = cards
     .filter(card => progress[card.id] && isDue(progress[card.id], now))
     .sort((a, b) => Date.parse(progress[a.id].due) - Date.parse(progress[b.id].due))
-  const fresh = cards.filter(card => !progress[card.id])
+  const fresh = cards.filter(card => !progress[card.id]).slice(0, Math.max(0, newLimit))
   return [...due, ...fresh].slice(0, size)
+}
+
+// Picks a random set of cards for "review anyway" practice, ignoring the schedule.
+export function buildPracticeSession<T>(cards: T[], size = PRACTICE_SIZE): T[] {
+  const pool = [...cards]
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[pool[i], pool[j]] = [pool[j], pool[i]]
+  }
+  return pool.slice(0, size)
 }

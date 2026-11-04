@@ -4,6 +4,7 @@ import {
   getGuestHistory, clearGuestHistory, setGuestHistory,
 } from '@/services/history/reviewStorage'
 import { removeFullAttempts } from '@/services/history/fullHistory'
+import { migrateGuestFlashcards } from '@/services/flashcards/progress'
 
 const inFlight = new Map()
 const CLEANUP_TIMEOUT_MS = 5000
@@ -98,15 +99,15 @@ async function migrateHistory() {
   }
 }
 
-// After sign-in, moves this device's guest flags and history into the account.
+// After sign-in, moves this device's guest flags, history and flashcard progress into the account.
 export function migrateGuestDataIfNeeded(userId) {
   if (!userId) return Promise.resolve()
   if (inFlight.has(userId)) return inFlight.get(userId)
 
   const run = (async () => {
     try {
-      if (getGuestFlags().length === 0 && getGuestHistory().length === 0) return
-      await Promise.all([migrateFlags(userId), migrateHistory()])
+      // Each step returns quickly when there is nothing local to move.
+      await Promise.all([migrateFlags(userId), migrateHistory(), migrateGuestFlashcards(userId)])
     } catch (e) {
       console.warn('[migrateGuestData] Migration stopped, local data kept:', e)
     }

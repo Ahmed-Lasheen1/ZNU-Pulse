@@ -8,15 +8,17 @@ import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import EmptyState from '@/shared/ui/feedback/EmptyState'
 import { CardRowsSkeleton } from '@/shared/ui/feedback/Skeletons'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
+import { useHistoryOverlay } from '@/shared/hooks/useHistoryOverlay'
 import { ModuleIcon } from '@/shared/icons/medicalIcons'
 import { FlashcardIcon } from '@/shared/icons/FlashcardIcon'
 import { LightbulbIcon, EmptyBoxIcon } from '@/shared/icons/tool-icons'
 import { fetchModuleFlashcards } from '@/services/content/moduleContent'
 import { fetchLessonsForModule } from '@/services/content/lessons'
 import { fetchLessonStageMap, inStage } from '@/services/content/lessonStages'
-import { loadProgress, saveReview, syncProgress } from '@/services/flashcards/progress'
+import { loadProgress, loadIntroducedToday, saveReview, syncProgress } from '@/services/flashcards/progress'
 import {
-  buildSession, emptyCard, fromStored, isDue, newerProgress, reviewCard, toStored,
+  buildSession, buildPracticeSession, emptyCard, fromStored, isDue, newerProgress, reviewCard, toStored,
+  SESSION_SIZE, NEW_CARDS_PER_DAY,
   type Answer, type ProgressMap,
 } from '@/services/flashcards/scheduler'
 import { FLASHCARD_ACCENT, FLASHCARD_ACCENT_DEEP } from '@/shared/theme/accents'
@@ -25,7 +27,7 @@ import FlashcardStudy from '@/features/practice/flashcards/FlashcardStudy'
 interface FlashcardModule { id: string; name: string; icon?: string | null; color: string; status: 'active' | 'completed' }
 interface FlashcardRow { id: string; lesson_id: string; front: string; back: string; created_at: string }
 interface FlashcardLesson { id: string; title: string }
-interface Session { lessonId: string; title: string; queue: FlashcardRow[]; run: number }
+interface Session { lessonId: string; title: string; queue: FlashcardRow[]; run: number; practice: boolean }
 
 const PAGE_MAX_WIDTH = 900
 
@@ -43,11 +45,15 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
   const [lessons, setLessons] = useState<FlashcardLesson[]>([])
   const [lessonStageMap, setLessonStageMap] = useState<Record<string, string[]>>({})
   const [progress, setProgress] = useState<ProgressMap>({})
+  const [introduced, setIntroduced] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [progressLoaded, setProgressLoaded] = useState(false)
   const [loadError, setLoadError] = useState(false)
   const [session, setSession] = useState<Session | null>(null)
   const autoStartedRef = useRef(false)
+
+  // Hardware/browser Back (and the page's Back pill) closes an open session instead of leaving the page.
+  useHistoryOverlay(!!session, () => { setSession(null); pushProgress() })
 
   useEffect(() => {
     let ignore = false
@@ -71,9 +77,10 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
   useEffect(() => {
     let ignore = false
     setProgressLoaded(false)
-    loadProgress(userId, mod.id).then(local => {
+    Promise.all([loadProgress(userId, mod.id), loadIntroducedToday(userId, mod.id)]).then(([local, introducedToday]) => {
       if (ignore) return
       setProgress(prev => newerProgress(local, prev))
+      setIntroduced(introducedToday)
       setProgressLoaded(true)
     })
 
@@ -97,15 +104,39 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
     }
   }, [userId, mod.id])
 
-  // Builds a session for a lesson from its due and new cards.
-  function start(lessonId: string, run = 0) {
-    const queue = buildSession(cards.filter(c => c.lesson_id === lessonId), progress, new Date())
+  // How many more never-studied cards of a lesson may be introduced today.
+  function newAllowance(lessonId: string) {
+    const introducedHere = cards.filter(c => c.lesson_id === lessonId && introduced.includes(c.id)).length
+    return Math.max(0, NEW_CARDS_PER_DAY - introducedHere)
+  }
+
+  // Builds a session for a lesson: due cards plus today's new cards, or a schedule-free practice round.
+  function start(lessonId: string, run = 0, practice = false) {
+    const lessonCards = cards.filter(c => c.lesson_id === lessonId)
+    let queue = practice
+      ? buildPracticeSession(lessonCards)
+      : buildSession(lessonCards, progress, new Date(), SESSION_SIZE, newAllowance(lessonId))
+    let isPractice = practice
+
+    // Nothing due on a first open: offer every card instead of a dead end.
+    if (queue.length === 0 && !practice && run === 0 && lessonCards.length > 0) {
+      queue = buildPracticeSession(lessonCards)
+      isPractice = true
+      showToast("Nothing is due — reviewing all cards. This won't change your schedule.", 'info')
+    }
+
     if (queue.length === 0) {
-      showToast(run > 0 ? 'No more cards for now' : "You're all caught up on this lesson", 'info')
+      const newLeft = lessonCards.some(c => !progress[c.id])
+      showToast(
+        run > 0 && newLeft ? `Daily limit of ${NEW_CARDS_PER_DAY} new cards reached — come back tomorrow`
+          : run > 0 ? 'No more cards for now'
+          : 'No flashcards in this lesson yet',
+        'info'
+      )
       setSession(null)
       return
     }
-    setSession({ lessonId, title: lessons.find(l => l.id === lessonId)?.title || 'Flashcards', queue, run })
+    setSession({ lessonId, title: lessons.find(l => l.id === lessonId)?.title || 'Flashcards', queue, run, practice: isPractice })
   }
 
   // Opens the lesson from the link once cards and saved progress are ready.
@@ -116,15 +147,19 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, progressLoaded])
 
-  // Schedules the card from the answer and saves it on the device.
+  // Schedules the card from the answer and saves it on the device (practice rounds never change the schedule).
   function rate(cardId: string, answer: Answer) {
+    if (session?.practice) return
     const now = new Date()
     const saved = progress[cardId]
+    const wasNew = !saved
     const next = toStored(reviewCard(saved ? fromStored(saved) : emptyCard(now), answer, now), now)
     setProgress(prev => ({ ...prev, [cardId]: next }))
-    saveReview(userId, mod.id, cardId, next)
+    if (wasNew) setIntroduced(prev => (prev.includes(cardId) ? prev : [...prev, cardId]))
+    saveReview(userId, mod.id, cardId, next, wasNew)
   }
 
+  // Uploads pending reviews and merges newer server progress.
   function pushProgress() {
     syncProgress(userId, mod.id).then(merged => { if (merged) setProgress(prev => newerProgress(prev, merged)) })
   }
@@ -132,13 +167,14 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
   if (session) return (
     <PageShell dark={dark} backFallback={`/module/${mod.id}`} maxWidth={PAGE_MAX_WIDTH}>
       <FlashcardStudy
-        key={`${session.lessonId}-${session.run}`}
+        key={`${session.lessonId}-${session.run}-${session.practice ? 'p' : 's'}`}
         dark={dark}
         title={session.title}
+        practice={session.practice}
         queue={session.queue}
         onRate={rate}
         onFinish={pushProgress}
-        onMore={() => start(session.lessonId, session.run + 1)}
+        onMore={() => start(session.lessonId, session.run + 1, session.practice)}
         onExit={() => { setSession(null); pushProgress() }}
       />
     </PageShell>
@@ -149,7 +185,9 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
     .filter(l => cards.some(c => c.lesson_id === l.id) && inStage({ lesson_id: l.id }, stage, lessonStageMap))
     .map(lesson => {
       const lessonCards = cards.filter(c => c.lesson_id === lesson.id)
-      const toStudy = lessonCards.filter(c => !progress[c.id] || isDue(progress[c.id], now)).length
+      const dueCount = lessonCards.filter(c => progress[c.id] && isDue(progress[c.id], now)).length
+      const newCount = lessonCards.filter(c => !progress[c.id]).length
+      const toStudy = dueCount + Math.min(newCount, newAllowance(lesson.id))
       return { lesson, total: lessonCards.length, toStudy }
     })
 
@@ -169,7 +207,7 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
         <div style={{ marginBottom: 16 }}>
           <LiquidGlassCard dark={dark} delay={0} style={{ padding: '12px 18px', textAlign: 'center' }}>
             <span style={{ color: pt.cobalt, fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <LightbulbIcon color={pt.cobalt} size={14} /> Your progress is saved on this device only. Sign in to keep it across devices.
+              <LightbulbIcon color={pt.cobalt} size={14} /> Your progress is saved on this device. Sign in to keep it across devices.
             </span>
           </LiquidGlassCard>
         </div>
@@ -204,10 +242,10 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
             </div>
             <div style={{
               background: toStudy > 0 ? FLASHCARD_ACCENT_DEEP : 'transparent',
-              color: toStudy > 0 ? '#fff' : pt.textMuted,
-              border: toStudy > 0 ? 'none' : `1px solid ${pt.border}`,
+              color: toStudy > 0 ? '#fff' : accent,
+              border: toStudy > 0 ? 'none' : `1px solid ${accent}66`,
               borderRadius: 999, padding: '6px 14px', fontSize: 12, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap',
-            }}>{toStudy > 0 ? `${toStudy} to study` : '✓ Caught up'}</div>
+            }}>{toStudy > 0 ? `${toStudy} to study` : '✓ Review anyway'}</div>
           </LiquidGlassCard>
         ))}
       </div>

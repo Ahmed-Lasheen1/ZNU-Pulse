@@ -18,6 +18,8 @@ export interface StudyCard {
 interface FlashcardStudyProps {
   dark: boolean
   title: string
+  // True for a "review anyway" round, which never changes the schedule.
+  practice?: boolean
   queue: StudyCard[]
   onRate: (cardId: string, answer: Answer) => void
   onFinish: () => void
@@ -28,7 +30,7 @@ interface FlashcardStudyProps {
 const AGAIN_COLOR = '#DC2626'
 
 // One study session: a flippable card, then "Again" or "Got it".
-export default function FlashcardStudy({ dark, title, queue: initialQueue, onRate, onFinish, onMore, onExit }: FlashcardStudyProps) {
+export default function FlashcardStudy({ dark, title, practice = false, queue: initialQueue, onRate, onFinish, onMore, onExit }: FlashcardStudyProps) {
   const pt = getPulseTheme(dark)
   const reduced = usePrefersReducedMotion()
   const [queue, setQueue] = useState(initialQueue)
@@ -142,6 +144,12 @@ export default function FlashcardStudy({ dark, title, queue: initialQueue, onRat
         }}>✕ Exit</button>
       </div>
 
+      {practice && (
+        <div style={{ ...pulseType.small, color: ON_GRADIENT_TOP.secondary, textAlign: 'center', marginBottom: 12 }}>
+          Practice round — your review schedule won't change
+        </div>
+      )}
+
       <div style={{ height: 6, borderRadius: 999, overflow: 'hidden', background: 'rgba(1,12,74,0.18)', marginBottom: 6 }}>
         <div style={{ height: '100%', width: `${total > 0 ? (mastered / total) * 100 : 0}%`, background: FLASHCARD_ACCENT_DEEP, borderRadius: 999, transition: 'width 0.3s ease' }} />
       </div>
@@ -219,11 +227,13 @@ export default function FlashcardStudy({ dark, title, queue: initialQueue, onRat
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
             <CheckCircleIcon color={accent} size={40} />
           </div>
-          <div style={{ ...pulseType.sectionTitle, color: pt.textPrimary, marginBottom: 4 }}>Session complete</div>
+          <div style={{ ...pulseType.sectionTitle, color: pt.textPrimary, marginBottom: 4 }}>
+            {practice ? 'Practice complete' : 'Session complete'}
+          </div>
           <div style={{ ...pulseType.small, color: pt.textMuted, marginBottom: 20 }}>{total} card{total === 1 ? '' : 's'} reviewed</div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={onExit} style={quietPill}>Done</button>
-            <button onClick={onMore} style={pill(FLASHCARD_ACCENT_DEEP)}>Study more</button>
+            <button onClick={onMore} style={pill(FLASHCARD_ACCENT_DEEP)}>{practice ? 'Practice more' : 'Study more'}</button>
           </div>
         </LiquidGlassCard>
       )}
