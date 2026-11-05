@@ -49,16 +49,18 @@ const PILL_W = 'min(220px, calc(100vw - 48px))'
 const PANEL_OFFSET = 8
 const PANEL_PAD = 12
 
-// Where a pill starts (centred behind the toggle button) and how far apart the pills end up.
+// How far apart the pills end up, and where each starts: just above the clip line under the toggle button.
 const PILL_STEP = PILL_H + PILL_GAP
-const PILL_START = -(BUTTON_SIZE / 2 + PANEL_OFFSET + PILL_H / 2)
+const PILL_START = -(PILL_STEP + PILL_H)
 
-// Animation timings (ms), modelled on the lesson tools menu: pills slide out of the button in turn.
-const MOVE_MS = 300
-const FADE_MS = 200
-const OPEN_STAGGER_MS = 40
-const CLOSE_STAGGER_MS = 25
-const EASE = 'cubic-bezier(0.2, 0.9, 0.3, 1.25)'
+// Animation timings (ms). Pills slide out from under the button in turn and slide back in on close.
+const OPEN_MS = 320
+const OPEN_STAGGER_MS = 35
+const CLOSE_MS = 240
+const CLOSE_STAGGER_MS = 20
+const END_FADE_MS = 80
+const OPEN_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'
+const CLOSE_EASE = 'cubic-bezier(0.4, 0, 0.6, 1)'
 
 // Pills are almost opaque instead of blurred: backdrop-filter on ~10 pills is what makes phones lag.
 function pillTint(dark: boolean) {
@@ -70,15 +72,15 @@ function slot(index: number): CSSProperties {
   return { ['--i' as string]: index } as CSSProperties
 }
 
-// Base look shared by every pill: same width, same height, content centred.
+// Base look shared by every pill: same width, same height, content aligned to the left.
 function pillStyle(pt: PulseTheme): CSSProperties {
   return {
-    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+    display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 10,
     width: PILL_W, height: PILL_H, padding: '0 18px', margin: 0,
     border: 'none', borderRadius: 999, boxSizing: 'border-box',
     backgroundColor: 'var(--nav-pill-bg)', boxShadow: 'var(--nav-pill-shadow)',
     color: pt.text, fontFamily: 'inherit', fontSize: 14, fontWeight: 600,
-    whiteSpace: 'nowrap', textAlign: 'center',
+    whiteSpace: 'nowrap', textAlign: 'left',
   }
 }
 
@@ -88,7 +90,7 @@ interface NavSearchProps {
   onSubmit: (query: string) => void
 }
 
-// Search field that fills its pill: icon on the left, text centred between equal side padding.
+// Search field that fills its pill: icon on the left, text starting right after it.
 function NavSearch({ pt, tabIndex, onSubmit }: NavSearchProps) {
   const [value, setValue] = useState('')
 
@@ -100,7 +102,7 @@ function NavSearch({ pt, tabIndex, onSubmit }: NavSearchProps) {
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <SearchIcon size={16} color={pt.faint} style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+      <SearchIcon size={16} color={pt.faint} style={{ position: 'absolute', left: 18, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
       <input
         className="nav-search-input"
         value={value}
@@ -122,7 +124,7 @@ interface NavMenuProps {
   align?: Align
 }
 
-// Header menu: a toggle button and a column of equal pills that slide out from behind it.
+// Header menu: a toggle button and a column of equal pills that slide out from under it.
 export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuProps) {
   const [open, setOpen] = useState(false)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
@@ -216,18 +218,17 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
 
   const panelStyle: CSSProperties = {
     position: 'absolute',
-    top: BUTTON_SIZE + PANEL_OFFSET - PANEL_PAD,
+    top: BUTTON_SIZE,
     [cornerSide]: -PANEL_PAD,
     display: 'flex', flexDirection: 'column', gap: PILL_GAP,
     alignItems: cornerSide === 'right' ? 'flex-end' : 'flex-start',
-    padding: PANEL_PAD,
+    padding: `${PANEL_OFFSET}px ${PANEL_PAD}px ${PANEL_PAD}px`,
     maxWidth: '100vw',
     boxSizing: 'border-box',
     zIndex: 1999,
     fontFamily: pulseFonts.body,
     pointerEvents: open ? 'auto' : 'none',
     ['--count' as string]: pillCount,
-    ['--nav-side' as string]: cornerSide,
     ['--start' as string]: `${PILL_START}px`,
     ['--step' as string]: `${PILL_STEP}px`,
     ['--nav-pill-bg' as string]: pillTint(dark),
@@ -237,12 +238,22 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
   } as CSSProperties
 
   return (
-    <div ref={wrapperRef} style={{ position: 'relative', width: BUTTON_SIZE, height: BUTTON_SIZE }}>
+    // Taps inside the menu must not reach the background grid's window listener, which starts a full-screen ripple redraw.
+    <div
+      ref={wrapperRef}
+      onPointerDown={e => e.stopPropagation()}
+      style={{ position: 'relative', width: BUTTON_SIZE, height: BUTTON_SIZE }}
+    >
       <style>{`
-        .nav-panel { scrollbar-width: none; overscroll-behavior: contain; }
+        /* The top edge sits right under the toggle button: pills slide out from it and back behind it. */
+        .nav-panel {
+          clip-path: inset(0 -20px -20px -20px);
+          scrollbar-width: none;
+          overscroll-behavior: contain;
+        }
         .nav-panel::-webkit-scrollbar { display: none; }
 
-        /* Only short screens scroll; taller ones stay unclipped so pills can emerge from the button. */
+        /* Only short screens scroll. */
         @media (max-height: 720px) {
           .nav-panel {
             overflow-y: auto; overflow-x: hidden;
@@ -251,30 +262,30 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
           }
         }
 
-        /* Closed: hidden behind the toggle button, half size. Last pill leaves first. */
+        /* Closed: above the clip line, out of sight. Only position and opacity change (no scaling), so nothing is re-rasterized. */
         .nav-pill {
           --close-delay: calc((var(--count) - 1 - var(--i)) * ${CLOSE_STAGGER_MS}ms);
           flex-shrink: 0;
           z-index: calc(var(--count) - var(--i));
           opacity: 0;
           visibility: hidden;
-          transform: translateY(calc(var(--start) - var(--i) * var(--step))) scale(0.5);
-          transform-origin: top var(--nav-side);
+          will-change: transform, opacity;
+          transform: translateY(calc(var(--start) - var(--i) * var(--step)));
           transition:
-            transform ${MOVE_MS}ms ${EASE} var(--close-delay),
-            opacity ${FADE_MS}ms ease var(--close-delay),
-            visibility 0s linear calc(${MOVE_MS}ms + var(--close-delay));
+            transform ${CLOSE_MS}ms ${CLOSE_EASE} var(--close-delay),
+            opacity ${END_FADE_MS}ms linear calc(${CLOSE_MS - END_FADE_MS}ms + var(--close-delay)),
+            visibility 0s linear calc(${CLOSE_MS}ms + var(--close-delay));
         }
 
-        /* Open: each pill slides to its place in turn, first pill first. */
+        /* Open: each pill slides down to its place in turn, first pill first. */
         .nav-panel[data-open="true"] .nav-pill {
           --open-delay: calc(var(--i) * ${OPEN_STAGGER_MS}ms);
           opacity: 1;
           visibility: visible;
           transform: none;
           transition:
-            transform ${MOVE_MS}ms ${EASE} var(--open-delay),
-            opacity ${FADE_MS}ms ease var(--open-delay),
+            transform ${OPEN_MS}ms ${OPEN_EASE} var(--open-delay),
+            opacity 100ms linear var(--open-delay),
             visibility 0s linear 0s;
         }
 
@@ -289,9 +300,9 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
 
         .nav-search-input {
           display: block; width: 100%; height: 100%; margin: 0;
-          padding: 0 42px; border: none; border-radius: 999px; outline: none;
+          padding: 0 18px 0 44px; border: none; border-radius: 999px; outline: none;
           background: transparent; font-family: inherit; font-size: 16px; font-weight: 600;
-          line-height: normal; text-align: center;
+          line-height: normal; text-align: left;
           -webkit-appearance: none; appearance: none;
         }
         .nav-search-input::placeholder { color: var(--nav-placeholder); opacity: 1; }
@@ -322,7 +333,7 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
           <button
             type="button" className="nav-pill nav-pill-btn glass-focus-ring" tabIndex={tabIndex}
             onClick={() => goTo('/profile')}
-            style={{ ...pillStyle(pt), ...slot(0), flexDirection: 'column', gap: 2, cursor: 'pointer', lineHeight: 1.15 }}
+            style={{ ...pillStyle(pt), ...slot(0), flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 2, cursor: 'pointer', lineHeight: 1.15 }}
           >
             <span style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, maxWidth: '100%' }}>
               <UserIcon color={pt.text} size={13} />
@@ -366,7 +377,7 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
           )
         })}
 
-        <div className="nav-pill" style={{ ...pillStyle(pt), ...slot(themeSlot), padding: 0 }}>
+        <div className="nav-pill" style={{ ...pillStyle(pt), ...slot(themeSlot), justifyContent: 'center', padding: 0 }}>
           <ThemeSwitch dark={dark} onToggle={toggleTheme} scale={0.62} stretchX={1.3} />
         </div>
 
