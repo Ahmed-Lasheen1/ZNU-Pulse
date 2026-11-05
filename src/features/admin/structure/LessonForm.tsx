@@ -20,9 +20,12 @@ interface LessonFormProps {
   showMessage: (message: string) => void
   onSaved: () => void
   onDone: () => void
+  // Called with the lesson's id after it was created or updated successfully.
+  onLessonSaved?: (lessonId: string) => void
 }
 
-export default function LessonForm({ dark, lesson, module, subject, showMessage, onSaved, onDone }: LessonFormProps) {
+// Form for adding or editing a lesson, including its exam stages.
+export default function LessonForm({ dark, lesson, module, subject, showMessage, onSaved, onDone, onLessonSaved }: LessonFormProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
   const stageOptions = useStageOptions(module.id)
@@ -42,6 +45,7 @@ export default function LessonForm({ dark, lesson, module, subject, showMessage,
     return () => { ignore = true }
   }, [lessonId])
 
+  // Clears the form and tells the parent the edit is finished.
   function resetForm() {
     setTitle('')
     setIcon('')
@@ -49,10 +53,12 @@ export default function LessonForm({ dark, lesson, module, subject, showMessage,
     onDone()
   }
 
+  // Adds or removes an exam stage from the lesson being edited.
   function toggleStage(value: string) {
     setStages(prev => prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value])
   }
 
+  // Makes the lesson's saved stages match the selection (adds missing rows, removes unselected ones).
   async function syncLessonStages(id: string) {
     const { data: existing, error: readError } = await supabase.from('lesson_exam_stages').select('stage').eq('lesson_id', id)
     if (readError) return { error: readError }
@@ -90,16 +96,25 @@ export default function LessonForm({ dark, lesson, module, subject, showMessage,
       const { data, error } = await supabase.from('lessons').insert([payload]).select('id').single()
       if (error || !data) return { error: error || new Error('Could not create the lesson') }
       const stageResult = await syncLessonStages(data.id)
-      if (stageResult.error) await supabase.from('lessons').delete().eq('id', data.id)
+      if (stageResult.error) {
+        await supabase.from('lessons').delete().eq('id', data.id)
+        return stageResult
+      }
+      // Lets the admin context bar select the lesson that was just added.
+      onLessonSaved?.(data.id)
       return stageResult
     },
     updateFn: async (id, payload) => {
       const { error } = await supabase.from('lessons').update(payload).eq('id', id)
       if (error) return { error }
-      return syncLessonStages(id)
+      const stageResult = await syncLessonStages(id)
+      // Lets the admin context bar select the lesson that was just edited.
+      if (!stageResult.error) onLessonSaved?.(id)
+      return stageResult
     },
   })
 
+  // Validates the form and saves the lesson.
   function save() {
     if (crud.saving) return
     if (!title) return showMessage(REQUIRED_FIELDS_MESSAGE)

@@ -36,6 +36,7 @@ interface StructureTabProps {
   refresh: () => Promise<void>
 }
 
+// `depth` is how many selectors (module, subject, lesson) the context bar shows for the segment.
 const SEGMENTS = [
   { id: 'modules', label: 'Modules', Icon: PackageIcon, depth: 0 },
   { id: 'subjects', label: 'Subjects', Icon: BookIcon, depth: 1 },
@@ -60,6 +61,7 @@ const ENTITY_COPY: Record<EntityKind, { table: string; label: string; deleteMess
   },
 }
 
+// Admin "Structure" tab: manages modules, subjects, lessons and exam stages.
 export default function StructureTab({ dark, modules, subjects, lessons, context, loading, refresh }: StructureTabProps) {
   const pt = getPulseTheme(dark)
   const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
@@ -96,21 +98,25 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
     return { subjectsIn, lessonsInModule, lessonsInSubject }
   }, [subjects, lessons])
 
+  // Switches segment and leaves any edit in progress.
   function changeSegment(next: Segment) {
     setSegment(next)
     setEditingId(null)
   }
 
+  // Jumps to the subjects of a module.
   function openSubjects(module: AdminModule) {
     context.setContext({ moduleId: module.id, subjectId: '', lessonId: '' })
     changeSegment('subjects')
   }
 
+  // Jumps to the lessons of a subject.
   function openLessons(subject: AdminSubject) {
     context.setContext({ moduleId: subject.module_id, subjectId: subject.id, lessonId: '' })
     changeSegment('lessons')
   }
 
+  // Deletes the confirmed module, subject or lesson and reloads the structure.
   async function confirmDelete() {
     if (!deleteTarget) return
     const { kind, id } = deleteTarget
@@ -133,6 +139,7 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
 
   const muted = { color: pt.textMuted, fontSize: 12 }
 
+  // Modules list with its add/edit form.
   function renderModules() {
     const module = editingId ? modules.find(m => m.id === editingId) ?? null : null
 
@@ -170,6 +177,7 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
     return <AdminSplitLayout form={form} list={list} />
   }
 
+  // Subjects of the selected module with their add/edit form.
   function renderSubjects() {
     if (!currentModule) return prompt('Pick a module above to manage its subjects')
 
@@ -218,6 +226,7 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
     return <AdminSplitLayout form={form} list={list} />
   }
 
+  // Lessons of the selected subject (or module) with their add/edit form.
   function renderLessons() {
     if (!currentModule) return prompt('Pick a module above to manage its lessons')
 
@@ -233,6 +242,7 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
         lesson={lesson}
         module={formModule}
         subject={formSubject}
+        onLessonSaved={lessonId => context.setContext({ moduleId: formModule.id, subjectId: formSubject.id, lessonId })}
       />
     ) : prompt(moduleHasSubjects ? 'Pick a subject above to add a lesson' : 'This module has no subjects yet — add one in the Subjects tab')
 
@@ -279,6 +289,7 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
     return <AdminSplitLayout form={form} list={list} />
   }
 
+  // Exam stages and stage simulator settings of the selected module.
   function renderStages() {
     if (!currentModule) return prompt('Pick a module above to manage its exam stages')
     return (

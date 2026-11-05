@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from 'react'
 import { supabase } from '@/core/supabase'
+import { fetchAllRows } from '@/core/fetchAllRows'
 import { getPulseTheme, pulseFonts } from '@/shared/theme/premiumTheme'
 import InlineMessage from '@/shared/ui/feedback/InlineMessage'
 import QuestionSourceBadge from '@/shared/ui/display/QuestionSourceBadge'
@@ -15,6 +16,7 @@ import { useAdminEntityCrud } from '@/features/admin/common/useAdminEntityCrud'
 import { useConfirmDelete } from '@/features/admin/common/useConfirmDelete'
 import { useAdminList } from '@/features/admin/common/useAdminList'
 import { useStageOptions } from '@/features/admin/common/useStageOptions'
+import { isDuplicateText, splitDuplicates, skippedNote } from '@/features/admin/common/duplicates'
 import { PICK_MODULE_MESSAGE, REQUIRED_FIELDS_MESSAGE } from '@/features/admin/common/useAdminContext'
 import { syncContentVersions } from '@/services/content/contentVersions'
 import { EditIcon, ListIcon, ConstructionIcon, SearchIcon2 } from '@/shared/icons/tool-icons'
@@ -70,6 +72,7 @@ interface QuestionsTabProps {
 }
 
 const QUESTION_COLUMNS = 'id, question, module_id, subject_id, lesson_id, exam_type, exam_stage, source, created_at'
+const DUPLICATE_CHECK_FAILED_MESSAGE = '❌ Could not check for duplicates — try again'
 
 const EMPTY_DRAFT: QuestionDraft = {
   question: '', optionA: '', optionB: '', optionC: '', optionD: '',
@@ -111,6 +114,7 @@ C) ...
 D) ...
 Correct: A`
 
+// Splits pasted text into questions and reports blocks that cannot be read.
 function parseBulkQuestions(text: string) {
   const blocks = text.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean)
   const questions: ParsedQuestion[] = []
@@ -149,6 +153,18 @@ function parseBulkQuestions(text: string) {
   return { questions, errors }
 }
 
+// Loads every question text of a module (optionally leaving one question out), or null when the lookup fails.
+async function loadModuleQuestionTexts(moduleId: string, excludeId: string | null) {
+  const { data, error } = await fetchAllRows(() => supabase
+    .from('questions')
+    .select('id, question')
+    .eq('module_id', moduleId)
+    .order('id'))
+  if (error || !data) return null
+  return (data as { id: string; question: string }[]).filter(row => row.id !== excludeId).map(row => row.question)
+}
+
+// Style of the round "correct answer" letter button.
 function correctBadge(pt: PulseTheme, active: boolean): CSSProperties {
   return {
     flexShrink: 0, width: 30, height: 30, borderRadius: '50%', cursor: 'pointer',
@@ -159,13 +175,14 @@ function correctBadge(pt: PulseTheme, active: boolean): CSSProperties {
   }
 }
 
+// Admin tab for adding questions one at a time or in bulk, and for editing or deleting them.
 export default function QuestionsTab({ dark, modules, context }: QuestionsTabProps) {
   const pt = getPulseTheme(dark)
   const baseStyle = adminInStyle(pt, dark)
   const inStyle: CSSProperties = { ...baseStyle, padding: '10px 14px', fontSize: 13, marginBottom: 8 }
   const selectStyle: CSSProperties = { ...inStyle, marginBottom: 0 }
   const compactLabel: CSSProperties = { ...fieldLabel(pt), fontSize: 11, marginBottom: 3 }
-  const { message, showMessage } = useAdminMessage()
+  const { message, showMessage } = useAdminMessage(5000)
   const stageOptions = useStageOptions(context.moduleId)
 
   const [search, setSearch] = useState('')
@@ -181,13 +198,16 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
   const [bulkMode, setBulkMode] = useState(true)
   const [bulkText, setBulkText] = useState('')
   const [bulkSaving, setBulkSaving] = useState(false)
+  const [checking, setChecking] = useState(false)
 
   const bulkActive = bulkMode && !editingId
 
+  // Updates one field of the single-question form.
   function setField<K extends keyof QuestionDraft>(key: K, value: QuestionDraft[K]) {
     setDraft(prev => ({ ...prev, [key]: value }))
   }
 
+  // Loads a question (with its answer key) into the form and moves the context bar to it.
   async function editQuestion(row: QuestionRow) {
     const { data, error: loadError } = await supabase.rpc('admin_get_question', { p_question_id: row.id })
     if (loadError || !data || data.length === 0) return showMessage('❌ Could not load this question for editing')
@@ -208,11 +228,13 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
     context.setContext({ moduleId: full.module_id, subjectId: full.subject_id || '', lessonId: full.lesson_id || '' })
   }
 
+  // Clears the form after a save or cancel, keeping the scope settings for the next question.
   function resetForm() {
     setEditingId(null)
     setDraft(prev => ({ ...EMPTY_DRAFT, examType: prev.examType, examStage: prev.examStage, source: prev.source }))
   }
 
+  // Module, lesson and tag fields shared by single and bulk saves.
   function scopeFields() {
     return {
       exam_type: draft.examType,
@@ -260,15 +282,24 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
   })
   const del = useConfirmDelete(crud.remove)
 
-  function saveQuestion() {
-    if (crud.saving) return
+  // Validates the single-question form, rejects duplicates in the module, then saves.
+  async function saveQuestion() {
+    if (crud.saving || checking) return
     if (!context.moduleId) return showMessage(PICK_MODULE_MESSAGE)
     if (!draft.question || !draft.optionA || !draft.optionB || !draft.optionC || !draft.optionD) {
       return showMessage(REQUIRED_FIELDS_MESSAGE)
     }
+
+    setChecking(true)
+    const existingTexts = await loadModuleQuestionTexts(context.moduleId, editingId)
+    setChecking(false)
+    if (!existingTexts) return showMessage(DUPLICATE_CHECK_FAILED_MESSAGE)
+    if (isDuplicateText(draft.question, existingTexts)) return showMessage('❌ This question already exists in this module')
+
     crud.save()
   }
 
+  // Parses the pasted text and inserts every non-duplicate question into the selected module.
   async function bulkAddQuestions() {
     if (bulkSaving) return
     if (!context.moduleId) return showMessage(PICK_MODULE_MESSAGE)
@@ -279,12 +310,24 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
     if (parsed.length === 0) return showMessage('❌ No questions found in the text')
 
     setBulkSaving(true)
-    const { error: insertError } = await supabase.from('questions').insert(parsed.map(q => ({ ...q, ...scopeFields() })))
+    const existingTexts = await loadModuleQuestionTexts(context.moduleId, null)
+    if (!existingTexts) {
+      setBulkSaving(false)
+      return showMessage(DUPLICATE_CHECK_FAILED_MESSAGE)
+    }
+
+    const { fresh, duplicates } = splitDuplicates(parsed, q => q.question, existingTexts)
+    if (fresh.length === 0) {
+      setBulkSaving(false)
+      return showMessage(`❌ All ${parsed.length} question(s) already exist in this module`)
+    }
+
+    const { error: insertError } = await supabase.from('questions').insert(fresh.map(q => ({ ...q, ...scopeFields() })))
     setBulkSaving(false)
 
     if (insertError) return showMessage('❌ ' + insertError.message)
     syncContentVersions({ force: true })
-    showMessage(`✅ ${parsed.length} questions added!`)
+    showMessage(`✅ ${fresh.length} questions added!${skippedNote(duplicates.length)}`)
     setBulkText('')
     refresh()
   }
@@ -300,7 +343,7 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
       editing={!!editingId}
       addLabel={bulkActive ? 'Parse & Add All' : 'Add Question'}
       savingLabel={bulkActive ? 'Adding...' : 'Saving...'}
-      saving={bulkActive ? bulkSaving : crud.saving}
+      saving={bulkActive ? bulkSaving : crud.saving || checking}
       onSave={bulkActive ? bulkAddQuestions : saveQuestion}
       onCancel={editingId ? resetForm : undefined}
       headerAction={!editingId && (

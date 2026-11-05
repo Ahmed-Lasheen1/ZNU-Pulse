@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '@/core/supabase'
+import { fetchAllRows } from '@/core/fetchAllRows'
 import { getPulseTheme } from '@/shared/theme/premiumTheme'
 import InlineMessage from '@/shared/ui/feedback/InlineMessage'
 import AdminSplitLayout from '@/features/admin/common/AdminSplitLayout'
@@ -12,6 +13,7 @@ import { useAdminMessage } from '@/features/admin/common/useAdminMessage'
 import { useAdminEntityCrud } from '@/features/admin/common/useAdminEntityCrud'
 import { useConfirmDelete } from '@/features/admin/common/useConfirmDelete'
 import { useAdminList } from '@/features/admin/common/useAdminList'
+import { isDuplicateText, splitDuplicates, skippedNote } from '@/features/admin/common/duplicates'
 import { PICK_MODULE_MESSAGE, REQUIRED_FIELDS_MESSAGE } from '@/features/admin/common/useAdminContext'
 import { syncContentVersions } from '@/services/content/contentVersions'
 import { EditIcon, ListIcon, ConstructionIcon, SearchIcon2 } from '@/shared/icons/tool-icons'
@@ -35,6 +37,7 @@ interface FlashcardsTabProps {
 
 const FLASHCARD_COLUMNS = 'id, module_id, lesson_id, front, back, created_at'
 const PICK_LESSON_MESSAGE = '❌ Pick a subject and lesson above first'
+const DUPLICATE_CHECK_FAILED_MESSAGE = '❌ Could not check for duplicates — try again'
 const MAX_TEXT_LENGTH = 2000
 const MAX_BULK_CARDS = 300
 
@@ -76,11 +79,22 @@ function parseBulkFlashcards(text: string) {
   return { cards, errors }
 }
 
+// Loads every card front of a lesson (optionally leaving one card out), or null when the lookup fails.
+async function loadLessonFronts(lessonId: string, excludeId: string | null) {
+  const { data, error } = await fetchAllRows(() => supabase
+    .from('flashcards')
+    .select('id, front')
+    .eq('lesson_id', lessonId)
+    .order('id'))
+  if (error || !data) return null
+  return (data as { id: string; front: string }[]).filter(row => row.id !== excludeId).map(row => row.front)
+}
+
 // Admin tab for adding flashcards one at a time or in bulk, and for editing or deleting them.
 export default function FlashcardsTab({ dark, modules, lessons, context }: FlashcardsTabProps) {
   const pt = getPulseTheme(dark)
   const baseStyle = adminInStyle(pt, dark)
-  const { message, showMessage } = useAdminMessage()
+  const { message, showMessage } = useAdminMessage(5000)
 
   const [search, setSearch] = useState('')
   const { rows: flashcards, loading, error, refresh } = useAdminList<FlashcardRow>({
@@ -96,6 +110,7 @@ export default function FlashcardsTab({ dark, modules, lessons, context }: Flash
   const [bulkMode, setBulkMode] = useState(true)
   const [bulkText, setBulkText] = useState('')
   const [bulkSaving, setBulkSaving] = useState(false)
+  const [checking, setChecking] = useState(false)
 
   const bulkActive = bulkMode && !editingId
   const lessonTitle = (id: string) => lessons.find(l => l.id === id)?.title ?? ''
@@ -127,19 +142,26 @@ export default function FlashcardsTab({ dark, modules, lessons, context }: Flash
   })
   const del = useConfirmDelete(crud.remove)
 
-  // Validates the single-card form and saves it.
-  function saveCard() {
-    if (crud.saving) return
+  // Validates the single-card form, rejects duplicates in the lesson, then saves.
+  async function saveCard() {
+    if (crud.saving || checking) return
     if (!context.moduleId) return showMessage(PICK_MODULE_MESSAGE)
     if (!context.lessonId) return showMessage(PICK_LESSON_MESSAGE)
     if (!front.trim() || !back.trim()) return showMessage(REQUIRED_FIELDS_MESSAGE)
     if (front.length > MAX_TEXT_LENGTH || back.length > MAX_TEXT_LENGTH) {
       return showMessage(`❌ Each side must be under ${MAX_TEXT_LENGTH} characters`)
     }
+
+    setChecking(true)
+    const existingFronts = await loadLessonFronts(context.lessonId, editingId)
+    setChecking(false)
+    if (!existingFronts) return showMessage(DUPLICATE_CHECK_FAILED_MESSAGE)
+    if (isDuplicateText(front, existingFronts)) return showMessage('❌ This flashcard already exists in this lesson')
+
     crud.save()
   }
 
-  // Parses the pasted text and inserts every card into the selected lesson.
+  // Parses the pasted text and inserts every non-duplicate card into the selected lesson.
   async function bulkAddCards() {
     if (bulkSaving) return
     if (!context.moduleId) return showMessage(PICK_MODULE_MESSAGE)
@@ -152,14 +174,26 @@ export default function FlashcardsTab({ dark, modules, lessons, context }: Flash
     if (cards.length > MAX_BULK_CARDS) return showMessage(`❌ Add at most ${MAX_BULK_CARDS} cards at a time`)
 
     setBulkSaving(true)
+    const existingFronts = await loadLessonFronts(context.lessonId, null)
+    if (!existingFronts) {
+      setBulkSaving(false)
+      return showMessage(DUPLICATE_CHECK_FAILED_MESSAGE)
+    }
+
+    const { fresh, duplicates } = splitDuplicates(cards, c => c.front, existingFronts)
+    if (fresh.length === 0) {
+      setBulkSaving(false)
+      return showMessage(`❌ All ${cards.length} card(s) already exist in this lesson`)
+    }
+
     const { error: insertError } = await supabase
       .from('flashcards')
-      .insert(cards.map(c => ({ ...c, module_id: context.moduleId, lesson_id: context.lessonId })))
+      .insert(fresh.map(c => ({ ...c, module_id: context.moduleId, lesson_id: context.lessonId })))
     setBulkSaving(false)
 
     if (insertError) return showMessage('❌ ' + insertError.message)
     syncContentVersions({ force: true })
-    showMessage(`✅ ${cards.length} flashcards added!`)
+    showMessage(`✅ ${fresh.length} flashcards added!${skippedNote(duplicates.length)}`)
     setBulkText('')
     refresh()
   }
@@ -174,7 +208,7 @@ export default function FlashcardsTab({ dark, modules, lessons, context }: Flash
       editing={!!editingId}
       addLabel={bulkActive ? 'Parse & Add All' : 'Add Flashcard'}
       savingLabel={bulkActive ? 'Adding...' : 'Saving...'}
-      saving={bulkActive ? bulkSaving : crud.saving}
+      saving={bulkActive ? bulkSaving : crud.saving || checking}
       onSave={bulkActive ? bulkAddCards : saveCard}
       onCancel={editingId ? resetForm : undefined}
       headerAction={!editingId && (

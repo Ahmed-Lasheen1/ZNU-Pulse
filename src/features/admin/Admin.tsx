@@ -53,7 +53,7 @@ export default function Admin({ dark }: { dark: boolean }) {
   const isAdmin = profile?.role === 'admin'
   const pt = getPulseTheme(dark)
 
-  const [activeTab, setActiveTab] = useState<AdminTab>('questions')
+  const [activeTab, setActiveTab] = useState<AdminTab>('structure')
   const [modules, setModules] = useState<AdminModule[]>([])
   const [subjects, setSubjects] = useState<AdminSubject[]>([])
   const [lessons, setLessons] = useState<AdminLesson[]>([])
