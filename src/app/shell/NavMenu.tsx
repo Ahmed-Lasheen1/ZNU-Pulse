@@ -53,14 +53,20 @@ const PANEL_PAD = 12
 const PILL_STEP = PILL_H + PILL_GAP
 const PILL_START = -(PILL_STEP + PILL_H)
 
-// Animation timings (ms). Pills slide out from under the button in turn and slide back in on close.
-const OPEN_MS = 320
+// Animation timings (ms). Pills spring out from under the button in turn and slide back in on close.
+const OPEN_MS = 650
 const OPEN_STAGGER_MS = 35
 const CLOSE_MS = 240
 const CLOSE_STAGGER_MS = 20
 const END_FADE_MS = 80
-const OPEN_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'
 const CLOSE_EASE = 'cubic-bezier(0.4, 0, 0.6, 1)'
+
+// Smooth ease-out used where a spring is not supported or would overshoot a scrolling panel.
+const SMOOTH_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'
+
+// Damped spring (about 5% overshoot) written as a CSS linear() easing, generated from the spring equation.
+const SPRING_EASE =
+  'linear(0, 0.039, 0.136, 0.263, 0.402, 0.538, 0.663, 0.77, 0.859, 0.928, 0.979, 1.015, 1.037, 1.05, 1.054, 1.053, 1.049, 1.042, 1.035, 1.027, 1.02, 1.014, 1.009, 1.005, 1.002, 1, 0.998, 0.997, 0.997, 0.997, 0.997, 0.998, 0.998, 0.998, 0.999, 0.999, 0.999, 1, 1, 1, 1)'
 
 // Pills are almost opaque instead of blurred: backdrop-filter on ~10 pills is what makes phones lag.
 function pillTint(dark: boolean) {
@@ -72,7 +78,7 @@ function slot(index: number): CSSProperties {
   return { ['--i' as string]: index } as CSSProperties
 }
 
-// Base look shared by every pill: same width, same height, content aligned to the left.
+// Base look shared by every glass pill: same width, same height, content aligned to the left.
 function pillStyle(pt: PulseTheme): CSSProperties {
   return {
     display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 10,
@@ -124,7 +130,7 @@ interface NavMenuProps {
   align?: Align
 }
 
-// Header menu: a toggle button and a column of equal pills that slide out from under it.
+// Header menu: a toggle button and a column of equal pills that spring out from under it.
 export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuProps) {
   const [open, setOpen] = useState(false)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
@@ -245,17 +251,25 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
       style={{ position: 'relative', width: BUTTON_SIZE, height: BUTTON_SIZE }}
     >
       <style>{`
-        /* The top edge sits right under the toggle button: pills slide out from it and back behind it. */
+        /* The top edge sits right under the toggle button: pills slide out from it and back behind it.
+           The bottom clip margin leaves room for the spring overshoot of the last pills. */
         .nav-panel {
-          clip-path: inset(0 -20px -20px -20px);
+          --open-ease: ${SMOOTH_EASE};
+          clip-path: inset(0 -20px -64px -20px);
           scrollbar-width: none;
           overscroll-behavior: contain;
         }
         .nav-panel::-webkit-scrollbar { display: none; }
 
-        /* Only short screens scroll. */
+        /* Browsers that support linear() get the spring. */
+        @supports (transition-timing-function: linear(0, 1)) {
+          .nav-panel { --open-ease: ${SPRING_EASE}; }
+        }
+
+        /* Only short screens scroll; there the spring is replaced by the smooth ease so the panel does not bounce its scroll area. */
         @media (max-height: 720px) {
           .nav-panel {
+            --open-ease: ${SMOOTH_EASE};
             overflow-y: auto; overflow-x: hidden;
             max-height: calc(100dvh - 110px - env(safe-area-inset-top, 0px));
             -webkit-overflow-scrolling: touch;
@@ -277,14 +291,14 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
             visibility 0s linear calc(${CLOSE_MS}ms + var(--close-delay));
         }
 
-        /* Open: each pill slides down to its place in turn, first pill first. */
+        /* Open: each pill springs down to its place in turn, first pill first. */
         .nav-panel[data-open="true"] .nav-pill {
           --open-delay: calc(var(--i) * ${OPEN_STAGGER_MS}ms);
           opacity: 1;
           visibility: visible;
           transform: none;
           transition:
-            transform ${OPEN_MS}ms ${OPEN_EASE} var(--open-delay),
+            transform ${OPEN_MS}ms var(--open-ease) var(--open-delay),
             opacity 100ms linear var(--open-delay),
             visibility 0s linear 0s;
         }
@@ -377,7 +391,11 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
           )
         })}
 
-        <div className="nav-pill" style={{ ...pillStyle(pt), ...slot(themeSlot), justifyContent: 'center', padding: 0 }}>
+        {/* Theme: only the switch, centred, with no glass pill behind it. */}
+        <div
+          className="nav-pill"
+          style={{ ...slot(themeSlot), display: 'flex', alignItems: 'center', justifyContent: 'center', width: PILL_W, height: PILL_H }}
+        >
           <ThemeSwitch dark={dark} onToggle={toggleTheme} scale={0.62} stretchX={1.3} />
         </div>
 
@@ -385,7 +403,7 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
           <button
             type="button" className="nav-pill nav-pill-btn glass-focus-ring" tabIndex={tabIndex}
             onClick={() => setShowSignOutConfirm(true)}
-            style={{ ...pillStyle(pt), ...slot(signOutSlot), cursor: 'pointer', color: pt.danger, fontWeight: 700 }}
+            style={{ ...pillStyle(pt), ...slot(signOutSlot), justifyContent: 'center', cursor: 'pointer', color: pt.danger, fontWeight: 700 }}
           >
             <SignOutIcon color={pt.danger} size={17} />
             Sign Out
