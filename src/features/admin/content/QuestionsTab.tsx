@@ -1,6 +1,5 @@
 import { useState, type CSSProperties } from 'react'
 import { supabase } from '@/core/supabase'
-import { fetchAllRows } from '@/core/fetchAllRows'
 import { getPulseTheme, pulseFonts } from '@/shared/theme/premiumTheme'
 import InlineMessage from '@/shared/ui/feedback/InlineMessage'
 import QuestionSourceBadge from '@/shared/ui/display/QuestionSourceBadge'
@@ -153,15 +152,15 @@ function parseBulkQuestions(text: string) {
   return { questions, errors }
 }
 
-// Loads every question text of a module (optionally leaving one question out), or null when the lookup fails.
-async function loadModuleQuestionTexts(moduleId: string, excludeId: string | null) {
-  const { data, error } = await fetchAllRows(() => supabase
-    .from('questions')
-    .select('id, question')
-    .eq('module_id', moduleId)
-    .order('id'))
-  if (error || !data) return null
-  return (data as { id: string; question: string }[]).filter(row => row.id !== excludeId).map(row => row.question)
+// Asks the server which of the given texts already exist in the module (optionally ignoring one question), or null when the lookup fails.
+async function findExistingQuestionTexts(moduleId: string, texts: string[], excludeId: string | null) {
+  const { data, error } = await supabase.rpc('admin_find_existing_questions', {
+    p_module_id: moduleId,
+    p_texts: texts,
+    p_exclude_id: excludeId,
+  })
+  if (error || !Array.isArray(data)) return null
+  return data as string[]
 }
 
 // Style of the round "correct answer" letter button.
@@ -291,7 +290,7 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
     }
 
     setChecking(true)
-    const existingTexts = await loadModuleQuestionTexts(context.moduleId, editingId)
+    const existingTexts = await findExistingQuestionTexts(context.moduleId, [draft.question], editingId)
     setChecking(false)
     if (!existingTexts) return showMessage(DUPLICATE_CHECK_FAILED_MESSAGE)
     if (isDuplicateText(draft.question, existingTexts)) return showMessage('❌ This question already exists in this module')
@@ -310,7 +309,7 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
     if (parsed.length === 0) return showMessage('❌ No questions found in the text')
 
     setBulkSaving(true)
-    const existingTexts = await loadModuleQuestionTexts(context.moduleId, null)
+    const existingTexts = await findExistingQuestionTexts(context.moduleId, parsed.map(q => q.question), null)
     if (!existingTexts) {
       setBulkSaving(false)
       return showMessage(DUPLICATE_CHECK_FAILED_MESSAGE)
@@ -332,8 +331,10 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
     refresh()
   }
 
+  // Readable name of an exam stage value.
   const stageLabel = (value: string) => stageOptions.find(s => s.value === value)?.label ?? value
 
+  // Left side: bulk or single question form.
   const form = (
     <AdminFormCard
       dark={dark}
@@ -426,6 +427,7 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
 
   const searchTerm = search.trim()
 
+  // Right side: searchable list of the module's questions.
   const list = (
     <div>
       <div style={{ position: 'relative', marginBottom: 16 }}>

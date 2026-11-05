@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/core/supabase'
+import { useAuth } from '@/core/contexts'
+import { cachedQuery, invalidateCache, MINUTE } from '@/core/dataCache'
 import { getPulseTheme } from '@/shared/theme/premiumTheme'
 import { watchOnlineCount } from '@/services/presence/onlinePresence'
 import { CardGridSkeleton } from '@/shared/ui/feedback/Skeletons'
@@ -15,7 +17,7 @@ import {
   MISSING_FUNCTION_CODE, MISSING_FUNCTION_MESSAGE, statRow,
   type AnalyticsData, type DifficultyState
 } from '@/features/admin/analytics/analyticsShared'
-import { DotIcon, PeopleIcon, ChartBarIcon, TargetIcon, LightningIcon, UserIcon, CalendarDotIcon, BookIcon } from '@/shared/icons/tool-icons'
+import { DotIcon, PeopleIcon, ChartBarIcon, TargetIcon, LightningIcon, UserIcon, CalendarDotIcon, BookIcon, RefreshIcon } from '@/shared/icons/tool-icons'
 import type { AdminModule } from '@/features/admin/common/adminTypes'
 
 interface AnalyticsTabProps {
@@ -24,6 +26,10 @@ interface AnalyticsTabProps {
 }
 
 const PERIODS = [7, 30, 90] as const
+
+// How long a saved analytics copy is reused before it is refreshed in the background.
+const ANALYTICS_TTL = 5 * MINUTE
+const DIFFICULTY_TTL = 10 * MINUTE
 
 const SECTIONS = [
   { id: 'overview', label: 'Overview', Icon: ChartBarIcon },
@@ -34,8 +40,15 @@ const SECTIONS = [
 
 type SectionId = typeof SECTIONS[number]['id']
 
+// Cache keys start with "user:" so sign-out clears them with the other per-user caches.
+const analyticsKey = (userId: string, days: number) => `user:${userId}:admin-analytics:${days}`
+const difficultyKey = (userId: string) => `user:${userId}:admin-difficulty`
+
+// Admin analytics: stat cards plus Overview/Students/Learning/Content sections, cached between visits.
 export default function AnalyticsTab({ dark, modules }: AnalyticsTabProps) {
   const pt = getPulseTheme(dark)
+  const { user } = useAuth() as { user: { id: string } | null }
+  const userId = user?.id ?? null
   const [days, setDays] = useState<number>(30)
   const [section, setSection] = useState<SectionId>('overview')
   const [data, setData] = useState<AnalyticsData | null>(null)
@@ -43,11 +56,19 @@ export default function AnalyticsTab({ dark, modules }: AnalyticsTabProps) {
   const [errorMessage, setErrorMessage] = useState('')
   const [onlineCount, setOnlineCount] = useState(0)
   const [difficulty, setDifficulty] = useState<DifficultyState>({ rows: [], loading: true, error: false })
+  const [reloadTick, setReloadTick] = useState(0)
 
+  // Loads the summary for the selected period from the saved copy, refreshing it when it is older than the cache lifetime.
   useEffect(() => {
+    if (!userId) return
     let ignore = false
     setLoading(true)
-    supabase.rpc('admin_get_analytics', { p_days: days }).then(({ data: result, error }) => {
+    cachedQuery(analyticsKey(userId, days), () => supabase.rpc('admin_get_analytics', { p_days: days }), {
+      ttl: ANALYTICS_TTL,
+      onUpdate: ({ data: fresh, error }: any) => {
+        if (!ignore && !error && fresh) setData(fresh as AnalyticsData)
+      },
+    }).then(({ data: result, error }: any) => {
       if (ignore) return
       if (error) {
         setErrorMessage(error.code === MISSING_FUNCTION_CODE ? MISSING_FUNCTION_MESSAGE : "Couldn't load analytics — check your connection.")
@@ -58,18 +79,37 @@ export default function AnalyticsTab({ dark, modules }: AnalyticsTabProps) {
       setLoading(false)
     })
     return () => { ignore = true }
-  }, [days])
+  }, [days, userId, reloadTick])
 
+  const learningOpened = section === 'learning'
+
+  // Loads the hardest-questions list only once the Learning section is opened.
   useEffect(() => {
+    if (!userId || !learningOpened) return
     let ignore = false
-    supabase.rpc('get_question_difficulty', { p_min_attempts: 3 }).then(({ data: rows, error }) => {
+    cachedQuery(difficultyKey(userId), () => supabase.rpc('get_question_difficulty', { p_min_attempts: 3 }), {
+      ttl: DIFFICULTY_TTL,
+      onUpdate: ({ data: fresh, error }: any) => {
+        if (!ignore && !error && fresh) setDifficulty({ rows: fresh, loading: false, error: false })
+      },
+    }).then(({ data: rows, error }: any) => {
       if (ignore) return
       setDifficulty({ rows: rows && !error ? rows : [], loading: false, error: !!error })
     })
     return () => { ignore = true }
-  }, [])
+  }, [userId, learningOpened, reloadTick])
 
+  // Keeps the live "online now" counter in sync with the presence channel.
   useEffect(() => watchOnlineCount(setOnlineCount), [])
+
+  // Drops every saved analytics copy and loads fresh numbers.
+  function refreshAnalytics() {
+    if (!userId) return
+    PERIODS.forEach(period => invalidateCache(analyticsKey(userId, period)))
+    invalidateCache(difficultyKey(userId))
+    setDifficulty({ rows: [], loading: true, error: false })
+    setReloadTick(t => t + 1)
+  }
 
   const users = data?.users
   const performance = data?.performance
@@ -84,6 +124,7 @@ export default function AnalyticsTab({ dark, modules }: AnalyticsTabProps) {
         {PERIODS.map(period => (
           <AdminPill key={period} dark={dark} active={days === period} label={`${period} days`} Icon={CalendarDotIcon} onSelect={() => setDays(period)} />
         ))}
+        <AdminPill dark={dark} active={false} label="Refresh" Icon={RefreshIcon} onSelect={refreshAnalytics} />
       </div>
 
       {errorMessage && <div style={{ marginBottom: 16 }}><ErrorBanner message={errorMessage} /></div>}
@@ -127,6 +168,7 @@ export default function AnalyticsTab({ dark, modules }: AnalyticsTabProps) {
       <p style={{ color: pt.textMuted, fontSize: 11, marginTop: 8, textAlign: 'center' }}>
         "Online now" counts open browser tabs right now. A student counts as active on a day when they answered a question or finished a quiz.
         Arrows compare with the previous period of the same length. Times are Cairo time.
+        Numbers are saved for a few minutes — use Refresh for the latest.
       </p>
     </div>
   )

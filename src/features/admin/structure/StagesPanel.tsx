@@ -7,7 +7,7 @@ import { miniBtn, inStyle as adminInStyle, fieldLabel } from '@/features/admin/c
 import { EXAM_STAGES as DEFAULT_STAGES } from '@/services/content/examStages'
 import { invalidateModuleStagesCache } from '@/services/content/moduleStages'
 import { fetchLessonStageMap } from '@/services/content/lessonStages'
-import { fetchAllRows } from '@/core/fetchAllRows'
+import { fetchModuleQuestions } from '@/services/content/moduleContent'
 import { simulatorPool, invalidateSimulatorConfig } from '@/services/exam/stageSimulator'
 import { TargetIcon, GearIcon, DotIcon, TrashIcon, PlusIcon } from '@/shared/icons/tool-icons'
 import type { AdminModule, AdminSubject } from '@/features/admin/common/adminTypes'
@@ -31,19 +31,23 @@ interface StagesPanelProps {
 const MAX_PER_SUBJECT = 100
 const MAX_TOTAL = 200
 
+// Turns a stage title into a stable lowercase value.
 function slugify(text: string) {
   return text.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'stage'
 }
 
+// Parses a typed question count and clamps it to the per-subject limit.
 function toCount(value: string | undefined) {
   const n = parseInt(value || '', 10)
   return Number.isFinite(n) ? Math.max(0, Math.min(MAX_PER_SUBJECT, n)) : 0
 }
 
+// Builds editable rows from the global default stages.
 function defaultStageRows(): StageRow[] {
   return DEFAULT_STAGES.map(s => ({ key: crypto.randomUUID(), value: s.value, title: s.title, emoji: s.emoji, color: s.color }))
 }
 
+// Admin panel for a module's exam stages and its stage simulator settings.
 export default function StagesPanel({ dark, module, subjects, showMessage }: StagesPanelProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
@@ -61,6 +65,7 @@ export default function StagesPanel({ dark, module, subjects, showMessage }: Sta
   const [simLoading, setSimLoading] = useState(false)
   const [simSaving, setSimSaving] = useState(false)
 
+  // Loads the module's custom stages, or the global defaults when none are saved.
   const loadStages = useCallback(async () => {
     setStagesLoading(true)
     const { data } = await supabase.from('module_exam_stages').select('*').eq('module_id', module.id).order('position')
@@ -76,14 +81,11 @@ export default function StagesPanel({ dark, module, subjects, showMessage }: Sta
 
   useEffect(() => { loadStages() }, [loadStages])
 
+  // Loads the module's questions from the shared cache to show how many are available per subject.
   useEffect(() => {
     let ignore = false
     Promise.all([
-      fetchAllRows(() => supabase
-        .from('questions_public')
-        .select('id, subject_id, lesson_id, exam_type, exam_stage')
-        .eq('module_id', module.id)
-        .order('id')),
+      fetchModuleQuestions(module.id),
       fetchLessonStageMap(),
     ]).then(([questionsRes, mapRes]) => {
       if (ignore) return
@@ -93,6 +95,7 @@ export default function StagesPanel({ dark, module, subjects, showMessage }: Sta
     return () => { ignore = true }
   }, [module.id])
 
+  // Loads the saved simulator question counts of the selected stage.
   useEffect(() => {
     setSimCounts({})
     if (!simStage) return
@@ -114,14 +117,17 @@ export default function StagesPanel({ dark, module, subjects, showMessage }: Sta
     return () => { ignore = true }
   }, [module.id, simStage, showMessage])
 
+  // Edits one field of a stage row.
   function updateStage(key: string, field: 'title' | 'emoji' | 'color', value: string) {
     setStages(prev => prev.map(s => s.key === key ? { ...s, [field]: value } : s))
   }
 
+  // Removes a stage row from the editor.
   function removeStage(key: string) {
     setStages(prev => prev.filter(s => s.key !== key))
   }
 
+  // Appends a new stage row with a unique value.
   function addStage() {
     const taken = new Set(stages.map(s => s.value))
     let value = 'new_stage'
@@ -129,6 +135,7 @@ export default function StagesPanel({ dark, module, subjects, showMessage }: Sta
     setStages(prev => [...prev, { key: crypto.randomUUID(), value, title: 'New Stage', emoji: '', color: FALLBACK_STAGE_COLOR }])
   }
 
+  // Saves the edited stages as the module's custom set.
   async function saveStages() {
     if (stages.length === 0) return showMessage('❌ A module needs at least one exam stage')
     setStagesSaving(true)
@@ -147,6 +154,7 @@ export default function StagesPanel({ dark, module, subjects, showMessage }: Sta
     loadStages()
   }
 
+  // Deletes the module's custom stages so it falls back to the defaults.
   async function resetStages() {
     setConfirmResetOpen(false)
     setStagesSaving(true)
@@ -158,6 +166,7 @@ export default function StagesPanel({ dark, module, subjects, showMessage }: Sta
     loadStages()
   }
 
+  // Number of questions available per subject for the selected stage.
   const available = useMemo(() => {
     const result: Record<string, number> = {}
     if (!simStage) return result
@@ -167,6 +176,7 @@ export default function StagesPanel({ dark, module, subjects, showMessage }: Sta
 
   const simTotal = subjects.reduce((sum, s) => sum + toCount(simCounts[s.id]), 0)
 
+  // Saves the simulator question counts of the selected stage.
   async function saveSimulator() {
     if (!simStage || simSaving) return
     if (simTotal > MAX_TOTAL) return showMessage(`❌ Total cannot exceed ${MAX_TOTAL} questions`)

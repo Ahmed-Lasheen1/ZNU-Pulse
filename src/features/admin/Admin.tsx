@@ -4,8 +4,8 @@ import { useAuth, useModules } from '@/core/contexts'
 import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
 import BackButton from '@/shared/ui/layout/BackButton'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
-import { invalidateSubjectsCache } from '@/services/content/subjects'
-import { invalidateLessonsCache } from '@/services/content/lessons'
+import { fetchAllSubjects, invalidateSubjectsCache } from '@/services/content/subjects'
+import { fetchAllLessons, invalidateLessonsCache } from '@/services/content/lessons'
 import { fetchAllRows } from '@/core/fetchAllRows'
 import NotFound from '@/shared/ui/feedback/NotFound'
 import { PackageIcon, FolderIcon, CalendarDotIcon, QuestionMarkIcon, ChartBarIcon, GearIcon } from '@/shared/icons/tool-icons'
@@ -46,15 +46,18 @@ const CONTEXT_DEPTH: Partial<Record<AdminTab, number>> = {
   flashcards: 3,
 }
 
-// Admin panel shell: loads modules, subjects and lessons and shows the selected tab.
+// Admin panel shell: shows the selected tab, using cached modules, subjects and lessons on open.
 export default function Admin({ dark }: { dark: boolean }) {
   const { profile, authLoaded } = useAuth() as { profile?: { role?: string } | null; authLoaded: boolean }
-  const { refreshModules } = useModules() as { refreshModules: () => Promise<{ modules: AdminModule[]; error?: any }> }
+  const { modules, modulesLoaded, refreshModules } = useModules() as {
+    modules: AdminModule[]
+    modulesLoaded: boolean
+    refreshModules: () => Promise<{ modules: AdminModule[]; error?: any }>
+  }
   const isAdmin = profile?.role === 'admin'
   const pt = getPulseTheme(dark)
 
   const [activeTab, setActiveTab] = useState<AdminTab>('structure')
-  const [modules, setModules] = useState<AdminModule[]>([])
   const [subjects, setSubjects] = useState<AdminSubject[]>([])
   const [lessons, setLessons] = useState<AdminLesson[]>([])
   const [refDataLoading, setRefDataLoading] = useState(true)
@@ -62,14 +65,28 @@ export default function Admin({ dark }: { dark: boolean }) {
 
   const context = useAdminContext(modules, subjects, lessons)
 
-  // Reloads the module list.
-  async function fetchModules() {
+  // Loads subjects and lessons from the shared caches when the panel opens (no forced refetch).
+  useEffect(() => {
+    if (!isAdmin) return
+    let ignore = false
+    setRefDataLoading(true)
+    Promise.all([fetchAllSubjects(), fetchAllLessons()]).then(([subjectsRes, lessonsRes]) => {
+      if (ignore) return
+      setSubjects(subjectsRes.subjects as AdminSubject[])
+      setLessons(lessonsRes.lessons as AdminLesson[])
+      if (subjectsRes.error || lessonsRes.error) setRefDataError(true)
+      setRefDataLoading(false)
+    })
+    return () => { ignore = true }
+  }, [isAdmin])
+
+  // Forces a fresh load of the module list after an admin change.
+  async function reloadModules() {
     const result = await refreshModules()
-    setModules((result?.modules || []) as AdminModule[])
     if (result?.error) setRefDataError(true)
   }
 
-  // Reloads every subject.
+  // Reloads every subject straight from the server.
   async function fetchSubjects() {
     invalidateSubjectsCache()
     const { data, error } = await fetchAllRows(() => supabase.from('subjects').select('*').order('created_at').order('id'))
@@ -77,7 +94,7 @@ export default function Admin({ dark }: { dark: boolean }) {
     if (error) setRefDataError(true)
   }
 
-  // Reloads every lesson.
+  // Reloads every lesson straight from the server.
   async function fetchLessons() {
     invalidateLessonsCache()
     const { data, error } = await fetchAllRows(() => supabase.from('lessons').select('*').order('created_at').order('id'))
@@ -85,17 +102,11 @@ export default function Admin({ dark }: { dark: boolean }) {
     if (error) setRefDataError(true)
   }
 
-  // Reloads modules, subjects and lessons together.
+  // Reloads modules, subjects and lessons together after an admin change.
   async function refreshStructure() {
     setRefDataError(false)
-    await Promise.all([fetchModules(), fetchSubjects(), fetchLessons()])
+    await Promise.all([reloadModules(), fetchSubjects(), fetchLessons()])
   }
-
-  useEffect(() => {
-    if (!isAdmin) return
-    setRefDataLoading(true)
-    refreshStructure().finally(() => setRefDataLoading(false))
-  }, [isAdmin])
 
   if (!authLoaded) {
     return (
@@ -191,7 +202,7 @@ export default function Admin({ dark }: { dark: boolean }) {
         {activeTab === 'structure' && (
           <StructureTab
             dark={dark} modules={modules} subjects={subjects} lessons={lessons} context={context}
-            loading={refDataLoading} refresh={refreshStructure}
+            loading={refDataLoading || !modulesLoaded} refresh={refreshStructure}
           />
         )}
         {activeTab === 'analytics' && <AnalyticsTab dark={dark} modules={modules} />}
