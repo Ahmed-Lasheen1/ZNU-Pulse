@@ -5,7 +5,6 @@ import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiu
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import TabRow from '@/shared/ui/controls/TabRow'
 import MediaOverlay from '@/shared/ui/overlay/MediaOverlay'
-import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import PageShell from '@/shared/ui/layout/PageShell'
 import PageIntro from '@/shared/ui/layout/PageIntro'
@@ -17,10 +16,14 @@ import { cachedSnapshot } from '@/core/dataCache'
 import { getDriveOrRawUrl } from '@/shared/utils/embedUrl'
 import { useModules } from '@/core/contexts'
 import { useHistoryOverlay } from '@/shared/hooks/useHistoryOverlay'
-import { ScheduleIcon, EmptyBoxIcon, SearchIcon2 } from '@/shared/icons/tool-icons'
+import { ScheduleIcon, EmptyBoxIcon } from '@/shared/icons/tool-icons'
 import { ExamIcon } from '@/shared/icons/medicalIcons'
 import { glassHoverTint } from '@/shared/theme/liquidGlass'
 import { SECTION_GAP } from '@/shared/theme/layout'
+import StudyPlanCard from '@/features/tools/schedule/StudyPlanCard'
+import ExamScheduleCard from '@/features/tools/schedule/ExamScheduleCard'
+import { daysFromToday } from '@/features/tools/schedule/scheduleDates'
+import type { ScheduleRow } from '@/features/tools/schedule/types'
 
 const SCHEDULE_ACCENT = '#a78bfa'
 
@@ -34,18 +37,18 @@ interface ScheduleModule {
   status: 'active' | 'completed'
 }
 
-interface ScheduleRow {
-  id: string
-  title: string
-  week?: string | null
-  dates?: string[] | null
-  url: string
-  type: 'study' | 'exam'
-  module_id: string
-}
-
 type ScheduleType = 'study' | 'exam'
 
+// Sort key for an exam: upcoming first (soonest), then undated, then finished (most recent first).
+function examSortKey(exam: ScheduleRow) {
+  const diffs = (exam.dates || []).map(daysFromToday)
+  const upcoming = diffs.filter(d => d >= 0).sort((a, b) => a - b)
+  if (upcoming.length > 0) return upcoming[0]
+  if (diffs.length === 0) return 50000
+  return 100000 + Math.abs(Math.max(...diffs))
+}
+
+// Schedules page: study plans and exam schedules per module, with an optional image for each.
 export default function Schedule({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const location = useLocation()
@@ -97,6 +100,7 @@ export default function Schedule({ dark }: { dark: boolean }) {
   useEffect(() => {
     if (!activeModule) return
     let ignore = false
+    // Loads the module's schedules from the saved copy, refreshing in the background.
     async function fetchData() {
       setLoading(true)
       setLoadError(false)
@@ -121,17 +125,20 @@ export default function Schedule({ dark }: { dark: boolean }) {
     return () => { ignore = true }
   }, [activeModule])
 
+  // Opens the image of a schedule linked from search, when it has one.
   useEffect(() => {
     if (!itemParam || viewer || schedules.length === 0 || openedItemRef.current === itemParam) return
     const match = schedules.find(s => s.id === itemParam)
     if (match) {
       openedItemRef.current = itemParam
-      setViewer(match)
+      if (match.url) setViewer(match)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemParam, schedules])
 
+  // Opens a schedule's image (needs a connection); schedules without an image do nothing.
   function openSchedule(sch: ScheduleRow) {
+    if (!sch.url) return
     if (!navigator.onLine) {
       showToast("Schedule images need a connection — try again when you're online", 'info')
       return
@@ -140,6 +147,7 @@ export default function Schedule({ dark }: { dark: boolean }) {
   }
 
   const filtered = schedules.filter(s => s.type === activeType)
+  const visible = activeType === 'exam' ? [...filtered].sort((a, b) => examSortKey(a) - examSortKey(b)) : filtered
   const hoverTint = glassHoverTint(dark)
 
   return (
@@ -147,7 +155,7 @@ export default function Schedule({ dark }: { dark: boolean }) {
       {(loadError || modulesError) && <ErrorBanner />}
       {savedCopy && <OfflineNote dark={dark} message="You're offline — showing the last saved schedules." />}
 
-      {viewer && (
+      {viewer && viewer.url && (
         <MediaOverlay
           dark={dark}
           onClose={() => setViewer(null)}
@@ -185,14 +193,14 @@ export default function Schedule({ dark }: { dark: boolean }) {
               role="button"
               tabIndex={0}
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveType(type) } }}
-              aria-label={type === 'study' ? 'Study Schedule' : 'Exam Schedule'}
+              aria-label={type === 'study' ? 'Study Planner' : 'Exam Schedule'}
             >
               <div style={{
                 padding: '10px 20px', whiteSpace: 'nowrap',
                 ...pulseType.button, color, display: 'flex', alignItems: 'center', gap: 8
               }}>
                 {type === 'study' ? <ScheduleIcon color={color} size={15} /> : <ExamIcon color={color} size={15} />}
-                {type === 'study' ? 'Study Schedule' : 'Exam Schedule'}
+                {type === 'study' ? 'Study Planner' : 'Exam Schedule'}
               </div>
             </PulseGlassRow>
           )
@@ -201,54 +209,32 @@ export default function Schedule({ dark }: { dark: boolean }) {
 
       {!modulesLoaded || loading ? (
         <ScheduleSkeleton />
-      ) : filtered.length === 0 ? (
-        !loadError && <EmptyState dark={dark} icon={<EmptyBoxIcon color={pt.sub} size={16} />} message="No schedules yet" />
+      ) : visible.length === 0 ? (
+        !loadError && (
+          <EmptyState
+            dark={dark}
+            icon={<EmptyBoxIcon color={pt.sub} size={16} />}
+            message={activeType === 'study' ? 'No study plans yet' : 'No exams scheduled yet'}
+          />
+        )
       ) : (
         <div>
-          {filtered.map((sch, i) => {
-            const isLast = i === filtered.length - 1
-            const sortedDates = sch.dates && sch.dates.length > 0 ? [...sch.dates].sort() : []
-            return (
-              <div key={sch.id} style={{ marginBottom: isLast ? 0 : TASK_GAP }}>
-                <LiquidGlassCard
+          {visible.map((sch, i) => (
+            <div key={sch.id} style={{ marginBottom: i === visible.length - 1 ? 0 : TASK_GAP }}>
+              {sch.type === 'exam' ? (
+                <ExamScheduleCard dark={dark} schedule={sch} accent={SCHEDULE_ACCENT} delay={i * 90} onViewImage={() => openSchedule(sch)} />
+              ) : (
+                <StudyPlanCard
                   dark={dark}
+                  schedule={sch}
+                  accent={SCHEDULE_ACCENT}
                   delay={i * 90}
-                  onClick={() => openSchedule(sch)}
-                  style={{ borderRadius: 999, padding: '10px 18px 10px 10px', display: 'flex', alignItems: 'center', gap: 14 }}
-                >
-                  <div style={{
-                    width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
-                    background: `${SCHEDULE_ACCENT}22`, border: `1px solid ${SCHEDULE_ACCENT}55`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                  }}>
-                    {sch.type === 'exam' ? <ExamIcon color={SCHEDULE_ACCENT} size={20} /> : <ScheduleIcon color={SCHEDULE_ACCENT} size={20} />}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ ...pulseType.cardTitle, color: pt.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {sch.title}
-                    </div>
-                    <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2 }}>
-                      {sch.week ? sch.week : null}
-                      {sortedDates.length > 0 && (
-                        <span style={{ color: SCHEDULE_ACCENT, fontWeight: 700 }}>
-                          {sch.week ? ' · ' : ''}
-                          {sortedDates.map(d => new Date(d).toLocaleDateString()).join(', ')}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div style={{
-                    background: SCHEDULE_ACCENT, color: '#0f172a',
-                    borderRadius: 10, padding: '8px 14px',
-                    fontWeight: 700, fontSize: 12, flexShrink: 0,
-                    display: 'flex', alignItems: 'center', gap: 6
-                  }}>
-                    <SearchIcon2 color="#0f172a" size={13} /> View
-                  </div>
-                </LiquidGlassCard>
-              </div>
-            )
-          })}
+                  defaultOpen={i === 0}
+                  onViewImage={() => openSchedule(sch)}
+                />
+              )}
+            </div>
+          ))}
         </div>
       )}
     </PageShell>
