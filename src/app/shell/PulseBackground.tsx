@@ -5,14 +5,14 @@ import KineticGrid from '@/shared/ui/motion/kinetic-grid'
 // page uses the exact same gradient rather than redefining it.
 export const PULSE_BG = [
   'linear-gradient(180deg,',
-  '#a6d2ef 0%,',
-  '#97bcd7 15%,',
-  '#81a6c3 30%,',
-  '#6c8fad 45%,',
-  '#497194 60%,',
-  '#274e79 75%,',
-  '#042a59 90%,',
-  '#010c4a 100%)',
+  '#c1e8ff 0%,',
+  '#7da0ca 15%,',
+  '#7da0ca 30%,',
+  '#5483b3 45%,',
+  '#5483b3 60%,',
+  '#052659 75%,',
+  '#052659 90%,',
+  '#021024 100%)',
 ].join(' ')
 
 // `interactive` layers the kinetic grid (see components/ui/kinetic-grid.tsx)
