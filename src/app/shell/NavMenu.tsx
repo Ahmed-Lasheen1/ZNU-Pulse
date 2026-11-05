@@ -49,6 +49,10 @@ const PILL_W = 'min(220px, calc(100vw - 48px))'
 const PANEL_OFFSET = 8
 const PANEL_PAD = 12
 
+// Extra visible room the clip wrapper leaves around the panel: sides for the glow, bottom for the spring overshoot.
+const CLIP_BLEED_X = 8
+const CLIP_BLEED_BOTTOM = 64
+
 // How far apart the pills end up, and where each starts: just above the clip line under the toggle button.
 const PILL_STEP = PILL_H + PILL_GAP
 const PILL_START = -(PILL_STEP + PILL_H)
@@ -222,16 +226,27 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
     navigate('/')
   }
 
-  const panelStyle: CSSProperties = {
+  // Outer wrapper that clips the pills at the line under the toggle button with a plain rectangular overflow clip.
+  // It ignores pointer events so its bleed area never blocks the page.
+  const clipStyle: CSSProperties = {
     position: 'absolute',
     top: BUTTON_SIZE,
-    [cornerSide]: -PANEL_PAD,
+    [cornerSide]: -(PANEL_PAD + CLIP_BLEED_X),
+    padding: `0 ${CLIP_BLEED_X}px ${CLIP_BLEED_BOTTOM}px`,
+    maxWidth: '100vw',
+    boxSizing: 'border-box',
+    overflow: 'hidden',
+    pointerEvents: 'none',
+    zIndex: 1999,
+  } as CSSProperties
+
+  const panelStyle: CSSProperties = {
+    position: 'relative',
     display: 'flex', flexDirection: 'column', gap: PILL_GAP,
     alignItems: cornerSide === 'right' ? 'flex-end' : 'flex-start',
     padding: `${PANEL_OFFSET}px ${PANEL_PAD}px ${PANEL_PAD}px`,
-    maxWidth: '100vw',
+    maxWidth: '100%',
     boxSizing: 'border-box',
-    zIndex: 1999,
     fontFamily: pulseFonts.body,
     pointerEvents: open ? 'auto' : 'none',
     ['--count' as string]: pillCount,
@@ -244,18 +259,19 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
   } as CSSProperties
 
   return (
-    // Taps inside the menu must not reach the background grid's window listener, which starts a full-screen ripple redraw.
+    // Pointer events inside the menu must not reach the background grid's window listeners, which redraw the full-screen canvas.
     <div
       ref={wrapperRef}
       onPointerDown={e => e.stopPropagation()}
+      onPointerMove={e => e.stopPropagation()}
       style={{ position: 'relative', width: BUTTON_SIZE, height: BUTTON_SIZE }}
     >
       <style>{`
-        /* The top edge sits right under the toggle button: pills slide out from it and back behind it.
-           The bottom clip margin leaves room for the spring overshoot of the last pills. */
+        /* The clip wrapper's top edge sits right under the toggle button: pills slide out from it and back behind it.
+           A plain overflow clip replaces clip-path, which forced a mask over every moving pill on each frame.
+           The bottom bleed leaves room for the spring overshoot of the last pills. */
         .nav-panel {
           --open-ease: ${SMOOTH_EASE};
-          clip-path: inset(0 -20px -64px -20px);
           scrollbar-width: none;
           overscroll-behavior: contain;
         }
@@ -276,7 +292,9 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
           }
         }
 
-        /* Closed: above the clip line, out of sight. Only position and opacity change (no scaling), so nothing is re-rasterized. */
+        /* Closed: above the clip line, out of sight. Only position and opacity change (no scaling), so nothing is re-rasterized.
+           translate3d keeps each pill on the same compositor layer from start to finish, so there is no re-raster snap when the
+           transition ends; backface-visibility hidden is the usual guard against flicker on transformed layers. */
         .nav-pill {
           --close-delay: calc((var(--count) - 1 - var(--i)) * ${CLOSE_STAGGER_MS}ms);
           flex-shrink: 0;
@@ -284,7 +302,9 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
           opacity: 0;
           visibility: hidden;
           will-change: transform, opacity;
-          transform: translateY(calc(var(--start) - var(--i) * var(--step)));
+          backface-visibility: hidden;
+          -webkit-backface-visibility: hidden;
+          transform: translate3d(0, calc(var(--start) - var(--i) * var(--step)), 0);
           transition:
             transform ${CLOSE_MS}ms ${CLOSE_EASE} var(--close-delay),
             opacity ${END_FADE_MS}ms linear calc(${CLOSE_MS - END_FADE_MS}ms + var(--close-delay)),
@@ -296,7 +316,7 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
           --open-delay: calc(var(--i) * ${OPEN_STAGGER_MS}ms);
           opacity: 1;
           visibility: visible;
-          transform: none;
+          transform: translate3d(0, 0, 0);
           transition:
             transform ${OPEN_MS}ms var(--open-ease) var(--open-delay),
             opacity 100ms linear var(--open-delay),
@@ -328,87 +348,89 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
           .nav-pill, .nav-panel[data-open="true"] .nav-pill {
             transition-duration: 0.01ms !important;
             transition-delay: 0s !important;
-            transform: none;
+            transform: translate3d(0, 0, 0);
           }
         }
       `}</style>
 
-      <div
-        id="nav-menu-panel"
-        className="nav-panel"
-        data-open={open}
-        aria-label="Site navigation"
-        aria-hidden={!open}
-        {...(!open ? { inert: '' as any } : {})}
-        onBlur={handleContentBlur}
-        style={panelStyle}
-      >
-        {user ? (
-          <button
-            type="button" className="nav-pill nav-pill-btn glass-focus-ring" tabIndex={tabIndex}
-            onClick={() => goTo('/profile')}
-            style={{ ...pillStyle(pt), ...slot(0), flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 2, cursor: 'pointer', lineHeight: 1.15 }}
-          >
-            <span style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, maxWidth: '100%' }}>
-              <UserIcon color={pt.text} size={13} />
-              <span style={{ fontSize: 13, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                Dr. {profile?.name || '...'}
-              </span>
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: pt.amber, fontSize: 12, fontWeight: 700 }}>
-              <StarIcon color={pt.amber} size={12} />
-              {profile?.points || 0} points
-            </span>
-          </button>
-        ) : (
-          <button
-            type="button" className="nav-pill glass-focus-ring" tabIndex={tabIndex}
-            onClick={() => goTo('/auth')}
-            style={{
-              ...pillStyle(pt), ...slot(0), cursor: 'pointer',
-              backgroundImage: `linear-gradient(135deg, ${pt.cobalt}cc, ${pt.indigo}cc)`,
-              color: '#fff', fontWeight: 800,
-            }}
-          >Sign In →</button>
-        )}
-
-        <div className="nav-pill" style={{ ...pillStyle(pt), ...slot(searchSlot), padding: 0 }}>
-          <NavSearch pt={pt} tabIndex={tabIndex} onSubmit={submitSearch} />
-        </div>
-
-        {navItems.map((item, i) => {
-          const Icon = item.Icon
-          const iconColor = pt[item.accent] || pt.text
-          return (
-            <button
-              key={item.href} type="button" className="nav-pill nav-pill-btn glass-focus-ring" tabIndex={tabIndex}
-              onClick={() => goTo(item.href)}
-              style={{ ...pillStyle(pt), ...slot(firstNavSlot + i), cursor: 'pointer', fontWeight: item.href === '/' ? 800 : 600 }}
-            >
-              <Icon color={iconColor} size={17} />
-              {item.label}
-            </button>
-          )
-        })}
-
-        {/* Theme: only the switch, centred, with no glass pill behind it. */}
+      <div className="nav-clip" style={clipStyle}>
         <div
-          className="nav-pill"
-          style={{ ...slot(themeSlot), display: 'flex', alignItems: 'center', justifyContent: 'center', width: PILL_W, height: PILL_H }}
+          id="nav-menu-panel"
+          className="nav-panel"
+          data-open={open}
+          aria-label="Site navigation"
+          aria-hidden={!open}
+          {...(!open ? { inert: '' as any } : {})}
+          onBlur={handleContentBlur}
+          style={panelStyle}
         >
-          <ThemeSwitch dark={dark} onToggle={toggleTheme} scale={0.62} stretchX={1.3} />
-        </div>
+          {user ? (
+            <button
+              type="button" className="nav-pill nav-pill-btn glass-focus-ring" tabIndex={tabIndex}
+              onClick={() => goTo('/profile')}
+              style={{ ...pillStyle(pt), ...slot(0), flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 2, cursor: 'pointer', lineHeight: 1.15 }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, maxWidth: '100%' }}>
+                <UserIcon color={pt.text} size={13} />
+                <span style={{ fontSize: 13, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  Dr. {profile?.name || '...'}
+                </span>
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: pt.amber, fontSize: 12, fontWeight: 700 }}>
+                <StarIcon color={pt.amber} size={12} />
+                {profile?.points || 0} points
+              </span>
+            </button>
+          ) : (
+            <button
+              type="button" className="nav-pill glass-focus-ring" tabIndex={tabIndex}
+              onClick={() => goTo('/auth')}
+              style={{
+                ...pillStyle(pt), ...slot(0), cursor: 'pointer',
+                backgroundImage: `linear-gradient(135deg, ${pt.cobalt}cc, ${pt.indigo}cc)`,
+                color: '#fff', fontWeight: 800,
+              }}
+            >Sign In →</button>
+          )}
 
-        {user && (
-          <button
-            type="button" className="nav-pill nav-pill-btn glass-focus-ring" tabIndex={tabIndex}
-            onClick={() => setShowSignOutConfirm(true)}
-            style={{ ...pillStyle(pt), ...slot(signOutSlot), justifyContent: 'center', cursor: 'pointer', color: pt.danger, fontWeight: 700 }}
+          <div className="nav-pill" style={{ ...pillStyle(pt), ...slot(searchSlot), padding: 0 }}>
+            <NavSearch pt={pt} tabIndex={tabIndex} onSubmit={submitSearch} />
+          </div>
+
+          {navItems.map((item, i) => {
+            const Icon = item.Icon
+            const iconColor = pt[item.accent] || pt.text
+            return (
+              <button
+                key={item.href} type="button" className="nav-pill nav-pill-btn glass-focus-ring" tabIndex={tabIndex}
+                onClick={() => goTo(item.href)}
+                style={{ ...pillStyle(pt), ...slot(firstNavSlot + i), cursor: 'pointer', fontWeight: item.href === '/' ? 800 : 600 }}
+              >
+                <Icon color={iconColor} size={17} />
+                {item.label}
+              </button>
+            )
+          })}
+
+          {/* Theme: only the switch, centred, with no glass pill behind it. */}
+          <div
+            className="nav-pill"
+            style={{ ...slot(themeSlot), display: 'flex', alignItems: 'center', justifyContent: 'center', width: PILL_W, height: PILL_H }}
           >
-            <SignOutIcon color={pt.danger} size={17} />
-            Sign Out
-          </button>
-        )}
+            <ThemeSwitch dark={dark} onToggle={toggleTheme} scale={0.62} stretchX={1.3} />
+          </div>
+
+          {user && (
+            <button
+              type="button" className="nav-pill nav-pill-btn glass-focus-ring" tabIndex={tabIndex}
+              onClick={() => setShowSignOutConfirm(true)}
+              style={{ ...pillStyle(pt), ...slot(signOutSlot), justifyContent: 'center', cursor: 'pointer', color: pt.danger, fontWeight: 700 }}
+            >
+              <SignOutIcon color={pt.danger} size={17} />
+              Sign Out
+            </button>
+          )}
+        </div>
       </div>
 
       <ConfirmDialog
