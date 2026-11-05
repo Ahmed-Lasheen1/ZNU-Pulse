@@ -11,6 +11,7 @@ import { CardRowsSkeleton } from '@/shared/ui/feedback/Skeletons'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import ConfirmDialog from '@/shared/ui/feedback/ConfirmDialog'
 import AutoDirText from '@/shared/ui/display/AutoDirText'
+import DateStamp from '@/shared/ui/display/DateStamp'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { networkFirst, cachedSnapshot } from '@/core/dataCache'
 import { getGuestToken } from '@/features/tools/pulse-check/pollIdentity'
@@ -27,6 +28,7 @@ interface PollOption {
 interface Poll {
   id: string
   title: string
+  created_at: string
   closes_at: string | null
   closed: boolean
   allow_multiple: boolean
@@ -50,6 +52,7 @@ interface PollsSectionProps {
 const REFRESH_MS = 15000
 const MIN_OPTIONS = 2
 const MAX_OPTIONS = 6
+const INPUT_FONT_SIZE = 16
 
 const newOption = (): OptionDraft => ({ id: crypto.randomUUID(), value: '' })
 
@@ -137,19 +140,17 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
     setVotingId(null)
   }
 
+  // Single choice: tapping your own option again removes the vote. Multiple: each tap toggles that option.
   function chooseOption(poll: Poll, optionId: string) {
     const mine = poll.my_votes || []
     const has = mine.includes(optionId)
     if (!poll.allow_multiple) {
-      if (!has) saveVotes(poll, [optionId], mine.length > 0 ? 'Vote changed' : '✅ Vote saved')
+      if (has) saveVotes(poll, [], 'Vote removed')
+      else saveVotes(poll, [optionId], mine.length > 0 ? 'Vote changed' : '✅ Vote saved')
       return
     }
     const next = has ? mine.filter(id => id !== optionId) : [...mine, optionId]
     saveVotes(poll, next, next.length === 0 ? 'Vote removed' : has ? 'Choice removed' : '✅ Vote saved')
-  }
-
-  function removeVote(poll: Poll) {
-    saveVotes(poll, [], 'Vote removed')
   }
 
   function resetForm() {
@@ -197,7 +198,7 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
     refreshPolls()
   }
 
-  const inStyle = { ...glassInput(pt, dark), padding: '12px 18px', marginBottom: 0 }
+  const inStyle = { ...glassInput(pt, dark), padding: '12px 18px', marginBottom: 0, fontSize: INPUT_FONT_SIZE }
   const arabicFont = (text: string) => (isArabicText(text) ? { fontFamily: ARABIC_FONT } : {})
   const pillBtn = (color: string) => ({
     background: 'transparent', border: `1px solid ${color}66`, color, borderRadius: 999,
@@ -286,8 +287,8 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
           poll.show_results
             ? `${total} ${poll.allow_multiple ? 'voter' : 'vote'}${total === 1 ? '' : 's'}`
             : 'Vote to see the results',
-          !poll.closed && poll.allow_multiple ? 'you can pick more than one' : null,
-          !poll.closed && !poll.allow_multiple && mine.length > 0 ? 'tap another option to change your vote' : null,
+          !poll.closed && poll.allow_multiple ? 'you can pick more than one, tap a choice again to remove it' : null,
+          !poll.closed && !poll.allow_multiple && mine.length > 0 ? 'tap another option to change your vote, or tap yours again to remove it' : null,
         ].filter(Boolean)
 
         return (
@@ -310,6 +311,7 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
                       background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', color: pt.textSecondary,
                     }}>Multiple choice</span>
                   )}
+                  <DateStamp value={poll.created_at} color={pt.textMuted} />
                 </div>
 
                 <AutoDirText text={poll.title} style={{ ...pulseType.cardTitle, color: pt.textPrimary, marginBottom: 14, ...wrapText }} />
@@ -360,21 +362,14 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
 
               <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>{footerParts.join(' · ')}</div>
 
-              {(!poll.closed && mine.length > 0) || isAdmin ? (
+              {isAdmin && (
                 <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-                  {!poll.closed && mine.length > 0 && (
-                    <button onClick={() => removeVote(poll)} disabled={isVoting} style={pillBtn(pt.sub)}>Remove my vote</button>
-                  )}
-                  {isAdmin && (
-                    <>
-                      <button onClick={() => toggleClosed(poll)} style={pillBtn(pt.sub)}>{poll.closed ? 'Reopen' : 'Close poll'}</button>
-                      <button onClick={() => setConfirmDeleteId(poll.id)} style={pillBtn(pt.danger)}>
-                        <TrashIcon color={pt.danger} size={12} /> Delete
-                      </button>
-                    </>
-                  )}
+                  <button onClick={() => toggleClosed(poll)} style={pillBtn(pt.sub)}>{poll.closed ? 'Reopen' : 'Close poll'}</button>
+                  <button onClick={() => setConfirmDeleteId(poll.id)} style={pillBtn(pt.danger)}>
+                    <TrashIcon color={pt.danger} size={12} /> Delete
+                  </button>
                 </div>
-              ) : null}
+              )}
             </LiquidGlassCard>
           </div>
         )

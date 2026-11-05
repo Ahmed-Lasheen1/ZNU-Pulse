@@ -16,6 +16,7 @@ import { NotifyPermissionButton } from '@/features/notifications'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import ConfirmDialog from '@/shared/ui/feedback/ConfirmDialog'
 import AutoDirText from '@/shared/ui/display/AutoDirText'
+import DateStamp from '@/shared/ui/display/DateStamp'
 import PollsSection from '@/features/tools/pulse-check/PollsSection'
 import { containsProfanity } from '@/shared/utils/moderation'
 import { isSuccessMessage } from '@/shared/utils/messageStyle'
@@ -33,6 +34,7 @@ const QUESTIONS_ACCENT = '#a78bfa'
 const POLLS_ACCENT = '#2dd4bf'
 
 const RECENT_QUESTIONS_LIMIT = 300
+const INPUT_FONT_SIZE = 16
 
 const SUBMIT_COOLDOWN_MS = 30_000
 const COOLDOWN_STORAGE_KEY = 'anon_q_last_submit_at'
@@ -298,7 +300,7 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
   const unansweredQs = questions.filter(q => !q.answered)
 
   const isSuccess = isSuccessMessage(msg)
-  const inStyle = { ...glassInput(pt, dark), padding: '13px 20px' }
+  const inStyle = { ...glassInput(pt, dark), padding: '13px 20px', fontSize: INPUT_FONT_SIZE }
   const arabicFont = (text: string) => (isArabicText(text) ? { fontFamily: ARABIC_FONT } : {})
   const submitDisabled = cooldownRemaining > 0
   const cooldownSeconds = Math.ceil(cooldownRemaining / 1000)
@@ -386,15 +388,18 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
                     }}>
                       <div dir={textDir(q.question)}>
                         <AutoDirText text={q.question} style={{ color: pt.textPrimary, fontSize: 13, marginBottom: 8 }} />
-                        <span style={{
-                          fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
-                          background: q.answered ? 'rgba(74,222,128,0.16)' : `${pt.amber}20`,
-                          color: q.answered ? '#4ade80' : pt.amber,
-                          display: 'inline-flex', alignItems: 'center', gap: 5
-                        }}>
-                          {q.answered ? <CheckCircleIcon color="#4ade80" size={12} /> : <ClockIcon color={pt.amber} size={12} />}
-                          {q.answered ? 'Answered' : 'Waiting for an answer'}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                          <span style={{
+                            fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
+                            background: q.answered ? 'rgba(74,222,128,0.16)' : `${pt.amber}20`,
+                            color: q.answered ? '#4ade80' : pt.amber,
+                            display: 'inline-flex', alignItems: 'center', gap: 5
+                          }}>
+                            {q.answered ? <CheckCircleIcon color="#4ade80" size={12} /> : <ClockIcon color={pt.amber} size={12} />}
+                            {q.answered ? 'Answered' : 'Waiting for an answer'}
+                          </span>
+                          <DateStamp value={q.created_at} color={pt.textMuted} />
+                        </div>
                       </div>
                       {q.answered && q.answer && (
                         <div dir={textDir(q.answer)} style={{
@@ -432,11 +437,14 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
                 return (
                   <div key={q.id} style={{ marginBottom: isLast ? 0 : 12 }}>
                     <LiquidGlassCard dark={dark} delay={i * 60} style={{ padding: 18 }}>
-                      <div dir={textDir(q.question)} style={{ color: pt.textPrimary, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <div dir={textDir(q.question)} style={{ color: pt.textPrimary, fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                         <span style={{ flexShrink: 0, display: 'inline-flex', paddingTop: 3 }}>
                           <QuestionMarkIcon color={pt.textPrimary} size={15} />
                         </span>
                         <AutoDirText text={q.question} wrapperStyle={{ flex: 1, minWidth: 0 }} />
+                      </div>
+                      <div style={{ marginBottom: 12 }}>
+                        <DateStamp value={q.created_at} color={pt.textMuted} />
                       </div>
                       <textarea
                         dir="auto"
@@ -478,11 +486,14 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
               return (
                 <div key={q.id} style={{ marginBottom: isLast ? 0 : 12 }}>
                   <LiquidGlassCard dark={dark} delay={i * 60} style={{ padding: 20 }}>
-                    <div dir={textDir(q.question)} style={{ color: pt.textPrimary, fontWeight: 700, marginBottom: 12, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                    <div dir={textDir(q.question)} style={{ color: pt.textPrimary, fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                       <span style={{ flexShrink: 0, display: 'inline-flex', paddingTop: 3 }}>
                         <QuestionMarkIcon color={pt.textPrimary} size={15} />
                       </span>
                       <AutoDirText text={q.question} wrapperStyle={{ flex: 1, minWidth: 0 }} />
+                    </div>
+                    <div style={{ marginBottom: 12 }}>
+                      <DateStamp value={q.created_at} color={pt.textMuted} />
                     </div>
                     <div dir={textDir(q.answer || '')} style={{
                       background: 'rgba(74,222,128,0.10)', border: '1px solid rgba(74,222,128,0.25)',

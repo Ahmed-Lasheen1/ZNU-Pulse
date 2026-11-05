@@ -10,3 +10,10 @@ export const countLabel = (n: number) => plural(n, 'question')
 export function escapeLikePattern(value: string) {
   return value.replace(/[%_\\]/g, '\\$&')
 }
+
+// "Oct 22, 2026" in the visitor's locale; empty for invalid dates.
+export function formatDate(value: string | number | Date) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+}
