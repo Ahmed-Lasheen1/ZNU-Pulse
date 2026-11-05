@@ -174,3 +174,15 @@ h1, h2, h3 {
     0 0 0 4px #38bdf8,
     0 0 0 5px rgba(0, 0, 0, 0.18);
 }
+
+/* Study screens (MCQ and flashcards) */
+
+.study-btn { transition: opacity 0.15s ease, transform 0.12s ease; }
+.study-btn:active { transform: scale(0.97); }
+.study-btn:disabled:active { transform: none; }
+
+/* Keyboard shortcut hints only make sense with a mouse and keyboard. */
+.kbd-hint { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .kbd-hint { display: block; }
+}

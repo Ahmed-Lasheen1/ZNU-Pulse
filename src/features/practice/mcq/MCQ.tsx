@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '@/core/supabase'
 import { useAuth, useModules } from '@/core/contexts'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
+import { useStudyFontScale } from '@/shared/hooks/useStudyFontScale'
 import { fetchModuleStages } from '@/services/content/moduleStages'
 import { fetchAllSubjects } from '@/services/content/subjects'
 import { fetchAllLessons } from '@/services/content/lessons'
@@ -12,7 +13,6 @@ import { isTransientFailure } from '@/services/offline/isTransientFailure'
 import { fetchLessonStageMap, inStage } from '@/services/content/lessonStages'
 import { getGuestFlags, toggleGuestFlag, enrichGuestFlagsWithResults, addGuestHistory } from '@/services/history/reviewStorage'
 import { loadSavedActiveExam, persistActiveExam, clearActiveExam } from '@/services/exam/activeExam'
-import { storageGet, storageSet } from '@/core/safeStorage'
 import { fetchSimulatorConfig, drawSimulator, drawProportional, simulatorSourceChoice, simulatorTotal, QUIZ_MAX_QUESTIONS } from '@/services/exam/stageSimulator'
 import { clearHomeHistory } from '@/services/content/homeData'
 import { saveFullAttempt } from '@/services/history/fullHistory'
@@ -100,18 +100,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const [sourceChoice, setSourceChoice] = useState<SourceChoice | null>(null)
   const [quizStage, setQuizStage] = useState<string | null>(null)
 
-  const FONT_SCALES = [0.9, 1, 1.15, 1.3]
-  const [fontScale, setFontScale] = useState<number>(() => {
-    const saved = storageGet('znu_mcq_font_scale')
-    const parsed = saved ? parseFloat(saved) : 1
-    return FONT_SCALES.includes(parsed) ? parsed : 1
-  })
-  useEffect(() => { storageSet('znu_mcq_font_scale', String(fontScale)) }, [fontScale])
-
-  // Cycles through the available exam text sizes.
-  function cycleFontScale() {
-    setFontScale(prev => FONT_SCALES[(FONT_SCALES.indexOf(prev) + 1) % FONT_SCALES.length])
-  }
+  const { fontScale, cycleFontScale } = useStudyFontScale()
 
   const timerRef = useRef<ReturnType<typeof setInterval>>()
   const quizStartedAtRef = useRef<number | null>(null)
