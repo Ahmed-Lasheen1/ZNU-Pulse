@@ -2,27 +2,38 @@ import type { ReactNode } from 'react'
 
 interface FlipCardProps {
   flipped: boolean
-  onFlip: () => void
+  // Called on every tap; the parent decides whether to show the answer or the question.
+  onToggle: () => void
   front: ReactNode
   back: ReactNode
 }
 
-// Card that rotates in 3D to reveal its back; both faces share one grid cell.
-export default function FlipCard({ flipped, onFlip, front, back }: FlipCardProps) {
+// Swaps the question and answer faces with a short crossfade, so the text never rotates or mirrors.
+// The hidden face is removed from hit-testing and scrolling, so the visible face always scrolls.
+export default function FlipCard({ flipped, onToggle, front, back }: FlipCardProps) {
+  // Toggles between question and answer, unless the tap ended a text selection.
+  function handleClick() {
+    if (window.getSelection()?.toString()) return
+    onToggle()
+  }
+
   return (
     <div className="flip-scene">
       <style>{`
-        .flip-scene { perspective: 1400px; }
-        .flip-inner {
-          display: grid; border-radius: 18px; outline: none;
-          transform-style: preserve-3d;
-          transition: transform 0.55s cubic-bezier(0.4, 0.2, 0.2, 1);
+        .flip-inner { display: grid; border-radius: 18px; outline: none; cursor: pointer; }
+        .flip-face {
+          grid-area: 1 / 1; min-width: 0;
+          opacity: 1; transform: none; visibility: visible;
+          transition: opacity 0.25s ease, transform 0.25s ease, visibility 0s;
         }
-        .flip-inner[data-flipped="true"] { transform: rotateY(180deg); }
-        .flip-inner[data-flipped="false"] { cursor: pointer; }
-        .flip-face { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-        .flip-face-back { transform: rotateY(180deg); }
-        @media (prefers-reduced-motion: reduce) { .flip-inner { transition: none; } }
+        .flip-face[data-shown="false"] {
+          opacity: 0; transform: translateY(8px) scale(0.98);
+          visibility: hidden; pointer-events: none;
+          transition: opacity 0.25s ease, transform 0.25s ease, visibility 0s linear 0.25s;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .flip-face, .flip-face[data-shown="false"] { transition: none; transform: none; }
+        }
       `}</style>
 
       <div
@@ -30,11 +41,11 @@ export default function FlipCard({ flipped, onFlip, front, back }: FlipCardProps
         data-flipped={flipped}
         role="button"
         tabIndex={0}
-        aria-label={flipped ? 'Answer shown' : 'Show answer'}
-        onClick={() => { if (!flipped) onFlip() }}
+        aria-label={flipped ? 'Answer shown — tap to see the question' : 'Show answer'}
+        onClick={handleClick}
       >
-        <div className="flip-face" aria-hidden={flipped}>{front}</div>
-        <div className="flip-face flip-face-back" aria-hidden={!flipped}>{back}</div>
+        <div className="flip-face" data-shown={!flipped} aria-hidden={flipped}>{front}</div>
+        <div className="flip-face" data-shown={flipped} aria-hidden={!flipped}>{back}</div>
       </div>
     </div>
   )

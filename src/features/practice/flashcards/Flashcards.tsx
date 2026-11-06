@@ -16,7 +16,7 @@ import { fetchLessonsForModule } from '@/services/content/lessons'
 import { fetchLessonStageMap, inStage } from '@/services/content/lessonStages'
 import { loadProgress, saveReview, syncProgress } from '@/services/flashcards/progress'
 import {
-  buildSession, emptyCard, fromStored, isDue, newerProgress, reviewCard, toStored,
+  buildPracticeSession, buildSession, emptyCard, fromStored, isDue, newerProgress, reviewCard, toStored,
   type Answer, type ProgressMap,
 } from '@/services/flashcards/scheduler'
 import { FLASHCARD_ACCENT } from '@/shared/theme/accents'
@@ -25,7 +25,8 @@ import FlashcardStudy from '@/features/practice/flashcards/FlashcardStudy'
 interface FlashcardModule { id: string; name: string; icon?: string | null; color: string; status: 'active' | 'completed' }
 interface FlashcardRow { id: string; lesson_id: string; front: string; back: string; created_at: string }
 interface FlashcardLesson { id: string; title: string }
-interface Session { lessonId: string; title: string; queue: FlashcardRow[]; run: number }
+// `practice` sessions ("review anyway") never change the saved schedule.
+interface Session { lessonId: string; title: string; queue: FlashcardRow[]; run: number; practice: boolean }
 
 const PAGE_MAX_WIDTH = 900
 
@@ -99,15 +100,19 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
     }
   }, [userId, mod.id])
 
-  // Builds a session for a lesson from its due and new cards.
+  // Starts a session for a lesson: due and new cards first, or a "review anyway" practice session when none are left.
   function start(lessonId: string, run = 0) {
-    const queue = buildSession(cards.filter(c => c.lesson_id === lessonId), progress, new Date())
+    const lessonCards = cards.filter(c => c.lesson_id === lessonId)
+    const due = buildSession(lessonCards, progress, new Date())
+    const practice = due.length === 0
+    const queue = practice ? buildPracticeSession(lessonCards) : due
     if (queue.length === 0) {
-      showToast(run > 0 ? 'No more cards for now' : "You're all caught up on this lesson", 'info')
+      showToast('No cards in this lesson yet', 'info')
       setSession(null)
       return
     }
-    setSession({ lessonId, title: lessons.find(l => l.id === lessonId)?.title || 'Flashcards', queue, run })
+    if (practice && run === 0) showToast("Nothing due — reviewing anyway. Your schedule won't change.", 'info')
+    setSession({ lessonId, title: lessons.find(l => l.id === lessonId)?.title || 'Flashcards', queue, run, practice })
     window.scrollTo({ top: 0 })
   }
 
@@ -119,7 +124,7 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, progressLoaded])
 
-  // Schedules the card from the answer and saves it on the device.
+  // Schedules the card from the answer and saves it on the device (never called in practice sessions).
   function rate(cardId: string, answer: Answer) {
     const now = new Date()
     const saved = progress[cardId]
@@ -140,6 +145,7 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
       accent={FLASHCARD_ACCENT}
       title={session.title}
       queue={session.queue}
+      practice={session.practice}
       onRate={rate}
       onFinish={pushProgress}
       onMore={() => start(session.lessonId, session.run + 1)}
@@ -210,7 +216,7 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
               color: toStudy > 0 ? '#0f172a' : pt.textMuted,
               border: toStudy > 0 ? 'none' : `1px solid ${pt.border}`,
               borderRadius: 999, padding: '6px 14px', fontSize: 12, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap',
-            }}>{toStudy > 0 ? `${toStudy} to study` : '✓ Caught up'}</div>
+            }}>{toStudy > 0 ? `${toStudy} to study` : 'Review anyway'}</div>
           </LiquidGlassCard>
         ))}
       </div>

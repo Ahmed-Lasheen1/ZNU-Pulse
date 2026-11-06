@@ -25,6 +25,8 @@ interface FlashcardStudyProps {
   accent: string
   title: string
   queue: StudyCardItem[]
+  // True for "review anyway" sessions: answers are never saved or scheduled.
+  practice?: boolean
   onRate: (cardId: string, answer: Answer) => void
   onFinish: () => void
   onMore: () => void
@@ -43,8 +45,8 @@ function Stat({ label, value, color, mutedColor }: { label: string; value: strin
   )
 }
 
-// Runs one study session: flip a card, then record "Again" or "Got it".
-export default function FlashcardStudy({ dark, accent, title, queue: initialQueue, onRate, onFinish, onMore, onExit }: FlashcardStudyProps) {
+// Runs one study session: flip a card, then record "Again" or "Got it" (not saved in practice sessions).
+export default function FlashcardStudy({ dark, accent, title, queue: initialQueue, practice = false, onRate, onFinish, onMore, onExit }: FlashcardStudyProps) {
   const pt = getPulseTheme(dark)
   const { fontScale, cycleFontScale } = useStudyFontScale()
   const [queue, setQueue] = useState(initialQueue)
@@ -59,7 +61,7 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
   const current = queue[0] ?? null
   const finished = queue.length === 0
 
-  // The back keeps showing the last revealed card while the flip-back plays, so the next answer never flashes.
+  // The back keeps showing the last revealed card while the face fades out, so the next answer never flashes.
   const revealedRef = useRef<StudyCardItem | null>(current)
   if (flipped && current) revealedRef.current = current
   const backCard = revealedRef.current
@@ -67,7 +69,7 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
   // Records the answer; "Again" sends the card to the back of the queue, "Got it" removes it.
   function answer(result: Answer) {
     if (!current || !flipped) return
-    onRate(current.id, result)
+    if (!practice) onRate(current.id, result)
     setFlipped(false)
     if (result === 'again') {
       retriedRef.current.add(current.id)
@@ -80,8 +82,8 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
 
   const answerRef = useRef(answer)
   answerRef.current = answer
-  const flipRef = useRef(() => {})
-  flipRef.current = () => { if (current && !flipped) setFlipped(true) }
+  const toggleRef = useRef(() => {})
+  toggleRef.current = () => { if (current) setFlipped(f => !f) }
 
   // Tells the page once when the queue is empty so it can upload progress.
   useEffect(() => {
@@ -92,12 +94,12 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finished])
 
-  // Keyboard shortcuts: Space/Enter reveals, 1 = Again, 2 = Got it.
+  // Keyboard shortcuts: Space/Enter flips the card, 1 = Again, 2 = Got it.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON') return
-      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flipRef.current() }
+      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggleRef.current() }
       else if (e.key === '1') answerRef.current('again')
       else if (e.key === '2') answerRef.current('good')
     }
@@ -123,7 +125,7 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
       <StudyHeader
         dark={dark}
         eyebrow={`ZNU · ${title.toUpperCase()}`}
-        status={finished ? 'SESSION COMPLETE' : `CARD ${Math.min(mastered + 1, total)} / ${total}`}
+        status={finished ? 'SESSION COMPLETE' : `${practice ? 'PRACTICE · ' : ''}CARD ${Math.min(mastered + 1, total)} / ${total}`}
         fontScale={fontScale}
         onCycleFontScale={finished ? undefined : cycleFontScale}
         onExit={onExit}
@@ -139,13 +141,17 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
             dark={dark}
             accent={accent}
           />
-          <div style={{ ...pulseType.small, color: ON_GRADIENT_TOP.muted, textAlign: 'right', margin: '-10px 2px 14px 0' }}>
-            {queue.length} left
+          <div style={{
+            ...pulseType.small, color: ON_GRADIENT_TOP.muted, margin: '-10px 2px 14px 0',
+            display: 'flex', justifyContent: practice ? 'space-between' : 'flex-end', gap: 12,
+          }}>
+            {practice && <span>Review anyway · your schedule is unchanged</span>}
+            <span>{queue.length} left</span>
           </div>
 
           <FlipCard
             flipped={flipped}
-            onFlip={() => setFlipped(true)}
+            onToggle={() => setFlipped(f => !f)}
             front={
               <StudyCard dark={dark} height={STUDY_CARD_HEIGHT}>
                 <AutoDirText text={current.front} style={textStyle} />
@@ -163,7 +169,7 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
             ariaLabel="Flashcard actions"
             maxWidth={MAX_WIDTH}
             onHeightChange={setBarHeight}
-            hint="Space to reveal · 1 Again · 2 Got it"
+            hint="Space to flip · 1 Again · 2 Got it"
           >
             {!flipped ? (
               <button
@@ -217,7 +223,7 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
 
           <div style={{ display: 'flex', gap: 10, width: '100%' }}>
             <button className="study-btn" onClick={onExit} style={endButton('transparent', pt.sub, `1px solid ${pt.border}`)}>Done</button>
-            <button className="study-btn" onClick={onMore} style={endButton(accent, '#0f172a')}>Study more</button>
+            <button className="study-btn" onClick={onMore} style={endButton(accent, '#0f172a')}>{practice ? 'Review again' : 'Study more'}</button>
           </div>
         </StudyCard>
       )}
