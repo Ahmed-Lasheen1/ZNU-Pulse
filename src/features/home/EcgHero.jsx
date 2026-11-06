@@ -85,8 +85,10 @@ export default function EcgHero({ height = 220 }) {
         width="100%" height="100%"
         style={{ display: 'block', overflow: 'visible' }}
       >
+        {/* Filter regions are sized to the path box plus the stroke, blur (about 3.5 sigma) and, for the shadow, its offset.
+            The beam filters are recomputed every frame, so the tight regions keep that per-frame work small. */}
         <defs>
-          <filter id={shadowId} x="-30%" y="-30%" width="160%" height="170%" colorInterpolationFilters="sRGB">
+          <filter id={shadowId} x="-10%" y="-10%" width="122%" height="128%" colorInterpolationFilters="sRGB">
             <feGaussianBlur in="SourceAlpha" stdDeviation="13" result="blur" />
             <feOffset in="blur" dx="9" dy="17" result="offsetBlur" />
             <feColorMatrix
@@ -103,10 +105,10 @@ export default function EcgHero({ height = 220 }) {
 
           {!reduced && (
             <>
-              <filter id={haloId} x="-60%" y="-60%" width="220%" height="220%">
+              <filter id={haloId} x="-8%" y="-11%" width="116%" height="122%">
                 <feGaussianBlur stdDeviation="6" />
               </filter>
-              <filter id={glowId} x="-40%" y="-40%" width="180%" height="180%">
+              <filter id={glowId} x="-6%" y="-8%" width="112%" height="116%">
                 <feGaussianBlur stdDeviation="2" result="blur" />
                 <feMerge>
                   <feMergeNode in="blur" />
