@@ -1,47 +1,43 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuth, useModules } from '@/core/contexts'
-import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
-import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
+import { ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
 import PageShell from '@/shared/ui/layout/PageShell'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
-import EmptyState from '@/shared/ui/feedback/EmptyState'
-import { CardRowsSkeleton } from '@/shared/ui/feedback/Skeletons'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
-import { ModuleIcon } from '@/shared/icons/medicalIcons'
-import { FlashcardIcon } from '@/shared/icons/FlashcardIcon'
-import { LightbulbIcon, EmptyBoxIcon } from '@/shared/icons/tool-icons'
 import { fetchModuleFlashcards } from '@/services/content/moduleContent'
 import { fetchLessonsForModule } from '@/services/content/lessons'
+import { fetchSubjectsForModule } from '@/services/content/subjects'
+import { fetchModuleStages } from '@/services/content/moduleStages'
 import { fetchLessonStageMap, inStage } from '@/services/content/lessonStages'
 import { loadProgress, saveReview, syncProgress } from '@/services/flashcards/progress'
-import {
-  SESSION_SIZE, buildPracticeSession, buildSession, emptyCard, fromStored, isDue, newerProgress, reviewCard, toStored,
-  type Answer, type ProgressMap,
-} from '@/services/flashcards/scheduler'
-import { plural } from '@/shared/utils/format'
+import { SESSION_SIZE, buildPracticeSession, buildSession, emptyCard, fromStored, isDue, newerProgress, reviewCard, toStored, type Answer, type ProgressMap, } from '@/services/flashcards/scheduler'
 import { FLASHCARD_ACCENT } from '@/shared/theme/accents'
 import FlashcardStudy from '@/features/practice/flashcards/FlashcardStudy'
+import FlashcardsBrowse, { type SubjectGroup } from '@/features/practice/flashcards/FlashcardsBrowse'
 
 interface FlashcardModule { id: string; name: string; icon?: string | null; color: string; status: 'active' | 'completed' }
 interface FlashcardRow { id: string; lesson_id: string; front: string; back: string; created_at: string }
-interface FlashcardLesson { id: string; title: string }
-// `lessonId` is null for the "study all due" session; `practice` sessions ("review anyway") never change the saved schedule.
-interface Session { lessonId: string | null; title: string; queue: FlashcardRow[]; run: number; practice: boolean }
+interface FlashcardLesson { id: string; title: string; subject_id: string }
+interface FlashcardSubject { id: string; name: string; icon?: string | null; color?: string | null }
+// `lessonId` and `subjectId` are both null for the "study all due" session; `practice` sessions never change the saved schedule.
+interface Session { lessonId: string | null; subjectId: string | null; title: string; queue: FlashcardRow[]; run: number; practice: boolean }
 
 const PAGE_MAX_WIDTH = 900
 
-// Lists a module's lessons that have flashcards and runs study sessions for them.
-function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
+// Loads a module's flashcards, runs study sessions and shows the browse page.
+function ModuleFlashcards({ mod, dark, stage: initialStage, initialLessonId }: {
   mod: FlashcardModule; dark: boolean; stage: string; initialLessonId?: string
 }) {
-  const pt = getPulseTheme(dark)
   const { user } = useAuth() as { user: { id: string } | null }
   const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
   const userId = user?.id ?? null
 
   const [cards, setCards] = useState<FlashcardRow[]>([])
   const [lessons, setLessons] = useState<FlashcardLesson[]>([])
+  const [subjects, setSubjects] = useState<FlashcardSubject[]>([])
+  const [stages, setStages] = useState<any[]>([])
+  const [activeStage, setActiveStage] = useState(initialStage)
   const [lessonStageMap, setLessonStageMap] = useState<Record<string, string[]>>({})
   const [progress, setProgress] = useState<ProgressMap>({})
   const [loading, setLoading] = useState(true)
@@ -50,7 +46,7 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
   const [session, setSession] = useState<Session | null>(null)
   const autoStartedRef = useRef(false)
 
-  // Loads the module's cards (cached), lessons and lesson stages.
+  // Loads the module's cards (cached), lessons, subjects, stages and lesson stages.
   useEffect(() => {
     let ignore = false
     setLoading(true)
@@ -58,12 +54,16 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
       fetchModuleFlashcards(mod.id, ({ data, error }: any) => { if (!ignore && !error) setCards(data) }),
       fetchLessonsForModule(mod.id),
       fetchLessonStageMap(),
-    ]).then(([cardsRes, lessonsRes, stageRes]: any[]) => {
+      fetchSubjectsForModule(mod.id),
+      fetchModuleStages(mod.id),
+    ]).then(([cardsRes, lessonsRes, stageRes, subjectsRes, stagesRes]: any[]) => {
       if (ignore) return
       if (cardsRes.data) setCards(cardsRes.data)
       setLessons(lessonsRes.lessons)
       setLessonStageMap(stageRes.map)
-      if (cardsRes.error || lessonsRes.error) setLoadError(true)
+      setSubjects(subjectsRes.subjects)
+      setStages(stagesRes)
+      if (cardsRes.error || lessonsRes.error || subjectsRes.error) setLoadError(true)
       setLoading(false)
     })
     return () => { ignore = true }
@@ -101,25 +101,53 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
     }
   }, [userId, mod.id])
 
+  // Lessons that have cards, and the stages that contain at least one of them.
+  const lessonsWithCards = useMemo(() => lessons.filter(l => cards.some(c => c.lesson_id === l.id)), [lessons, cards])
+  const visibleStages = useMemo(
+    () => stages.filter(s => lessonsWithCards.some(l => inStage({ lesson_id: l.id }, s.value, lessonStageMap))),
+    [stages, lessonsWithCards, lessonStageMap]
+  )
+  const stage = loading || activeStage === 'all' || visibleStages.some(s => s.value === activeStage) ? activeStage : 'all'
+
   // Cards of the lessons shown for the current stage (used by the "study all due" session).
   const visibleCards = useMemo(() => {
     const lessonIds = new Set(lessons.filter(l => inStage({ lesson_id: l.id }, stage, lessonStageMap)).map(l => l.id))
     return cards.filter(c => lessonIds.has(c.lesson_id))
   }, [cards, lessons, lessonStageMap, stage])
 
-  // Starts a session for a lesson: due and new cards first, or a silent "review anyway" practice session when none are left.
-  function start(lessonId: string, run = 0) {
-    const lessonCards = cards.filter(c => c.lesson_id === lessonId)
-    const due = buildSession(lessonCards, progress, new Date())
+  // Starts a session for a card list: due and new cards first, or a "review anyway" practice session when none are left.
+  function begin(pool: FlashcardRow[], meta: Pick<Session, 'lessonId' | 'subjectId' | 'title'>, run: number) {
+    const due = buildSession(pool, progress, new Date())
     const practice = due.length === 0
-    const queue = practice ? buildPracticeSession(lessonCards) : due
+    const queue = practice ? buildPracticeSession(pool) : due
     if (queue.length === 0) {
-      showToast('No cards in this lesson yet', 'info')
+      showToast('No cards here yet', 'info')
       setSession(null)
       return
     }
-    setSession({ lessonId, title: lessons.find(l => l.id === lessonId)?.title || 'Flashcards', queue, run, practice })
+    setSession({ ...meta, queue, run, practice })
     window.scrollTo({ top: 0 })
+  }
+
+  // Starts a session for one lesson.
+  function start(lessonId: string, run = 0) {
+    begin(
+      cards.filter(c => c.lesson_id === lessonId),
+      { lessonId, subjectId: null, title: lessons.find(l => l.id === lessonId)?.title || 'Flashcards' },
+      run
+    )
+  }
+
+  // Starts a session for every lesson of a subject in the current stage.
+  function startSubject(subjectId: string, run = 0) {
+    const lessonIds = new Set(
+      lessons.filter(l => l.subject_id === subjectId && inStage({ lesson_id: l.id }, stage, lessonStageMap)).map(l => l.id)
+    )
+    begin(
+      cards.filter(c => lessonIds.has(c.lesson_id)),
+      { lessonId: null, subjectId, title: subjects.find(s => s.id === subjectId)?.name || 'Flashcards' },
+      run
+    )
   }
 
   // Starts a session of due cards from every lesson (never-studied cards are left out); exits when nothing is due.
@@ -130,7 +158,7 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
       setSession(null)
       return
     }
-    setSession({ lessonId: null, title: 'All due cards', queue, run, practice: false })
+    setSession({ lessonId: null, subjectId: null, title: 'All due cards', queue, run, practice: false })
     window.scrollTo({ top: 0 })
   }
 
@@ -158,7 +186,7 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
 
   if (session) return (
     <FlashcardStudy
-      key={`${session.lessonId ?? 'due'}-${session.run}`}
+      key={`${session.lessonId ?? session.subjectId ?? 'due'}-${session.run}`}
       dark={dark}
       accent={FLASHCARD_ACCENT}
       title={session.title}
@@ -166,109 +194,60 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
       practice={session.practice}
       onRate={rate}
       onFinish={pushProgress}
-      onMore={() => (session.lessonId ? start(session.lessonId, session.run + 1) : startAllDue(session.run + 1))}
+      onMore={() => {
+        if (session.lessonId) start(session.lessonId, session.run + 1)
+        else if (session.subjectId) startSubject(session.subjectId, session.run + 1)
+        else startAllDue(session.run + 1)
+      }}
       onExit={() => { setSession(null); pushProgress() }}
     />
   )
 
   const now = new Date()
-  const lessonRows = lessons
-    .filter(l => cards.some(c => c.lesson_id === l.id) && inStage({ lesson_id: l.id }, stage, lessonStageMap))
-    .map(lesson => {
-      const lessonCards = cards.filter(c => c.lesson_id === lesson.id)
-      const due = lessonCards.filter(c => progress[c.id] && isDue(progress[c.id], now)).length
-      const fresh = lessonCards.filter(c => !progress[c.id]).length
-      return { lesson, total: lessonCards.length, due, toStudy: due + fresh }
+  const groups: SubjectGroup[] = subjects
+    .map(subject => {
+      const rows = lessons
+        .filter(l => l.subject_id === subject.id && inStage({ lesson_id: l.id }, stage, lessonStageMap))
+        .map(lesson => {
+          const lessonCards = cards.filter(c => c.lesson_id === lesson.id)
+          const due = lessonCards.filter(c => progress[c.id] && isDue(progress[c.id], now)).length
+          const fresh = lessonCards.filter(c => !progress[c.id]).length
+          return { lesson, total: lessonCards.length, due, toStudy: due + fresh }
+        })
+        .filter(row => row.total > 0)
+      return {
+        subject,
+        rows,
+        total: rows.reduce((sum, r) => sum + r.total, 0),
+        due: rows.reduce((sum, r) => sum + r.due, 0),
+        toStudy: rows.reduce((sum, r) => sum + r.toStudy, 0),
+      }
     })
-  const dueTotal = lessonRows.reduce((sum, row) => sum + row.due, 0)
-  const dueLessons = lessonRows.filter(row => row.due > 0).length
+    .filter(group => group.rows.length > 0)
+
+  const dueTotal = groups.reduce((sum, g) => sum + g.due, 0)
+  const dueLessons = groups.reduce((sum, g) => sum + g.rows.filter(r => r.due > 0).length, 0)
+  const totalCards = groups.reduce((sum, g) => sum + g.total, 0)
 
   return (
-    <PageShell dark={dark} backFallback={`/module/${mod.id}`} maxWidth={PAGE_MAX_WIDTH}>
-      <div style={{ textAlign: 'center', padding: '10px 0 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-          <ModuleIcon value={mod.icon} size={44} color={mod.color} />
-        </div>
-        <h1 style={{ ...pulseType.pageTitle, fontSize: 24, color: mod.color, marginBottom: 6, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{mod.name}</h1>
-        <div style={{ color: ON_GRADIENT_TOP.muted, fontSize: 13, fontWeight: 600 }}>Flashcards</div>
-      </div>
-
-      {loadError && <ErrorBanner />}
-
-      {!user && (
-        <div style={{ marginBottom: 16 }}>
-          <LiquidGlassCard dark={dark} delay={0} style={{ padding: '12px 18px', textAlign: 'center' }}>
-            <span style={{ color: pt.cobalt, fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <LightbulbIcon color={pt.cobalt} size={14} /> Your progress is saved on this device only. Sign in to keep it across devices.
-            </span>
-          </LiquidGlassCard>
-        </div>
-      )}
-
-      {loading && <CardRowsSkeleton count={3} label="Loading flashcards" />}
-
-      {!loading && lessonRows.length === 0 && !loadError && (
-        <EmptyState dark={dark} icon={<EmptyBoxIcon color={pt.sub} size={16} />} message="No flashcards here yet" />
-      )}
-
-      {!loading && progressLoaded && dueTotal > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <LiquidGlassCard
-            dark={dark} delay={0} onClick={() => startAllDue()}
-            style={{ padding: 'clamp(14px, 3vw, 18px) clamp(14px, 3vw, 22px)', display: 'flex', alignItems: 'center', gap: 12 }}
-          >
-            <div style={{
-              width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-              background: `${FLASHCARD_ACCENT}20`, border: `1px solid ${FLASHCARD_ACCENT}40`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <FlashcardIcon color={FLASHCARD_ACCENT} size={20} />
-            </div>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ ...pulseType.cardTitle, color: pt.textPrimary, fontSize: 15 }}>Study all due cards</div>
-              <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2 }}>
-                {plural(dueTotal, 'card')} due across {plural(dueLessons, 'lesson')}
-              </div>
-            </div>
-            <div style={{
-              background: FLASHCARD_ACCENT, color: '#0f172a', borderRadius: 999,
-              padding: '6px 14px', fontSize: 12, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap',
-            }}>Start</div>
-          </LiquidGlassCard>
-        </div>
-      )}
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {!loading && lessonRows.map(({ lesson, total, toStudy }, i) => (
-          <LiquidGlassCard
-            key={lesson.id} dark={dark} delay={i * 70} onClick={() => start(lesson.id)}
-            style={{ padding: 'clamp(14px, 3vw, 18px) clamp(14px, 3vw, 22px)', display: 'flex', alignItems: 'center', gap: 12 }}
-          >
-            <div style={{
-              width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-              background: `${FLASHCARD_ACCENT}20`, border: `1px solid ${FLASHCARD_ACCENT}40`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <FlashcardIcon color={FLASHCARD_ACCENT} size={20} />
-            </div>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{
-                ...pulseType.cardTitle, color: pt.textPrimary, fontSize: 15,
-                display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2,
-                overflow: 'hidden', wordBreak: 'break-word', overflowWrap: 'anywhere',
-              }}>{lesson.title}</div>
-              <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2 }}>{total} card{total === 1 ? '' : 's'}</div>
-            </div>
-            <div style={{
-              background: toStudy > 0 ? FLASHCARD_ACCENT : 'transparent',
-              color: toStudy > 0 ? '#0f172a' : pt.textMuted,
-              border: toStudy > 0 ? 'none' : `1px solid ${pt.border}`,
-              borderRadius: 999, padding: '6px 14px', fontSize: 12, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap',
-            }}>{toStudy > 0 ? `${toStudy} to study` : 'Review anyway'}</div>
-          </LiquidGlassCard>
-        ))}
-      </div>
-    </PageShell>
+    <FlashcardsBrowse
+      dark={dark}
+      mod={mod}
+      signedIn={!!user}
+      loading={loading}
+      loadError={loadError}
+      progressLoaded={progressLoaded}
+      stages={visibleStages}
+      activeStage={stage}
+      onSelectStage={setActiveStage}
+      groups={groups}
+      totalCards={totalCards}
+      dueTotal={dueTotal}
+      dueLessons={dueLessons}
+      onStartDue={() => startAllDue()}
+      onStartSubject={subjectId => startSubject(subjectId)}
+      onStartLesson={lessonId => start(lessonId)}
+    />
   )
 }
 
