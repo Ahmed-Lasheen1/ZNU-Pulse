@@ -50,6 +50,7 @@ interface MCQExamFlowProps {
   goNext: () => void
 }
 
+// Style of the translucent pill buttons on the results screen.
 function glassPillBtn(overrides: React.CSSProperties = {}): React.CSSProperties {
   return {
     background: 'rgba(1,12,74,0.28)',
@@ -60,6 +61,7 @@ function glassPillBtn(overrides: React.CSSProperties = {}): React.CSSProperties 
   }
 }
 
+// Style of the solid "Done" pill button on the results screen.
 function solidPillBtn(pt: ReturnType<typeof getPulseTheme>): React.CSSProperties {
   return {
     flex: 1, background: pt.cobalt, border: 'none', borderRadius: 999, padding: '13px',
@@ -67,6 +69,7 @@ function solidPillBtn(pt: ReturnType<typeof getPulseTheme>): React.CSSProperties
   }
 }
 
+// Exam screen: question flow, results summary and answer review for every MCQ mode.
 export default function MCQExamFlow({
   dark, quizMode, quizTitle, submitted, grading, quizQuestions, answers, results,
   flaggedIds, struckOut, currentIndex, setCurrentIndex,
@@ -83,6 +86,7 @@ export default function MCQExamFlow({
   const [confirmExitOpen, setConfirmExitOpen] = useState(false)
   const [barHeight, setBarHeight] = useState(96)
 
+  // Counts the questions answered correctly.
   function getScore() {
     return quizQuestions.filter(q => results[q.id]?.is_correct).length
   }
@@ -115,6 +119,7 @@ export default function MCQExamFlow({
   const showCurrentSubjectTag = showsSubjectTags && !!currentSubject
   const showCurrentLessonTag = !lessonFilter && !!currentLesson
 
+  // Asks for confirmation before leaving an exam with answers; otherwise leaves right away.
   function requestExit() {
     if (!submitted && answeredCount > 0) setConfirmExitOpen(true)
     else stopQuiz()
@@ -194,7 +199,7 @@ export default function MCQExamFlow({
 
       <StudyHeader
         dark={dark}
-        eyebrow={`ZNU · ${quizTitle.toUpperCase()}`}
+        eyebrow={quizTitle.toUpperCase()}
         status={headerStatus}
         timer={inQuiz && total > 0 ? formatTime(elapsedSeconds) : undefined}
         fontScale={fontScale}
@@ -286,6 +291,7 @@ export default function MCQExamFlow({
 
                       const hoverBgFinal = revealed ? 'transparent' : selected ? `${pt.cobalt}20` : hoverBg
 
+                      // Selects the option on Enter or Space unless the answer is already revealed.
                       function handleOptionKeyDown(e: React.KeyboardEvent) {
                         if (revealed) return
                         if (e.key === 'Enter' || e.key === ' ') {

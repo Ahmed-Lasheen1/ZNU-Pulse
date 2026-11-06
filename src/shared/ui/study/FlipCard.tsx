@@ -8,8 +8,12 @@ interface FlipCardProps {
   back: ReactNode
 }
 
+// Duration of one flip in milliseconds; the face swap happens at the halfway point.
+const FLIP_MS = 350
+
 // Flips the whole card in 3D; the back face is pre-rotated 180deg so its text reads correctly after the turn.
-// The face turned away is also hidden from hit-testing, so the visible face always receives taps and scrolling.
+// Taps are handled on the stationary scene (not the rotating element), so they register at every moment of the
+// flip and a card can be flipped straight back mid-turn. The face turned away is hidden from hit-testing.
 export default function FlipCard({ flipped, onToggle, front, back }: FlipCardProps) {
   // Toggles between question and answer, unless the tap ended a text selection.
   function handleClick() {
@@ -18,13 +22,19 @@ export default function FlipCard({ flipped, onToggle, front, back }: FlipCardPro
   }
 
   return (
-    <div className="flip-scene">
+    <div
+      className="flip-scene glass-focus-ring"
+      role="button"
+      tabIndex={0}
+      aria-label={flipped ? 'Answer shown — tap to see the question' : 'Show answer'}
+      onClick={handleClick}
+    >
       <style>{`
-        .flip-scene { perspective: 1400px; }
+        .flip-scene { perspective: 1400px; border-radius: 18px; outline: none; cursor: pointer; }
         .flip-inner {
-          display: grid; border-radius: 18px; outline: none; cursor: pointer;
+          display: grid; border-radius: 18px;
           transform-style: preserve-3d; -webkit-transform-style: preserve-3d;
-          transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+          transition: transform ${FLIP_MS}ms cubic-bezier(0.4, 0.2, 0.2, 1);
         }
         .flip-inner[data-flipped="true"] { transform: rotateY(180deg); }
         .flip-face {
@@ -37,21 +47,14 @@ export default function FlipCard({ flipped, onToggle, front, back }: FlipCardPro
         /* Switches at the halfway point of the turn, when the card is edge-on. */
         .flip-face[data-shown="false"] {
           visibility: hidden; pointer-events: none;
-          transition: visibility 0s linear 0.3s;
+          transition: visibility 0s linear ${FLIP_MS / 2}ms;
         }
         @media (prefers-reduced-motion: reduce) {
           .flip-inner, .flip-face, .flip-face[data-shown="false"] { transition: none; }
         }
       `}</style>
 
-      <div
-        className="flip-inner glass-focus-ring"
-        data-flipped={flipped}
-        role="button"
-        tabIndex={0}
-        aria-label={flipped ? 'Answer shown — tap to see the question' : 'Show answer'}
-        onClick={handleClick}
-      >
+      <div className="flip-inner" data-flipped={flipped}>
         <div className="flip-face flip-face-front" data-shown={!flipped} aria-hidden={flipped}>{front}</div>
         <div className="flip-face flip-face-back" data-shown={flipped} aria-hidden={!flipped}>{back}</div>
       </div>

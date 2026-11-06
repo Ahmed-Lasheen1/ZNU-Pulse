@@ -107,7 +107,7 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
     return cards.filter(c => lessonIds.has(c.lesson_id))
   }, [cards, lessons, lessonStageMap, stage])
 
-  // Starts a session for a lesson: due and new cards first, or a "review anyway" practice session when none are left.
+  // Starts a session for a lesson: due and new cards first, or a silent "review anyway" practice session when none are left.
   function start(lessonId: string, run = 0) {
     const lessonCards = cards.filter(c => c.lesson_id === lessonId)
     const due = buildSession(lessonCards, progress, new Date())
@@ -118,7 +118,6 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
       setSession(null)
       return
     }
-    if (practice && run === 0) showToast("Nothing due — reviewing anyway. Your schedule won't change.", 'info')
     setSession({ lessonId, title: lessons.find(l => l.id === lessonId)?.title || 'Flashcards', queue, run, practice })
     window.scrollTo({ top: 0 })
   }

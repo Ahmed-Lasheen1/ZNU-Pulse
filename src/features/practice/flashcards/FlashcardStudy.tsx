@@ -96,6 +96,7 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
 
   // Keyboard shortcuts: Space/Enter flips the card, 1 = Again, 2 = Got it.
   useEffect(() => {
+    // Handles one key press, ignoring typing in form fields and button presses.
     function onKeyDown(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON') return
@@ -115,6 +116,8 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
   const doneIndexes = new Set(Array.from({ length: mastered }, (_, i) => i))
   const retried = retriedRef.current.size
   const firstTryPercent = total > 0 ? Math.round(((total - retried) / total) * 100) : 0
+
+  // Style of a full-width button on the end screen.
   const endButton = (background: string, color: string, border = 'none') => ({
     flex: 1, padding: '14px', borderRadius: 999, background, color, border,
     fontWeight: 800, fontSize: 14, fontFamily: pulseFonts.body, cursor: 'pointer',
@@ -124,8 +127,8 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
     <StudyShell maxWidth={MAX_WIDTH} bottomPadding={finished ? 16 : barHeight + 16}>
       <StudyHeader
         dark={dark}
-        eyebrow={`ZNU · ${title.toUpperCase()}`}
-        status={finished ? 'SESSION COMPLETE' : `${practice ? 'PRACTICE · ' : ''}CARD ${Math.min(mastered + 1, total)} / ${total}`}
+        eyebrow={title.toUpperCase()}
+        status={finished ? 'SESSION COMPLETE' : `CARD ${Math.min(mastered + 1, total)} / ${total}`}
         fontScale={fontScale}
         onCycleFontScale={finished ? undefined : cycleFontScale}
         onExit={onExit}
@@ -143,9 +146,8 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
           />
           <div style={{
             ...pulseType.small, color: ON_GRADIENT_TOP.muted, margin: '-10px 2px 14px 0',
-            display: 'flex', justifyContent: practice ? 'space-between' : 'flex-end', gap: 12,
+            display: 'flex', justifyContent: 'flex-end', gap: 12,
           }}>
-            {practice && <span>Review anyway · your schedule is unchanged</span>}
             <span>{queue.length} left</span>
           </div>
 
