@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
 import StudyShell from '@/shared/ui/study/StudyShell'
 import StudyHeader from '@/shared/ui/study/StudyHeader'
-import StudyCard from '@/shared/ui/study/StudyCard'
+import StudyCard, { STUDY_CARD_HEIGHT } from '@/shared/ui/study/StudyCard'
 import FlipCard from '@/shared/ui/study/FlipCard'
 import ProgressRail from '@/shared/ui/study/ProgressRail'
 import StudyActionBar, { BAR_BUTTON_BASE } from '@/shared/ui/study/StudyActionBar'
@@ -11,7 +11,7 @@ import { useStudyFontScale } from '@/shared/hooks/useStudyFontScale'
 import { wrapText } from '@/shared/utils/textStyles'
 import { accuracyColor } from '@/shared/utils/accuracy'
 import { CheckCircleIcon } from '@/shared/icons/tool-icons'
-import { InfoTag, EXAM_DIVIDER, formatTime } from '@/features/practice/mcqShared'
+import { EXAM_DIVIDER, formatTime } from '@/features/practice/mcqShared'
 import type { Answer } from '@/services/flashcards/scheduler'
 
 export interface StudyCardItem {
@@ -107,7 +107,7 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
 
   const textStyle = {
     ...pulseType.cardTitle,
-    fontSize: `calc(clamp(18px, 2vw, 22px) * ${fontScale})`,
+    fontSize: `calc(20px * ${fontScale})`,
     lineHeight: 1.55, color: pt.textPrimary, ...wrapText,
   }
   const doneIndexes = new Set(Array.from({ length: mastered }, (_, i) => i))
@@ -147,12 +147,12 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
             flipped={flipped}
             onFlip={() => setFlipped(true)}
             front={
-              <StudyCard dark={dark} header={<InfoTag label="QUESTION" color={accent} dark={dark} />}>
+              <StudyCard dark={dark} height={STUDY_CARD_HEIGHT}>
                 <AutoDirText text={current.front} style={textStyle} />
               </StudyCard>
             }
             back={
-              <StudyCard dark={dark} header={<InfoTag label="ANSWER" color={accent} dark={dark} />}>
+              <StudyCard dark={dark} height={STUDY_CARD_HEIGHT}>
                 <AutoDirText text={backCard.back} style={textStyle} />
               </StudyCard>
             }
@@ -202,7 +202,9 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
 
       {finished && (
         <StudyCard dark={dark} style={{ alignItems: 'center', textAlign: 'center' }}>
-          <CheckCircleIcon color={accent} size={40} />
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <CheckCircleIcon color={accent} size={40} />
+          </div>
           <div style={{ ...pulseType.sectionLabel, color: pt.textMuted, marginTop: 14 }}>First-try accuracy</div>
           <div style={{ ...pulseType.display, color: accuracyColor(firstTryPercent, pt), margin: '4px 0 2px' }}>{firstTryPercent}%</div>
           <div style={{ ...pulseType.small, color: pt.textMuted }}>of cards known without a retry</div>

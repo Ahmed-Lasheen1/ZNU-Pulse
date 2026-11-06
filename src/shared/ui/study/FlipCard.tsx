@@ -7,7 +7,7 @@ interface FlipCardProps {
   back: ReactNode
 }
 
-// Card that rotates in 3D to reveal its back; both faces share one grid cell so the height never jumps.
+// Card that rotates in 3D to reveal its back; both faces share one grid cell.
 export default function FlipCard({ flipped, onFlip, front, back }: FlipCardProps) {
   return (
     <div className="flip-scene">
@@ -21,7 +21,6 @@ export default function FlipCard({ flipped, onFlip, front, back }: FlipCardProps
         .flip-inner[data-flipped="true"] { transform: rotateY(180deg); }
         .flip-inner[data-flipped="false"] { cursor: pointer; }
         .flip-face { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-        .flip-face > div { height: 100%; }
         .flip-face-back { transform: rotateY(180deg); }
         @media (prefers-reduced-motion: reduce) { .flip-inner { transition: none; } }
       `}</style>

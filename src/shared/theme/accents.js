@@ -1,8 +1,6 @@
-// Accent color of the practice / MCQ features.
-export const MCQ_ACCENT = '#e2725b'
+// Single accent color shared by the practice (MCQ) and flashcards study screens.
+export const STUDY_ACCENT = '#e2725b'
 
-// Accent color of the flashcards feature (text/icons on dark surfaces).
-export const FLASHCARD_ACCENT = '#2dd4bf'
-
-// Deeper flashcards accent: filled buttons with white text, text on light surfaces.
-export const FLASHCARD_ACCENT_DEEP = '#0f766e'
+// Kept so existing imports keep working; both point to the shared accent.
+export const MCQ_ACCENT = STUDY_ACCENT
+export const FLASHCARD_ACCENT = STUDY_ACCENT
