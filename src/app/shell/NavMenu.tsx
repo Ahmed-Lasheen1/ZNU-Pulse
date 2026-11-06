@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type CSSProperties, type FocusEvent } from 'react'
+import { useState, useRef, useEffect, type CSSProperties, type FocusEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search as SearchIcon } from 'lucide-react'
 import { useAuth } from '@/core/contexts'
@@ -53,7 +53,7 @@ const PANEL_PAD = 12
 const CLIP_BLEED_X = 8
 const CLIP_BLEED_BOTTOM = 64
 
-// How far apart the pills end up, and where each starts: just above the clip line under the toggle button.
+// How far apart the pills end up, and where the first one starts: just above the clip line under the toggle button.
 const PILL_STEP = PILL_H + PILL_GAP
 const PILL_START = -(PILL_STEP + PILL_H)
 
@@ -62,13 +62,11 @@ const OPEN_MS = 650
 const OPEN_STAGGER_MS = 35
 const CLOSE_MS = 240
 const CLOSE_STAGGER_MS = 20
-const END_FADE_MS = 80
 const CLOSE_EASE = 'cubic-bezier(0.4, 0, 0.6, 1)'
 
-// Attribute set on <html> while the pills animate; the global stylesheet pauses heavy page animations (the Home ECG beam) during it.
-const NAV_BUSY_ATTR = 'data-nav-busy'
-// Slightly longer than the slowest open (spring + stagger of the last pill) so the pause covers the whole animation.
-const NAV_BUSY_MS = 1200
+// A pill (after the first) fades in only once it has slid out from behind the pill above it, so stacked glows never add up.
+const FADE_DELAY_MS = 70
+const FADE_MS = 140
 
 // Smooth ease-out used where a spring is not supported or would overshoot a scrolling panel.
 const SMOOTH_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'
@@ -77,14 +75,9 @@ const SMOOTH_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'
 const SPRING_EASE =
   'linear(0, 0.039, 0.136, 0.263, 0.402, 0.538, 0.663, 0.77, 0.859, 0.928, 0.979, 1.015, 1.037, 1.05, 1.054, 1.053, 1.049, 1.042, 1.035, 1.027, 1.02, 1.014, 1.009, 1.005, 1.002, 1, 0.998, 0.997, 0.997, 0.997, 0.997, 0.998, 0.998, 0.998, 0.999, 0.999, 0.999, 1, 1, 1, 1)'
 
-// Pills are almost opaque instead of blurred: backdrop-filter on ~10 pills is what makes phones lag.
+// Pills are opaque (no blur) so the pills stacked behind never show through; the colors match the old translucent look over the page gradient.
 function pillTint(dark: boolean) {
-  return dark ? 'rgba(38, 48, 68, 0.88)' : 'rgba(255, 255, 255, 0.88)'
-}
-
-// Sets the position of a pill in the stagger sequence.
-function slot(index: number): CSSProperties {
-  return { ['--i' as string]: index } as CSSProperties
+  return dark ? 'rgb(46, 59, 81)' : 'rgb(237, 242, 245)'
 }
 
 // Base look shared by every glass pill: same width, same height, content aligned to the left.
@@ -97,6 +90,22 @@ function pillStyle(pt: PulseTheme): CSSProperties {
     color: pt.text, fontFamily: 'inherit', fontSize: 14, fontWeight: 600,
     whiteSpace: 'nowrap', textAlign: 'left',
   }
+}
+
+// Sets the position of a node in the chain (used for the stagger delays).
+function slot(index: number): CSSProperties {
+  return { ['--i' as string]: index } as CSSProperties
+}
+
+// Nests every pill inside the previous pill's node so each pill moves with the pill above it and only slides one step on its own.
+function renderChain(pills: ReactNode[], index = 0): ReactNode {
+  if (index >= pills.length) return null
+  return (
+    <div className={index === 0 ? 'nav-node' : 'nav-node nav-node-child'} style={slot(index)}>
+      {pills[index]}
+      {renderChain(pills, index + 1)}
+    </div>
+  )
 }
 
 interface NavSearchProps {
@@ -139,7 +148,7 @@ interface NavMenuProps {
   align?: Align
 }
 
-// Header menu: a toggle button and a column of equal pills that spring out from under it.
+// Header menu: a toggle button and a chain of equal pills that unfold from under it, each from behind the pill above.
 export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuProps) {
   const [open, setOpen] = useState(false)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
@@ -153,18 +162,10 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
   const triggerButtonRef = useRef<HTMLButtonElement>(null)
   const hasOpenedRef = useRef(false)
   const skipFocusRestoreRef = useRef(false)
-  const prevOpenRef = useRef(false)
   const pt = getPulseTheme(dark)
 
   const cornerSide: Align = align === 'right' ? 'right' : 'left'
   const tabIndex = open ? 0 : -1
-
-  // Pill positions in the stagger: profile, search, nav links, theme, then sign out.
-  const searchSlot = 1
-  const firstNavSlot = 2
-  const themeSlot = firstNavSlot + navItems.length
-  const signOutSlot = themeSlot + 1
-  const pillCount = user ? signOutSlot + 1 : themeSlot + 1
 
   // Closes the menu on outside click/tap or Escape while it is open.
   useEffect(() => {
@@ -195,19 +196,6 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
     }
     if (hasOpenedRef.current) {
       triggerButtonRef.current?.focus()
-    }
-  }, [open])
-
-  // Marks the page as busy while the pills animate so heavy background animations pause and the pills get the whole frame budget.
-  useEffect(() => {
-    if (prevOpenRef.current === open) return
-    prevOpenRef.current = open
-    const root = document.documentElement
-    root.setAttribute(NAV_BUSY_ATTR, '')
-    const timer = setTimeout(() => root.removeAttribute(NAV_BUSY_ATTR), NAV_BUSY_MS)
-    return () => {
-      clearTimeout(timer)
-      root.removeAttribute(NAV_BUSY_ATTR)
     }
   }, [open])
 
@@ -245,6 +233,76 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
     navigate('/')
   }
 
+  // Pills in display order: profile (or sign in), search, nav links, theme, then sign out.
+  const pills: ReactNode[] = [
+    user ? (
+      <button
+        type="button" className="nav-pill nav-pill-btn glass-focus-ring" tabIndex={tabIndex}
+        onClick={() => goTo('/profile')}
+        style={{ ...pillStyle(pt), flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 2, cursor: 'pointer', lineHeight: 1.15 }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, maxWidth: '100%' }}>
+          <UserIcon color={pt.text} size={13} />
+          <span style={{ fontSize: 13, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            Dr. {profile?.name || '...'}
+          </span>
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: pt.amber, fontSize: 12, fontWeight: 700 }}>
+          <StarIcon color={pt.amber} size={12} />
+          {profile?.points || 0} points
+        </span>
+      </button>
+    ) : (
+      <button
+        type="button" className="nav-pill glass-focus-ring" tabIndex={tabIndex}
+        onClick={() => goTo('/auth')}
+        style={{
+          ...pillStyle(pt), cursor: 'pointer',
+          backgroundImage: `linear-gradient(135deg, ${pt.cobalt}cc, ${pt.indigo}cc)`,
+          color: '#fff', fontWeight: 800,
+        }}
+      >Sign In →</button>
+    ),
+
+    <div className="nav-pill" style={{ ...pillStyle(pt), padding: 0 }}>
+      <NavSearch pt={pt} tabIndex={tabIndex} onSubmit={submitSearch} />
+    </div>,
+
+    ...navItems.map(item => {
+      const Icon = item.Icon
+      const iconColor = pt[item.accent] || pt.text
+      return (
+        <button
+          key={item.href} type="button" className="nav-pill nav-pill-btn glass-focus-ring" tabIndex={tabIndex}
+          onClick={() => goTo(item.href)}
+          style={{ ...pillStyle(pt), cursor: 'pointer', fontWeight: item.href === '/' ? 800 : 600 }}
+        >
+          <Icon color={iconColor} size={17} />
+          {item.label}
+        </button>
+      )
+    }),
+
+    // Theme: only the switch, centred, with no glass pill behind it.
+    <div
+      className="nav-pill"
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: PILL_W, height: PILL_H }}
+    >
+      <ThemeSwitch dark={dark} onToggle={toggleTheme} scale={0.62} stretchX={1.3} />
+    </div>,
+
+    ...(user ? [(
+      <button
+        key="sign-out" type="button" className="nav-pill nav-pill-btn glass-focus-ring" tabIndex={tabIndex}
+        onClick={() => setShowSignOutConfirm(true)}
+        style={{ ...pillStyle(pt), justifyContent: 'center', cursor: 'pointer', color: pt.danger, fontWeight: 700 }}
+      >
+        <SignOutIcon color={pt.danger} size={17} />
+        Sign Out
+      </button>
+    )] : []),
+  ]
+
   // Outer wrapper that clips the pills at the line under the toggle button with a plain rectangular overflow clip.
   // It ignores pointer events so its bleed area never blocks the page.
   const clipStyle: CSSProperties = {
@@ -261,16 +319,17 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
 
   const panelStyle: CSSProperties = {
     position: 'relative',
-    display: 'flex', flexDirection: 'column', gap: PILL_GAP,
+    display: 'flex', flexDirection: 'column',
     alignItems: cornerSide === 'right' ? 'flex-end' : 'flex-start',
     padding: `${PANEL_OFFSET}px ${PANEL_PAD}px ${PANEL_PAD}px`,
     maxWidth: '100%',
     boxSizing: 'border-box',
     fontFamily: pulseFonts.body,
     pointerEvents: open ? 'auto' : 'none',
-    ['--count' as string]: pillCount,
+    ['--count' as string]: pills.length,
     ['--start' as string]: `${PILL_START}px`,
     ['--step' as string]: `${PILL_STEP}px`,
+    ['--nav-align' as string]: cornerSide === 'right' ? 'flex-end' : 'flex-start',
     ['--nav-pill-bg' as string]: pillTint(dark),
     ['--nav-pill-shadow' as string]: liquidGlassShadow(dark),
     ['--nav-pill-hover' as string]: glassHoverTint(dark),
@@ -286,7 +345,7 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
       style={{ position: 'relative', width: BUTTON_SIZE, height: BUTTON_SIZE }}
     >
       <style>{`
-        /* The clip wrapper's top edge sits right under the toggle button: pills slide out from it and back behind it.
+        /* The clip wrapper's top edge sits right under the toggle button: the pills slide out from it and back behind it.
            A plain overflow clip replaces clip-path, which forced a mask over every moving pill on each frame.
            The bottom bleed leaves room for the spring overshoot of the last pills. */
         .nav-panel {
@@ -311,33 +370,50 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
           }
         }
 
-        /* Closed: above the clip line and fully transparent. Only position and opacity change (no scaling), so nothing is re-rasterized.
-           There is no visibility toggle: the panel is inert, aria-hidden and ignores pointer events while closed, and keeping the pills
-           painted avoids repainting all of them in the frame the menu opens.
-           translate3d keeps each pill on the same compositor layer from start to finish, so there is no re-raster snap when the
-           transition ends; backface-visibility hidden is the usual guard against flicker on transformed layers. */
-        .nav-pill {
+        /* Every pill lives in a node nested inside the previous pill's node, so it travels with the pill above it.
+           Closed, the first node sits above the clip line and every other node is pulled up exactly one step, which puts its pill
+           directly behind the pill above it. Only transform changes, on translate3d layers, so nothing is re-rasterized and each
+           layer stays the same from start to finish. */
+        .nav-node {
+          --open-delay: calc(var(--i) * ${OPEN_STAGGER_MS}ms);
           --close-delay: calc((var(--count) - 1 - var(--i)) * ${CLOSE_STAGGER_MS}ms);
+          --closed-y: var(--start);
+          display: flex; flex-direction: column; align-items: var(--nav-align); gap: ${PILL_GAP}px;
           flex-shrink: 0;
-          z-index: calc(var(--count) - var(--i));
-          opacity: 0;
-          will-change: transform, opacity;
+          isolation: isolate;
+          will-change: transform;
           backface-visibility: hidden;
           -webkit-backface-visibility: hidden;
-          transform: translate3d(0, calc(var(--start) - var(--i) * var(--step)), 0);
-          transition:
-            transform ${CLOSE_MS}ms ${CLOSE_EASE} var(--close-delay),
-            opacity ${END_FADE_MS}ms linear calc(${CLOSE_MS - END_FADE_MS}ms + var(--close-delay));
+          transform: translate3d(0, var(--closed-y), 0);
+          transition: transform ${CLOSE_MS}ms ${CLOSE_EASE} var(--close-delay);
         }
 
-        /* Open: each pill springs down to its place in turn, first pill first. */
-        .nav-panel[data-open="true"] .nav-pill {
-          --open-delay: calc(var(--i) * ${OPEN_STAGGER_MS}ms);
-          opacity: 1;
+        /* Child nodes paint behind the pill above them, so a pill is hidden until it slides out from under it. */
+        .nav-node-child {
+          --closed-y: calc(var(--step) * -1);
+          z-index: -1;
+        }
+
+        /* Open: each node springs to its place in turn, first node first. */
+        .nav-panel[data-open="true"] .nav-node {
           transform: translate3d(0, 0, 0);
-          transition:
-            transform ${OPEN_MS}ms var(--open-ease) var(--open-delay),
-            opacity 100ms linear var(--open-delay);
+          transition: transform ${OPEN_MS}ms var(--open-ease) var(--open-delay);
+        }
+
+        /* Closed pills are invisible; the panel is also inert, aria-hidden and ignores pointer events.
+           The switch happens in one step, after the pill has folded away, so no pill fades while moving. */
+        .nav-pill {
+          opacity: 0;
+          transition: opacity 0s linear calc(${CLOSE_MS}ms + var(--close-delay));
+        }
+        .nav-panel[data-open="true"] .nav-pill {
+          opacity: 1;
+          transition: opacity 0s linear var(--open-delay);
+        }
+
+        /* Pills after the first fade in once they have separated from the pill above, so stacked glows never add up. */
+        .nav-panel[data-open="true"] .nav-node-child > .nav-pill {
+          transition: opacity ${FADE_MS}ms linear calc(var(--open-delay) + ${FADE_DELAY_MS}ms);
         }
 
         @media (hover: hover) {
@@ -362,10 +438,11 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
         .nav-search-input:focus-visible { box-shadow: 0 0 0 2px #38bdf8; }
 
         @media (prefers-reduced-motion: reduce) {
-          .nav-pill, .nav-panel[data-open="true"] .nav-pill {
+          .nav-node, .nav-panel[data-open="true"] .nav-node,
+          .nav-pill, .nav-panel[data-open="true"] .nav-pill,
+          .nav-panel[data-open="true"] .nav-node-child > .nav-pill {
             transition-duration: 0.01ms !important;
             transition-delay: 0s !important;
-            transform: translate3d(0, 0, 0);
           }
         }
       `}</style>
@@ -381,72 +458,7 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
           onBlur={handleContentBlur}
           style={panelStyle}
         >
-          {user ? (
-            <button
-              type="button" className="nav-pill nav-pill-btn glass-focus-ring" tabIndex={tabIndex}
-              onClick={() => goTo('/profile')}
-              style={{ ...pillStyle(pt), ...slot(0), flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 2, cursor: 'pointer', lineHeight: 1.15 }}
-            >
-              <span style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, maxWidth: '100%' }}>
-                <UserIcon color={pt.text} size={13} />
-                <span style={{ fontSize: 13, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  Dr. {profile?.name || '...'}
-                </span>
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: pt.amber, fontSize: 12, fontWeight: 700 }}>
-                <StarIcon color={pt.amber} size={12} />
-                {profile?.points || 0} points
-              </span>
-            </button>
-          ) : (
-            <button
-              type="button" className="nav-pill glass-focus-ring" tabIndex={tabIndex}
-              onClick={() => goTo('/auth')}
-              style={{
-                ...pillStyle(pt), ...slot(0), cursor: 'pointer',
-                backgroundImage: `linear-gradient(135deg, ${pt.cobalt}cc, ${pt.indigo}cc)`,
-                color: '#fff', fontWeight: 800,
-              }}
-            >Sign In →</button>
-          )}
-
-          <div className="nav-pill" style={{ ...pillStyle(pt), ...slot(searchSlot), padding: 0 }}>
-            <NavSearch pt={pt} tabIndex={tabIndex} onSubmit={submitSearch} />
-          </div>
-
-          {navItems.map((item, i) => {
-            const Icon = item.Icon
-            const iconColor = pt[item.accent] || pt.text
-            return (
-              <button
-                key={item.href} type="button" className="nav-pill nav-pill-btn glass-focus-ring" tabIndex={tabIndex}
-                onClick={() => goTo(item.href)}
-                style={{ ...pillStyle(pt), ...slot(firstNavSlot + i), cursor: 'pointer', fontWeight: item.href === '/' ? 800 : 600 }}
-              >
-                <Icon color={iconColor} size={17} />
-                {item.label}
-              </button>
-            )
-          })}
-
-          {/* Theme: only the switch, centred, with no glass pill behind it. */}
-          <div
-            className="nav-pill"
-            style={{ ...slot(themeSlot), display: 'flex', alignItems: 'center', justifyContent: 'center', width: PILL_W, height: PILL_H }}
-          >
-            <ThemeSwitch dark={dark} onToggle={toggleTheme} scale={0.62} stretchX={1.3} />
-          </div>
-
-          {user && (
-            <button
-              type="button" className="nav-pill nav-pill-btn glass-focus-ring" tabIndex={tabIndex}
-              onClick={() => setShowSignOutConfirm(true)}
-              style={{ ...pillStyle(pt), ...slot(signOutSlot), justifyContent: 'center', cursor: 'pointer', color: pt.danger, fontWeight: 700 }}
-            >
-              <SignOutIcon color={pt.danger} size={17} />
-              Sign Out
-            </button>
-          )}
+          {renderChain(pills)}
         </div>
       </div>
 
