@@ -8,8 +8,8 @@ interface FlipCardProps {
   back: ReactNode
 }
 
-// Swaps the question and answer faces with a short crossfade, so the text never rotates or mirrors.
-// The hidden face is removed from hit-testing and scrolling, so the visible face always scrolls.
+// Flips the whole card in 3D; the back face is pre-rotated 180deg so its text reads correctly after the turn.
+// The face turned away is also hidden from hit-testing, so the visible face always receives taps and scrolling.
 export default function FlipCard({ flipped, onToggle, front, back }: FlipCardProps) {
   // Toggles between question and answer, unless the tap ended a text selection.
   function handleClick() {
@@ -20,19 +20,27 @@ export default function FlipCard({ flipped, onToggle, front, back }: FlipCardPro
   return (
     <div className="flip-scene">
       <style>{`
-        .flip-inner { display: grid; border-radius: 18px; outline: none; cursor: pointer; }
+        .flip-scene { perspective: 1400px; }
+        .flip-inner {
+          display: grid; border-radius: 18px; outline: none; cursor: pointer;
+          transform-style: preserve-3d; -webkit-transform-style: preserve-3d;
+          transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+        }
+        .flip-inner[data-flipped="true"] { transform: rotateY(180deg); }
         .flip-face {
           grid-area: 1 / 1; min-width: 0;
-          opacity: 1; transform: none; visibility: visible;
-          transition: opacity 0.25s ease, transform 0.25s ease, visibility 0s;
+          backface-visibility: hidden; -webkit-backface-visibility: hidden;
+          visibility: visible;
+          transition: visibility 0s;
         }
+        .flip-face-back { transform: rotateY(180deg); }
+        /* Switches at the halfway point of the turn, when the card is edge-on. */
         .flip-face[data-shown="false"] {
-          opacity: 0; transform: translateY(8px) scale(0.98);
           visibility: hidden; pointer-events: none;
-          transition: opacity 0.25s ease, transform 0.25s ease, visibility 0s linear 0.25s;
+          transition: visibility 0s linear 0.3s;
         }
         @media (prefers-reduced-motion: reduce) {
-          .flip-face, .flip-face[data-shown="false"] { transition: none; transform: none; }
+          .flip-inner, .flip-face, .flip-face[data-shown="false"] { transition: none; }
         }
       `}</style>
 
@@ -44,8 +52,8 @@ export default function FlipCard({ flipped, onToggle, front, back }: FlipCardPro
         aria-label={flipped ? 'Answer shown — tap to see the question' : 'Show answer'}
         onClick={handleClick}
       >
-        <div className="flip-face" data-shown={!flipped} aria-hidden={flipped}>{front}</div>
-        <div className="flip-face" data-shown={flipped} aria-hidden={!flipped}>{back}</div>
+        <div className="flip-face flip-face-front" data-shown={!flipped} aria-hidden={flipped}>{front}</div>
+        <div className="flip-face flip-face-back" data-shown={flipped} aria-hidden={!flipped}>{back}</div>
       </div>
     </div>
   )
