@@ -1,27 +1,21 @@
 import { supabase } from '@/core/supabase'
 import { fetchAllRows } from '@/core/fetchAllRows'
 import { idbGet, idbSet, idbDelete, idbKeys } from '@/core/idb'
-import { newerProgress, type ProgressMap } from '@/services/flashcards/scheduler'
+import { isDue, newerProgress, type ProgressMap } from '@/services/flashcards/scheduler'
 
-// Cards first studied on one local day (used for the daily new-card limit).
-interface Introduced {
-  day: string
-  ids: string[]
-}
-
-// Saved progress of one module, the ids of cards not yet uploaded, and today's newly introduced cards.
+// Saved progress of one module and the ids of cards not yet uploaded.
 interface Store {
   cards: ProgressMap
   dirty: string[]
-  introduced?: Introduced
 }
 
 const BATCH_SIZE = 500
 const GUEST_PREFIX = 'flashcard-progress:guest:'
 
+// Key prefix shared by every module store of one owner (null = guest).
 // Signed-in data lives under "user:" so sign-out clears it with the other per-user caches.
-const keyFor = (userId: string | null, moduleId: string) =>
-  userId ? `user:${userId}:flashcards:${moduleId}` : `${GUEST_PREFIX}${moduleId}`
+const prefixFor = (userId: string | null) => (userId ? `user:${userId}:flashcards:` : GUEST_PREFIX)
+const keyFor = (userId: string | null, moduleId: string) => `${prefixFor(userId)}${moduleId}`
 
 let chain: Promise<unknown> = Promise.resolve()
 
@@ -32,18 +26,19 @@ function queue<T>(task: () => Promise<T>): Promise<T> {
   return run
 }
 
-// Today's date in the device's local time, as YYYY-MM-DD.
-function localDay() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 // Reads the saved store of a module (empty when nothing is saved).
 async function readStore(key: string): Promise<Store> {
   const saved: any = await idbGet(key)
   return saved?.cards
-    ? { cards: saved.cards, dirty: saved.dirty || [], introduced: saved.introduced }
+    ? { cards: saved.cards, dirty: saved.dirty || [] }
     : { cards: {}, dirty: [] }
+}
+
+// Reads every saved module store of one owner as [moduleId, cards] pairs.
+async function readOwnerStores(userId: string | null): Promise<[string, ProgressMap][]> {
+  const prefix = prefixFor(userId)
+  const keys = (await idbKeys()).filter((k): k is string => typeof k === 'string' && k.startsWith(prefix))
+  return Promise.all(keys.map(async key => [key.slice(prefix.length), (await readStore(key)).cards] as [string, ProgressMap]))
 }
 
 // Loads the progress saved on this device (instant, works offline).
@@ -51,28 +46,34 @@ export function loadProgress(userId: string | null, moduleId: string): Promise<P
   return queue(async () => (await readStore(keyFor(userId, moduleId))).cards)
 }
 
-// Loads the ids of cards first studied today on this device.
-export function loadIntroducedToday(userId: string | null, moduleId: string): Promise<string[]> {
+// Loads the last review time of every studied card across all modules (used for the daily streak).
+export function loadReviewTimes(userId: string | null): Promise<string[]> {
   return queue(async () => {
-    const { introduced } = await readStore(keyFor(userId, moduleId))
-    return introduced && introduced.day === localDay() ? introduced.ids : []
+    const stores = await readOwnerStores(userId)
+    return stores.flatMap(([, cards]) => Object.values(cards).map(entry => entry.last_review))
   })
 }
 
-// Saves one reviewed card on the device, marks it for upload when signed in, and records first-time cards.
-export function saveReview(
-  userId: string | null, moduleId: string, cardId: string, progress: ProgressMap[string], wasNew = false
-) {
+// Counts studied cards that are due now, per module (never-studied cards are not counted).
+export function loadDueCounts(userId: string | null): Promise<Record<string, number>> {
+  return queue(async () => {
+    const now = new Date()
+    const counts: Record<string, number> = {}
+    for (const [moduleId, cards] of await readOwnerStores(userId)) {
+      const due = Object.values(cards).filter(entry => isDue(entry, now)).length
+      if (due > 0) counts[moduleId] = due
+    }
+    return counts
+  })
+}
+
+// Saves one reviewed card on the device and marks it for upload when signed in.
+export function saveReview(userId: string | null, moduleId: string, cardId: string, progress: ProgressMap[string]) {
   return queue(async () => {
     const key = keyFor(userId, moduleId)
     const store = await readStore(key)
     store.cards[cardId] = progress
     if (userId && !store.dirty.includes(cardId)) store.dirty.push(cardId)
-    if (wasNew) {
-      const day = localDay()
-      const ids = store.introduced && store.introduced.day === day ? store.introduced.ids : []
-      if (!ids.includes(cardId)) store.introduced = { day, ids: [...ids, cardId] }
-    }
     await idbSet(key, store)
   })
 }

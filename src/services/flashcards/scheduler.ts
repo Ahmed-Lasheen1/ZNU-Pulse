@@ -15,9 +15,6 @@ export type ProgressMap = Record<string, StoredProgress>
 // Most cards a single study session contains.
 export const SESSION_SIZE = 20
 
-// Most never-studied cards introduced per lesson per day.
-export const NEW_CARDS_PER_DAY = 20
-
 // Most cards a "review anyway" practice session contains.
 export const PRACTICE_SIZE = 50
 
@@ -68,7 +65,7 @@ export function newerProgress(a: ProgressMap, b: ProgressMap): ProgressMap {
   return merged
 }
 
-// Picks the cards for one session: due cards first (oldest due first), then at most `newLimit` new cards.
+// Picks the cards for one session: due cards first (oldest due first), then at most `newLimit` never-studied cards (0 = due cards only).
 export function buildSession<T extends { id: string }>(
   cards: T[], progress: ProgressMap, now: Date, size = SESSION_SIZE, newLimit = Infinity
 ): T[] {

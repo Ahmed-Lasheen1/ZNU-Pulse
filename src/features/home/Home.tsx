@@ -9,6 +9,7 @@ import { computeStreak } from '@/features/home/streak'
 import { getGuestHistory } from '@/services/history/reviewStorage'
 import { hasSavedActiveExam } from '@/services/exam/activeExam'
 import { fetchSubjectById } from '@/services/content/subjects'
+import { loadDueCounts, loadReviewTimes } from '@/services/flashcards/progress'
 import { ENTRANCE_PAUSE, LOGO_DELAY } from '@/shared/theme/pulseMotion'
 import { NotifyPermissionButton } from '@/features/notifications'
 import { GuestSignInButton } from '@/features/account'
@@ -16,9 +17,12 @@ import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import EcgHero from '@/features/home/EcgHero'
 import AutoDirText from '@/shared/ui/display/AutoDirText'
 import { ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, PauseIcon, LightningIcon, CheckCircleIcon, WeeklyReportIcon, StreakFlameIcon } from '@/shared/icons/tool-icons'
+import { FlashcardIcon } from '@/shared/icons/FlashcardIcon'
 import { NumberTicker } from '@/shared/ui/motion/number-ticker'
 import { ModuleIcon } from '@/shared/icons/medicalIcons'
 import { accuracyTier, accuracyColor, type AccuracyTier } from '@/shared/utils/accuracy'
+import { plural } from '@/shared/utils/format'
+import { FLASHCARD_ACCENT } from '@/shared/theme/accents'
 import { fetchHomeAnnouncement, fetchHomeHistory } from '@/services/content/homeData'
 import { ReportGridSkeleton, CardRowsSkeleton } from '@/shared/ui/feedback/Skeletons'
 
@@ -45,11 +49,14 @@ const MODULE_BLURBS: Record<string, string> = {
   digest: 'Learn the process of nourishment',
   gastro: 'Learn the process of nourishment',
 }
+
+// Returns the one-line description shown under a module name.
 function moduleBlurb(name: string) {
   const key = Object.keys(MODULE_BLURBS).find(k => name.toLowerCase().includes(k))
   return key ? MODULE_BLURBS[key] : 'Master the essentials of this module.'
 }
 
+// Picks the encouragement label and color for the week's accuracy.
 function weeklyAccuracyFeedback(accuracy: number, pt: ReturnType<typeof getPulseTheme>) {
   const labels: Record<AccuracyTier, string> = {
     excellent: 'Outstanding week!',
@@ -71,12 +78,14 @@ const TOOLS_START = ACTIVE_MODULES_START + 0.6
 const COMPLETED_MODULES_START = TOOLS_START + 0.6
 const FOOTER_DELAY = TOOLS_START + 0.8
 
+// Converts an entrance time in seconds into the delay LiquidGlassCard expects.
 function msFor(targetSeconds: number) {
   return Math.round(((targetSeconds - ENTRANCE_PAUSE) / 1.5) * 1000)
 }
 
 interface WeeklySummary { totalAttempted: number; accuracy: number; topSubjectName: string | null }
 
+// Home dashboard: weekly report, flashcards due, active modules, tools and completed modules.
 export default function Home({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const navigate = useNavigate()
@@ -88,6 +97,7 @@ export default function Home({ dark }: { dark: boolean }) {
   const [pausedExam, setPausedExam] = useState(false)
   const [weeklySummary, setWeeklySummary] = useState<WeeklySummary | null>(null)
   const [reportLoading, setReportLoading] = useState(true)
+  const [dueByModule, setDueByModule] = useState<Record<string, number>>({})
 
   const [archiveOpen, setArchiveOpen] = useState(false)
 
@@ -101,8 +111,10 @@ export default function Home({ dark }: { dark: boolean }) {
   const [playEntrance] = useState(entranceNow)
 
   const mountedAtRef = useRef(Date.now())
+  // Seconds left until an entrance target time, counted from when Home mounted.
   const remainingFor = (target: number) =>
     playEntrance ? Math.max(0, target - (Date.now() - mountedAtRef.current) / 1000) : 0
+  // Entrance settings for a card whose reveal may already be overdue.
   const cardEntrance = (target: number) => {
     const remaining = remainingFor(target)
     return remaining <= 0
@@ -117,16 +129,20 @@ export default function Home({ dark }: { dark: boolean }) {
     return () => { ignore = true }
   }, [])
 
+  // Loads the streak (quiz attempts plus flashcard reviews) and the weekly quiz report.
   useEffect(() => {
     let ignore = false
     async function loadStreakAndWeeklySummary() {
       setReportLoading(true)
       const weekAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000
 
-      const rows: any[] = userId ? await fetchHomeHistory(userId, HOME_HISTORY_LIMIT) : getGuestHistory()
+      const [rows, reviewTimes]: [any[], string[]] = await Promise.all([
+        userId ? fetchHomeHistory(userId, HOME_HISTORY_LIMIT) : Promise.resolve(getGuestHistory()),
+        loadReviewTimes(userId ?? null),
+      ])
       if (ignore) return
 
-      setStreak(computeStreak(rows.map((r: any) => r.completed_at)))
+      setStreak(computeStreak([...rows.map((r: any) => r.completed_at), ...reviewTimes]))
 
       const weeklyRows = rows.filter((r: any) => {
         const ts = typeof r.completed_at === 'number' ? r.completed_at : new Date(r.completed_at).getTime()
@@ -159,6 +175,13 @@ export default function Home({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
 
+  // Loads how many flashcards are due per module from the progress saved on this device.
+  useEffect(() => {
+    let ignore = false
+    loadDueCounts(userId ?? null).then(counts => { if (!ignore) setDueByModule(counts) })
+    return () => { ignore = true }
+  }, [userId])
+
   useEffect(() => {
     let ignore = false
     hasSavedActiveExam(user).then(has => { if (!ignore) setPausedExam(has) })
@@ -168,7 +191,9 @@ export default function Home({ dark }: { dark: boolean }) {
 
   const activeModules = modules.filter(m => m.status === 'active')
   const completedModules = modules.filter(m => m.status === 'completed')
+  const dueModules = activeModules.filter(m => (dueByModule[m.id] || 0) > 0)
 
+  // Section heading with an optional icon that fades in during the entrance.
   const sectionTitle = (
     text: string,
     delaySeconds: number,
@@ -355,6 +380,16 @@ export default function Home({ dark }: { dark: boolean }) {
                     )}
                   </LiquidGlassCard>
                 )}
+
+                {dueModules.map((mod, i) => (
+                  <LiquidGlassCard key={mod.id} dark={dark} delay={msFor(WEEKLY_REPORT_START) + 400 + i * 150} instant={!playEntrance}
+                    onClick={() => navigate(`/flashcards?module=${mod.id}`)}
+                    style={{ padding: '16px 20px' }}>
+                    <div style={{ ...pulseType.cardTitle, fontSize: 14, color: FLASHCARD_ACCENT, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <FlashcardIcon color={FLASHCARD_ACCENT} size={14} /> {plural(dueByModule[mod.id], 'flashcard')} due · {mod.name} →
+                    </div>
+                  </LiquidGlassCard>
+                ))}
               </div>
 
               <motion.div className="pulse-hero-panel"

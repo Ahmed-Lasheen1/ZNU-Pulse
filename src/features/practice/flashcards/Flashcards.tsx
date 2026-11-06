@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuth, useModules } from '@/core/contexts'
 import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
@@ -16,17 +16,18 @@ import { fetchLessonsForModule } from '@/services/content/lessons'
 import { fetchLessonStageMap, inStage } from '@/services/content/lessonStages'
 import { loadProgress, saveReview, syncProgress } from '@/services/flashcards/progress'
 import {
-  buildPracticeSession, buildSession, emptyCard, fromStored, isDue, newerProgress, reviewCard, toStored,
+  SESSION_SIZE, buildPracticeSession, buildSession, emptyCard, fromStored, isDue, newerProgress, reviewCard, toStored,
   type Answer, type ProgressMap,
 } from '@/services/flashcards/scheduler'
+import { plural } from '@/shared/utils/format'
 import { FLASHCARD_ACCENT } from '@/shared/theme/accents'
 import FlashcardStudy from '@/features/practice/flashcards/FlashcardStudy'
 
 interface FlashcardModule { id: string; name: string; icon?: string | null; color: string; status: 'active' | 'completed' }
 interface FlashcardRow { id: string; lesson_id: string; front: string; back: string; created_at: string }
 interface FlashcardLesson { id: string; title: string }
-// `practice` sessions ("review anyway") never change the saved schedule.
-interface Session { lessonId: string; title: string; queue: FlashcardRow[]; run: number; practice: boolean }
+// `lessonId` is null for the "study all due" session; `practice` sessions ("review anyway") never change the saved schedule.
+interface Session { lessonId: string | null; title: string; queue: FlashcardRow[]; run: number; practice: boolean }
 
 const PAGE_MAX_WIDTH = 900
 
@@ -100,6 +101,12 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
     }
   }, [userId, mod.id])
 
+  // Cards of the lessons shown for the current stage (used by the "study all due" session).
+  const visibleCards = useMemo(() => {
+    const lessonIds = new Set(lessons.filter(l => inStage({ lesson_id: l.id }, stage, lessonStageMap)).map(l => l.id))
+    return cards.filter(c => lessonIds.has(c.lesson_id))
+  }, [cards, lessons, lessonStageMap, stage])
+
   // Starts a session for a lesson: due and new cards first, or a "review anyway" practice session when none are left.
   function start(lessonId: string, run = 0) {
     const lessonCards = cards.filter(c => c.lesson_id === lessonId)
@@ -113,6 +120,18 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
     }
     if (practice && run === 0) showToast("Nothing due — reviewing anyway. Your schedule won't change.", 'info')
     setSession({ lessonId, title: lessons.find(l => l.id === lessonId)?.title || 'Flashcards', queue, run, practice })
+    window.scrollTo({ top: 0 })
+  }
+
+  // Starts a session of due cards from every lesson (never-studied cards are left out); exits when nothing is due.
+  function startAllDue(run = 0) {
+    const queue = buildSession(visibleCards, progress, new Date(), SESSION_SIZE, 0)
+    if (queue.length === 0) {
+      showToast("You're all caught up", 'info')
+      setSession(null)
+      return
+    }
+    setSession({ lessonId: null, title: 'All due cards', queue, run, practice: false })
     window.scrollTo({ top: 0 })
   }
 
@@ -140,7 +159,7 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
 
   if (session) return (
     <FlashcardStudy
-      key={`${session.lessonId}-${session.run}`}
+      key={`${session.lessonId ?? 'due'}-${session.run}`}
       dark={dark}
       accent={FLASHCARD_ACCENT}
       title={session.title}
@@ -148,7 +167,7 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
       practice={session.practice}
       onRate={rate}
       onFinish={pushProgress}
-      onMore={() => start(session.lessonId, session.run + 1)}
+      onMore={() => (session.lessonId ? start(session.lessonId, session.run + 1) : startAllDue(session.run + 1))}
       onExit={() => { setSession(null); pushProgress() }}
     />
   )
@@ -158,9 +177,12 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
     .filter(l => cards.some(c => c.lesson_id === l.id) && inStage({ lesson_id: l.id }, stage, lessonStageMap))
     .map(lesson => {
       const lessonCards = cards.filter(c => c.lesson_id === lesson.id)
-      const toStudy = lessonCards.filter(c => !progress[c.id] || isDue(progress[c.id], now)).length
-      return { lesson, total: lessonCards.length, toStudy }
+      const due = lessonCards.filter(c => progress[c.id] && isDue(progress[c.id], now)).length
+      const fresh = lessonCards.filter(c => !progress[c.id]).length
+      return { lesson, total: lessonCards.length, due, toStudy: due + fresh }
     })
+  const dueTotal = lessonRows.reduce((sum, row) => sum + row.due, 0)
+  const dueLessons = lessonRows.filter(row => row.due > 0).length
 
   return (
     <PageShell dark={dark} backFallback={`/module/${mod.id}`} maxWidth={PAGE_MAX_WIDTH}>
@@ -188,6 +210,33 @@ function ModuleFlashcards({ mod, dark, stage, initialLessonId }: {
 
       {!loading && lessonRows.length === 0 && !loadError && (
         <EmptyState dark={dark} icon={<EmptyBoxIcon color={pt.sub} size={16} />} message="No flashcards here yet" />
+      )}
+
+      {!loading && progressLoaded && dueTotal > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <LiquidGlassCard
+            dark={dark} delay={0} onClick={() => startAllDue()}
+            style={{ padding: 'clamp(14px, 3vw, 18px) clamp(14px, 3vw, 22px)', display: 'flex', alignItems: 'center', gap: 12 }}
+          >
+            <div style={{
+              width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+              background: `${FLASHCARD_ACCENT}20`, border: `1px solid ${FLASHCARD_ACCENT}40`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <FlashcardIcon color={FLASHCARD_ACCENT} size={20} />
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ ...pulseType.cardTitle, color: pt.textPrimary, fontSize: 15 }}>Study all due cards</div>
+              <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2 }}>
+                {plural(dueTotal, 'card')} due across {plural(dueLessons, 'lesson')}
+              </div>
+            </div>
+            <div style={{
+              background: FLASHCARD_ACCENT, color: '#0f172a', borderRadius: 999,
+              padding: '6px 14px', fontSize: 12, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap',
+            }}>Start</div>
+          </LiquidGlassCard>
+        </div>
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

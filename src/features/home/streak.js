@@ -1,7 +1,8 @@
 // Computes a "current streak" (consecutive days with at least one quiz
-// attempt) from a flat list of timestamps — works with both Supabase
-// timestamptz strings (signed-in users) and plain ms-epoch numbers
-// (guest history), since `new Date()` accepts either.
+// attempt or flashcard review) from a flat list of timestamps — works with
+// Supabase timestamptz strings, ISO strings from saved flashcard progress,
+// and plain ms-epoch numbers (guest history), since `new Date()` accepts
+// all of them.
 export function computeStreak(timestamps) {
   if (!timestamps || timestamps.length === 0) return 0
 
