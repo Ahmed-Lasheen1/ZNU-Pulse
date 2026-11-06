@@ -186,3 +186,8 @@ h1, h2, h3 {
 @media (hover: hover) and (pointer: fine) {
   .kbd-hint { display: block; }
 }
+
+/* While the nav menu animates (NavMenu sets data-nav-busy on <html>), the Home ECG beam pauses:
+   it repaints blurred SVG filters on the main thread every frame and competes with the pills.
+   It resumes from where it stopped. */
+html[data-nav-busy] .pulse-hero-beam { animation-play-state: paused; }

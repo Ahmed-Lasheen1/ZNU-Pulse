@@ -65,6 +65,11 @@ const CLOSE_STAGGER_MS = 20
 const END_FADE_MS = 80
 const CLOSE_EASE = 'cubic-bezier(0.4, 0, 0.6, 1)'
 
+// Attribute set on <html> while the pills animate; the global stylesheet pauses heavy page animations (the Home ECG beam) during it.
+const NAV_BUSY_ATTR = 'data-nav-busy'
+// Slightly longer than the slowest open (spring + stagger of the last pill) so the pause covers the whole animation.
+const NAV_BUSY_MS = 1200
+
 // Smooth ease-out used where a spring is not supported or would overshoot a scrolling panel.
 const SMOOTH_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'
 
@@ -148,6 +153,7 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
   const triggerButtonRef = useRef<HTMLButtonElement>(null)
   const hasOpenedRef = useRef(false)
   const skipFocusRestoreRef = useRef(false)
+  const prevOpenRef = useRef(false)
   const pt = getPulseTheme(dark)
 
   const cornerSide: Align = align === 'right' ? 'right' : 'left'
@@ -189,6 +195,19 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
     }
     if (hasOpenedRef.current) {
       triggerButtonRef.current?.focus()
+    }
+  }, [open])
+
+  // Marks the page as busy while the pills animate so heavy background animations pause and the pills get the whole frame budget.
+  useEffect(() => {
+    if (prevOpenRef.current === open) return
+    prevOpenRef.current = open
+    const root = document.documentElement
+    root.setAttribute(NAV_BUSY_ATTR, '')
+    const timer = setTimeout(() => root.removeAttribute(NAV_BUSY_ATTR), NAV_BUSY_MS)
+    return () => {
+      clearTimeout(timer)
+      root.removeAttribute(NAV_BUSY_ATTR)
     }
   }, [open])
 
@@ -292,7 +311,9 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
           }
         }
 
-        /* Closed: above the clip line, out of sight. Only position and opacity change (no scaling), so nothing is re-rasterized.
+        /* Closed: above the clip line and fully transparent. Only position and opacity change (no scaling), so nothing is re-rasterized.
+           There is no visibility toggle: the panel is inert, aria-hidden and ignores pointer events while closed, and keeping the pills
+           painted avoids repainting all of them in the frame the menu opens.
            translate3d keeps each pill on the same compositor layer from start to finish, so there is no re-raster snap when the
            transition ends; backface-visibility hidden is the usual guard against flicker on transformed layers. */
         .nav-pill {
@@ -300,27 +321,23 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
           flex-shrink: 0;
           z-index: calc(var(--count) - var(--i));
           opacity: 0;
-          visibility: hidden;
           will-change: transform, opacity;
           backface-visibility: hidden;
           -webkit-backface-visibility: hidden;
           transform: translate3d(0, calc(var(--start) - var(--i) * var(--step)), 0);
           transition:
             transform ${CLOSE_MS}ms ${CLOSE_EASE} var(--close-delay),
-            opacity ${END_FADE_MS}ms linear calc(${CLOSE_MS - END_FADE_MS}ms + var(--close-delay)),
-            visibility 0s linear calc(${CLOSE_MS}ms + var(--close-delay));
+            opacity ${END_FADE_MS}ms linear calc(${CLOSE_MS - END_FADE_MS}ms + var(--close-delay));
         }
 
         /* Open: each pill springs down to its place in turn, first pill first. */
         .nav-panel[data-open="true"] .nav-pill {
           --open-delay: calc(var(--i) * ${OPEN_STAGGER_MS}ms);
           opacity: 1;
-          visibility: visible;
           transform: translate3d(0, 0, 0);
           transition:
             transform ${OPEN_MS}ms var(--open-ease) var(--open-delay),
-            opacity 100ms linear var(--open-delay),
-            visibility 0s linear 0s;
+            opacity 100ms linear var(--open-delay);
         }
 
         @media (hover: hover) {
