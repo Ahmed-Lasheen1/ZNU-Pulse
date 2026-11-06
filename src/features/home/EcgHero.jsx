@@ -52,8 +52,14 @@ const STROKE_WIDTH = 25
 // regardless of on-screen geometry). Kept generous — too short reads
 // as a dot chasing the line instead of a moving piece of the line.
 const BEAM_FRACTION = 0.13
-const BEAM_DURATION = '7s'
+const BEAM_DURATION_S = 7
 
+// The beam moves only 1-2px per frame, so updating it 30 times a second looks identical to 60
+// while halving how often its blurred filters are repainted. Lower this to make the beam cheaper still.
+const BEAM_FPS = 30
+const BEAM_STEPS = Math.round(BEAM_DURATION_S * BEAM_FPS)
+
+// Renders the ECG artwork with its shadow, base line and traveling beam.
 export default function EcgHero({ height = 220 }) {
   const reduced = usePrefersReducedMotion()
   // Unique per mount so multiple instances (or hot-reload remounts)
@@ -64,9 +70,12 @@ export default function EcgHero({ height = 220 }) {
   const glowId = `pulseBeamGlow-${uid}`
 
   return (
+    // will-change gives the artwork its own compositor layer, so the beam's repaints stay inside it
+    // and never invalidate the glass cards and menu around it.
     <div style={{
       position: 'relative', width: '100%', height, maxHeight: '100%',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
+      willChange: 'transform',
     }}>
       <style>{`
         @keyframes pulseHeroDash {
@@ -75,7 +84,7 @@ export default function EcgHero({ height = 220 }) {
         }
         .pulse-hero-beam {
           stroke-dasharray: ${BEAM_FRACTION} 1;
-          animation: pulseHeroDash ${BEAM_DURATION} linear infinite;
+          animation: pulseHeroDash ${BEAM_DURATION_S}s steps(${BEAM_STEPS}, end) infinite;
         }
       `}</style>
 
@@ -86,7 +95,7 @@ export default function EcgHero({ height = 220 }) {
         style={{ display: 'block', overflow: 'visible' }}
       >
         {/* Filter regions are sized to the path box plus the stroke, blur (about 3.5 sigma) and, for the shadow, its offset.
-            The beam filters are recomputed every frame, so the tight regions keep that per-frame work small. */}
+            The beam filters are recomputed every update, so the tight regions keep that work small. */}
         <defs>
           <filter id={shadowId} x="-10%" y="-10%" width="122%" height="128%" colorInterpolationFilters="sRGB">
             <feGaussianBlur in="SourceAlpha" stdDeviation="13" result="blur" />
