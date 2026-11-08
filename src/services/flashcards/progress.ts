@@ -54,13 +54,20 @@ export function loadReviewTimes(userId: string | null): Promise<string[]> {
   })
 }
 
-// Counts studied cards that are due now, per module (never-studied cards are not counted).
-export function loadDueCounts(userId: string | null): Promise<Record<string, number>> {
+// Counts due cards per module. Only cards that still exist (liveCardIdsByModule) are counted,
+// so cards deleted by an admin no longer show up as due. Modules missing from the map are skipped.
+export function loadDueCounts(
+  userId: string | null,
+  liveCardIdsByModule: Record<string, Set<string>>
+): Promise<Record<string, number>> {
   return queue(async () => {
     const now = new Date()
     const counts: Record<string, number> = {}
-    for (const [moduleId, cards] of await readOwnerStores(userId)) {
-      const due = Object.values(cards).filter(entry => isDue(entry, now)).length
+    for (const [moduleId, liveIds] of Object.entries(liveCardIdsByModule)) {
+      const { cards } = await readStore(keyFor(userId, moduleId))
+      const due = Object.entries(cards)
+        .filter(([cardId, entry]) => liveIds.has(cardId) && isDue(entry, now))
+        .length
       if (due > 0) counts[moduleId] = due
     }
     return counts

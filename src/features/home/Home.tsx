@@ -7,10 +7,12 @@ import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP, ON_GRADIENT_BOTT
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import { computeStreak } from '@/features/home/streak'
 import { nextUpcomingExam } from '@/features/home/upcomingExam'
+import HomeNoticeCard from '@/features/home/HomeNoticeCard'
 import { relativeDayLabel } from '@/features/tools/schedule'
 import { getGuestHistory } from '@/services/history/reviewStorage'
 import { hasSavedActiveExam } from '@/services/exam/activeExam'
 import { fetchSubjectById } from '@/services/content/subjects'
+import { fetchModuleFlashcards } from '@/services/content/moduleContent'
 import { loadDueCounts, loadReviewTimes } from '@/services/flashcards/progress'
 import { ENTRANCE_PAUSE, LOGO_DELAY } from '@/shared/theme/pulseMotion'
 import { NotifyPermissionButton } from '@/features/notifications'
@@ -18,7 +20,7 @@ import { GuestSignInButton } from '@/features/account'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import EcgHero from '@/features/home/EcgHero'
 import AutoDirText from '@/shared/ui/display/AutoDirText'
-import { ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, PauseIcon, LightningIcon, CheckCircleIcon, WeeklyReportIcon, StreakFlameIcon } from '@/shared/icons/tool-icons'
+import { ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, PauseIcon, LightningIcon, CheckCircleIcon, WeeklyReportIcon, StreakFlameIcon, MegaphoneIcon } from '@/shared/icons/tool-icons'
 import { FlashcardIcon } from '@/shared/icons/FlashcardIcon'
 import { NumberTicker } from '@/shared/ui/motion/number-ticker'
 import { ModuleIcon, ExamIcon } from '@/shared/icons/medicalIcons'
@@ -90,7 +92,7 @@ function msFor(targetSeconds: number) {
 
 interface WeeklySummary { totalAttempted: number; accuracy: number; topSubjectName: string | null }
 
-// Home dashboard: weekly report, next exam countdown, flashcards due, active modules, tools and completed modules.
+// Home dashboard: weekly report, notices, active modules, tools and completed modules.
 export default function Home({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const navigate = useNavigate()
@@ -188,12 +190,24 @@ export default function Home({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
 
-  // Loads how many flashcards are due per module from the progress saved on this device.
+  // Loads due flashcard counts for each active module, counting only cards that still exist.
   useEffect(() => {
+    if (!modulesLoaded) return
     let ignore = false
-    loadDueCounts(userId ?? null).then(counts => { if (!ignore) setDueByModule(counts) })
+    async function loadDue() {
+      const liveByModule: Record<string, Set<string>> = {}
+      await Promise.all(
+        modules.filter(m => m.status === 'active').map(async m => {
+          const { data, error } = await fetchModuleFlashcards(m.id)
+          if (!error && data) liveByModule[m.id] = new Set((data as { id: string }[]).map(c => c.id))
+        })
+      )
+      const counts = await loadDueCounts(userId ?? null, liveByModule)
+      if (!ignore) setDueByModule(counts)
+    }
+    loadDue()
     return () => { ignore = true }
-  }, [userId])
+  }, [userId, modulesLoaded, modules])
 
   useEffect(() => {
     let ignore = false
@@ -380,55 +394,57 @@ export default function Home({ dark }: { dark: boolean }) {
                 </LiquidGlassCard>
 
                 {upcomingExam && (
-                  <LiquidGlassCard dark={dark} delay={msFor(WEEKLY_REPORT_START) + 100} instant={!playEntrance}
+                  <HomeNoticeCard
+                    dark={dark}
+                    accent={examColor}
+                    Icon={ExamIcon}
+                    title={<span dir="auto">{upcomingExam.title}</span>}
+                    body={upcomingExam.moduleName}
+                    badge={relativeDayLabel(upcomingExam.days)}
                     onClick={() => navigate(`/schedule?module=${upcomingExam.moduleId}&type=exam`)}
-                    style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{
-                      width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
-                      background: `${examColor}22`, display: 'flex', alignItems: 'center', justifyContent: 'center'
-                    }}>
-                      <ExamIcon color={examColor} size={19} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div dir="auto" style={{ ...pulseType.cardTitle, fontSize: 14, color: pt.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {upcomingExam.title}
-                      </div>
-                      <div style={{ ...pulseType.small, fontSize: 11, color: pt.textMuted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {upcomingExam.moduleName}
-                      </div>
-                    </div>
-                    <span style={{
-                      background: `${examColor}22`, color: examColor, borderRadius: 999,
-                      padding: '3px 11px', fontSize: 11.5, fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0
-                    }}>{relativeDayLabel(upcomingExam.days)}</span>
-                  </LiquidGlassCard>
+                    delay={msFor(WEEKLY_REPORT_START) + 100}
+                    instant={!playEntrance}
+                  />
                 )}
 
-                {(pausedExam || announcement) && (
-                  <LiquidGlassCard dark={dark} delay={msFor(WEEKLY_REPORT_START) + 200} instant={!playEntrance}
-                    onClick={pausedExam ? () => navigate('/mcq') : undefined}
-                    style={{ padding: '16px 20px' }}>
-                    {pausedExam ? (
-                      <div style={{ ...pulseType.cardTitle, fontSize: 14, color: pt.cobalt, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <PauseIcon color={pt.cobalt} size={13} /> Continue where you left off →
-                      </div>
-                    ) : (
-                      <AutoDirText text={announcement} style={{
-                        ...pulseType.bodyEmphasis, fontSize: 13, color: pt.textPrimary,
-                        lineHeight: 1.5, wordBreak: 'break-word'
-                      }} />
-                    )}
-                  </LiquidGlassCard>
+                {pausedExam && (
+                  <HomeNoticeCard
+                    dark={dark}
+                    accent={pt.cobalt}
+                    Icon={PauseIcon}
+                    title="Continue where you left off"
+                    body="Resume your paused exam"
+                    onClick={() => navigate('/mcq')}
+                    delay={msFor(WEEKLY_REPORT_START) + 200}
+                    instant={!playEntrance}
+                  />
+                )}
+
+                {announcement && (
+                  <HomeNoticeCard
+                    dark={dark}
+                    accent={pt.amber}
+                    Icon={MegaphoneIcon}
+                    title="Announcement"
+                    body={<AutoDirText text={announcement} style={{ ...pulseType.small, fontSize: 12, color: pt.textPrimary, lineHeight: 1.5 }} />}
+                    multiline
+                    delay={msFor(WEEKLY_REPORT_START) + 300}
+                    instant={!playEntrance}
+                  />
                 )}
 
                 {dueModules.map((mod, i) => (
-                  <LiquidGlassCard key={mod.id} dark={dark} delay={msFor(WEEKLY_REPORT_START) + 400 + i * 150} instant={!playEntrance}
+                  <HomeNoticeCard
+                    key={mod.id}
+                    dark={dark}
+                    accent={FLASHCARD_ACCENT}
+                    Icon={FlashcardIcon}
+                    title={`${plural(dueByModule[mod.id], 'flashcard')} due`}
+                    body={mod.name}
                     onClick={() => navigate(`/flashcards?module=${mod.id}`)}
-                    style={{ padding: '16px 20px' }}>
-                    <div style={{ ...pulseType.cardTitle, fontSize: 14, color: FLASHCARD_ACCENT, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <FlashcardIcon color={FLASHCARD_ACCENT} size={14} /> {plural(dueByModule[mod.id], 'flashcard')} due · {mod.name} →
-                    </div>
-                  </LiquidGlassCard>
+                    delay={msFor(WEEKLY_REPORT_START) + 400 + i * 150}
+                    instant={!playEntrance}
+                  />
                 ))}
               </div>
 
