@@ -22,13 +22,13 @@ import { GuestSignInButton } from '@/features/account'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import EcgHero from '@/features/home/EcgHero'
 import AutoDirText from '@/shared/ui/display/AutoDirText'
-import { ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, PauseIcon, LightningIcon, CheckCircleIcon, WeeklyReportIcon, StreakFlameIcon, MegaphoneIcon } from '@/shared/icons/tool-icons'
+import { ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, LightningIcon, CheckCircleIcon, WeeklyReportIcon, StreakFlameIcon } from '@/shared/icons/tool-icons'
 import { FlashcardIcon } from '@/shared/icons/FlashcardIcon'
 import { NumberTicker } from '@/shared/ui/motion/number-ticker'
 import { ModuleIcon, ExamIcon } from '@/shared/icons/medicalIcons'
 import { accuracyTier, accuracyColor, type AccuracyTier } from '@/shared/utils/accuracy'
 import { plural } from '@/shared/utils/format'
-import { FLASHCARD_ACCENT } from '@/shared/theme/accents'
+import { FLASHCARD_ACCENT, MCQ_ACCENT } from '@/shared/theme/accents'
 import { fetchHomeAnnouncement, fetchHomeHistory, fetchExamSchedules } from '@/services/content/homeData'
 import { ReportGridSkeleton, CardRowsSkeleton } from '@/shared/ui/feedback/Skeletons'
 
@@ -413,6 +413,16 @@ export default function Home({ dark }: { dark: boolean }) {
                   </div>
                 </LiquidGlassCard>
 
+                {announcement && (
+                  <LiquidGlassCard dark={dark} delay={msFor(WEEKLY_REPORT_START) + 300} instant={!playEntrance}
+                    style={{ padding: '16px 20px' }}>
+                    <AutoDirText text={announcement} style={{
+                      ...pulseType.bodyEmphasis, fontSize: 13, color: pt.textPrimary,
+                      lineHeight: 1.5, wordBreak: 'break-word'
+                    }} />
+                  </LiquidGlassCard>
+                )}
+
                 {upcomingExam && (
                   <HomeNoticeCard
                     dark={dark}
@@ -430,25 +440,12 @@ export default function Home({ dark }: { dark: boolean }) {
                 {pausedExam && (
                   <HomeNoticeCard
                     dark={dark}
-                    accent={pt.cobalt}
-                    Icon={PauseIcon}
+                    accent={MCQ_ACCENT}
+                    Icon={ExamIcon}
                     title={pausedExam.title}
                     body={`${pausedModule?.name ?? 'Module'} · ${pausedExam.answered}/${pausedExam.total} answered`}
                     onClick={() => navigate(pausedExam.moduleId ? `/mcq?module=${pausedExam.moduleId}` : '/mcq')}
                     delay={msFor(WEEKLY_REPORT_START) + 200}
-                    instant={!playEntrance}
-                  />
-                )}
-
-                {announcement && (
-                  <HomeNoticeCard
-                    dark={dark}
-                    accent={pt.amber}
-                    Icon={MegaphoneIcon}
-                    title="Announcement"
-                    body={<AutoDirText text={announcement} style={{ ...pulseType.small, fontSize: 12, color: pt.textPrimary, lineHeight: 1.5 }} />}
-                    multiline
-                    delay={msFor(WEEKLY_REPORT_START) + 300}
                     instant={!playEntrance}
                   />
                 )}
