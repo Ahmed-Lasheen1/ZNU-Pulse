@@ -11,12 +11,15 @@ import { CardRowsSkeleton } from '@/shared/ui/feedback/Skeletons'
 import { ModuleIcon, ExamIcon } from '@/shared/icons/medicalIcons'
 import { OfflineIcon, BookIcon, PauseIcon, PlayIcon, EmptyBoxIcon, GraduationCapIcon, TargetIcon } from '@/shared/icons/tool-icons'
 import { EXAM_LOW_SHADOW } from '@/features/practice/mcqShared'
+import { useWeakSpots } from '@/features/practice/mcq/useWeakSpots'
 import { MCQ_ACCENT } from '@/shared/theme/accents'
 import { stagesOf, inStage } from '@/services/content/lessonStages'
 import { simulatorPool, simulatorTotal, QUIZ_MAX_QUESTIONS } from '@/services/exam/stageSimulator'
+import { WEAK_BELOW } from '@/services/history/weakSpots'
 import { quizName } from '@/features/practice/quizNames'
 import { glassHoverTint } from '@/shared/theme/liquidGlass'
-import { countLabel } from '@/shared/utils/format'
+import { accuracyColor } from '@/shared/utils/accuracy'
+import { countLabel, plural } from '@/shared/utils/format'
 
 interface SimulatorRow {
   stage: string
@@ -60,6 +63,10 @@ interface MCQBrowseProps {
   onCancelChoice: () => void
 }
 
+// Most weak lessons listed at once.
+const MAX_WEAK_SPOTS = 3
+
+// Small counter text shown under quiz cards.
 function CountText({ children }: { children: ReactNode }) {
   return (
     <span style={{
@@ -69,6 +76,7 @@ function CountText({ children }: { children: ReactNode }) {
   )
 }
 
+// Dialog asking whether to practice with every question or only University Doctors' questions.
 function SourceChoiceDialog({
   dark, open, allCount, doctorCount, onCancel, onChooseAll, onChooseDoctors
 }: {
@@ -139,6 +147,7 @@ interface SubjectAccordionRowProps {
   onPracticeLesson: (lessonId: string) => void
 }
 
+// Subject row that expands in place to its lessons, with a "Practice All" button.
 function SubjectAccordionRow({
   dark, sub, count, tabAccentColor, delay, lessonRows, expanded, forceOpen, onToggle, onPracticeSubject, onPracticeLesson
 }: SubjectAccordionRowProps) {
@@ -228,6 +237,7 @@ function SubjectAccordionRow({
   )
 }
 
+// MCQ browse page: resume card, mock exam, stage simulator, weak spots and practice by subject.
 export default function MCQBrowse({
   dark, modulesError, loadError, usingCache, resumeData, onResume, onDiscardResume,
   activeModuleObj, stages, activeStage, onSelectStage,
@@ -240,6 +250,7 @@ export default function MCQBrowse({
   const navigate = useNavigate()
   const hoverTint = glassHoverTint(dark)
   const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null)
+  const lessonAccuracy = useWeakSpots(questions)
 
   const tabAccentColor = activeModuleObj?.color || pt.cobalt
   const stageActive = activeStage !== 'all'
@@ -264,6 +275,15 @@ export default function MCQBrowse({
       return { sub, count: getPracticeQuestions(sub.id, null).length, lessonRows }
     })
     .filter(r => !stageActive || r.count > 0 || r.lessonRows.length > 0)
+
+  // Lessons of the current view that have practice questions and an accuracy below the weak-spot line, weakest first.
+  const weakSpots = subjectRows
+    .flatMap(({ sub, lessonRows }) => lessonRows
+      .filter(r => r.count > 0 && lessonAccuracy[r.lesson.id])
+      .map(r => ({ lesson: r.lesson, subject: sub, stat: lessonAccuracy[r.lesson.id] })))
+    .filter(r => r.stat.accuracy < WEAK_BELOW)
+    .sort((a, b) => a.stat.accuracy - b.stat.accuracy)
+    .slice(0, MAX_WEAK_SPOTS)
 
   const moduleTotal = questions.filter(q => q.module_id === activeModuleObj?.id).length
 
@@ -444,6 +464,36 @@ export default function MCQBrowse({
                 borderRadius: 999, fontWeight: 800, cursor: 'pointer', fontFamily: pulseFonts.body, flexShrink: 0
               }}>Start →</button>
             </div>
+          </LiquidGlassCard>
+        </div>
+      )}
+
+      {!loading && weakSpots.length > 0 && (
+        <div style={{ marginBottom: 32 }}>
+          <h3 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16 }}>Weak Spots</h3>
+          <LiquidGlassCard dark={dark} delay={0} style={{ padding: '6px 16px' }}>
+            {weakSpots.map(({ lesson, subject, stat }, i) => (
+              <div key={lesson.id} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '12px 0',
+                borderTop: i === 0 ? 'none' : `1px solid ${pt.border}`
+              }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ color: pt.textPrimary, fontWeight: 700, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lesson.title}</div>
+                  <div style={{ color: pt.textMuted, fontSize: 11.5, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {subject.name} · {plural(stat.answered, 'answer')}
+                  </div>
+                </div>
+                <span style={{
+                  flexShrink: 0, fontWeight: 800, fontSize: 13, color: accuracyColor(stat.accuracy, pt),
+                  background: `${accuracyColor(stat.accuracy, pt)}22`, borderRadius: 999, padding: '3px 11px'
+                }}>{stat.accuracy}%</span>
+                <button onClick={() => onStartQuiz('practice', null, lesson.id)} style={{
+                  background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '8px 16px',
+                  borderRadius: 999, fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: pulseFonts.body,
+                  flexShrink: 0
+                }}>Practice</button>
+              </div>
+            ))}
           </LiquidGlassCard>
         </div>
       )}

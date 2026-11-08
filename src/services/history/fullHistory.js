@@ -36,6 +36,13 @@ export async function getFullAttempt(id) {
   return (await idbGet(ENTRY + id)) ?? null
 }
 
+// Lists every saved attempt of this owner, newest first (null owner = guest).
+export async function listFullAttempts(userId) {
+  const ids = (await idbGet(indexKey(userId))) ?? []
+  const attempts = await Promise.all(ids.map(id => idbGet(ENTRY + id)))
+  return attempts.filter(Boolean)
+}
+
 // With `ids`, removes just those attempts; without, removes every attempt saved for this owner (null owner = guest).
 export function removeFullAttempts(userId, ids = null) {
   return queue(async () => {

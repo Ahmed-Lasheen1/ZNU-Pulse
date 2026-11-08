@@ -6,6 +6,8 @@ import { useAuth, useModules, useHomeEntrance } from '@/core/contexts'
 import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP, ON_GRADIENT_BOTTOM } from '@/shared/theme/premiumTheme'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import { computeStreak } from '@/features/home/streak'
+import { nextUpcomingExam } from '@/features/home/upcomingExam'
+import { relativeDayLabel } from '@/features/tools/schedule'
 import { getGuestHistory } from '@/services/history/reviewStorage'
 import { hasSavedActiveExam } from '@/services/exam/activeExam'
 import { fetchSubjectById } from '@/services/content/subjects'
@@ -19,11 +21,11 @@ import AutoDirText from '@/shared/ui/display/AutoDirText'
 import { ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, PauseIcon, LightningIcon, CheckCircleIcon, WeeklyReportIcon, StreakFlameIcon } from '@/shared/icons/tool-icons'
 import { FlashcardIcon } from '@/shared/icons/FlashcardIcon'
 import { NumberTicker } from '@/shared/ui/motion/number-ticker'
-import { ModuleIcon } from '@/shared/icons/medicalIcons'
+import { ModuleIcon, ExamIcon } from '@/shared/icons/medicalIcons'
 import { accuracyTier, accuracyColor, type AccuracyTier } from '@/shared/utils/accuracy'
 import { plural } from '@/shared/utils/format'
 import { FLASHCARD_ACCENT } from '@/shared/theme/accents'
-import { fetchHomeAnnouncement, fetchHomeHistory } from '@/services/content/homeData'
+import { fetchHomeAnnouncement, fetchHomeHistory, fetchExamSchedules } from '@/services/content/homeData'
 import { ReportGridSkeleton, CardRowsSkeleton } from '@/shared/ui/feedback/Skeletons'
 
 interface HomeModule {
@@ -41,6 +43,9 @@ const ACTIVE_MODULES_ACCENT = getPulseTheme(false).cobalt
 const FOOTER_LINE_COLOR = getPulseTheme(true).border
 
 const HOME_HISTORY_LIMIT = 200
+
+// An exam this many days away or fewer is highlighted as urgent.
+const EXAM_URGENT_DAYS = 2
 
 const MODULE_BLURBS: Record<string, string> = {
   neuro: 'Explore the wonders of the nervous system',
@@ -85,7 +90,7 @@ function msFor(targetSeconds: number) {
 
 interface WeeklySummary { totalAttempted: number; accuracy: number; topSubjectName: string | null }
 
-// Home dashboard: weekly report, flashcards due, active modules, tools and completed modules.
+// Home dashboard: weekly report, next exam countdown, flashcards due, active modules, tools and completed modules.
 export default function Home({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const navigate = useNavigate()
@@ -98,6 +103,7 @@ export default function Home({ dark }: { dark: boolean }) {
   const [weeklySummary, setWeeklySummary] = useState<WeeklySummary | null>(null)
   const [reportLoading, setReportLoading] = useState(true)
   const [dueByModule, setDueByModule] = useState<Record<string, number>>({})
+  const [examSchedules, setExamSchedules] = useState<any[]>([])
 
   const [archiveOpen, setArchiveOpen] = useState(false)
 
@@ -126,6 +132,13 @@ export default function Home({ dark }: { dark: boolean }) {
     let ignore = false
     fetchHomeAnnouncement(value => { if (!ignore) setAnnouncement(value) })
       .then(({ data }) => { if (!ignore) setAnnouncement(data?.value || '') })
+    return () => { ignore = true }
+  }, [])
+
+  // Loads the exam schedules (cached) used for the next-exam countdown.
+  useEffect(() => {
+    let ignore = false
+    fetchExamSchedules().then(({ data }: { data: any[] | null }) => { if (!ignore) setExamSchedules(data || []) })
     return () => { ignore = true }
   }, [])
 
@@ -192,6 +205,8 @@ export default function Home({ dark }: { dark: boolean }) {
   const activeModules = modules.filter(m => m.status === 'active')
   const completedModules = modules.filter(m => m.status === 'completed')
   const dueModules = activeModules.filter(m => (dueByModule[m.id] || 0) > 0)
+  const upcomingExam = nextUpcomingExam(examSchedules, activeModules)
+  const examColor = upcomingExam && upcomingExam.days <= EXAM_URGENT_DAYS ? pt.amber : pt.cobalt
 
   // Section heading with an optional icon that fades in during the entrance.
   const sectionTitle = (
@@ -363,6 +378,31 @@ export default function Home({ dark }: { dark: boolean }) {
                     </div>
                   </div>
                 </LiquidGlassCard>
+
+                {upcomingExam && (
+                  <LiquidGlassCard dark={dark} delay={msFor(WEEKLY_REPORT_START) + 100} instant={!playEntrance}
+                    onClick={() => navigate(`/schedule?module=${upcomingExam.moduleId}&type=exam`)}
+                    style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{
+                      width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
+                      background: `${examColor}22`, display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                      <ExamIcon color={examColor} size={19} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div dir="auto" style={{ ...pulseType.cardTitle, fontSize: 14, color: pt.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {upcomingExam.title}
+                      </div>
+                      <div style={{ ...pulseType.small, fontSize: 11, color: pt.textMuted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {upcomingExam.moduleName}
+                      </div>
+                    </div>
+                    <span style={{
+                      background: `${examColor}22`, color: examColor, borderRadius: 999,
+                      padding: '3px 11px', fontSize: 11.5, fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0
+                    }}>{relativeDayLabel(upcomingExam.days)}</span>
+                  </LiquidGlassCard>
+                )}
 
                 {(pausedExam || announcement) && (
                   <LiquidGlassCard dark={dark} delay={msFor(WEEKLY_REPORT_START) + 200} instant={!playEntrance}

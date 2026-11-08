@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
 import { getPulseTheme, pulseType } from '@/shared/theme/premiumTheme'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
@@ -6,6 +7,7 @@ import { ScheduleIcon, SearchIcon2 } from '@/shared/icons/tool-icons'
 import { storageGet, storageSet } from '@/core/safeStorage'
 import { wrapText } from '@/shared/utils/textStyles'
 import { daysFromToday, formatDayHeading } from '@/features/tools/schedule/scheduleDates'
+import { usePlanProgress } from '@/features/tools/schedule/usePlanProgress'
 import type { PlanItem, ScheduleRow } from '@/features/tools/schedule/types'
 
 interface StudyPlanCardProps {
@@ -52,18 +54,25 @@ function groupItems(items: PlanItem[]): PlanGroup[] {
 }
 
 // Study plan card: collapsible day-by-day checklist, or a plain image row when the plan has no items.
+// Linked items open their lesson's practice or flashcards and tick themselves once the lesson is studied.
 export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOpen, onViewImage }: StudyPlanCardProps) {
   const pt = getPulseTheme(dark)
+  const navigate = useNavigate()
   const items = schedule.items || []
   const hasItems = items.length > 0
   const [open, setOpen] = useState(defaultOpen)
   const [done, setDone] = useState(() => readDone(schedule.id))
+  const autoDone = usePlanProgress(schedule, open)
 
-  const doneCount = items.filter(item => done.has(item.id)).length
+  // An item counts as done when ticked by hand or completed through study activity.
+  const isItemDone = (itemId: string) => done.has(itemId) || autoDone.has(itemId)
+
+  const doneCount = items.filter(item => isItemDone(item.id)).length
   const percent = hasItems ? Math.round((doneCount / items.length) * 100) : 0
 
-  // Ticks or unticks one plan item and saves the result on this device.
+  // Ticks or unticks one plan item and saves the result on this device; study-completed items stay ticked.
   function toggleItem(itemId: string) {
+    if (autoDone.has(itemId)) return
     const next = new Set(done)
     if (next.has(itemId)) next.delete(itemId)
     else next.add(itemId)
@@ -75,6 +84,13 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
   function handleHeader() {
     if (hasItems) setOpen(o => !o)
     else onViewImage()
+  }
+
+  // Opens the lesson's practice questions or flashcards for a linked item.
+  function openLink(item: PlanItem) {
+    if (!item.link) return
+    const tool = item.link.kind === 'practice' ? 'mcq' : 'flashcards'
+    navigate(`/${tool}?module=${schedule.module_id}&lesson=${item.link.lesson_id}`)
   }
 
   const subtitle = [hasItems ? `${doneCount}/${items.length} done` : null, schedule.week].filter(Boolean).join(' · ')
@@ -131,7 +147,7 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
         <div style={{ padding: '0 18px 16px' }}>
           {groupItems(items).map(group => {
             const diff = group.date ? daysFromToday(group.date) : null
-            const allDone = group.items.every(item => done.has(item.id))
+            const allDone = group.items.every(item => isItemDone(item.id))
             const headingColor = diff === 0 ? accent : diff !== null && diff < 0 && !allDone ? pt.amber : pt.textMuted
             return (
               <div key={group.date ?? 'anytime'} style={{ marginTop: 10 }}>
@@ -139,28 +155,40 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
                   {group.date ? formatDayHeading(group.date) : 'Anytime'}
                 </div>
                 {group.items.map(item => {
-                  const isDone = done.has(item.id)
+                  const isDone = isItemDone(item.id)
                   return (
-                    <button
-                      key={item.id} type="button" role="checkbox" aria-checked={isDone}
-                      onClick={() => toggleItem(item.id)}
-                      style={{
-                        display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%',
-                        background: 'transparent', border: 'none', padding: '7px 0',
-                        cursor: 'pointer', textAlign: 'start', fontFamily: 'inherit',
-                      }}
-                    >
-                      <span aria-hidden style={{
-                        width: 18, height: 18, borderRadius: 6, flexShrink: 0, marginTop: 1,
-                        border: `1.5px solid ${isDone ? accent : pt.faint}`,
-                        background: isDone ? accent : 'transparent', color: '#0f172a',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900,
-                      }}>{isDone && '✓'}</span>
-                      <span dir="auto" style={{
-                        ...pulseType.body, color: isDone ? pt.textMuted : pt.textPrimary,
-                        textDecoration: isDone ? 'line-through' : 'none', flex: 1, minWidth: 0, ...wrapText,
-                      }}>{item.text}</span>
-                    </button>
+                    <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <button
+                        type="button" role="checkbox" aria-checked={isDone}
+                        onClick={() => toggleItem(item.id)}
+                        style={{
+                          display: 'flex', alignItems: 'flex-start', gap: 10, flex: 1, minWidth: 0,
+                          background: 'transparent', border: 'none', padding: '7px 0',
+                          cursor: 'pointer', textAlign: 'start', fontFamily: 'inherit',
+                        }}
+                      >
+                        <span aria-hidden style={{
+                          width: 18, height: 18, borderRadius: 6, flexShrink: 0, marginTop: 1,
+                          border: `1.5px solid ${isDone ? accent : pt.faint}`,
+                          background: isDone ? accent : 'transparent', color: '#0f172a',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900,
+                        }}>{isDone && '✓'}</span>
+                        <span dir="auto" style={{
+                          ...pulseType.body, color: isDone ? pt.textMuted : pt.textPrimary,
+                          textDecoration: isDone ? 'line-through' : 'none', flex: 1, minWidth: 0, ...wrapText,
+                        }}>{item.text}</span>
+                      </button>
+                      {item.link && (
+                        <button
+                          type="button" onClick={() => openLink(item)}
+                          aria-label={item.link.kind === 'practice' ? `Practice questions: ${item.text}` : `Flashcards: ${item.text}`}
+                          style={{
+                            flexShrink: 0, marginTop: 5, background: 'transparent', border: `1px solid ${accent}66`, color: accent,
+                            borderRadius: 999, padding: '3px 11px', fontWeight: 700, fontSize: 11.5, cursor: 'pointer', fontFamily: 'inherit',
+                          }}
+                        >{item.link.kind === 'practice' ? 'Practice →' : 'Flashcards →'}</button>
+                      )}
+                    </div>
                   )
                 })}
               </div>

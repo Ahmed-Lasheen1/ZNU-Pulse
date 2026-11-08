@@ -2,6 +2,7 @@ import { supabase } from '@/core/supabase'
 import { cachedQuery, invalidateCache, networkFirst, MINUTE } from '@/core/dataCache'
 
 const ANNOUNCEMENT_KEY = 'home-announcement'
+const EXAMS_KEY = 'home-exam-schedules'
 const HISTORY_TTL_MS = 2 * MINUTE
 
 let history = null
@@ -20,6 +21,15 @@ export function fetchHomeAnnouncement(onUpdate) {
 // Clears the cached announcement.
 export function invalidateHomeAnnouncement() {
   invalidateCache(ANNOUNCEMENT_KEY)
+}
+
+// Loads every exam schedule's title, dates and module for the Home countdown, cached for 10 minutes.
+export function fetchExamSchedules() {
+  return cachedQuery(
+    EXAMS_KEY,
+    () => supabase.from('schedules').select('id, title, dates, module_id').eq('type', 'exam').not('dates', 'is', null),
+    { ttl: 10 * MINUTE }
+  )
 }
 
 // Memory-cached for 2 minutes; the last good copy is also kept on the device for offline use.
