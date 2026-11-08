@@ -90,6 +90,19 @@ export async function loadSavedActiveExam(user) {
   return local.payload.savedAt > remote.savedAt ? local.payload : hydrateExam(remote)
 }
 
+// Short summary of the paused exam for Home's notice card; null when nothing is paused.
+export async function loadSavedActiveExamSummary(user) {
+  const exam = await loadSavedActiveExam(user)
+  if (!exam) return null
+  return {
+    moduleId: exam.activeModule ?? null,
+    quizMode: exam.quizMode || 'practice',
+    stage: exam.quizConfig?.stage || exam.quizConfig?.simulatorStage || null,
+    answered: Object.keys(exam.answers || {}).length,
+    total: (exam.quizQuestions || []).length,
+  }
+}
+
 // Existence only (Home's "continue" card) — shares the same memoized server read.
 export async function hasSavedActiveExam(user) {
   if (!user) return !!getGuestActiveExam()

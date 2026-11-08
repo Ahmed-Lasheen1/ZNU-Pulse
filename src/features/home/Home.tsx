@@ -9,9 +9,11 @@ import { computeStreak } from '@/features/home/streak'
 import { nextUpcomingExam } from '@/features/home/upcomingExam'
 import HomeNoticeCard from '@/features/home/HomeNoticeCard'
 import { relativeDayLabel } from '@/features/tools/schedule'
+import { quizName } from '@/features/practice/quizNames'
 import { getGuestHistory } from '@/services/history/reviewStorage'
-import { hasSavedActiveExam } from '@/services/exam/activeExam'
+import { loadSavedActiveExamSummary } from '@/services/exam/activeExam'
 import { fetchSubjectById } from '@/services/content/subjects'
+import { fetchModuleStages } from '@/services/content/moduleStages'
 import { fetchModuleFlashcards } from '@/services/content/moduleContent'
 import { loadDueCounts, loadReviewTimes } from '@/services/flashcards/progress'
 import { ENTRANCE_PAUSE, LOGO_DELAY } from '@/shared/theme/pulseMotion'
@@ -32,6 +34,16 @@ import { ReportGridSkeleton, CardRowsSkeleton } from '@/shared/ui/feedback/Skele
 
 interface HomeModule {
   id: string; name: string; icon?: string | null; color: string; status: 'active' | 'completed'
+}
+
+// Summary of the paused exam shown as a Home notice.
+interface PausedExamInfo {
+  moduleId: string | null
+  quizMode: string
+  stage: string | null
+  answered: number
+  total: number
+  title: string
 }
 
 const toolCards = [
@@ -101,7 +113,7 @@ export default function Home({ dark }: { dark: boolean }) {
   const { modules, modulesLoaded, modulesError } = useModules() as { modules: HomeModule[]; modulesLoaded: boolean; modulesError: boolean }
   const [announcement, setAnnouncement] = useState('')
   const [streak, setStreak] = useState(0)
-  const [pausedExam, setPausedExam] = useState(false)
+  const [pausedExam, setPausedExam] = useState<PausedExamInfo | null>(null)
   const [weeklySummary, setWeeklySummary] = useState<WeeklySummary | null>(null)
   const [reportLoading, setReportLoading] = useState(true)
   const [dueByModule, setDueByModule] = useState<Record<string, number>>({})
@@ -209,9 +221,16 @@ export default function Home({ dark }: { dark: boolean }) {
     return () => { ignore = true }
   }, [userId, modulesLoaded, modules])
 
+  // Loads the paused exam and names it the same way the MCQ page does (stage title when present).
   useEffect(() => {
     let ignore = false
-    hasSavedActiveExam(user).then(has => { if (!ignore) setPausedExam(has) })
+    loadSavedActiveExamSummary(user).then(async summary => {
+      if (!summary) { if (!ignore) setPausedExam(null); return }
+      const stages = summary.moduleId && summary.stage ? await fetchModuleStages(summary.moduleId) : []
+      const stageTitle = stages.find((s: any) => s.value === summary.stage)?.title
+      const title = quizName(summary.quizMode, stageTitle)
+      if (!ignore) setPausedExam({ ...summary, title })
+    })
     return () => { ignore = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
@@ -221,6 +240,7 @@ export default function Home({ dark }: { dark: boolean }) {
   const dueModules = activeModules.filter(m => (dueByModule[m.id] || 0) > 0)
   const upcomingExam = nextUpcomingExam(examSchedules, activeModules)
   const examColor = upcomingExam && upcomingExam.days <= EXAM_URGENT_DAYS ? pt.amber : pt.cobalt
+  const pausedModule = pausedExam ? modules.find(m => m.id === pausedExam.moduleId) : undefined
 
   // Section heading with an optional icon that fades in during the entrance.
   const sectionTitle = (
@@ -412,9 +432,9 @@ export default function Home({ dark }: { dark: boolean }) {
                     dark={dark}
                     accent={pt.cobalt}
                     Icon={PauseIcon}
-                    title="Continue where you left off"
-                    body="Resume your paused exam"
-                    onClick={() => navigate('/mcq')}
+                    title={pausedExam.title}
+                    body={`${pausedModule?.name ?? 'Module'} · ${pausedExam.answered}/${pausedExam.total} answered`}
+                    onClick={() => navigate(pausedExam.moduleId ? `/mcq?module=${pausedExam.moduleId}` : '/mcq')}
                     delay={msFor(WEEKLY_REPORT_START) + 200}
                     instant={!playEntrance}
                   />
