@@ -3,12 +3,16 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
 import { getPulseTheme, pulseType } from '@/shared/theme/premiumTheme'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
+import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { ScheduleIcon, SearchIcon2 } from '@/shared/icons/tool-icons'
+import { ModuleIcon } from '@/shared/icons/medicalIcons'
 import { storageGet, storageSet } from '@/core/safeStorage'
 import { wrapText } from '@/shared/utils/textStyles'
 import { daysFromToday, formatDayHeading } from '@/features/tools/schedule/scheduleDates'
 import { usePlanProgress } from '@/features/tools/schedule/usePlanProgress'
-import type { PlanItem, ScheduleRow } from '@/features/tools/schedule/types'
+import { usePlanLookups, type PlanLookups } from '@/features/tools/schedule/usePlanLookups'
+import { PLAN_TOOL_META, planToolColor, itemLessonId, itemTools } from '@/features/tools/schedule/planItems'
+import type { PlanItem, PlanLinkKind, ScheduleRow } from '@/features/tools/schedule/types'
 
 interface StudyPlanCardProps {
   dark: boolean
@@ -19,10 +23,15 @@ interface StudyPlanCardProps {
   onViewImage: () => void
 }
 
-interface PlanGroup {
-  date: string | null
+interface SubjectGroup {
+  key: string
+  name: string
+  color: string | null
+  icon: string | null
   items: PlanItem[]
 }
+
+const NO_SUBJECT = 'none'
 
 // Storage key of the plan items a student has ticked on this device.
 const doneKey = (scheduleId: string) => `schedule_plan_done_${scheduleId}`
@@ -36,39 +45,62 @@ function readDone(scheduleId: string): Set<string> {
   }
 }
 
-// Groups items by day (oldest first); items without a date go last.
-function groupItems(items: PlanItem[]): PlanGroup[] {
-  const byDate = new Map<string, PlanItem[]>()
-  const undated: PlanItem[] = []
+// Orders items by date (oldest first); items without a date go last.
+function sortByDate(items: PlanItem[]) {
+  return [...items].sort((a, b) => (a.date && b.date ? a.date.localeCompare(b.date) : a.date ? -1 : b.date ? 1 : 0))
+}
+
+// Groups items by subject in the module's subject order; items without a known subject go last under "General".
+function groupBySubject(items: PlanItem[], lookups: PlanLookups): SubjectGroup[] {
+  if (!lookups.loaded) return [{ key: NO_SUBJECT, name: '', color: null, icon: null, items: sortByDate(items) }]
+
+  const lessonSubject = new Map(lookups.lessons.map(l => [l.id, l.subject_id]))
+  const known = new Set(lookups.subjects.map(s => s.id))
+  const buckets = new Map<string, PlanItem[]>()
   items.forEach(item => {
-    if (!item.date) { undated.push(item); return }
-    const list = byDate.get(item.date) || []
-    list.push(item)
-    byDate.set(item.date, list)
+    const raw = item.subject_id || lessonSubject.get(itemLessonId(item) ?? '') || null
+    const key = raw && known.has(raw) ? raw : NO_SUBJECT
+    buckets.set(key, [...(buckets.get(key) || []), item])
   })
-  const groups: PlanGroup[] = [...byDate.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, list]) => ({ date, items: list }))
-  if (undated.length > 0) groups.push({ date: null, items: undated })
+
+  const groups: SubjectGroup[] = lookups.subjects
+    .filter(s => buckets.has(s.id))
+    .map(s => ({ key: s.id, name: s.name, color: s.color || '#34d399', icon: s.icon || null, items: sortByDate(buckets.get(s.id) as PlanItem[]) }))
+  if (buckets.has(NO_SUBJECT)) groups.push({ key: NO_SUBJECT, name: 'General', color: null, icon: null, items: sortByDate(buckets.get(NO_SUBJECT) as PlanItem[]) })
   return groups
 }
 
-// Study plan card: collapsible day-by-day checklist, or a plain image row when the plan has no items.
-// Linked items open their lesson's practice or flashcards and tick themselves once the lesson is studied.
+// Style of the small colored tool buttons, same look as the Study by Lesson buttons.
+function toolBtn(color: string) {
+  return {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    background: `${color}18`, border: `1px solid ${color}55`, color,
+    borderRadius: 999, padding: '6px 12px', fontSize: 11.5, fontWeight: 700,
+    cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit',
+  } as const
+}
+
+// Study plan card: collapsible checklist grouped by subject, or a plain image row when the plan has no items.
+// Each item can open its lesson's summary, flashcards and practice, and ticks itself once the lesson is studied.
 export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOpen, onViewImage }: StudyPlanCardProps) {
   const pt = getPulseTheme(dark)
   const navigate = useNavigate()
+  const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
   const items = schedule.items || []
   const hasItems = items.length > 0
   const [open, setOpen] = useState(defaultOpen)
   const [done, setDone] = useState(() => readDone(schedule.id))
+  const [pickerItemId, setPickerItemId] = useState<string | null>(null)
   const autoDone = usePlanProgress(schedule, open)
+  const lookups = usePlanLookups(schedule.module_id, open && hasItems)
 
   // An item counts as done when ticked by hand or completed through study activity.
   const isItemDone = (itemId: string) => done.has(itemId) || autoDone.has(itemId)
 
   const doneCount = items.filter(item => isItemDone(item.id)).length
   const percent = hasItems ? Math.round((doneCount / items.length) * 100) : 0
+  const groups = groupBySubject(items, lookups)
+  const showHeaders = groups.some(g => g.key !== NO_SUBJECT)
 
   // Ticks or unticks one plan item and saves the result on this device; study-completed items stay ticked.
   function toggleItem(itemId: string) {
@@ -86,11 +118,96 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
     else onViewImage()
   }
 
-  // Opens the lesson's practice questions or flashcards for a linked item.
-  function openLink(item: PlanItem) {
-    if (!item.link) return
-    const tool = item.link.kind === 'practice' ? 'mcq' : 'flashcards'
-    navigate(`/${tool}?module=${schedule.module_id}&lesson=${item.link.lesson_id}`)
+  // Opens one summary in the Summaries page.
+  function openSummaryPage(summaryId: string) {
+    navigate(`/summaries?module=${schedule.module_id}&summary=${summaryId}`)
+  }
+
+  // Opens a tool of an item: practice and flashcards go to their lesson, summaries open directly or via a small picker.
+  function openTool(item: PlanItem, kind: PlanLinkKind) {
+    const lessonId = itemLessonId(item)
+    if (!lessonId) return
+    if (kind === 'practice') { navigate(`/mcq?module=${schedule.module_id}&lesson=${lessonId}`); return }
+    if (kind === 'flashcards') { navigate(`/flashcards?module=${schedule.module_id}&lesson=${lessonId}`); return }
+    const list = lookups.summariesByLesson[lessonId] || []
+    if (lookups.loaded && list.length === 0) { showToast('No summary added for this lesson yet', 'info'); return }
+    if (list.length === 1) { openSummaryPage(list[0].id); return }
+    setPickerItemId(prev => (prev === item.id ? null : item.id))
+  }
+
+  // Renders one plan item: checkbox, text, date and note, plus its tool buttons.
+  function renderItem(item: PlanItem) {
+    const isDone = isItemDone(item.id)
+    const tools = itemTools(item)
+    const lessonId = itemLessonId(item)
+    const diff = item.date ? daysFromToday(item.date) : null
+    const dateColor = diff === 0 ? accent : diff !== null && diff < 0 && !isDone ? pt.amber : pt.textMuted
+    const summaries = lessonId ? lookups.summariesByLesson[lessonId] || [] : []
+
+    return (
+      <div key={item.id} style={{ padding: '6px 0' }}>
+        <button
+          type="button" role="checkbox" aria-checked={isDone}
+          onClick={() => toggleItem(item.id)}
+          style={{
+            display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%',
+            background: 'transparent', border: 'none', padding: '2px 0',
+            cursor: 'pointer', textAlign: 'start', fontFamily: 'inherit',
+          }}
+        >
+          <span aria-hidden style={{
+            width: 18, height: 18, borderRadius: 6, flexShrink: 0, marginTop: 1,
+            border: `1.5px solid ${isDone ? accent : pt.faint}`,
+            background: isDone ? accent : 'transparent', color: '#0f172a',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900,
+          }}>{isDone && '✓'}</span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span dir="auto" style={{
+              ...pulseType.body, display: 'block', color: isDone ? pt.textMuted : pt.textPrimary,
+              textDecoration: isDone ? 'line-through' : 'none', ...wrapText,
+            }}>{item.text}</span>
+            {item.date && (
+              <span style={{ ...pulseType.small, display: 'block', color: dateColor, fontWeight: 700, marginTop: 1 }}>
+                {formatDayHeading(item.date)}
+              </span>
+            )}
+            {item.note && (
+              <span dir="auto" style={{ ...pulseType.small, display: 'block', color: pt.textMuted, marginTop: 2, ...wrapText }}>
+                {item.note}
+              </span>
+            )}
+          </span>
+        </button>
+
+        {tools.length > 0 && lessonId && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '4px 0 0 28px' }}>
+            {tools.map(kind => {
+              const meta = PLAN_TOOL_META[kind]
+              const color = planToolColor(kind, pt)
+              return (
+                <button
+                  key={kind} type="button" onClick={() => openTool(item, kind)}
+                  aria-label={`${meta.label}: ${item.text}`} style={toolBtn(color)}
+                >
+                  <meta.Icon color={color} size={12} /> {meta.label}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {pickerItemId === item.id && summaries.length > 1 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '6px 0 0 34px' }}>
+            {summaries.map(s => (
+              <button key={s.id} onClick={() => openSummaryPage(s.id)} style={{
+                background: 'transparent', border: 'none', textAlign: 'start', cursor: 'pointer',
+                color: pt.sub, fontSize: 12, fontWeight: 600, padding: '4px 0', fontFamily: 'inherit',
+              }}>• {s.title}</button>
+            ))}
+          </div>
+        )}
+      </div>
+    )
   }
 
   const subtitle = [hasItems ? `${doneCount}/${items.length} done` : null, schedule.week].filter(Boolean).join(' · ')
@@ -145,55 +262,20 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
 
       {hasItems && open && (
         <div style={{ padding: '0 18px 16px' }}>
-          {groupItems(items).map(group => {
-            const diff = group.date ? daysFromToday(group.date) : null
-            const allDone = group.items.every(item => isItemDone(item.id))
-            const headingColor = diff === 0 ? accent : diff !== null && diff < 0 && !allDone ? pt.amber : pt.textMuted
-            return (
-              <div key={group.date ?? 'anytime'} style={{ marginTop: 10 }}>
-                <div style={{ ...pulseType.sectionLabel, fontSize: 11, color: headingColor, marginBottom: 2 }}>
-                  {group.date ? formatDayHeading(group.date) : 'Anytime'}
+          {groups.map(group => (
+            <div key={group.key} style={{ marginTop: 10 }}>
+              {showHeaders && (
+                <div style={{
+                  ...pulseType.sectionLabel, fontSize: 11, marginBottom: 2,
+                  color: group.color || pt.textMuted, display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                  {group.icon && <ModuleIcon value={group.icon} size={14} color={group.color || pt.textMuted} />}
+                  <span style={{ minWidth: 0, ...wrapText }}>{group.name}</span>
                 </div>
-                {group.items.map(item => {
-                  const isDone = isItemDone(item.id)
-                  return (
-                    <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                      <button
-                        type="button" role="checkbox" aria-checked={isDone}
-                        onClick={() => toggleItem(item.id)}
-                        style={{
-                          display: 'flex', alignItems: 'flex-start', gap: 10, flex: 1, minWidth: 0,
-                          background: 'transparent', border: 'none', padding: '7px 0',
-                          cursor: 'pointer', textAlign: 'start', fontFamily: 'inherit',
-                        }}
-                      >
-                        <span aria-hidden style={{
-                          width: 18, height: 18, borderRadius: 6, flexShrink: 0, marginTop: 1,
-                          border: `1.5px solid ${isDone ? accent : pt.faint}`,
-                          background: isDone ? accent : 'transparent', color: '#0f172a',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900,
-                        }}>{isDone && '✓'}</span>
-                        <span dir="auto" style={{
-                          ...pulseType.body, color: isDone ? pt.textMuted : pt.textPrimary,
-                          textDecoration: isDone ? 'line-through' : 'none', flex: 1, minWidth: 0, ...wrapText,
-                        }}>{item.text}</span>
-                      </button>
-                      {item.link && (
-                        <button
-                          type="button" onClick={() => openLink(item)}
-                          aria-label={item.link.kind === 'practice' ? `Practice questions: ${item.text}` : `Flashcards: ${item.text}`}
-                          style={{
-                            flexShrink: 0, marginTop: 5, background: 'transparent', border: `1px solid ${accent}66`, color: accent,
-                            borderRadius: 999, padding: '3px 11px', fontWeight: 700, fontSize: 11.5, cursor: 'pointer', fontFamily: 'inherit',
-                          }}
-                        >{item.link.kind === 'practice' ? 'Practice →' : 'Flashcards →'}</button>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )
-          })}
+              )}
+              {group.items.map(renderItem)}
+            </div>
+          ))}
 
           {schedule.url && (
             <button type="button" onClick={onViewImage} style={{

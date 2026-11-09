@@ -1,7 +1,7 @@
-// Study tool a plan item can open for one lesson.
-export type PlanLinkKind = 'practice' | 'flashcards'
+// Study tool a plan item can open for its lesson.
+export type PlanLinkKind = 'summary' | 'practice' | 'flashcards'
 
-// Optional shortcut from a plan item to a lesson's practice questions or flashcards.
+// Legacy single shortcut from older plans; new plans store `lesson_id` and `tools` instead.
 export interface PlanLink {
   kind: PlanLinkKind
   lesson_id: string
@@ -12,6 +12,10 @@ export interface PlanItem {
   id: string
   date: string | null
   text: string
+  subject_id?: string | null
+  lesson_id?: string | null
+  tools?: PlanLinkKind[] | null
+  note?: string | null
   link?: PlanLink | null
 }
 

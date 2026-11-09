@@ -13,18 +13,13 @@ import { useConfirmDelete } from '@/features/admin/common/useConfirmDelete'
 import { useAdminList } from '@/features/admin/common/useAdminList'
 import { PICK_MODULE_MESSAGE, REQUIRED_FIELDS_MESSAGE } from '@/features/admin/common/useAdminContext'
 import { fetchLessonsForModule } from '@/services/content/lessons'
+import { fetchSubjectsForModule } from '@/services/content/subjects'
 import { plural } from '@/shared/utils/format'
 import { PlusIcon, TrashIcon, ConstructionIcon, CalendarDotIcon } from '@/shared/icons/tool-icons'
 import { ExamIcon } from '@/shared/icons/medicalIcons'
-import type { AdminModule, AdminLesson, AdminContext } from '@/features/admin/common/adminTypes'
-import type { PlanLink, PlanLinkKind } from '@/features/tools/schedule/types'
-
-interface PlanItemRow {
-  id: string
-  date: string | null
-  text: string
-  link?: PlanLink | null
-}
+import { PLAN_TOOL_ORDER, PLAN_TOOL_META, planToolColor, itemTools, itemLessonId } from '@/features/tools/schedule/planItems'
+import type { AdminModule, AdminSubject, AdminLesson, AdminContext } from '@/features/admin/common/adminTypes'
+import type { PlanItem, PlanLinkKind } from '@/features/tools/schedule/types'
 
 interface ScheduleRow {
   id: string
@@ -33,7 +28,7 @@ interface ScheduleRow {
   type: 'study' | 'exam'
   module_id: string
   dates?: string[] | null
-  items?: PlanItemRow[] | null
+  items?: PlanItem[] | null
 }
 
 interface DateEntry {
@@ -45,8 +40,10 @@ interface PlanDraft {
   id: string
   date: string
   text: string
-  linkKind: PlanLinkKind | ''
+  subjectId: string
   lessonId: string
+  tools: PlanLinkKind[]
+  note: string
 }
 
 interface SchedulesTabProps {
@@ -59,12 +56,14 @@ interface SchedulesTabProps {
 const createDateEntry = (value = ''): DateEntry => ({ id: crypto.randomUUID(), value })
 
 // Creates an empty (or pre-filled) study plan item.
-const createPlanDraft = (item?: Partial<PlanItemRow>): PlanDraft => ({
+const createPlanDraft = (item?: PlanItem, subjectId = ''): PlanDraft => ({
   id: item?.id || crypto.randomUUID(),
   date: item?.date || '',
   text: item?.text || '',
-  linkKind: item?.link?.kind || '',
-  lessonId: item?.link?.lesson_id || '',
+  subjectId: item?.subject_id || subjectId,
+  lessonId: item ? itemLessonId(item) || '' : '',
+  tools: item ? itemTools(item) : [],
+  note: item?.note || '',
 })
 
 // Admin tab for adding, editing and deleting study plans and exam schedules; an image link is optional.
@@ -81,30 +80,43 @@ export default function SchedulesTab({ dark, modules, context }: SchedulesTabPro
   const [dates, setDates] = useState<DateEntry[]>(() => [createDateEntry()])
   const [plan, setPlan] = useState<PlanDraft[]>(() => [createPlanDraft()])
   const [lessons, setLessons] = useState<AdminLesson[]>([])
+  const [subjects, setSubjects] = useState<AdminSubject[]>([])
 
-  // Loads the selected module's lessons (shared cache) for the plan item link pickers.
+  // Loads the selected module's subjects and lessons (shared cache) for the plan item pickers.
   useEffect(() => {
-    if (!context.moduleId) { setLessons([]); return }
+    if (!context.moduleId) { setLessons([]); setSubjects([]); return }
     let ignore = false
-    fetchLessonsForModule(context.moduleId).then(({ lessons: list }: { lessons: AdminLesson[] }) => { if (!ignore) setLessons(list) })
+    Promise.all([fetchSubjectsForModule(context.moduleId), fetchLessonsForModule(context.moduleId)]).then(([subjectsRes, lessonsRes]: any[]) => {
+      if (ignore) return
+      setSubjects(subjectsRes.subjects)
+      setLessons(lessonsRes.lessons)
+    })
     return () => { ignore = true }
   }, [context.moduleId])
+
+  // Subject of a draft: the chosen one, or the subject of its lesson.
+  const subjectOf = (p: PlanDraft) => p.subjectId || lessons.find(l => l.id === p.lessonId)?.subject_id || ''
 
   // Non-empty exam dates from the form.
   const cleanDates = () => dates.map(d => d.value.trim()).filter(Boolean)
 
-  // Plan items with text from the form (dates are optional); a link is kept only when both its tool and lesson are chosen.
-  const cleanPlan = (): PlanItemRow[] =>
+  // Plan items with text from the form; the text falls back to the lesson title, and tools are kept only with a lesson.
+  const cleanPlan = (): PlanItem[] =>
     plan
       .map(p => {
-        const item: PlanItemRow = { id: p.id, date: p.date || null, text: p.text.trim() }
-        if (p.linkKind && p.lessonId) item.link = { kind: p.linkKind, lesson_id: p.lessonId }
+        const lesson = lessons.find(l => l.id === p.lessonId)
+        const item: PlanItem = { id: p.id, date: p.date || null, text: p.text.trim() || lesson?.title || '' }
+        const subjectId = subjectOf(p)
+        if (subjectId) item.subject_id = subjectId
+        if (p.lessonId) item.lesson_id = p.lessonId
+        if (p.lessonId && p.tools.length > 0) item.tools = PLAN_TOOL_ORDER.filter(kind => p.tools.includes(kind))
+        if (p.note.trim()) item.note = p.note.trim()
         return item
       })
       .filter(p => p.text)
 
-  // True when a plan item picked a tool but no lesson, or the other way round.
-  const hasHalfLink = () => plan.some(p => p.text.trim() && !!p.linkKind !== !!p.lessonId)
+  // True when a plan item has links but no lesson to open them for.
+  const hasLinksWithoutLesson = () => plan.some(p => p.tools.length > 0 && !p.lessonId)
 
   // Loads a schedule into the form and moves the context bar to its module.
   function editSchedule(schedule: ScheduleRow) {
@@ -113,7 +125,7 @@ export default function SchedulesTab({ dark, modules, context }: SchedulesTabPro
     setUrl(schedule.url || '')
     setType(schedule.type)
     setDates((schedule.dates && schedule.dates.length > 0 ? schedule.dates : ['']).map(value => createDateEntry(value)))
-    setPlan(schedule.items && schedule.items.length > 0 ? schedule.items.map(createPlanDraft) : [createPlanDraft()])
+    setPlan(schedule.items && schedule.items.length > 0 ? schedule.items.map(item => createPlanDraft(item)) : [createPlanDraft()])
     context.setContext({ moduleId: schedule.module_id, subjectId: '', lessonId: '' })
   }
 
@@ -146,9 +158,26 @@ export default function SchedulesTab({ dark, modules, context }: SchedulesTabPro
     setPlan(prev => prev.map(p => p.id === id ? { ...p, ...changes } : p))
   }
 
-  // Adds another plan item.
+  // Changes an item's subject and clears its lesson when it belongs to another subject.
+  function changeSubject(p: PlanDraft, subjectId: string) {
+    const keepLesson = lessons.some(l => l.id === p.lessonId && l.subject_id === subjectId)
+    updatePlan(p.id, { subjectId, lessonId: keepLesson ? p.lessonId : '', tools: keepLesson ? p.tools : [] })
+  }
+
+  // Changes an item's lesson, taking the lesson's subject.
+  function changeLesson(p: PlanDraft, lessonId: string) {
+    const lesson = lessons.find(l => l.id === lessonId)
+    updatePlan(p.id, { lessonId, subjectId: lesson?.subject_id || p.subjectId, tools: lessonId ? p.tools : [] })
+  }
+
+  // Turns one lesson link of a plan item on or off.
+  function toggleTool(p: PlanDraft, kind: PlanLinkKind) {
+    updatePlan(p.id, { tools: p.tools.includes(kind) ? p.tools.filter(k => k !== kind) : [...p.tools, kind] })
+  }
+
+  // Adds another plan item, starting on the same subject as the previous one.
   function addPlanItem() {
-    setPlan(prev => [...prev, createPlanDraft()])
+    setPlan(prev => [...prev, createPlanDraft(undefined, prev.length > 0 ? subjectOf(prev[prev.length - 1]) : '')])
   }
 
   // Removes a plan item (the last one is just cleared).
@@ -187,7 +216,7 @@ export default function SchedulesTab({ dark, modules, context }: SchedulesTabPro
     if (!hasContent) {
       return showMessage(type === 'exam' ? '❌ Add an exam date or an image link' : '❌ Add at least one plan item or an image link')
     }
-    if (type === 'study' && hasHalfLink()) return showMessage('❌ Choose both a tool and a lesson for linked plan items')
+    if (type === 'study' && hasLinksWithoutLesson()) return showMessage('❌ Choose a lesson for plan items that have links')
     crud.save()
   }
 
@@ -211,52 +240,88 @@ export default function SchedulesTab({ dark, modules, context }: SchedulesTabPro
 
       {type === 'study' && (
         <>
-          <label style={fieldLabel(pt)}>Plan items (date and link are optional)</label>
-          {plan.map(p => (
-            <div key={p.id} style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-                <input
-                  type="date"
-                  value={p.date}
-                  onChange={e => updatePlan(p.id, { date: e.target.value })}
-                  aria-label="Plan item date"
-                  style={{ ...inStyle, marginBottom: 0, flex: '0 0 150px', minWidth: 0 }}
-                />
+          <label style={fieldLabel(pt)}>Plan items — grouped by subject for students (date, links and note are optional)</label>
+          {plan.map(p => {
+            const subjectId = subjectOf(p)
+            const lessonOptions = subjectId ? lessons.filter(l => l.subject_id === subjectId) : lessons
+            const chosenLesson = lessons.find(l => l.id === p.lessonId)
+            return (
+              <div key={p.id} style={{ border: `1px solid ${pt.border}`, borderRadius: 14, padding: 12, marginBottom: 10 }}>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                  <input
+                    type="date"
+                    value={p.date}
+                    onChange={e => updatePlan(p.id, { date: e.target.value })}
+                    aria-label="Plan item date"
+                    style={{ ...inStyle, marginBottom: 0, flex: '0 0 150px', minWidth: 0 }}
+                  />
+                  <input
+                    dir="auto"
+                    placeholder={chosenLesson?.title || 'e.g. Review lecture 3'}
+                    value={p.text}
+                    onChange={e => updatePlan(p.id, { text: e.target.value })}
+                    style={{ ...inStyle, marginBottom: 0, flex: '1 1 180px', minWidth: 0 }}
+                  />
+                  <button onClick={() => removePlanItem(p.id)} aria-label="Remove this plan item" style={miniBtn(pt.danger)}>
+                    <TrashIcon color={pt.danger} size={12} />
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                  <select
+                    value={subjectId}
+                    onChange={e => changeSubject(p, e.target.value)}
+                    aria-label="Subject of this plan item"
+                    style={{ ...inStyle, marginBottom: 0, flex: '1 1 150px', minWidth: 0 }}
+                  >
+                    <option value="">No subject</option>
+                    {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                  <select
+                    value={p.lessonId}
+                    onChange={e => changeLesson(p, e.target.value)}
+                    aria-label="Lesson of this plan item"
+                    style={{ ...inStyle, marginBottom: 0, flex: '1 1 180px', minWidth: 0 }}
+                  >
+                    <option value="">No lesson</option>
+                    {lessonOptions.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                  {PLAN_TOOL_ORDER.map(kind => {
+                    const meta = PLAN_TOOL_META[kind]
+                    const color = planToolColor(kind, pt)
+                    const on = p.tools.includes(kind)
+                    return (
+                      <button
+                        key={kind} type="button" aria-pressed={on}
+                        disabled={!p.lessonId}
+                        onClick={() => toggleTool(p, kind)}
+                        style={{
+                          ...miniBtn(color),
+                          border: `1px solid ${on ? color : `${color}66`}`,
+                          background: on ? `${color}22` : 'transparent',
+                          opacity: p.lessonId ? 1 : 0.5,
+                          cursor: p.lessonId ? 'pointer' : 'not-allowed',
+                        }}
+                      >
+                        <meta.Icon color={color} size={12} /> {meta.label}
+                      </button>
+                    )
+                  })}
+                </div>
+
                 <input
                   dir="auto"
-                  placeholder="e.g. Review lecture 3"
-                  value={p.text}
-                  onChange={e => updatePlan(p.id, { text: e.target.value })}
-                  style={{ ...inStyle, marginBottom: 0, flex: '1 1 180px', minWidth: 0 }}
+                  placeholder="Note for students (optional)"
+                  value={p.note}
+                  onChange={e => updatePlan(p.id, { note: e.target.value })}
+                  style={{ ...inStyle, marginBottom: 0 }}
                 />
-                <button onClick={() => removePlanItem(p.id)} aria-label="Remove this plan item" style={miniBtn(pt.danger)}>
-                  <TrashIcon color={pt.danger} size={12} />
-                </button>
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <select
-                  value={p.linkKind}
-                  onChange={e => updatePlan(p.id, { linkKind: e.target.value as PlanDraft['linkKind'] })}
-                  aria-label="Study tool to open for this item"
-                  style={{ ...inStyle, marginBottom: 0, flex: '0 0 170px', minWidth: 0 }}
-                >
-                  <option value="">No link</option>
-                  <option value="practice">Practice questions</option>
-                  <option value="flashcards">Flashcards</option>
-                </select>
-                <select
-                  value={p.lessonId}
-                  onChange={e => updatePlan(p.id, { lessonId: e.target.value })}
-                  disabled={!p.linkKind}
-                  aria-label="Lesson to open for this item"
-                  style={{ ...inStyle, marginBottom: 0, flex: '1 1 180px', minWidth: 0, opacity: p.linkKind ? 1 : 0.5 }}
-                >
-                  <option value="">Choose a lesson</option>
-                  {lessons.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
-                </select>
-              </div>
-            </div>
-          ))}
+            )
+          })}
           <button onClick={addPlanItem} style={{ ...miniBtn(pt.sub), width: '100%', justifyContent: 'center', borderStyle: 'dashed', marginBottom: 12 }}>
             <PlusIcon color={pt.sub} size={11} /> Add Plan Item
           </button>

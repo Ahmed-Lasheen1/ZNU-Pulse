@@ -264,7 +264,8 @@ export default function MCQExamFlow({
 
               return (
                 <>
-                  <div role="radiogroup" aria-labelledby={`mcq-question-text-${safeIndex}`}>
+                  {/* Keyed by question so a focused option never carries its focus ring to the next question. */}
+                  <div key={safeIndex} role="radiogroup" aria-labelledby={`mcq-question-text-${safeIndex}`}>
                     {optionTexts(currentQuestion).map((opt: string, ai: number) => {
                       const label = optionLabels[ai]
                       const selected = answers[safeIndex] === label
@@ -559,7 +560,7 @@ export default function MCQExamFlow({
           dark={dark}
           ariaLabel="Question navigation"
           onHeightChange={setBarHeight}
-          hint="← → navigate · 1–4 select · F flag"
+          hint="← → navigate · 1–4 / A–D select · Enter next · F flag"
         >
           <div style={{
             display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',

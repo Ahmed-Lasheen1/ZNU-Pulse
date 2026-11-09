@@ -49,6 +49,12 @@ interface SourceChoice {
 // Returns the exam stage a quiz belongs to, if any.
 const stageOf = (config: QuizConfig | null) => config?.stage || config?.simulatorStage || null
 
+// Drops focus from a clicked option so no focus ring follows a question change.
+function releaseFocus() {
+  const el = document.activeElement as HTMLElement | null
+  if (el && el !== document.body) el.blur()
+}
+
 // Converts graded rows into a lookup keyed by question id.
 function toResultMap(graded: any[] | null) {
   const map: Record<string, any> = {}
@@ -280,10 +286,14 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
   useEffect(() => {
     if (!quizMode || submitted || grading) return
-    // Handles keyboard shortcuts during a quiz (arrows, 1-4, F).
+    // Handles keyboard shortcuts during a quiz (arrows, Home/End, Enter, 1-4 or A-D, F).
     function handleKeyDown(e: KeyboardEvent) {
-      const targetTag = (e.target as HTMLElement)?.tagName
-      if (targetTag === 'INPUT' || targetTag === 'TEXTAREA') return
+      // Browser shortcuts, keys a focused option already handled, and open dialogs are left alone.
+      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return
+      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return
+      const target = e.target as HTMLElement | null
+      const targetTag = target?.tagName
+      if (targetTag === 'INPUT' || targetTag === 'TEXTAREA' || targetTag === 'SELECT' || target?.isContentEditable) return
       const total = quizQuestions.length
       if (total === 0) return
       const safeIdx = Math.min(currentIndex, total - 1)
@@ -291,17 +301,26 @@ export default function MCQ({ dark }: { dark: boolean }) {
       if (!q) return
       const alreadyRevealed = (quizMode === 'practice' || quizMode === 'retry') && !!results[q.id]
       const key = e.key.toLowerCase()
+      const optionIndex = key.length === 1 ? Math.max('1234'.indexOf(key), 'abcd'.indexOf(key)) : -1
 
-      if (key === 'arrowleft') {
+      if (key === 'arrowleft' || key === 'arrowright' || key === 'home' || key === 'end') {
         e.preventDefault()
-        setCurrentIndex(i => Math.max(0, i - 1))
-      } else if (key === 'arrowright') {
+        releaseFocus()
+        setCurrentIndex(i => key === 'arrowleft' ? Math.max(0, i - 1)
+          : key === 'arrowright' ? Math.min(total - 1, i + 1)
+          : key === 'home' ? 0 : total - 1)
+      } else if (key === 'enter') {
+        // Focused buttons keep their own Enter behavior.
+        if (targetTag === 'BUTTON' || e.repeat) return
         e.preventDefault()
+        releaseFocus()
         setCurrentIndex(i => Math.min(total - 1, i + 1))
-      } else if (['1', '2', '3', '4'].includes(key) && !alreadyRevealed) {
+      } else if (optionIndex >= 0 && !alreadyRevealed) {
+        if (e.repeat) return
         e.preventDefault()
-        selectAnswer(safeIdx, optionLabels[Number(key) - 1])
+        selectAnswer(safeIdx, optionLabels[optionIndex])
       } else if (key === 'f') {
+        if (e.repeat) return
         e.preventDefault()
         toggleFlagFor(q)
       }
