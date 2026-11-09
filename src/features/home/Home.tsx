@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown } from 'lucide-react'
@@ -46,6 +46,12 @@ interface PausedExamInfo {
   title: string
 }
 
+// Entrance settings handed to a card (see cardEntrance below).
+interface CardEntrance { instant: boolean; delay: number }
+
+// One notice card of the Home column, rendered once its entrance settings are known.
+interface NoticeEntry { key: string; render: (entrance: CardEntrance) => JSX.Element }
+
 const toolCards = [
   { Icon: ScheduleIcon, title: 'Schedules', sub: 'Plan your study time', to: '/schedule', accent: 'indigo' },
   { Icon: ChecklistIcon, title: 'Checklist', sub: 'Track your progress', to: '/checklist', accent: 'amber' },
@@ -60,6 +66,12 @@ const HOME_HISTORY_LIMIT = 200
 
 // An exam this many days away or fewer is highlighted as urgent.
 const EXAM_URGENT_DAYS = 2
+
+// Longest the notice cards wait for all their data before showing what is ready.
+const NOTICE_WAIT_MS = 2000
+
+// Seconds between consecutive notice cards during the entrance.
+const NOTICE_STAGGER = 0.15
 
 const MODULE_BLURBS: Record<string, string> = {
   neuro: 'Explore the wonders of the nervous system',
@@ -119,6 +131,13 @@ export default function Home({ dark }: { dark: boolean }) {
   const [dueByModule, setDueByModule] = useState<Record<string, number>>({})
   const [examSchedules, setExamSchedules] = useState<any[]>([])
 
+  // Each notice source flips its flag once it has settled, so the cards can enter together.
+  const [announcementLoaded, setAnnouncementLoaded] = useState(false)
+  const [examsLoaded, setExamsLoaded] = useState(false)
+  const [pausedLoaded, setPausedLoaded] = useState(false)
+  const [dueLoaded, setDueLoaded] = useState(false)
+  const [noticeWaitOver, setNoticeWaitOver] = useState(false)
+
   const [archiveOpen, setArchiveOpen] = useState(false)
 
   const [archiveOverflowVisible, setArchiveOverflowVisible] = useState(false)
@@ -135,24 +154,39 @@ export default function Home({ dark }: { dark: boolean }) {
   const remainingFor = (target: number) =>
     playEntrance ? Math.max(0, target - (Date.now() - mountedAtRef.current) / 1000) : 0
   // Entrance settings for a card whose reveal may already be overdue.
-  const cardEntrance = (target: number) => {
+  const cardEntrance = (target: number): CardEntrance => {
     const remaining = remainingFor(target)
     return remaining <= 0
       ? { instant: true, delay: 0 }
       : { instant: false, delay: msFor(Math.max(remaining, ENTRANCE_PAUSE)) }
   }
 
+  // Stops the notice cards from waiting forever if one of their requests is slow.
+  useEffect(() => {
+    const timer = setTimeout(() => setNoticeWaitOver(true), NOTICE_WAIT_MS)
+    return () => clearTimeout(timer)
+  }, [])
+
+  // Loads the Home announcement text.
   useEffect(() => {
     let ignore = false
     fetchHomeAnnouncement(value => { if (!ignore) setAnnouncement(value) })
-      .then(({ data }) => { if (!ignore) setAnnouncement(data?.value || '') })
+      .then(({ data }) => {
+        if (ignore) return
+        setAnnouncement(data?.value || '')
+        setAnnouncementLoaded(true)
+      })
     return () => { ignore = true }
   }, [])
 
   // Loads the exam schedules (cached) used for the next-exam countdown.
   useEffect(() => {
     let ignore = false
-    fetchExamSchedules().then(({ data }: { data: any[] | null }) => { if (!ignore) setExamSchedules(data || []) })
+    fetchExamSchedules().then(({ data }: { data: any[] | null }) => {
+      if (ignore) return
+      setExamSchedules(data || [])
+      setExamsLoaded(true)
+    })
     return () => { ignore = true }
   }, [])
 
@@ -215,7 +249,9 @@ export default function Home({ dark }: { dark: boolean }) {
         })
       )
       const counts = await loadDueCounts(userId ?? null, liveByModule)
-      if (!ignore) setDueByModule(counts)
+      if (ignore) return
+      setDueByModule(counts)
+      setDueLoaded(true)
     }
     loadDue()
     return () => { ignore = true }
@@ -224,13 +260,19 @@ export default function Home({ dark }: { dark: boolean }) {
   // Loads the paused exam and names it the same way the MCQ page does (stage title when present).
   useEffect(() => {
     let ignore = false
-    loadSavedActiveExamSummary(user).then(async summary => {
-      if (!summary) { if (!ignore) setPausedExam(null); return }
-      const stages = summary.moduleId && summary.stage ? await fetchModuleStages(summary.moduleId) : []
-      const stageTitle = stages.find((s: any) => s.value === summary.stage)?.title
-      const title = quizName(summary.quizMode, stageTitle)
-      if (!ignore) setPausedExam({ ...summary, title })
-    })
+    loadSavedActiveExamSummary(user)
+      .then(async summary => {
+        if (!summary) {
+          if (!ignore) { setPausedExam(null); setPausedLoaded(true) }
+          return
+        }
+        const stages = summary.moduleId && summary.stage ? await fetchModuleStages(summary.moduleId) : []
+        const stageTitle = stages.find((s: any) => s.value === summary.stage)?.title
+        const title = quizName(summary.quizMode, stageTitle)
+        if (!ignore) { setPausedExam({ ...summary, title }); setPausedLoaded(true) }
+      })
+      // A failed read must not keep the notice cards hidden.
+      .catch(() => { if (!ignore) setPausedLoaded(true) })
     return () => { ignore = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
@@ -241,6 +283,93 @@ export default function Home({ dark }: { dark: boolean }) {
   const upcomingExam = nextUpcomingExam(examSchedules, activeModules)
   const examColor = upcomingExam && upcomingExam.days <= EXAM_URGENT_DAYS ? pt.amber : pt.cobalt
   const pausedModule = pausedExam ? modules.find(m => m.id === pausedExam.moduleId) : undefined
+
+  // Notices show together once every source has settled (due also waits for modules), or after the wait cap.
+  const noticesReady = noticeWaitOver || (announcementLoaded && examsLoaded && pausedLoaded && dueLoaded)
+
+  // Renders the notice cards in a fixed order, staggered by position, so none appears above one already shown.
+  function renderNotices() {
+    if (!noticesReady) return null
+
+    const notices: NoticeEntry[] = []
+
+    if (announcement) {
+      notices.push({
+        key: 'announcement',
+        render: entrance => (
+          <LiquidGlassCard dark={dark} delay={entrance.delay} instant={entrance.instant} style={{ padding: '16px 20px' }}>
+            <AutoDirText text={announcement} style={{
+              ...pulseType.bodyEmphasis, fontSize: 13, color: pt.textPrimary,
+              lineHeight: 1.5, wordBreak: 'break-word'
+            }} />
+          </LiquidGlassCard>
+        ),
+      })
+    }
+
+    const exam = upcomingExam
+    if (exam) {
+      notices.push({
+        key: 'exam',
+        render: entrance => (
+          <HomeNoticeCard
+            dark={dark}
+            accent={examColor}
+            Icon={ExamIcon}
+            title={<span dir="auto">{exam.title}</span>}
+            body={exam.moduleName}
+            badge={relativeDayLabel(exam.days)}
+            onClick={() => navigate(`/schedule?module=${exam.moduleId}&type=exam`)}
+            delay={entrance.delay}
+            instant={entrance.instant}
+          />
+        ),
+      })
+    }
+
+    const paused = pausedExam
+    if (paused) {
+      notices.push({
+        key: 'paused-exam',
+        render: entrance => (
+          <HomeNoticeCard
+            dark={dark}
+            accent={MCQ_ACCENT}
+            Icon={ExamIcon}
+            title={paused.title}
+            body={`${pausedModule?.name ?? 'Module'} · ${paused.answered}/${paused.total} answered`}
+            onClick={() => navigate(paused.moduleId ? `/mcq?module=${paused.moduleId}` : '/mcq')}
+            delay={entrance.delay}
+            instant={entrance.instant}
+          />
+        ),
+      })
+    }
+
+    dueModules.forEach(mod => {
+      notices.push({
+        key: `due-${mod.id}`,
+        render: entrance => (
+          <HomeNoticeCard
+            dark={dark}
+            accent={FLASHCARD_ACCENT}
+            Icon={FlashcardIcon}
+            title={`${plural(dueByModule[mod.id], 'flashcard')} due`}
+            body={mod.name}
+            onClick={() => navigate(`/flashcards?module=${mod.id}`)}
+            delay={entrance.delay}
+            instant={entrance.instant}
+          />
+        ),
+      })
+    })
+
+    return notices.map((notice, i) => (
+      <Fragment key={notice.key}>
+        {notice.render(cardEntrance(WEEKLY_REPORT_START + NOTICE_STAGGER * (i + 1)))}
+      </Fragment>
+    ))
+  }
 
   // Section heading with an optional icon that fades in during the entrance.
   const sectionTitle = (
@@ -413,56 +542,7 @@ export default function Home({ dark }: { dark: boolean }) {
                   </div>
                 </LiquidGlassCard>
 
-                {announcement && (
-                  <LiquidGlassCard dark={dark} delay={msFor(WEEKLY_REPORT_START) + 300} instant={!playEntrance}
-                    style={{ padding: '16px 20px' }}>
-                    <AutoDirText text={announcement} style={{
-                      ...pulseType.bodyEmphasis, fontSize: 13, color: pt.textPrimary,
-                      lineHeight: 1.5, wordBreak: 'break-word'
-                    }} />
-                  </LiquidGlassCard>
-                )}
-
-                {upcomingExam && (
-                  <HomeNoticeCard
-                    dark={dark}
-                    accent={examColor}
-                    Icon={ExamIcon}
-                    title={<span dir="auto">{upcomingExam.title}</span>}
-                    body={upcomingExam.moduleName}
-                    badge={relativeDayLabel(upcomingExam.days)}
-                    onClick={() => navigate(`/schedule?module=${upcomingExam.moduleId}&type=exam`)}
-                    delay={msFor(WEEKLY_REPORT_START) + 100}
-                    instant={!playEntrance}
-                  />
-                )}
-
-                {pausedExam && (
-                  <HomeNoticeCard
-                    dark={dark}
-                    accent={MCQ_ACCENT}
-                    Icon={ExamIcon}
-                    title={pausedExam.title}
-                    body={`${pausedModule?.name ?? 'Module'} · ${pausedExam.answered}/${pausedExam.total} answered`}
-                    onClick={() => navigate(pausedExam.moduleId ? `/mcq?module=${pausedExam.moduleId}` : '/mcq')}
-                    delay={msFor(WEEKLY_REPORT_START) + 200}
-                    instant={!playEntrance}
-                  />
-                )}
-
-                {dueModules.map((mod, i) => (
-                  <HomeNoticeCard
-                    key={mod.id}
-                    dark={dark}
-                    accent={FLASHCARD_ACCENT}
-                    Icon={FlashcardIcon}
-                    title={`${plural(dueByModule[mod.id], 'flashcard')} due`}
-                    body={mod.name}
-                    onClick={() => navigate(`/flashcards?module=${mod.id}`)}
-                    delay={msFor(WEEKLY_REPORT_START) + 400 + i * 150}
-                    instant={!playEntrance}
-                  />
-                ))}
+                {renderNotices()}
               </div>
 
               <motion.div className="pulse-hero-panel"
