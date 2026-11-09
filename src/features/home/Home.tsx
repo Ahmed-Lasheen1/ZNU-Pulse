@@ -67,6 +67,9 @@ const HOME_HISTORY_LIMIT = 200
 // An exam this many days away or fewer is highlighted as urgent.
 const EXAM_URGENT_DAYS = 2
 
+// The exam notice only appears when the next exam is this many days away or fewer.
+const EXAM_NOTICE_DAYS = 7
+
 // Longest the notice cards wait for all their data before showing what is ready.
 const NOTICE_WAIT_MS = 2000
 
@@ -128,6 +131,8 @@ export default function Home({ dark }: { dark: boolean }) {
   const [pausedExam, setPausedExam] = useState<PausedExamInfo | null>(null)
   const [weeklySummary, setWeeklySummary] = useState<WeeklySummary | null>(null)
   const [reportLoading, setReportLoading] = useState(true)
+  // Seconds the report counters wait before counting, fixed once the data arrives.
+  const [tickerDelay, setTickerDelay] = useState(0)
   const [dueByModule, setDueByModule] = useState<Record<string, number>>({})
   const [examSchedules, setExamSchedules] = useState<any[]>([])
 
@@ -210,7 +215,13 @@ export default function Home({ dark }: { dark: boolean }) {
         return ts >= weekAgoMs
       })
 
-      if (weeklyRows.length === 0) { setWeeklySummary(null); setReportLoading(false); return }
+      // Counters start now: late data gets no extra wait, early data lines up with the entrance.
+      if (weeklyRows.length === 0) {
+        setWeeklySummary(null)
+        setTickerDelay(remainingFor(NOTIFY_DELAY))
+        setReportLoading(false)
+        return
+      }
 
       const totalAttempted = weeklyRows.reduce((a, h) => a + h.total, 0)
       const totalCorrect = weeklyRows.reduce((a, h) => a + h.correct, 0)
@@ -229,6 +240,7 @@ export default function Home({ dark }: { dark: boolean }) {
 
       if (ignore) return
       setWeeklySummary({ totalAttempted, accuracy, topSubjectName })
+      setTickerDelay(remainingFor(NOTIFY_DELAY))
       setReportLoading(false)
     }
     loadStreakAndWeeklySummary()
@@ -280,7 +292,9 @@ export default function Home({ dark }: { dark: boolean }) {
   const activeModules = modules.filter(m => m.status === 'active')
   const completedModules = modules.filter(m => m.status === 'completed')
   const dueModules = activeModules.filter(m => (dueByModule[m.id] || 0) > 0)
-  const upcomingExam = nextUpcomingExam(examSchedules, activeModules)
+  // The exam notice is shown only once the next exam is within EXAM_NOTICE_DAYS.
+  const nextExam = nextUpcomingExam(examSchedules, activeModules)
+  const upcomingExam = nextExam && nextExam.days <= EXAM_NOTICE_DAYS ? nextExam : null
   const examColor = upcomingExam && upcomingExam.days <= EXAM_URGENT_DAYS ? pt.amber : pt.cobalt
   const pausedModule = pausedExam ? modules.find(m => m.id === pausedExam.moduleId) : undefined
 
@@ -400,7 +414,6 @@ export default function Home({ dark }: { dark: boolean }) {
   }
 
   const weeklyFeedback = weeklySummary ? weeklyAccuracyFeedback(weeklySummary.accuracy, pt) : null
-  const tickerBaseDelay = NOTIFY_DELAY
 
   return (
     <div style={{ position: 'relative', overflowX: 'hidden' }}>
@@ -497,7 +510,7 @@ export default function Home({ dark }: { dark: boolean }) {
                         {weeklySummary ? (
                           <>
                             {playEntrance
-                              ? <NumberTicker value={weeklySummary.accuracy} delay={tickerBaseDelay} />
+                              ? <NumberTicker value={weeklySummary.accuracy} delay={tickerDelay} />
                               : weeklySummary.accuracy}%
                           </>
                         ) : '—'}
@@ -517,7 +530,7 @@ export default function Home({ dark }: { dark: boolean }) {
                     <div>
                       <div style={{ ...statNumStyle, color: pt.textPrimary }}>
                         {playEntrance
-                          ? <NumberTicker value={weeklySummary ? weeklySummary.totalAttempted : 0} delay={tickerBaseDelay + 0.15} />
+                          ? <NumberTicker value={weeklySummary ? weeklySummary.totalAttempted : 0} delay={tickerDelay + 0.15} />
                           : (weeklySummary ? weeklySummary.totalAttempted : 0)}
                       </div>
                       <div style={{ ...pulseType.small, color: pt.textSecondary, marginTop: 4 }}>Questions attempted</div>
@@ -533,7 +546,7 @@ export default function Home({ dark }: { dark: boolean }) {
                         <StreakFlameIcon size={16} />
                         <span style={{ ...pulseType.display, fontSize: 22, lineHeight: 1 }}>
                           {playEntrance
-                            ? <NumberTicker value={streak} delay={tickerBaseDelay + 0.3} />
+                            ? <NumberTicker value={streak} delay={tickerDelay + 0.3} />
                             : streak}
                         </span>
                       </div>
