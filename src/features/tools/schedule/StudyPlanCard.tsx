@@ -81,6 +81,7 @@ function toolBtn(color: string) {
 }
 
 // Study plan card: collapsible checklist grouped by subject, or a plain image row when the plan has no items.
+// The list expands with a height transition (grid-template-rows), like the Study by Lesson accordion.
 // Each item can open its lesson's summary, flashcards and practice, and ticks itself once the lesson is studied.
 export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOpen, onViewImage }: StudyPlanCardProps) {
   const pt = getPulseTheme(dark)
@@ -91,8 +92,9 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
   const [open, setOpen] = useState(defaultOpen)
   const [done, setDone] = useState(() => readDone(schedule.id))
   const [pickerItemId, setPickerItemId] = useState<string | null>(null)
-  const autoDone = usePlanProgress(schedule, open)
-  const lookups = usePlanLookups(schedule.module_id, open && hasItems)
+  const autoDone = usePlanProgress(schedule, hasItems)
+  const lookups = usePlanLookups(schedule.module_id, hasItems)
+  const panelId = `plan-items-${schedule.id}`
 
   // An item counts as done when ticked by hand or completed through study activity.
   const isItemDone = (itemId: string) => done.has(itemId) || autoDone.has(itemId)
@@ -218,6 +220,7 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
         type="button"
         onClick={handleHeader}
         aria-expanded={hasItems ? open : undefined}
+        aria-controls={hasItems ? panelId : undefined}
         style={{
           display: 'flex', alignItems: 'center', gap: 14, width: '100%',
           background: 'transparent', border: 'none', padding: '14px 18px',
@@ -254,38 +257,50 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
       {hasItems && (
         <div
           role="progressbar" aria-label="Plan progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}
-          style={{ height: 4, borderRadius: 999, margin: open ? '0 18px 12px' : '0 18px 16px', background: dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)', overflow: 'hidden' }}
+          style={{ height: 4, borderRadius: 999, margin: open ? '0 18px 12px' : '0 18px 16px', background: dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)', overflow: 'hidden', transition: 'margin 0.25s ease' }}
         >
           <div style={{ height: '100%', width: `${percent}%`, background: accent, borderRadius: 999, transition: 'width 0.3s ease' }} />
         </div>
       )}
 
-      {hasItems && open && (
-        <div style={{ padding: '0 18px 16px' }}>
-          {groups.map(group => (
-            <div key={group.key} style={{ marginTop: 10 }}>
-              {showHeaders && (
-                <div style={{
-                  ...pulseType.sectionLabel, fontSize: 11, marginBottom: 2,
-                  color: group.color || pt.textMuted, display: 'flex', alignItems: 'center', gap: 6,
-                }}>
-                  {group.icon && <ModuleIcon value={group.icon} size={14} color={group.color || pt.textMuted} />}
-                  <span style={{ minWidth: 0, ...wrapText }}>{group.name}</span>
+      {hasItems && (
+        <div style={{
+          display: 'grid',
+          gridTemplateRows: open ? '1fr' : '0fr',
+          visibility: open ? 'visible' : 'hidden',
+          transition: 'grid-template-rows 0.25s ease, visibility 0.25s',
+        }}>
+          <div style={{ overflow: 'hidden' }}>
+            <div
+              id={panelId} role="region" aria-label={`${schedule.title} items`} aria-hidden={!open}
+              style={{ padding: '0 18px 16px' }}
+            >
+              {groups.map(group => (
+                <div key={group.key} style={{ marginTop: 10 }}>
+                  {showHeaders && (
+                    <div style={{
+                      ...pulseType.sectionLabel, fontSize: 11, marginBottom: 2,
+                      color: group.color || pt.textMuted, display: 'flex', alignItems: 'center', gap: 6,
+                    }}>
+                      {group.icon && <ModuleIcon value={group.icon} size={14} color={group.color || pt.textMuted} />}
+                      <span style={{ minWidth: 0, ...wrapText }}>{group.name}</span>
+                    </div>
+                  )}
+                  {group.items.map(renderItem)}
                 </div>
-              )}
-              {group.items.map(renderItem)}
-            </div>
-          ))}
+              ))}
 
-          {schedule.url && (
-            <button type="button" onClick={onViewImage} style={{
-              marginTop: 14, background: 'transparent', border: `1px solid ${accent}66`, color: accent,
-              borderRadius: 999, padding: '7px 14px', fontWeight: 700, fontSize: 12, cursor: 'pointer',
-              fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6,
-            }}>
-              <SearchIcon2 color={accent} size={12} /> View schedule image
-            </button>
-          )}
+              {schedule.url && (
+                <button type="button" onClick={onViewImage} style={{
+                  marginTop: 14, background: 'transparent', border: `1px solid ${accent}66`, color: accent,
+                  borderRadius: 999, padding: '7px 14px', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                  fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6,
+                }}>
+                  <SearchIcon2 color={accent} size={12} /> View schedule image
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </LiquidGlassCard>
