@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { animate, motion, useMotionValue, useTransform, type AnimationPlaybackControls, type Transition } from 'framer-motion'
+import { animate, motion, useMotionValue, useTransform, type Transition } from 'framer-motion'
 import { getPulseTheme, pulseFonts } from '@/shared/theme/premiumTheme'
 import { usePrefersReducedMotion } from '@/shared/hooks/usePrefersReducedMotion'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
@@ -64,21 +64,25 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
   const pt = getPulseTheme(dark)
   const reduced = usePrefersReducedMotion()
   const buttons = useRef<Record<string, HTMLButtonElement | null>>({})
-  const trackRef = useRef<HTMLDivElement>(null)
   const wasVisible = useRef(false)
   const prevIndexRef = useRef(-1)
   const lastDirectionRef = useRef<1 | -1>(1)
-  const maxWidthRef = useRef(0)
+  // Leftmost and rightmost tab edges; the highlight never extends past them.
+  const boundsRef = useRef({ min: 0, max: 0 })
   const [box, setBox] = useState<HighlightBox | null>(null)
 
   // Edge positions live in motion values, so the animation runs outside React's render cycle.
   const leftMV = useMotionValue(0)
   const rightMV = useMotionValue(0)
-  // Clamps the overshoot to the track so it never widens the scrollable area.
-  const leftView = useTransform(leftMV, v => Math.min(Math.max(0, v), maxWidthRef.current || v))
-  const rightView = useTransform(rightMV, v => Math.min(Math.max(0, v), maxWidthRef.current || v))
-  const leftControls = useRef<AnimationPlaybackControls | null>(null)
-  const rightControls = useRef<AnimationPlaybackControls | null>(null)
+  // The highlight is placed with x (left edge) and width (right edge minus left edge), inside the first/last tab bounds.
+  const xMV = useTransform(leftMV, l => Math.max(boundsRef.current.min, l))
+  const widthMV = useTransform([leftMV, rightMV], (latest: number[]) => {
+    const left = Math.max(boundsRef.current.min, latest[0])
+    const right = Math.min(boundsRef.current.max || latest[1], latest[1])
+    return Math.max(0, right - left)
+  })
+  const leftControls = useRef<ReturnType<typeof animate> | null>(null)
+  const rightControls = useRef<ReturnType<typeof animate> | null>(null)
 
   // Measures the selected tab and updates the highlight target, remembering which way it moved.
   function measure(jump: boolean) {
@@ -92,7 +96,10 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
       lastDirectionRef.current = index > prevIndex ? 1 : -1
     }
     prevIndexRef.current = index
-    maxWidthRef.current = trackRef.current?.scrollWidth ?? 0
+
+    const first = buttons.current[items[0].value]
+    const last = buttons.current[items[items.length - 1].value]
+    if (first && last) boundsRef.current = { min: first.offsetLeft, max: last.offsetLeft + last.offsetWidth }
 
     const left = button.offsetLeft
     const right = left + button.offsetWidth
@@ -121,19 +128,17 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, items])
 
-  // Moves the highlight edges toward the new target. Interrupting a running spring keeps its velocity.
+  // Moves the highlight edges toward the new target. Stopping a running spring keeps its current position.
   useLayoutEffect(() => {
     if (!box) return
+    leftControls.current?.stop()
+    rightControls.current?.stop()
     if (box.jump || reduced) {
-      leftControls.current?.stop()
-      rightControls.current?.stop()
       leftMV.set(box.left)
       rightMV.set(box.right)
       return
     }
     const edges = edgeSprings(box.direction)
-    leftControls.current?.stop()
-    rightControls.current?.stop()
     leftControls.current = animate(leftMV, box.left, edges.left)
     rightControls.current = animate(rightMV, box.right, edges.right)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -163,10 +168,10 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
         }
         .stage-tabs-track::-webkit-scrollbar { display: none; }
         .stage-tab-highlight {
-          position: absolute; top: 8px; height: 50px;
+          position: absolute; top: 8px; left: 0; height: 50px;
           border-radius: 999px; pointer-events: none;
           background-image: linear-gradient(135deg, rgba(255,255,255,0.22), rgba(255,255,255,0) 60%);
-          will-change: left, right;
+          will-change: transform, width;
         }
         .stage-tab {
           position: relative; flex: 0 0 auto; height: 50px; padding: 0 22px;
@@ -193,7 +198,7 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
         activeTint={`${pt.cobalt}1f`}
         style={{ maxWidth: '100%', minWidth: 0, ['--stage-tab-hover' as string]: dark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.55)' }}
       >
-        <div className="stage-tabs-track" role="group" aria-label="Exam stage" ref={trackRef}>
+        <div className="stage-tabs-track" role="group" aria-label="Exam stage">
           {box && (
             <motion.span
               className="stage-tab-highlight"
@@ -204,7 +209,7 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
                 backgroundColor: box.color,
                 boxShadow: glow(box.color),
               }}
-              style={{ left: leftView, right: rightView }}
+              style={{ x: xMV, width: widthMV }}
               transition={reduced || box.jump
                 ? instant
                 : { backgroundColor: colorFade, boxShadow: colorFade, opacity: { duration: 0.25 } }}
