@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { motion, type Transition } from 'framer-motion'
+import { animate, motion, useMotionValue, useTransform, type AnimationPlaybackControls, type Transition } from 'framer-motion'
 import { getPulseTheme, pulseFonts } from '@/shared/theme/premiumTheme'
 import { usePrefersReducedMotion } from '@/shared/hooks/usePrefersReducedMotion'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
@@ -49,11 +49,11 @@ function glow(color: string) {
   return `0 8px 24px ${toRgba(color, 0.4)}, inset 0 1px 0 rgba(255,255,255,0.45)`
 }
 
-// Springs for the two edges of the highlight. The leading edge (the one moving toward the new tab)
-// snaps with a small overshoot; the trailing edge lags and wobbles, so the pill stretches between tabs.
-function edgeSprings(direction: 1 | -1): Pick<Record<'left' | 'right', Transition>, 'left' | 'right'> {
-  const leading: Transition = { type: 'spring', stiffness: 420, damping: 20, mass: 0.9 }
-  const trailing: Transition = { type: 'spring', stiffness: 200, damping: 13, mass: 1 }
+// Springs for the two edges of the highlight. The leading edge (toward the new tab) moves quickly;
+// the trailing edge lags, so the pill stretches between tabs and settles.
+function edgeSprings(direction: 1 | -1): { left: Transition; right: Transition } {
+  const leading: Transition = { type: 'spring', stiffness: 420, damping: 24, mass: 0.9 }
+  const trailing: Transition = { type: 'spring', stiffness: 230, damping: 17, mass: 1 }
   return direction > 0
     ? { right: leading, left: trailing }
     : { left: leading, right: trailing }
@@ -64,12 +64,23 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
   const pt = getPulseTheme(dark)
   const reduced = usePrefersReducedMotion()
   const buttons = useRef<Record<string, HTMLButtonElement | null>>({})
+  const trackRef = useRef<HTMLDivElement>(null)
   const wasVisible = useRef(false)
   const prevIndexRef = useRef(-1)
   const lastDirectionRef = useRef<1 | -1>(1)
+  const maxWidthRef = useRef(0)
   const [box, setBox] = useState<HighlightBox | null>(null)
 
-  // Measures the selected tab and updates the highlight edges, remembering which way it moved.
+  // Edge positions live in motion values, so the animation runs outside React's render cycle.
+  const leftMV = useMotionValue(0)
+  const rightMV = useMotionValue(0)
+  // Clamps the overshoot to the track so it never widens the scrollable area.
+  const leftView = useTransform(leftMV, v => Math.min(Math.max(0, v), maxWidthRef.current || v))
+  const rightView = useTransform(rightMV, v => Math.min(Math.max(0, v), maxWidthRef.current || v))
+  const leftControls = useRef<AnimationPlaybackControls | null>(null)
+  const rightControls = useRef<AnimationPlaybackControls | null>(null)
+
+  // Measures the selected tab and updates the highlight target, remembering which way it moved.
   function measure(jump: boolean) {
     const button = active ? buttons.current[active] : null
     const color = items.find(item => item.value === active)?.color
@@ -81,6 +92,7 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
       lastDirectionRef.current = index > prevIndex ? 1 : -1
     }
     prevIndexRef.current = index
+    maxWidthRef.current = trackRef.current?.scrollWidth ?? 0
 
     const left = button.offsetLeft
     const right = left + button.offsetWidth
@@ -109,6 +121,24 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, items])
 
+  // Moves the highlight edges toward the new target. Interrupting a running spring keeps its velocity.
+  useLayoutEffect(() => {
+    if (!box) return
+    if (box.jump || reduced) {
+      leftControls.current?.stop()
+      rightControls.current?.stop()
+      leftMV.set(box.left)
+      rightMV.set(box.right)
+      return
+    }
+    const edges = edgeSprings(box.direction)
+    leftControls.current?.stop()
+    rightControls.current?.stop()
+    leftControls.current = animate(leftMV, box.left, edges.left)
+    rightControls.current = animate(rightMV, box.right, edges.right)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [box, reduced])
+
   // Scrolls the selected tab into view on small screens.
   useEffect(() => {
     if (!active) return
@@ -121,7 +151,6 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
 
   const instant: Transition = { duration: 0 }
   const colorFade: Transition = box?.jump ? instant : { duration: 0.5, ease: 'easeInOut' }
-  const edges = box ? edgeSprings(box.direction) : null
 
   return (
     <div className="stage-tabs-wrap">
@@ -137,6 +166,7 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
           position: absolute; top: 8px; height: 50px;
           border-radius: 999px; pointer-events: none;
           background-image: linear-gradient(135deg, rgba(255,255,255,0.22), rgba(255,255,255,0) 60%);
+          will-change: left, right;
         }
         .stage-tab {
           position: relative; flex: 0 0 auto; height: 50px; padding: 0 22px;
@@ -147,7 +177,7 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
           -webkit-tap-highlight-color: transparent;
         }
         .stage-tab-label { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 9px; }
-        .stage-tab-icon { display: inline-flex; will-change: transform; }
+        .stage-tab-icon { display: inline-flex; }
         .stage-tab:not([aria-pressed="true"]):hover { background: var(--stage-tab-hover); }
         @media (max-width: 480px) {
           .stage-tab { height: 44px; padding: 0 16px; font-size: 13px; }
@@ -163,22 +193,21 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
         activeTint={`${pt.cobalt}1f`}
         style={{ maxWidth: '100%', minWidth: 0, ['--stage-tab-hover' as string]: dark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.55)' }}
       >
-        <div className="stage-tabs-track" role="group" aria-label="Exam stage">
+        <div className="stage-tabs-track" role="group" aria-label="Exam stage" ref={trackRef}>
           {box && (
             <motion.span
               className="stage-tab-highlight"
               aria-hidden
-              initial={{ opacity: 0, left: box.left, right: box.right, backgroundColor: box.color, boxShadow: glow(box.color) }}
+              initial={{ opacity: 0, backgroundColor: box.color, boxShadow: glow(box.color) }}
               animate={{
                 opacity: active ? 1 : 0,
-                left: box.left,
-                right: box.right,
                 backgroundColor: box.color,
                 boxShadow: glow(box.color),
               }}
+              style={{ left: leftView, right: rightView }}
               transition={reduced || box.jump
                 ? instant
-                : { ...edges, backgroundColor: colorFade, boxShadow: colorFade, opacity: { duration: 0.25 } }}
+                : { backgroundColor: colorFade, boxShadow: colorFade, opacity: { duration: 0.25 } }}
             />
           )}
           {items.map(item => {
