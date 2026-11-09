@@ -16,6 +16,7 @@ import { loadSavedActiveExam, persistActiveExam, clearActiveExam } from '@/servi
 import { fetchSimulatorConfig, drawSimulator, drawProportional, simulatorSourceChoice, simulatorTotal, QUIZ_MAX_QUESTIONS } from '@/services/exam/stageSimulator'
 import { clearHomeHistory } from '@/services/content/homeData'
 import { saveFullAttempt } from '@/services/history/fullHistory'
+import { invalidateFirstTryAnswers } from '@/services/history/firstTryAnswers'
 import { quizName } from '@/features/practice/quizNames'
 import { optionLabels } from '@/features/practice/mcqShared'
 import MCQBrowse from '@/features/practice/mcq/MCQBrowse'
@@ -661,7 +662,8 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
     const payload = quizQuestions.map((q, i) => ({ id: q.id, answer: answers[i] || null }))
     const total = quizQuestions.length
-    const timeSec = null
+    // Active time spent on the quiz in whole seconds (a resumed exam does not count the time it was paused).
+    const timeSec = quizStartedAtRef.current ? Math.max(0, Math.round((Date.now() - quizStartedAtRef.current) / 1000)) : null
     const attemptId = crypto.randomUUID()
 
     const retryModuleIsUniform = quizMode === 'retry' && quizQuestions.every(q => q.module_id === quizQuestions[0]?.module_id)
@@ -700,7 +702,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
 
       if (!response.error) {
         resultMap = toResultMap(response.data)
-        if (user) { fetchProfile(user.id); clearHomeHistory() }
+        if (user) { fetchProfile(user.id); clearHomeHistory(); invalidateFirstTryAnswers(user.id) }
       } else if (!isTransientFailure(response)) {
         setGrading(false)
         showToast('⚠️ Could not submit — check your connection and try again', 'error')

@@ -32,6 +32,11 @@ export function fetchExamSchedules() {
   )
 }
 
+// Clears the cached exam schedules (after an admin changes a schedule).
+export function invalidateExamSchedules() {
+  invalidateCache(EXAMS_KEY)
+}
+
 // Memory-cached for 2 minutes; the last good copy is also kept on the device for offline use.
 export function fetchHomeHistory(userId, limit) {
   if (history?.userId === userId && Date.now() - history.at < HISTORY_TTL_MS) return Promise.resolve(history.rows)

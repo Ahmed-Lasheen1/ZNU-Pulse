@@ -1,6 +1,6 @@
 import { supabase } from '@/core/supabase'
 import { fetchAllRows } from '@/core/fetchAllRows'
-import { cachedQuery, MINUTE } from '@/core/dataCache'
+import { cachedQuery, invalidateCache, MINUTE } from '@/core/dataCache'
 
 const FIRST_TRY_TTL = 5 * MINUTE
 
@@ -21,4 +21,9 @@ export async function loadFirstTryAnswers(userId) {
     { ttl: FIRST_TRY_TTL }
   )
   return { rows: data || [], error }
+}
+
+// Clears the cached first-try answers so the next read includes questions answered since.
+export function invalidateFirstTryAnswers(userId) {
+  if (userId) invalidateCache(keyFor(userId))
 }

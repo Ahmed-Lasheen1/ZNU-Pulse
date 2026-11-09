@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
 import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
@@ -9,6 +9,10 @@ import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import { glassHoverTint } from '@/shared/theme/liquidGlass'
 import { MCQ_ACCENT, FLASHCARD_ACCENT } from '@/shared/theme/accents'
+import { accuracyColor } from '@/shared/utils/accuracy'
+import { useWeakSpots } from '@/features/practice'
+import { fetchModuleQuestions } from '@/services/content/moduleContent'
+import { WEAK_BELOW } from '@/services/history/weakSpots'
 
 interface AccordionSubject {
   id: string
@@ -52,6 +56,7 @@ function pillBtn(color: string): CSSProperties {
 
 // Subject accordion — expands in place to lesson rows with inline
 // Summary/Flashcards/Practice actions, replacing the old Subject/Lesson pages.
+// Lessons the student is struggling with carry a small accuracy badge next to their title.
 export default function StudyByLessonSection({
   dark, moduleId, stage, subjects, lessons, lessonQuestionIds, lessonFlashcardIds, lessonSummaries, onOpenSummary
 }: StudyByLessonSectionProps) {
@@ -59,7 +64,16 @@ export default function StudyByLessonSection({
   const navigate = useNavigate()
   const [openSubjectId, setOpenSubjectId] = useState<string | null>(null)
   const [openPickerLessonId, setOpenPickerLessonId] = useState<string | null>(null)
+  const [moduleQuestions, setModuleQuestions] = useState<any[]>([])
+  const lessonAccuracy = useWeakSpots(moduleQuestions)
   const hoverTint = glassHoverTint(dark)
+
+  // Loads the module's questions (shared cache) so answers can be matched to lessons.
+  useEffect(() => {
+    let ignore = false
+    fetchModuleQuestions(moduleId).then(({ data }: { data: any[] | null }) => { if (!ignore && data) setModuleQuestions(data) })
+    return () => { ignore = true }
+  }, [moduleId])
 
   // Carries the selected exam stage into the MCQ page, like the simulator link does.
   const stageQuery = stage ? `&stage=${encodeURIComponent(stage)}` : ''
@@ -97,6 +111,7 @@ export default function StudyByLessonSection({
         .study-lesson-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; flex-wrap: wrap; }
         .study-lesson-main { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 160px; }
         .study-lesson-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .study-lesson-badge { flex-shrink: 0; font-size: 10.5px; font-weight: 800; line-height: 1; border-radius: 999px; padding: 3px 8px; font-variant-numeric: tabular-nums; }
         .study-lesson-actions { display: flex; gap: 6px; flex-shrink: 0; }
         @media (max-width: 480px) {
           .study-lesson-main { min-width: 100%; }
@@ -155,6 +170,9 @@ export default function StudyByLessonSection({
                       const hasQuestions = lessonQuestionIds.has(lesson.id)
                       const hasFlashcards = lessonFlashcardIds.has(lesson.id)
                       const pickerOpen = openPickerLessonId === lesson.id
+                      const stat = lessonAccuracy[lesson.id]
+                      const weak = hasQuestions && !!stat && stat.accuracy < WEAK_BELOW
+                      const weakColor = stat ? accuracyColor(stat.accuracy, pt) : pt.textMuted
                       return (
                         <div key={lesson.id}>
                           <PulseGlassRow dark={dark} radius={12}>
@@ -164,6 +182,14 @@ export default function StudyByLessonSection({
                                   ? <ModuleIcon value={lesson.icon} size={16} color={pt.success} />
                                   : <NotesIcon color={pt.success} size={16} />}
                                 <span className="study-lesson-title" style={{ color: pt.textPrimary, fontSize: 13, fontWeight: 600 }}>{lesson.title}</span>
+                                {weak && (
+                                  <span
+                                    className="study-lesson-badge"
+                                    title="Your recent accuracy in this lesson"
+                                    aria-label={`Accuracy ${stat.accuracy} percent, needs practice`}
+                                    style={{ color: weakColor, background: `${weakColor}22`, border: `1px solid ${weakColor}44` }}
+                                  >{stat.accuracy}%</span>
+                                )}
                               </div>
                               <div className="study-lesson-actions">
                                 {summaries.length > 0 && (
