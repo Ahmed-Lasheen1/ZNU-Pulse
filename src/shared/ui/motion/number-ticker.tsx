@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, type CSSProperties } from "react"
+import { useEffect, useLayoutEffect, useRef, type CSSProperties } from "react"
 import { useInView, useMotionValue, useSpring } from "framer-motion"
 
 import { cn } from "@/shared/utils/cn"
@@ -28,6 +28,18 @@ export function NumberTicker({
   })
   const isInView = useInView(ref, { once: true, margin: "0px" })
 
+  const format = (n: number) =>
+    Intl.NumberFormat("en-US", {
+      minimumFractionDigits: decimalPlaces,
+      maximumFractionDigits: decimalPlaces,
+    }).format(Number(n.toFixed(decimalPlaces)))
+
+  // Shows the starting number right away; the spring only emits on change, so a 0 would stay blank.
+  useLayoutEffect(() => {
+    if (ref.current) ref.current.textContent = format(motionValue.get())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
     if (!isInView) return
     const timeout = setTimeout(() => {
@@ -39,13 +51,9 @@ export function NumberTicker({
   useEffect(
     () =>
       springValue.on("change", (latest) => {
-        if (ref.current) {
-          ref.current.textContent = Intl.NumberFormat("en-US", {
-            minimumFractionDigits: decimalPlaces,
-            maximumFractionDigits: decimalPlaces,
-          }).format(Number(latest.toFixed(decimalPlaces)))
-        }
+        if (ref.current) ref.current.textContent = format(latest)
       }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [springValue, decimalPlaces],
   )
 

@@ -107,6 +107,8 @@ const statNumStyle = { ...pulseType.display, fontSize: 28, lineHeight: 1.1 }
 const HERO_DELAY = ENTRANCE_PAUSE
 const NOTIFY_DELAY = LOGO_DELAY + 0.3
 const WEEKLY_REPORT_START = LOGO_DELAY + 0.6
+// Report counters start once the weekly report card has mostly faded in.
+const REPORT_COUNT_START = WEEKLY_REPORT_START + 0.5
 const ACTIVE_MODULES_START = WEEKLY_REPORT_START + 0.6
 const TOOLS_START = ACTIVE_MODULES_START + 0.6
 const COMPLETED_MODULES_START = TOOLS_START + 0.6
@@ -215,10 +217,10 @@ export default function Home({ dark }: { dark: boolean }) {
         return ts >= weekAgoMs
       })
 
-      // Counters start now: late data gets no extra wait, early data lines up with the entrance.
+      // Counters start now: late data gets no extra wait, early data waits for the report card to appear.
       if (weeklyRows.length === 0) {
         setWeeklySummary(null)
-        setTickerDelay(remainingFor(NOTIFY_DELAY))
+        setTickerDelay(remainingFor(REPORT_COUNT_START))
         setReportLoading(false)
         return
       }
@@ -240,7 +242,7 @@ export default function Home({ dark }: { dark: boolean }) {
 
       if (ignore) return
       setWeeklySummary({ totalAttempted, accuracy, topSubjectName })
-      setTickerDelay(remainingFor(NOTIFY_DELAY))
+      setTickerDelay(remainingFor(REPORT_COUNT_START))
       setReportLoading(false)
     }
     loadStreakAndWeeklySummary()
@@ -431,28 +433,31 @@ export default function Home({ dark }: { dark: boolean }) {
             box-sizing: border-box;
           }
 
+          /* minmax(0, ...) lets a track shrink below its content, so long nowrap titles can't widen the column and push the page sideways. */
           .pulse-dash-grid {
             display: grid;
-            grid-template-columns: 1fr 1.3fr 1fr;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr);
             gap: clamp(14px, 1.6vw, 28px);
             align-items: stretch;
           }
+          .pulse-dash-grid > * { min-width: 0; }
           @media (max-width: 1000px) {
-            .pulse-dash-grid { grid-template-columns: 1fr; }
+            .pulse-dash-grid { grid-template-columns: minmax(0, 1fr); }
             .pulse-hero-panel { order: 1; }
             .pulse-dash-report { order: 2; }
             .pulse-dash-modules { order: 3; }
           }
 
-          .pulse-report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+          .pulse-report-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+          .pulse-report-grid > * { min-width: 0; }
           .pulse-tools-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: clamp(10px, 1.2vw, 18px);
           }
           .pulse-tools-grid > * { min-width: 0; }
           @media (max-width: 720px) {
-            .pulse-tools-grid { grid-template-columns: repeat(2, 1fr); }
+            .pulse-tools-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
           }
 
           .pulse-hero-panel {
