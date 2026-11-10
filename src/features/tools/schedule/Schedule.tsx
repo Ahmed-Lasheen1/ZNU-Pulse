@@ -16,6 +16,7 @@ import { cachedSnapshot } from '@/core/dataCache'
 import { getDriveOrRawUrl } from '@/shared/utils/embedUrl'
 import { useModules } from '@/core/contexts'
 import { useHistoryOverlay } from '@/shared/hooks/useHistoryOverlay'
+import { usePrefersReducedMotion } from '@/shared/hooks/usePrefersReducedMotion'
 import { ScheduleIcon, EmptyBoxIcon } from '@/shared/icons/tool-icons'
 import { ExamIcon } from '@/shared/icons/medicalIcons'
 import { glassHoverTint } from '@/shared/theme/liquidGlass'
@@ -28,6 +29,9 @@ import type { ScheduleRow } from '@/features/tools/schedule/types'
 const SCHEDULE_ACCENT = '#a78bfa'
 
 const TASK_GAP = 16
+
+// Gap left above a card scrolled into view so the fixed header never covers it.
+const SCROLL_OFFSET = 90
 
 interface ScheduleModule {
   id: string
@@ -52,6 +56,7 @@ function examSortKey(exam: ScheduleRow) {
 export default function Schedule({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const location = useLocation()
+  const reduced = usePrefersReducedMotion()
   const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
   const { modules, modulesLoaded, modulesError } = useModules() as {
     modules: ScheduleModule[]
@@ -77,9 +82,15 @@ export default function Schedule({ dark }: { dark: boolean }) {
 
   useHistoryOverlay(!!viewer, () => setViewer(null))
 
+  // Tabs show active modules; a completed module stays listed while it is the selected one (e.g. from a search link).
   const activeModules = modules.filter(m => m.status === 'active')
-  const selectableModules = activeModules.length > 0 ? activeModules : modules
+  const baseModules = activeModules.length > 0 ? activeModules : modules
+  const currentModule = modules.find(m => m.id === activeModule)
+  const selectableModules = currentModule && !baseModules.some(m => m.id === currentModule.id)
+    ? [...baseModules, currentModule]
+    : baseModules
 
+  // Picks the module from the link, or the first selectable one.
   useEffect(() => {
     if (moduleParam && modules.some(m => m.id === moduleParam)) {
       if (appliedModuleParamRef.current !== moduleParam) {
@@ -97,10 +108,10 @@ export default function Schedule({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules, moduleParam])
 
+  // Loads the module's schedules from the saved copy, refreshing in the background.
   useEffect(() => {
     if (!activeModule) return
     let ignore = false
-    // Loads the module's schedules from the saved copy, refreshing in the background.
     async function fetchData() {
       setLoading(true)
       setLoadError(false)
@@ -125,16 +136,25 @@ export default function Schedule({ dark }: { dark: boolean }) {
     return () => { ignore = true }
   }, [activeModule])
 
-  // Opens the image of a schedule linked from search, when it has one.
+  // Scrolls a schedule card into view once it is on screen.
+  function scrollToSchedule(id: string) {
+    setTimeout(() => {
+      document.getElementById(`schedule-${id}`)?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' })
+    }, 60)
+  }
+
+  // Opens a schedule linked from search: plans with items expand in place, anything else opens its image.
   useEffect(() => {
-    if (!itemParam || viewer || schedules.length === 0 || openedItemRef.current === itemParam) return
+    if (!itemParam || loading || viewer || schedules.length === 0 || openedItemRef.current === itemParam) return
     const match = schedules.find(s => s.id === itemParam)
-    if (match) {
-      openedItemRef.current = itemParam
-      if (match.url) setViewer(match)
-    }
+    if (!match || match.module_id !== activeModule) return
+    openedItemRef.current = itemParam
+    if (match.type !== activeType) setActiveType(match.type)
+    scrollToSchedule(match.id)
+    const isPlan = match.type === 'study' && (match.items?.length ?? 0) > 0
+    if (!isPlan) openSchedule(match)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemParam, schedules])
+  }, [itemParam, schedules, loading])
 
   // Opens a schedule's image (needs a connection); schedules without an image do nothing.
   function openSchedule(sch: ScheduleRow) {
@@ -146,7 +166,8 @@ export default function Schedule({ dark }: { dark: boolean }) {
     setViewer(sch)
   }
 
-  const filtered = schedules.filter(s => s.type === activeType)
+  // Only the selected module's schedules are shown, so a failed load never leaks another module's rows.
+  const filtered = schedules.filter(s => s.module_id === activeModule && s.type === activeType)
   const visible = activeType === 'exam' ? [...filtered].sort((a, b) => examSortKey(a) - examSortKey(b)) : filtered
   const hoverTint = glassHoverTint(dark)
 
@@ -220,7 +241,11 @@ export default function Schedule({ dark }: { dark: boolean }) {
       ) : (
         <div>
           {visible.map((sch, i) => (
-            <div key={sch.id} style={{ marginBottom: i === visible.length - 1 ? 0 : TASK_GAP }}>
+            <div
+              key={sch.id}
+              id={`schedule-${sch.id}`}
+              style={{ marginBottom: i === visible.length - 1 ? 0 : TASK_GAP, scrollMarginTop: SCROLL_OFFSET }}
+            >
               {sch.type === 'exam' ? (
                 <ExamScheduleCard dark={dark} schedule={sch} accent={SCHEDULE_ACCENT} delay={i * 90} onViewImage={() => openSchedule(sch)} />
               ) : (
@@ -229,7 +254,7 @@ export default function Schedule({ dark }: { dark: boolean }) {
                   schedule={sch}
                   accent={SCHEDULE_ACCENT}
                   delay={i * 90}
-                  defaultOpen={i === 0}
+                  defaultOpen={i === 0 || sch.id === itemParam}
                   onViewImage={() => openSchedule(sch)}
                 />
               )}

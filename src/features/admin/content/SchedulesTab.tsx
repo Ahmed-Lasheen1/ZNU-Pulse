@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { getPulseTheme } from '@/shared/theme/premiumTheme'
 import InlineMessage from '@/shared/ui/feedback/InlineMessage'
+import AdminContextBar from '@/features/admin/common/AdminContextBar'
 import AdminSplitLayout from '@/features/admin/common/AdminSplitLayout'
 import AdminFormCard from '@/features/admin/common/AdminFormCard'
 import AdminRow from '@/features/admin/common/AdminRow'
@@ -12,8 +13,6 @@ import { useAdminEntityCrud } from '@/features/admin/common/useAdminEntityCrud'
 import { useConfirmDelete } from '@/features/admin/common/useConfirmDelete'
 import { useAdminList } from '@/features/admin/common/useAdminList'
 import { PICK_MODULE_MESSAGE, REQUIRED_FIELDS_MESSAGE } from '@/features/admin/common/useAdminContext'
-import { fetchLessonsForModule } from '@/services/content/lessons'
-import { fetchSubjectsForModule } from '@/services/content/subjects'
 import { plural } from '@/shared/utils/format'
 import { PlusIcon, TrashIcon, ConstructionIcon, CalendarDotIcon } from '@/shared/icons/tool-icons'
 import { ExamIcon } from '@/shared/icons/medicalIcons'
@@ -36,12 +35,14 @@ interface DateEntry {
   value: string
 }
 
+// A plan item being edited. `subjectId` and `lessonId` are the item's own choice;
+// null means "follow the subject and lesson picked in the context bar".
 interface PlanDraft {
   id: string
   date: string
   text: string
-  subjectId: string
-  lessonId: string
+  subjectId: string | null
+  lessonId: string | null
   tools: PlanLinkKind[]
   note: string
 }
@@ -49,53 +50,67 @@ interface PlanDraft {
 interface SchedulesTabProps {
   dark: boolean
   modules: AdminModule[]
+  subjects: AdminSubject[]
+  lessons: AdminLesson[]
   context: AdminContext
 }
+
+type ScheduleType = ScheduleRow['type']
+
+const TYPE_OPTIONS = [
+  { id: 'study', label: 'Study Plan', Icon: CalendarDotIcon },
+  { id: 'exam', label: 'Exam Schedule', Icon: ExamIcon },
+] as const
 
 // Creates an empty (or pre-filled) exam date field.
 const createDateEntry = (value = ''): DateEntry => ({ id: crypto.randomUUID(), value })
 
-// Creates an empty (or pre-filled) study plan item.
-const createPlanDraft = (item?: PlanItem, subjectId = ''): PlanDraft => ({
-  id: item?.id || crypto.randomUUID(),
-  date: item?.date || '',
-  text: item?.text || '',
-  subjectId: item?.subject_id || subjectId,
-  lessonId: item ? itemLessonId(item) || '' : '',
-  tools: item ? itemTools(item) : [],
-  note: item?.note || '',
-})
+// Creates a plan item: new ones follow the context bar, saved ones keep their stored subject and lesson.
+function createPlanDraft(item?: PlanItem, subjectId: string | null = null): PlanDraft {
+  if (!item) return { id: crypto.randomUUID(), date: '', text: '', subjectId, lessonId: null, tools: [], note: '' }
+  return {
+    id: item.id,
+    date: item.date || '',
+    text: item.text || '',
+    subjectId: item.subject_id || '',
+    lessonId: itemLessonId(item) || '',
+    tools: itemTools(item),
+    note: item.note || '',
+  }
+}
+
+// Uses an item's own choice when it belongs to the module, or the context bar value when the item follows the bar.
+function resolveChoice(own: string | null, barValue: string, validIds: string[]) {
+  if (own === null) return barValue
+  return validIds.includes(own) ? own : ''
+}
 
 // Admin tab for adding, editing and deleting study plans and exam schedules; an image link is optional.
-export default function SchedulesTab({ dark, modules, context }: SchedulesTabProps) {
+export default function SchedulesTab({ dark, modules, subjects, lessons, context }: SchedulesTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
   const { message, showMessage } = useAdminMessage()
   const { rows: schedules, loading, error, refresh } = useAdminList<ScheduleRow>({ table: 'schedules', moduleId: context.moduleId })
 
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingType, setEditingType] = useState<ScheduleType | null>(null)
   const [title, setTitle] = useState('')
   const [url, setUrl] = useState('')
-  const [type, setType] = useState<ScheduleRow['type']>('study')
+  const [type, setType] = useState<ScheduleType>('study')
   const [dates, setDates] = useState<DateEntry[]>(() => [createDateEntry()])
   const [plan, setPlan] = useState<PlanDraft[]>(() => [createPlanDraft()])
-  const [lessons, setLessons] = useState<AdminLesson[]>([])
-  const [subjects, setSubjects] = useState<AdminSubject[]>([])
 
-  // Loads the selected module's subjects and lessons (shared cache) for the plan item pickers.
-  useEffect(() => {
-    if (!context.moduleId) { setLessons([]); setSubjects([]); return }
-    let ignore = false
-    Promise.all([fetchSubjectsForModule(context.moduleId), fetchLessonsForModule(context.moduleId)]).then(([subjectsRes, lessonsRes]: any[]) => {
-      if (ignore) return
-      setSubjects(subjectsRes.subjects)
-      setLessons(lessonsRes.lessons)
-    })
-    return () => { ignore = true }
-  }, [context.moduleId])
+  // Subjects and lessons of the selected module (the lists come from the Admin shell).
+  const moduleSubjects = useMemo(() => subjects.filter(s => s.module_id === context.moduleId), [subjects, context.moduleId])
+  const moduleLessons = useMemo(() => lessons.filter(l => l.module_id === context.moduleId), [lessons, context.moduleId])
 
-  // Subject of a draft: the chosen one, or the subject of its lesson.
-  const subjectOf = (p: PlanDraft) => p.subjectId || lessons.find(l => l.id === p.lessonId)?.subject_id || ''
+  // Works out an item's real subject and lesson; choices from another module are ignored, so they are never saved.
+  function resolveDraft(p: PlanDraft) {
+    const lessonId = resolveChoice(p.lessonId, context.lessonId, moduleLessons.map(l => l.id))
+    const lessonSubject = moduleLessons.find(l => l.id === lessonId)?.subject_id || ''
+    const subjectId = resolveChoice(p.subjectId, context.subjectId, moduleSubjects.map(s => s.id)) || lessonSubject
+    return { subjectId, lessonId }
+  }
 
   // Non-empty exam dates from the form.
   const cleanDates = () => dates.map(d => d.value.trim()).filter(Boolean)
@@ -104,23 +119,24 @@ export default function SchedulesTab({ dark, modules, context }: SchedulesTabPro
   const cleanPlan = (): PlanItem[] =>
     plan
       .map(p => {
-        const lesson = lessons.find(l => l.id === p.lessonId)
+        const { subjectId, lessonId } = resolveDraft(p)
+        const lesson = moduleLessons.find(l => l.id === lessonId)
         const item: PlanItem = { id: p.id, date: p.date || null, text: p.text.trim() || lesson?.title || '' }
-        const subjectId = subjectOf(p)
         if (subjectId) item.subject_id = subjectId
-        if (p.lessonId) item.lesson_id = p.lessonId
-        if (p.lessonId && p.tools.length > 0) item.tools = PLAN_TOOL_ORDER.filter(kind => p.tools.includes(kind))
+        if (lessonId) item.lesson_id = lessonId
+        if (lessonId && p.tools.length > 0) item.tools = PLAN_TOOL_ORDER.filter(kind => p.tools.includes(kind))
         if (p.note.trim()) item.note = p.note.trim()
         return item
       })
       .filter(p => p.text)
 
   // True when a plan item has links but no lesson to open them for.
-  const hasLinksWithoutLesson = () => plan.some(p => p.tools.length > 0 && !p.lessonId)
+  const hasLinksWithoutLesson = () => plan.some(p => p.tools.length > 0 && !resolveDraft(p).lessonId)
 
   // Loads a schedule into the form and moves the context bar to its module.
   function editSchedule(schedule: ScheduleRow) {
     setEditingId(schedule.id)
+    setEditingType(schedule.type)
     setTitle(schedule.title)
     setUrl(schedule.url || '')
     setType(schedule.type)
@@ -129,9 +145,11 @@ export default function SchedulesTab({ dark, modules, context }: SchedulesTabPro
     context.setContext({ moduleId: schedule.module_id, subjectId: '', lessonId: '' })
   }
 
-  // Clears the form after a save or cancel.
+  // Clears the form after a save or cancel; a finished edit also returns the type to Study Plan.
   function resetForm() {
+    if (editingId) setType('study')
     setEditingId(null)
+    setEditingType(null)
     setTitle('')
     setUrl('')
     setDates([createDateEntry()])
@@ -158,16 +176,17 @@ export default function SchedulesTab({ dark, modules, context }: SchedulesTabPro
     setPlan(prev => prev.map(p => p.id === id ? { ...p, ...changes } : p))
   }
 
-  // Changes an item's subject and clears its lesson when it belongs to another subject.
+  // Sets an item's own subject and drops its lesson when that lesson belongs to another subject.
   function changeSubject(p: PlanDraft, subjectId: string) {
-    const keepLesson = lessons.some(l => l.id === p.lessonId && l.subject_id === subjectId)
-    updatePlan(p.id, { subjectId, lessonId: keepLesson ? p.lessonId : '', tools: keepLesson ? p.tools : [] })
+    const { lessonId } = resolveDraft(p)
+    const keepLesson = moduleLessons.some(l => l.id === lessonId && l.subject_id === subjectId)
+    updatePlan(p.id, { subjectId, lessonId: keepLesson ? lessonId : '', tools: keepLesson ? p.tools : [] })
   }
 
-  // Changes an item's lesson, taking the lesson's subject.
+  // Sets an item's own lesson, taking the lesson's subject.
   function changeLesson(p: PlanDraft, lessonId: string) {
-    const lesson = lessons.find(l => l.id === lessonId)
-    updatePlan(p.id, { lessonId, subjectId: lesson?.subject_id || p.subjectId, tools: lessonId ? p.tools : [] })
+    const lesson = moduleLessons.find(l => l.id === lessonId)
+    updatePlan(p.id, { lessonId, subjectId: lesson ? lesson.subject_id : resolveDraft(p).subjectId, tools: lessonId ? p.tools : [] })
   }
 
   // Turns one lesson link of a plan item on or off.
@@ -175,9 +194,12 @@ export default function SchedulesTab({ dark, modules, context }: SchedulesTabPro
     updatePlan(p.id, { tools: p.tools.includes(kind) ? p.tools.filter(k => k !== kind) : [...p.tools, kind] })
   }
 
-  // Adds another plan item, starting on the same subject as the previous one.
+  // Adds another plan item: it follows the context bar, or starts on the previous item's subject when the bar has none.
   function addPlanItem() {
-    setPlan(prev => [...prev, createPlanDraft(undefined, prev.length > 0 ? subjectOf(prev[prev.length - 1]) : '')])
+    setPlan(prev => {
+      const previousSubject = prev.length > 0 ? resolveDraft(prev[prev.length - 1]).subjectId : ''
+      return [...prev, createPlanDraft(undefined, context.subjectId || !previousSubject ? null : previousSubject)]
+    })
   }
 
   // Removes a plan item (the last one is just cleared).
@@ -220,6 +242,10 @@ export default function SchedulesTab({ dark, modules, context }: SchedulesTabPro
     crud.save()
   }
 
+  const typeChangeWarning = editingId && editingType && type !== editingType
+    ? `Saving as ${type === 'exam' ? 'an exam schedule' : 'a study plan'} removes this schedule's ${editingType === 'exam' ? 'exam dates' : 'plan items'}.`
+    : null
+
   const form = (
     <AdminFormCard
       dark={dark}
@@ -230,21 +256,40 @@ export default function SchedulesTab({ dark, modules, context }: SchedulesTabPro
       onSave={saveSchedule}
       onCancel={editingId ? resetForm : undefined}
     >
-      <input placeholder={type === 'study' ? 'Title (e.g. Week 1 plan)' : 'Title (e.g. Midterm)'} value={title} onChange={e => setTitle(e.target.value)} style={inStyle} />
-
       <label style={fieldLabel(pt)}>Type</label>
-      <select value={type} onChange={e => setType(e.target.value as ScheduleRow['type'])} style={inStyle}>
-        <option value="study">Study Plan</option>
-        <option value="exam">Exam Schedule</option>
-      </select>
+      <div role="group" aria-label="Schedule type" style={{ display: 'flex', gap: 8, marginBottom: typeChangeWarning ? 8 : 16 }}>
+        {TYPE_OPTIONS.map(option => {
+          const active = type === option.id
+          return (
+            <button
+              key={option.id}
+              type="button"
+              aria-pressed={active}
+              onClick={() => setType(option.id)}
+              style={{
+                flex: 1, padding: '9px', borderRadius: 10, cursor: 'pointer',
+                border: `1.5px solid ${active ? pt.cobalt : pt.border}`,
+                background: active ? `${pt.cobalt}18` : 'transparent',
+                color: active ? pt.cobalt : pt.sub, fontWeight: 700, fontSize: 12,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6
+              }}
+            >
+              <option.Icon color={active ? pt.cobalt : pt.sub} size={13} /> {option.label}
+            </button>
+          )
+        })}
+      </div>
+      {typeChangeWarning && <p style={{ color: pt.amber, fontSize: 12, fontWeight: 600, marginBottom: 14 }}>{typeChangeWarning}</p>}
+
+      <input placeholder={type === 'study' ? 'Title (e.g. Week 1 plan)' : 'Title (e.g. Midterm)'} value={title} onChange={e => setTitle(e.target.value)} style={inStyle} />
 
       {type === 'study' && (
         <>
-          <label style={fieldLabel(pt)}>Plan items — grouped by subject for students (date, links and note are optional)</label>
+          <label style={fieldLabel(pt)}>Plan items — the subject and lesson picked above are pre-filled; change them per item if needed (date, links and note are optional)</label>
           {plan.map(p => {
-            const subjectId = subjectOf(p)
-            const lessonOptions = subjectId ? lessons.filter(l => l.subject_id === subjectId) : lessons
-            const chosenLesson = lessons.find(l => l.id === p.lessonId)
+            const { subjectId, lessonId } = resolveDraft(p)
+            const lessonOptions = subjectId ? moduleLessons.filter(l => l.subject_id === subjectId) : moduleLessons
+            const chosenLesson = moduleLessons.find(l => l.id === lessonId)
             return (
               <div key={p.id} style={{ border: `1px solid ${pt.border}`, borderRadius: 14, padding: 12, marginBottom: 10 }}>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
@@ -275,10 +320,10 @@ export default function SchedulesTab({ dark, modules, context }: SchedulesTabPro
                     style={{ ...inStyle, marginBottom: 0, flex: '1 1 150px', minWidth: 0 }}
                   >
                     <option value="">No subject</option>
-                    {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    {moduleSubjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                   <select
-                    value={p.lessonId}
+                    value={lessonId}
                     onChange={e => changeLesson(p, e.target.value)}
                     aria-label="Lesson of this plan item"
                     style={{ ...inStyle, marginBottom: 0, flex: '1 1 180px', minWidth: 0 }}
@@ -296,14 +341,14 @@ export default function SchedulesTab({ dark, modules, context }: SchedulesTabPro
                     return (
                       <button
                         key={kind} type="button" aria-pressed={on}
-                        disabled={!p.lessonId}
+                        disabled={!lessonId}
                         onClick={() => toggleTool(p, kind)}
                         style={{
                           ...miniBtn(color),
                           border: `1px solid ${on ? color : `${color}66`}`,
                           background: on ? `${color}22` : 'transparent',
-                          opacity: p.lessonId ? 1 : 0.5,
-                          cursor: p.lessonId ? 'pointer' : 'not-allowed',
+                          opacity: lessonId ? 1 : 0.5,
+                          cursor: lessonId ? 'pointer' : 'not-allowed',
                         }}
                       >
                         <meta.Icon color={color} size={12} /> {meta.label}
@@ -389,6 +434,11 @@ export default function SchedulesTab({ dark, modules, context }: SchedulesTabPro
 
   return (
     <div>
+      {/* Study plans pick subject and lesson here; exams only need the module. */}
+      <AdminContextBar
+        dark={dark} modules={modules} subjects={subjects} lessons={lessons}
+        context={context} depth={type === 'study' ? 3 : 1}
+      />
       <InlineMessage message={message} />
       <AdminSplitLayout form={form} list={list} />
       <AdminDeleteDialog dark={dark} noun="schedule" del={del} />

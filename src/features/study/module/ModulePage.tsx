@@ -6,7 +6,7 @@ import PageShell from '@/shared/ui/layout/PageShell'
 import ModuleNotFoundState from '@/features/study/module/ModuleNotFoundState'
 import StudyMaterialsSection from '@/features/study/module/StudyMaterialsSection'
 import StudyByLessonSection from '@/features/study/module/StudyByLessonSection'
-import StageTabs from '@/features/study/module/StageTabs'
+import TabRow from '@/shared/ui/controls/TabRow'
 import { PageSectionsSkeleton } from '@/shared/ui/feedback/Skeletons'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import { SummaryOverlay } from '@/features/study/summaries'
@@ -69,8 +69,9 @@ export default function ModulePage({ dark }: { dark: boolean }) {
     return examStages.filter(stage => withContent.has(stage.value))
   }, [examStages, facets, stageMap])
 
+  // Stage tabs in the shape TabRow expects (emoji stages pass their emoji as the icon).
   const tabItems = useMemo(
-    () => visibleExamStages.map(s => ({ value: s.value, title: s.title, color: s.color, emoji: s.emoji, Icon: s.Icon })),
+    () => visibleExamStages.map(s => ({ value: s.value, label: s.title, color: s.color, icon: s.emoji, Icon: s.Icon })),
     [visibleExamStages]
   )
 
@@ -242,7 +243,16 @@ export default function ModulePage({ dark }: { dark: boolean }) {
           <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             <ExamStageIcon color={ON_GRADIENT_TOP.muted} size={14} /> Exam Stage
           </h2>
-          <StageTabs dark={dark} items={tabItems} active={stageActive ? activeStage : null} onSelect={selectStage} />
+          <TabRow
+            items={tabItems}
+            active={stageActive ? activeStage : null}
+            onSelect={selectStage}
+            dark={dark}
+            size="lg"
+            allowDeselect
+            ariaLabel="Exam stage"
+            style={{ justifyContent: 'center', marginBottom: 0 }}
+          />
         </div>
       )}
 

@@ -38,8 +38,9 @@ const TABS = [
 
 type AdminTab = typeof TABS[number]['id']
 
+// How many context selectors (module, subject, lesson) the shell shows above a tab.
+// The schedules tab draws its own bar because its depth depends on the schedule type.
 const CONTEXT_DEPTH: Partial<Record<AdminTab, number>> = {
-  schedules: 1,
   files: 3,
   questions: 3,
   summaries: 3,
@@ -198,7 +199,7 @@ export default function Admin({ dark }: { dark: boolean }) {
         {activeTab === 'flashcards' && <FlashcardsTab dark={dark} modules={modules} lessons={lessons} context={context} />}
         {activeTab === 'files' && <FilesTab dark={dark} modules={modules} context={context} />}
         {activeTab === 'summaries' && <SummariesTab dark={dark} modules={modules} subjects={subjects} context={context} />}
-        {activeTab === 'schedules' && <SchedulesTab dark={dark} modules={modules} context={context} />}
+        {activeTab === 'schedules' && <SchedulesTab dark={dark} modules={modules} subjects={subjects} lessons={lessons} context={context} />}
         {activeTab === 'structure' && (
           <StructureTab
             dark={dark} modules={modules} subjects={subjects} lessons={lessons} context={context}
