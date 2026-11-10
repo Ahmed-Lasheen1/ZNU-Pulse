@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
 import { getPulseTheme, pulseType } from '@/shared/theme/premiumTheme'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
+import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { ScheduleIcon, SearchIcon2 } from '@/shared/icons/tool-icons'
 import { ModuleIcon } from '@/shared/icons/medicalIcons'
@@ -82,7 +83,8 @@ function toolBtn(color: string) {
 
 // Study plan card: collapsible checklist grouped by subject, or a plain image row when the plan has no items.
 // The list expands with a height transition (grid-template-rows), like the Study by Lesson accordion.
-// Each item can open its lesson's summary, flashcards and practice, and ticks itself once the lesson is studied.
+// Each item is a glass row like a lesson row there: checkbox and text on the left, tool buttons on the right.
+// Items open their lesson's summary, flashcards and practice, and tick themselves once the lesson is studied.
 export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOpen, onViewImage }: StudyPlanCardProps) {
   const pt = getPulseTheme(dark)
   const navigate = useNavigate()
@@ -131,13 +133,15 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
     if (!lessonId) return
     if (kind === 'practice') { navigate(`/mcq?module=${schedule.module_id}&lesson=${lessonId}`); return }
     if (kind === 'flashcards') { navigate(`/flashcards?module=${schedule.module_id}&lesson=${lessonId}`); return }
+    // Summaries are unknown until the lookups finish, so an early tap is ignored instead of opening an empty picker.
+    if (!lookups.loaded) return
     const list = lookups.summariesByLesson[lessonId] || []
-    if (lookups.loaded && list.length === 0) { showToast('No summary added for this lesson yet', 'info'); return }
+    if (list.length === 0) { showToast('No summary added for this lesson yet', 'info'); return }
     if (list.length === 1) { openSummaryPage(list[0].id); return }
     setPickerItemId(prev => (prev === item.id ? null : item.id))
   }
 
-  // Renders one plan item: checkbox, text, date and note, plus its tool buttons.
+  // Renders one plan item as a glass row: checkbox, text, date and note on the left, tool buttons on the right.
   function renderItem(item: PlanItem) {
     const isDone = isItemDone(item.id)
     const tools = itemTools(item)
@@ -147,59 +151,59 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
     const summaries = lessonId ? lookups.summariesByLesson[lessonId] || [] : []
 
     return (
-      <div key={item.id} style={{ padding: '6px 0' }}>
-        <button
-          type="button" role="checkbox" aria-checked={isDone}
-          onClick={() => toggleItem(item.id)}
-          style={{
-            display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%',
-            background: 'transparent', border: 'none', padding: '2px 0',
-            cursor: 'pointer', textAlign: 'start', fontFamily: 'inherit',
-          }}
-        >
-          <span aria-hidden style={{
-            width: 18, height: 18, borderRadius: 6, flexShrink: 0, marginTop: 1,
-            border: `1.5px solid ${isDone ? accent : pt.faint}`,
-            background: isDone ? accent : 'transparent', color: '#0f172a',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900,
-          }}>{isDone && '✓'}</span>
-          <span style={{ flex: 1, minWidth: 0 }}>
-            <span dir="auto" style={{
-              ...pulseType.body, display: 'block', color: isDone ? pt.textMuted : pt.textPrimary,
-              textDecoration: isDone ? 'line-through' : 'none', ...wrapText,
-            }}>{item.text}</span>
-            {item.date && (
-              <span style={{ ...pulseType.small, display: 'block', color: dateColor, fontWeight: 700, marginTop: 1 }}>
-                {formatDayHeading(item.date)}
+      <div key={item.id}>
+        <PulseGlassRow dark={dark} radius={12}>
+          <div className="plan-item-row">
+            <button
+              type="button" role="checkbox" aria-checked={isDone}
+              className="plan-item-main glass-focus-ring"
+              onClick={() => toggleItem(item.id)}
+            >
+              <span aria-hidden style={{
+                width: 18, height: 18, borderRadius: 6, flexShrink: 0, marginTop: 1,
+                border: `1.5px solid ${isDone ? accent : pt.faint}`,
+                background: isDone ? accent : 'transparent', color: '#0f172a',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900,
+              }}>{isDone && '✓'}</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span dir="auto" style={{
+                  ...pulseType.body, display: 'block', color: isDone ? pt.textMuted : pt.textPrimary,
+                  textDecoration: isDone ? 'line-through' : 'none', ...wrapText,
+                }}>{item.text}</span>
+                {item.date && (
+                  <span style={{ ...pulseType.small, display: 'block', color: dateColor, fontWeight: 700, marginTop: 1 }}>
+                    {formatDayHeading(item.date)}
+                  </span>
+                )}
+                {item.note && (
+                  <span dir="auto" style={{ ...pulseType.small, display: 'block', color: pt.textMuted, marginTop: 2, ...wrapText }}>
+                    {item.note}
+                  </span>
+                )}
               </span>
-            )}
-            {item.note && (
-              <span dir="auto" style={{ ...pulseType.small, display: 'block', color: pt.textMuted, marginTop: 2, ...wrapText }}>
-                {item.note}
-              </span>
-            )}
-          </span>
-        </button>
+            </button>
 
-        {tools.length > 0 && lessonId && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '4px 0 0 28px' }}>
-            {tools.map(kind => {
-              const meta = PLAN_TOOL_META[kind]
-              const color = planToolColor(kind, pt)
-              return (
-                <button
-                  key={kind} type="button" onClick={() => openTool(item, kind)}
-                  aria-label={`${meta.label}: ${item.text}`} style={toolBtn(color)}
-                >
-                  <meta.Icon color={color} size={12} /> {meta.label}
-                </button>
-              )
-            })}
+            {tools.length > 0 && lessonId && (
+              <div className="plan-item-actions">
+                {tools.map(kind => {
+                  const meta = PLAN_TOOL_META[kind]
+                  const color = planToolColor(kind, pt)
+                  return (
+                    <button
+                      key={kind} type="button" onClick={() => openTool(item, kind)}
+                      aria-label={`${meta.label}: ${item.text}`} style={toolBtn(color)}
+                    >
+                      <meta.Icon color={color} size={12} /> {meta.label}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
-        )}
+        </PulseGlassRow>
 
         {pickerItemId === item.id && summaries.length > 1 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '6px 0 0 34px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '6px 4px 0 34px' }}>
             {summaries.map(s => (
               <button key={s.id} onClick={() => openSummaryPage(s.id)} style={{
                 background: 'transparent', border: 'none', textAlign: 'start', cursor: 'pointer',
@@ -216,6 +220,20 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
 
   return (
     <LiquidGlassCard dark={dark} delay={delay} style={{ padding: 0 }}>
+      <style>{`
+        .plan-item-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; flex-wrap: wrap; }
+        .plan-item-main {
+          flex: 1; min-width: 200px; display: flex; align-items: flex-start; gap: 10px;
+          background: transparent; border: none; padding: 0; border-radius: 8px;
+          cursor: pointer; text-align: start; font-family: inherit; color: inherit;
+        }
+        .plan-item-actions { display: flex; flex-wrap: wrap; gap: 6px; flex-shrink: 0; }
+        @media (max-width: 480px) {
+          .plan-item-main { min-width: 100%; }
+          .plan-item-actions { min-width: 100%; padding-inline-start: 28px; }
+        }
+      `}</style>
+
       <button
         type="button"
         onClick={handleHeader}
@@ -273,26 +291,33 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
           <div style={{ overflow: 'hidden' }}>
             <div
               id={panelId} role="region" aria-label={`${schedule.title} items`} aria-hidden={!open}
-              style={{ padding: '0 18px 16px' }}
+              style={{ padding: '0 12px 16px' }}
             >
-              {groups.map(group => (
-                <div key={group.key} style={{ marginTop: 10 }}>
-                  {showHeaders && (
-                    <div style={{
-                      ...pulseType.sectionLabel, fontSize: 11, marginBottom: 2,
-                      color: group.color || pt.textMuted, display: 'flex', alignItems: 'center', gap: 6,
-                    }}>
-                      {group.icon && <ModuleIcon value={group.icon} size={14} color={group.color || pt.textMuted} />}
-                      <span style={{ minWidth: 0, ...wrapText }}>{group.name}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {groups.map(group => (
+                  <div key={group.key}>
+                    {showHeaders && (
+                      <div style={{
+                        ...pulseType.sectionLabel, fontSize: 11, margin: '0 4px 8px',
+                        color: group.color || pt.textMuted, display: 'flex', alignItems: 'center', gap: 6,
+                      }}>
+                        {group.icon && <ModuleIcon value={group.icon} size={14} color={group.color || pt.textMuted} />}
+                        <span style={{ minWidth: 0, ...wrapText }}>{group.name}</span>
+                        <span style={{ color: pt.textMuted, fontWeight: 600, letterSpacing: 0, textTransform: 'none' }}>
+                          · {group.items.filter(item => isItemDone(item.id)).length}/{group.items.length}
+                        </span>
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {group.items.map(renderItem)}
                     </div>
-                  )}
-                  {group.items.map(renderItem)}
-                </div>
-              ))}
+                  </div>
+                ))}
+              </div>
 
               {schedule.url && (
                 <button type="button" onClick={onViewImage} style={{
-                  marginTop: 14, background: 'transparent', border: `1px solid ${accent}66`, color: accent,
+                  marginTop: 16, background: 'transparent', border: `1px solid ${accent}66`, color: accent,
                   borderRadius: 999, padding: '7px 14px', fontWeight: 700, fontSize: 12, cursor: 'pointer',
                   fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6,
                 }}>

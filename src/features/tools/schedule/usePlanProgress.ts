@@ -22,7 +22,11 @@ export function usePlanProgress(schedule: ScheduleRow, enabled: boolean): Readon
   // Reads the cached questions, cards and progress, then marks every item that meets its goals.
   useEffect(() => {
     const tracked = (schedule.items || []).filter(item => itemLessonId(item) && itemTools(item).some(t => t !== 'summary'))
-    if (!enabled || tracked.length === 0) return
+    // Nothing to track (anymore): drop any ticks left over from earlier items.
+    if (!enabled || tracked.length === 0) {
+      setCompleted(NONE)
+      return
+    }
     let ignore = false
     const needsPractice = tracked.some(item => itemTools(item).includes('practice'))
     const needsCards = tracked.some(item => itemTools(item).includes('flashcards'))

@@ -194,6 +194,7 @@ export default function Schedule({ dark }: { dark: boolean }) {
 
       <PageIntro dark={dark} emoji={<ScheduleIcon color={ON_GRADIENT_TOP.primary} size={40} />} title="Schedules" subtitle="Study plans and exam dates, module by module" />
 
+      {/* Module tabs stay on a single line and scroll sideways when they do not fit (no wrapping). */}
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: SECTION_GAP }}>
         <TabRow
           items={selectableModules.map(m => ({ value: m.id, label: m.name, icon: m.icon, color: m.color, completed: m.status === 'completed' }))}
@@ -201,7 +202,7 @@ export default function Schedule({ dark }: { dark: boolean }) {
           onSelect={setActiveModule}
           dark={dark}
           scrollOnMobile
-          style={{ justifyContent: 'center', flexWrap: 'wrap', overflowX: 'visible', marginBottom: 0, rowGap: 10 }}
+          style={{ justifyContent: 'center', marginBottom: 0 }}
         />
       </div>
 

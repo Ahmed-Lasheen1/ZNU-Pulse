@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react'
 import { getPulseTheme } from '@/shared/theme/premiumTheme'
 import InlineMessage from '@/shared/ui/feedback/InlineMessage'
-import AdminContextBar from '@/features/admin/common/AdminContextBar'
 import AdminSplitLayout from '@/features/admin/common/AdminSplitLayout'
 import AdminFormCard from '@/features/admin/common/AdminFormCard'
 import AdminRow from '@/features/admin/common/AdminRow'
@@ -18,31 +17,20 @@ import { PlusIcon, TrashIcon, ConstructionIcon, CalendarDotIcon } from '@/shared
 import { ExamIcon } from '@/shared/icons/medicalIcons'
 import { PLAN_TOOL_ORDER, PLAN_TOOL_META, planToolColor, itemTools, itemLessonId } from '@/features/tools/schedule/planItems'
 import type { AdminModule, AdminSubject, AdminLesson, AdminContext } from '@/features/admin/common/adminTypes'
-import type { PlanItem, PlanLinkKind } from '@/features/tools/schedule/types'
-
-interface ScheduleRow {
-  id: string
-  title: string
-  url: string | null
-  type: 'study' | 'exam'
-  module_id: string
-  dates?: string[] | null
-  items?: PlanItem[] | null
-}
+import type { PlanItem, PlanLinkKind, ScheduleRow } from '@/features/tools/schedule/types'
 
 interface DateEntry {
   id: string
   value: string
 }
 
-// A plan item being edited. `subjectId` and `lessonId` are the item's own choice;
-// null means "follow the subject and lesson picked in the context bar".
+// A plan item being edited. `subjectId` and `lessonId` are the item's own choice ('' = none).
 interface PlanDraft {
   id: string
   date: string
   text: string
-  subjectId: string | null
-  lessonId: string | null
+  subjectId: string
+  lessonId: string
   tools: PlanLinkKind[]
   note: string
 }
@@ -65,9 +53,9 @@ const TYPE_OPTIONS = [
 // Creates an empty (or pre-filled) exam date field.
 const createDateEntry = (value = ''): DateEntry => ({ id: crypto.randomUUID(), value })
 
-// Creates a plan item: new ones follow the context bar, saved ones keep their stored subject and lesson.
-function createPlanDraft(item?: PlanItem, subjectId: string | null = null): PlanDraft {
-  if (!item) return { id: crypto.randomUUID(), date: '', text: '', subjectId, lessonId: null, tools: [], note: '' }
+// Creates a plan item: new ones start on the given subject, saved ones keep their stored subject and lesson.
+function createPlanDraft(item?: PlanItem, subjectId = ''): PlanDraft {
+  if (!item) return { id: crypto.randomUUID(), date: '', text: '', subjectId, lessonId: '', tools: [], note: '' }
   return {
     id: item.id,
     date: item.date || '',
@@ -79,13 +67,8 @@ function createPlanDraft(item?: PlanItem, subjectId: string | null = null): Plan
   }
 }
 
-// Uses an item's own choice when it belongs to the module, or the context bar value when the item follows the bar.
-function resolveChoice(own: string | null, barValue: string, validIds: string[]) {
-  if (own === null) return barValue
-  return validIds.includes(own) ? own : ''
-}
-
 // Admin tab for adding, editing and deleting study plans and exam schedules; an image link is optional.
+// The module comes from the Admin shell's context bar; subjects and lessons are chosen per plan item.
 export default function SchedulesTab({ dark, modules, subjects, lessons, context }: SchedulesTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
@@ -106,9 +89,9 @@ export default function SchedulesTab({ dark, modules, subjects, lessons, context
 
   // Works out an item's real subject and lesson; choices from another module are ignored, so they are never saved.
   function resolveDraft(p: PlanDraft) {
-    const lessonId = resolveChoice(p.lessonId, context.lessonId, moduleLessons.map(l => l.id))
+    const lessonId = moduleLessons.some(l => l.id === p.lessonId) ? p.lessonId : ''
     const lessonSubject = moduleLessons.find(l => l.id === lessonId)?.subject_id || ''
-    const subjectId = resolveChoice(p.subjectId, context.subjectId, moduleSubjects.map(s => s.id)) || lessonSubject
+    const subjectId = moduleSubjects.some(s => s.id === p.subjectId) ? p.subjectId : lessonSubject
     return { subjectId, lessonId }
   }
 
@@ -194,11 +177,11 @@ export default function SchedulesTab({ dark, modules, subjects, lessons, context
     updatePlan(p.id, { tools: p.tools.includes(kind) ? p.tools.filter(k => k !== kind) : [...p.tools, kind] })
   }
 
-  // Adds another plan item: it follows the context bar, or starts on the previous item's subject when the bar has none.
+  // Adds another plan item, starting on the previous item's subject.
   function addPlanItem() {
     setPlan(prev => {
       const previousSubject = prev.length > 0 ? resolveDraft(prev[prev.length - 1]).subjectId : ''
-      return [...prev, createPlanDraft(undefined, context.subjectId || !previousSubject ? null : previousSubject)]
+      return [...prev, createPlanDraft(undefined, previousSubject)]
     })
   }
 
@@ -285,7 +268,7 @@ export default function SchedulesTab({ dark, modules, subjects, lessons, context
 
       {type === 'study' && (
         <>
-          <label style={fieldLabel(pt)}>Plan items — the subject and lesson picked above are pre-filled; change them per item if needed (date, links and note are optional)</label>
+          <label style={fieldLabel(pt)}>Plan items — pick a subject and lesson for each item (date, links and note are optional)</label>
           {plan.map(p => {
             const { subjectId, lessonId } = resolveDraft(p)
             const lessonOptions = subjectId ? moduleLessons.filter(l => l.subject_id === subjectId) : moduleLessons
@@ -434,11 +417,6 @@ export default function SchedulesTab({ dark, modules, subjects, lessons, context
 
   return (
     <div>
-      {/* Study plans pick subject and lesson here; exams only need the module. */}
-      <AdminContextBar
-        dark={dark} modules={modules} subjects={subjects} lessons={lessons}
-        context={context} depth={type === 'study' ? 3 : 1}
-      />
       <InlineMessage message={message} />
       <AdminSplitLayout form={form} list={list} />
       <AdminDeleteDialog dark={dark} noun="schedule" del={del} />
