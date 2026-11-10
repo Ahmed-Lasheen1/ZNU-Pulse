@@ -24,13 +24,16 @@ interface HighlightBox {
   right: number
   color: string
   direction: 1 | -1
-  // How far the highlight has to travel (px), used to scale the spring speed.
-  distance: number
   jump: boolean
 }
 
-// Travel distance (px) at which the speed boost and stretch reach their maximum.
-const FULL_TRAVEL_PX = 220
+// Exponential ease-out: almost all of the movement happens at the very start, then a long gentle tail.
+const EASE_OUT_EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1]
+
+// Seconds the edge moving toward the new tab takes, and the (longer) time the edge left behind takes to catch up.
+// The difference between the two is what stretches the highlight.
+const LEADING_SECONDS = 0.5
+const TRAILING_SECONDS = 0.9
 
 // Largest height loss of the highlight while it is stretched (0.14 = 14%) and how fast it is reached.
 const MAX_SQUASH = 0.14
@@ -58,26 +61,23 @@ function glow(color: string) {
   return `0 8px 24px ${toRgba(color, 0.4)}, inset 0 1px 0 rgba(255,255,255,0.45)`
 }
 
-// Springs for the two edges of the highlight, scaled by travel distance. The leading edge (toward the new tab)
-// moves quickly and arrives faster on long jumps; the trailing edge lags more on long jumps, so the pill
-// stretches further between distant tabs and only slightly between neighbours.
-function edgeSprings(direction: 1 | -1, distance: number): { left: Transition; right: Transition } {
-  const t = Math.min(1, distance / FULL_TRAVEL_PX)
-  const leading: Transition = { type: 'spring', stiffness: 380 + 280 * t, damping: 23 + 6 * t, mass: 0.9 }
-  const trailing: Transition = { type: 'spring', stiffness: 230 - 90 * t, damping: 17 - 3 * t, mass: 1 }
+// Ease-out transitions for the two edges of the highlight. The leading edge (toward the new tab) finishes first;
+// the trailing edge takes longer, so the pill stretches right after the click and then slowly settles into the tab.
+function edgeTransitions(direction: 1 | -1): { left: Transition; right: Transition } {
+  const leading: Transition = { duration: LEADING_SECONDS, ease: EASE_OUT_EXPO }
+  const trailing: Transition = { duration: TRAILING_SECONDS, ease: EASE_OUT_EXPO }
   return direction > 0
     ? { right: leading, left: trailing }
     : { left: leading, right: trailing }
 }
 
-// Stage tab row with one sliding highlight that stretches and squashes between the selected tabs.
+// Stage tab row with one sliding highlight that launches fast, stretches, and settles slowly on the selected tab.
 export default function StageTabs({ dark, items, active, onSelect }: StageTabsProps) {
   const pt = getPulseTheme(dark)
   const reduced = usePrefersReducedMotion()
   const buttons = useRef<Record<string, HTMLButtonElement | null>>({})
   const wasVisible = useRef(false)
   const prevIndexRef = useRef(-1)
-  const prevLeftRef = useRef<number | null>(null)
   const lastDirectionRef = useRef<1 | -1>(1)
   // Width of the selected tab; the stretch is measured against it.
   const targetWidthRef = useRef(0)
@@ -104,7 +104,7 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
   const leftControls = useRef<ReturnType<typeof animate> | null>(null)
   const rightControls = useRef<ReturnType<typeof animate> | null>(null)
 
-  // Measures the selected tab and updates the highlight target, remembering which way it moved and how far.
+  // Measures the selected tab and updates the highlight target, remembering which way it moved.
   function measure(jump: boolean) {
     const button = active ? buttons.current[active] : null
     const color = items.find(item => item.value === active)?.color
@@ -124,13 +124,11 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
     const left = button.offsetLeft
     const right = left + button.offsetWidth
     const direction = lastDirectionRef.current
-    const distance = prevLeftRef.current === null ? 0 : Math.abs(left - prevLeftRef.current)
-    prevLeftRef.current = left
     targetWidthRef.current = button.offsetWidth
     setBox(prev =>
       prev && prev.left === left && prev.right === right && prev.color === color && prev.direction === direction
         ? prev
-        : { left, right, color, direction, distance, jump }
+        : { left, right, color, direction, jump }
     )
   }
 
@@ -139,7 +137,6 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
     if (!active) {
       wasVisible.current = false
       prevIndexRef.current = -1
-      prevLeftRef.current = null
       return
     }
     measure(!wasVisible.current)
@@ -152,7 +149,7 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, items])
 
-  // Moves the highlight edges toward the new target. Stopping a running spring keeps its current position and velocity.
+  // Moves the highlight edges toward the new target. Stopping a running animation keeps its current position.
   useLayoutEffect(() => {
     if (!box) return
     leftControls.current?.stop()
@@ -162,7 +159,7 @@ export default function StageTabs({ dark, items, active, onSelect }: StageTabsPr
       rightMV.set(box.right)
       return
     }
-    const edges = edgeSprings(box.direction, box.distance)
+    const edges = edgeTransitions(box.direction)
     leftControls.current = animate(leftMV, box.left, edges.left)
     rightControls.current = animate(rightMV, box.right, edges.right)
     // eslint-disable-next-line react-hooks/exhaustive-deps
