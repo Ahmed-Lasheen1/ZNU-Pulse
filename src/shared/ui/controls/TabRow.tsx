@@ -3,6 +3,7 @@ import { animate, motion, useMotionValue, useTransform, type Transition } from '
 import { getPulseTheme, pulseFonts } from '@/shared/theme/premiumTheme'
 import { ModuleIcon } from '@/shared/icons/medicalIcons'
 import { usePrefersReducedMotion } from '@/shared/hooks/usePrefersReducedMotion'
+import { useMediaQuery } from '@/shared/hooks/useMediaQuery'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 
 export interface TabRowItem {
@@ -30,6 +31,8 @@ interface TabRowProps {
   size?: 'md' | 'lg'
   // Lets a click on the active tab clear the selection.
   allowDeselect?: boolean
+  // Keeps a wrapping row on one scrollable line on phones.
+  scrollOnMobile?: boolean
   ariaLabel?: string
 }
 
@@ -45,15 +48,16 @@ interface HighlightBox {
   jump: boolean
 }
 
+const MOBILE_QUERY = '(max-width: 640px)'
+
 // Exponential ease-out: almost all of the movement happens at the very start, then a long gentle tail.
 const EASE_OUT_EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1]
 
-// Seconds the edge moving toward the new tab takes, and the (longer) time the edge left behind takes to catch up.
-// The difference between the two is what stretches the highlight.
+// Seconds the leading edge takes, and the longer time the trailing edge takes to catch up (this stretches the highlight).
 const LEADING_SECONDS = 0.5
 const TRAILING_SECONDS = 0.9
 
-// Largest height loss of the highlight while it is stretched (0.14 = 14%) and how fast it is reached.
+// Largest height loss of the highlight while stretched (0.14 = 14%) and how fast it is reached.
 const MAX_SQUASH = 0.14
 const SQUASH_RATE = 0.2
 
@@ -79,8 +83,7 @@ function glow(color: string) {
   return `0 8px 24px ${toRgba(color, 0.4)}, inset 0 1px 0 rgba(255,255,255,0.45)`
 }
 
-// Ease-out transitions for the two edges of the highlight. The leading edge (toward the new tab) finishes first;
-// the trailing edge takes longer, so the pill stretches right after the click and then slowly settles into the tab.
+// Ease-out transitions for the two highlight edges; the edge toward the new tab finishes first.
 function edgeTransitions(direction: 1 | -1): { left: Transition; right: Transition } {
   const leading: Transition = { duration: LEADING_SECONDS, ease: EASE_OUT_EXPO }
   const trailing: Transition = { duration: TRAILING_SECONDS, ease: EASE_OUT_EXPO }
@@ -89,13 +92,14 @@ function edgeTransitions(direction: 1 | -1): { left: Transition; right: Transiti
     : { left: leading, right: trailing }
 }
 
-// Shared row of glass tabs with one highlight that launches fast, stretches, and settles slowly on the selected tab.
+// Shared row of glass tabs with one highlight that launches fast, stretches, and settles on the selected tab.
 // Used for module switching, exam-stage filters and subject filters across the app.
 export default function TabRow({
-  items, active, onSelect, dark, accentColor, style, size = 'md', allowDeselect = false, ariaLabel,
+  items, active, onSelect, dark, accentColor, style, size = 'md', allowDeselect = false, scrollOnMobile = false, ariaLabel,
 }: TabRowProps) {
   const pt = getPulseTheme(dark)
   const reduced = usePrefersReducedMotion()
+  const narrow = useMediaQuery(MOBILE_QUERY)
   const trackRef = useRef<HTMLDivElement>(null)
   const buttons = useRef<Record<string, HTMLButtonElement | null>>({})
   const wasVisible = useRef(false)
@@ -131,7 +135,7 @@ export default function TabRow({
   const topControls = useRef<ReturnType<typeof animate> | null>(null)
 
   // Layout props go to the outer row; wrapping and scrolling are handled by the capsule's own track.
-  const wrapped = style?.flexWrap === 'wrap'
+  const wrapped = style?.flexWrap === 'wrap' && !(scrollOnMobile && narrow)
   const rowGap = style?.rowGap
   const justifyContent = style?.justifyContent
   const outerStyle: CSSProperties = { ...style }
@@ -204,7 +208,7 @@ export default function TabRow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, itemsKey, size, wrapped, shown])
 
-  // Moves the highlight toward the new target. Stopping a running animation keeps its current position.
+  // Moves the highlight toward the new target; stopping a running animation keeps its current position.
   useLayoutEffect(() => {
     if (!box) return
     leftControls.current?.stop()
@@ -237,7 +241,11 @@ export default function TabRow({
   const instant: Transition = { duration: 0 }
   const colorFade: Transition = box?.jump ? instant : { duration: 0.5, ease: 'easeInOut' }
 
-  const outerBase: CSSProperties = { display: 'flex', marginBottom: 16, ...outerStyle }
+  const outerBase: CSSProperties = {
+    display: 'flex', marginBottom: 16,
+    ...(scrollOnMobile ? { minWidth: 0, maxWidth: '100%' } : {}),
+    ...outerStyle,
+  }
   if (items.length === 0) return <div style={outerBase} />
 
   return (

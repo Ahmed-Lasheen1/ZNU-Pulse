@@ -173,6 +173,12 @@ export default function Schedule({ dark }: { dark: boolean }) {
 
   return (
     <PageShell dark={dark} backFallback="/" maxWidth={900}>
+      <style>{`
+        @media (max-width: 400px) {
+          .schedule-type-btn { padding: 10px 12px !important; font-size: 13px !important; gap: 6px !important; }
+        }
+      `}</style>
+
       {(loadError || modulesError) && <ErrorBanner />}
       {savedCopy && <OfflineNote dark={dark} message="You're offline — showing the last saved schedules." />}
 
@@ -194,6 +200,7 @@ export default function Schedule({ dark }: { dark: boolean }) {
           active={activeModule}
           onSelect={setActiveModule}
           dark={dark}
+          scrollOnMobile
           style={{ justifyContent: 'center', flexWrap: 'wrap', overflowX: 'visible', marginBottom: 0, rowGap: 10 }}
         />
       </div>
@@ -216,7 +223,7 @@ export default function Schedule({ dark }: { dark: boolean }) {
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveType(type) } }}
               aria-label={type === 'study' ? 'Study Planner' : 'Exam Schedule'}
             >
-              <div style={{
+              <div className="schedule-type-btn" style={{
                 padding: '10px 20px', whiteSpace: 'nowrap',
                 ...pulseType.button, color, display: 'flex', alignItems: 'center', gap: 8
               }}>

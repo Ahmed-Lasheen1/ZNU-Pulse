@@ -394,6 +394,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
           active={activeModule}
           onSelect={setActiveModule}
           dark={dark}
+          scrollOnMobile
           style={{
             justifyContent: 'center',
             flexWrap: 'wrap',
