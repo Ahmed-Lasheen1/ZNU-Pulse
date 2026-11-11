@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { getPulseTheme } from '@/shared/theme/premiumTheme'
 import InlineMessage from '@/shared/ui/feedback/InlineMessage'
+import AdminContextBar from '@/features/admin/common/AdminContextBar'
 import AdminSplitLayout from '@/features/admin/common/AdminSplitLayout'
 import AdminFormCard from '@/features/admin/common/AdminFormCard'
 import AdminRow from '@/features/admin/common/AdminRow'
@@ -68,7 +69,7 @@ function createPlanDraft(item?: PlanItem, subjectId = ''): PlanDraft {
 }
 
 // Admin tab for adding, editing and deleting study plans and exam schedules; an image link is optional.
-// The module comes from the Admin shell's context bar; subjects and lessons are chosen per plan item.
+// The module comes from this tab's context bar (module only); subjects and lessons are chosen per plan item.
 export default function SchedulesTab({ dark, modules, subjects, lessons, context }: SchedulesTabProps) {
   const pt = getPulseTheme(dark)
   const inStyle = adminInStyle(pt, dark)
@@ -431,6 +432,7 @@ export default function SchedulesTab({ dark, modules, subjects, lessons, context
 
   return (
     <div>
+      <AdminContextBar dark={dark} modules={modules} subjects={subjects} lessons={lessons} context={context} depth={1} />
       <InlineMessage message={message} />
       <AdminSplitLayout form={form} list={list} />
       <AdminDeleteDialog dark={dark} noun="schedule" del={del} />
