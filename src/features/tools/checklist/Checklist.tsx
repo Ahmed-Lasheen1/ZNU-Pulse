@@ -45,32 +45,38 @@ function pruneOrphanedGuestChecklists(validModuleIds: Set<string>) {
   }
 }
 
+// Parses a YYYY-MM-DD string as a local calendar date.
 function parseLocalDate(dateStr: string) {
   const [y, m, d] = dateStr.split('-').map(Number)
   return new Date(y, m - 1, d)
 }
 
+// Returns local midnight of the current day.
 function startOfToday() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   return today
 }
 
+// Whole days from today to a deadline (negative when it has passed).
 function dayDiff(deadline: string) {
   return Math.round((parseLocalDate(deadline).getTime() - startOfToday().getTime()) / (24 * 60 * 60 * 1000))
 }
 
+// True when the deadline is before today.
 function isOverdue(deadline: string | null) {
   if (!deadline) return false
   return dayDiff(deadline) < 0
 }
 
+// True when the deadline is today or within the next two days.
 function isDueSoon(deadline: string | null) {
   if (!deadline) return false
   const diff = dayDiff(deadline)
   return diff >= 0 && diff <= 2
 }
 
+// Readable deadline text such as "Due tomorrow" or "3 days overdue".
 function formatDeadlineLabel(deadline: string) {
   const diff = dayDiff(deadline)
   if (diff === 0) return 'Due today'
@@ -83,6 +89,7 @@ function formatDeadlineLabel(deadline: string) {
   return `Due ${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: sameYear ? undefined : 'numeric' })}`
 }
 
+// Sort rank of a task: overdue first, then due soon, then later, then undated.
 function urgencyRank(task: ChecklistTask) {
   if (!task.deadline) return 3
   if (isOverdue(task.deadline)) return 0
@@ -90,6 +97,7 @@ function urgencyRank(task: ChecklistTask) {
   return 2
 }
 
+// Orders tasks by urgency, then by nearest deadline.
 function sortByUrgency(tasks: ChecklistTask[]) {
   return [...tasks].sort((a, b) => {
     const rankDiff = urgencyRank(a) - urgencyRank(b)
@@ -99,6 +107,7 @@ function sortByUrgency(tasks: ChecklistTask[]) {
   })
 }
 
+// Checklist page: per-module study tasks with optional deadlines, saved on the account or on this device.
 export default function Checklist({ dark }: { dark: boolean }) {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -159,8 +168,10 @@ export default function Checklist({ dark }: { dark: boolean }) {
 
   useEffect(() => { setShowCompleted(false) }, [activeModule])
 
+  // Cache key of the signed-in user's tasks for the selected module.
   const cacheKey = () => `user:${user?.id}:checklist:${activeModule}`
 
+  // Loads the module's tasks (saved copy first, then fresh) or the guest's tasks from this device.
   async function fetchTasks(isIgnored: () => boolean = () => false, silent = false) {
     setTasksError(false)
     if (!silent) setTasksLoading(true)
@@ -197,6 +208,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
     setTasksLoading(false)
   }
 
+  // Queues a change for the signed-in user and reports rejected changes.
   async function sendOp(op: any) {
     const result = await queueChecklistOp(user!.id, op)
     setPendingCount(result.pending)
@@ -207,6 +219,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
     return result
   }
 
+  // Adds a new task from the form and saves it on the account or on this device.
   async function addTask() {
     if (!newTask.trim() || addingTask) return
     const task: ChecklistTask = {
@@ -234,6 +247,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
     showToast('✅ Task added')
   }
 
+  // Checks or unchecks a task and saves the change.
   async function toggleTask(task: ChecklistTask) {
     const updated = tasks.map(t => t.id === task.id ? { ...t, done: !t.done } : t)
     setTasks(updated)
@@ -245,6 +259,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
     }
   }
 
+  // Removes a task and saves the change.
   async function deleteTask(task: ChecklistTask) {
     const updated = tasks.filter(t => t.id !== task.id)
     setTasks(updated)
@@ -256,6 +271,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
     }
   }
 
+  // Shows at most one local notification per module per day for overdue or soon-due tasks.
   useEffect(() => {
     if (!('Notification' in window) || Notification.permission !== 'granted') return
     if (tasks.length === 0) return
@@ -284,6 +300,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
 
   const inStyle = { ...glassInput(pt, dark), padding: '13px 20px', marginBottom: 0 }
 
+  // Renders one task row with its checkbox, deadline label and delete button.
   function renderTaskRow(task: ChecklistTask, delay: number) {
     const overdue = isOverdue(task.deadline) && !task.done
     const dueSoon = isDueSoon(task.deadline) && !task.done && !overdue
@@ -386,6 +403,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
         </div>
       )}
 
+      {/* Module tabs stay on a single line and scroll sideways when they do not fit (no wrapping). */}
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: SECTION_GAP }}>
         <TabRow
           items={selectableModules.map((m: any) => ({
@@ -395,13 +413,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
           onSelect={setActiveModule}
           dark={dark}
           scrollOnMobile
-          style={{
-            justifyContent: 'center',
-            flexWrap: 'wrap',
-            overflowX: 'visible',
-            marginBottom: 0,
-            rowGap: 10,
-          }}
+          style={{ justifyContent: 'center', marginBottom: 0 }}
         />
       </div>
 

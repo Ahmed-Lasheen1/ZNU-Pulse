@@ -83,7 +83,8 @@ function toolBtn(color: string) {
 
 // Study plan card: collapsible checklist grouped by subject, or a plain image row when the plan has no items.
 // The list expands with a height transition (grid-template-rows), like the Study by Lesson accordion.
-// Each item is a glass row like a lesson row there: checkbox and text on the left, tool buttons on the right.
+// Each item is a glass row like a lesson row there: checkbox, name and date on the left, tool buttons on the right,
+// and the note on its own full-width line underneath.
 // Items open their lesson's summary, flashcards and practice, and tick themselves once the lesson is studied.
 export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOpen, onViewImage }: StudyPlanCardProps) {
   const pt = getPulseTheme(dark)
@@ -141,7 +142,7 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
     setPickerItemId(prev => (prev === item.id ? null : item.id))
   }
 
-  // Renders one plan item as a glass row: checkbox, text, date and note on the left, tool buttons on the right.
+  // Renders one plan item as a glass row: checkbox, name and date on the left, tool buttons on the right, note below.
   function renderItem(item: PlanItem) {
     const isDone = isItemDone(item.id)
     const tools = itemTools(item)
@@ -153,7 +154,7 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
     return (
       <div key={item.id}>
         <PulseGlassRow dark={dark} radius={12}>
-          <div className="plan-item-row">
+          <div className="plan-item-row" style={item.note ? { paddingBottom: 4 } : undefined}>
             <button
               type="button" role="checkbox" aria-checked={isDone}
               className="plan-item-main glass-focus-ring"
@@ -173,11 +174,6 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
                 {item.date && (
                   <span style={{ ...pulseType.small, display: 'block', color: dateColor, fontWeight: 700, marginTop: 1 }}>
                     {formatDayHeading(item.date)}
-                  </span>
-                )}
-                {item.note && (
-                  <span dir="auto" style={{ ...pulseType.small, display: 'block', color: pt.textMuted, marginTop: 2, ...wrapText }}>
-                    {item.note}
                   </span>
                 )}
               </span>
@@ -200,6 +196,12 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
               </div>
             )}
           </div>
+
+          {item.note && (
+            <div dir="auto" className="plan-item-note" style={{ ...pulseType.small, color: pt.textMuted, ...wrapText }}>
+              {item.note}
+            </div>
+          )}
         </PulseGlassRow>
 
         {pickerItemId === item.id && summaries.length > 1 && (
@@ -228,6 +230,7 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
           cursor: pointer; text-align: start; font-family: inherit; color: inherit;
         }
         .plan-item-actions { display: flex; flex-wrap: wrap; gap: 6px; flex-shrink: 0; }
+        .plan-item-note { padding: 0 14px 10px; padding-inline-start: 42px; }
         @media (max-width: 480px) {
           .plan-item-main { min-width: 100%; }
           .plan-item-actions { min-width: 100%; padding-inline-start: 28px; }

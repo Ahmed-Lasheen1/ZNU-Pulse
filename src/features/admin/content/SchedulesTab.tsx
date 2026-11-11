@@ -13,7 +13,7 @@ import { useConfirmDelete } from '@/features/admin/common/useConfirmDelete'
 import { useAdminList } from '@/features/admin/common/useAdminList'
 import { PICK_MODULE_MESSAGE, REQUIRED_FIELDS_MESSAGE } from '@/features/admin/common/useAdminContext'
 import { plural } from '@/shared/utils/format'
-import { PlusIcon, TrashIcon, ConstructionIcon, CalendarDotIcon } from '@/shared/icons/tool-icons'
+import { PlusIcon, TrashIcon, ConstructionIcon, CalendarDotIcon, XCircleIcon } from '@/shared/icons/tool-icons'
 import { ExamIcon } from '@/shared/icons/medicalIcons'
 import { PLAN_TOOL_ORDER, PLAN_TOOL_META, planToolColor, itemTools, itemLessonId } from '@/features/tools/schedule/planItems'
 import type { AdminModule, AdminSubject, AdminLesson, AdminContext } from '@/features/admin/common/adminTypes'
@@ -276,13 +276,27 @@ export default function SchedulesTab({ dark, modules, subjects, lessons, context
             return (
               <div key={p.id} style={{ border: `1px solid ${pt.border}`, borderRadius: 14, padding: 12, marginBottom: 10 }}>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-                  <input
-                    type="date"
-                    value={p.date}
-                    onChange={e => updatePlan(p.id, { date: e.target.value })}
-                    aria-label="Plan item date"
-                    style={{ ...inStyle, marginBottom: 0, flex: '0 0 150px', minWidth: 0 }}
-                  />
+                  {/* Date field with a clear button that shows once a date is set. */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '0 0 auto' }}>
+                    <input
+                      type="date"
+                      value={p.date}
+                      onChange={e => updatePlan(p.id, { date: e.target.value })}
+                      aria-label="Plan item date"
+                      style={{ ...inStyle, marginBottom: 0, width: 150, flex: '0 0 150px', minWidth: 0 }}
+                    />
+                    {p.date && (
+                      <button
+                        type="button"
+                        onClick={() => updatePlan(p.id, { date: '' })}
+                        aria-label="Clear this plan item's date"
+                        title="Clear date"
+                        style={miniBtn(pt.sub)}
+                      >
+                        <XCircleIcon color={pt.sub} size={12} />
+                      </button>
+                    )}
+                  </div>
                   <input
                     dir="auto"
                     placeholder={chosenLesson?.title || 'e.g. Review lecture 3'}
