@@ -6,7 +6,7 @@ import { MenuToggleIcon } from '@/shared/ui/controls/menu-toggle-icon'
 import ThemeSwitch from '@/shared/ui/controls/theme-switch'
 import { HomeIcon, ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, BookIcon, SignOutIcon, UserIcon, StarIcon } from '@/shared/icons/tool-icons'
 import { getPulseTheme, pulseFonts } from '@/shared/theme/premiumTheme'
-import { liquidGlassShadow, glassHoverTint } from '@/shared/theme/liquidGlass'
+import { liquidGlassShadow, liquidGlassBackdrop, liquidGlassTint, glassHoverTint } from '@/shared/theme/liquidGlass'
 import ConfirmDialog from '@/shared/ui/feedback/ConfirmDialog'
 import type { PulseTheme } from '@/shared/theme/types'
 
@@ -64,7 +64,7 @@ const CLOSE_MS = 240
 const CLOSE_STAGGER_MS = 20
 const CLOSE_EASE = 'cubic-bezier(0.4, 0, 0.6, 1)'
 
-// A pill (after the first) fades in only once it has slid out from behind the pill above it, so stacked glows never add up.
+// A pill (after the first) fades in only once it has slid out from behind the pill above it.
 const FADE_DELAY_MS = 70
 const FADE_MS = 140
 
@@ -75,18 +75,19 @@ const SMOOTH_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'
 const SPRING_EASE =
   'linear(0, 0.039, 0.136, 0.263, 0.402, 0.538, 0.663, 0.77, 0.859, 0.928, 0.979, 1.015, 1.037, 1.05, 1.054, 1.053, 1.049, 1.042, 1.035, 1.027, 1.02, 1.014, 1.009, 1.005, 1.002, 1, 0.998, 0.997, 0.997, 0.997, 0.997, 0.998, 0.998, 0.998, 0.999, 0.999, 0.999, 1, 1, 1, 1)'
 
-// Pills are opaque (no blur) so the pills stacked behind never show through; the colors match the old translucent look over the page gradient.
-function pillTint(dark: boolean) {
-  return dark ? 'rgb(46, 59, 81)' : 'rgb(237, 242, 245)'
+// Tint of the Sign In pill: replaces the neutral glass tint, like PulseGlassRow's activeTint.
+function signInTint(pt: PulseTheme) {
+  return `linear-gradient(135deg, ${pt.cobalt}cc, ${pt.indigo}cc)`
 }
 
 // Base look shared by every glass pill: same width, same height, content aligned to the left.
+// The glass itself (blur, shadow, tint) comes from the .nav-glass class below.
 function pillStyle(pt: PulseTheme): CSSProperties {
   return {
     display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 10,
     width: PILL_W, height: PILL_H, padding: '0 18px', margin: 0,
     border: 'none', borderRadius: 999, boxSizing: 'border-box',
-    backgroundColor: 'var(--nav-pill-bg)', boxShadow: 'var(--nav-pill-shadow)',
+    backgroundColor: 'transparent',
     color: pt.text, fontFamily: 'inherit', fontSize: 14, fontWeight: 600,
     whiteSpace: 'nowrap', textAlign: 'left',
   }
@@ -237,7 +238,7 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
   const pills: ReactNode[] = [
     user ? (
       <button
-        type="button" className="nav-pill nav-pill-btn glass-focus-ring" tabIndex={tabIndex}
+        type="button" className="nav-pill nav-glass nav-pill-btn glass-focus-ring" tabIndex={tabIndex}
         onClick={() => goTo('/profile')}
         style={{ ...pillStyle(pt), flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 2, cursor: 'pointer', lineHeight: 1.15 }}
       >
@@ -254,17 +255,17 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
       </button>
     ) : (
       <button
-        type="button" className="nav-pill glass-focus-ring" tabIndex={tabIndex}
+        type="button" className="nav-pill nav-glass nav-pill-btn glass-focus-ring" tabIndex={tabIndex}
         onClick={() => goTo('/auth')}
         style={{
           ...pillStyle(pt), cursor: 'pointer',
-          backgroundImage: `linear-gradient(135deg, ${pt.cobalt}cc, ${pt.indigo}cc)`,
+          ['--nav-pill-tint' as string]: signInTint(pt),
           color: '#fff', fontWeight: 800,
-        }}
+        } as CSSProperties}
       >Sign In →</button>
     ),
 
-    <div className="nav-pill" style={{ ...pillStyle(pt), padding: 0 }}>
+    <div className="nav-pill nav-glass" style={{ ...pillStyle(pt), padding: 0 }}>
       <NavSearch pt={pt} tabIndex={tabIndex} onSubmit={submitSearch} />
     </div>,
 
@@ -273,7 +274,7 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
       const iconColor = pt[item.accent] || pt.text
       return (
         <button
-          key={item.href} type="button" className="nav-pill nav-pill-btn glass-focus-ring" tabIndex={tabIndex}
+          key={item.href} type="button" className="nav-pill nav-glass nav-pill-btn glass-focus-ring" tabIndex={tabIndex}
           onClick={() => goTo(item.href)}
           style={{ ...pillStyle(pt), cursor: 'pointer', fontWeight: item.href === '/' ? 800 : 600 }}
         >
@@ -293,7 +294,7 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
 
     ...(user ? [(
       <button
-        key="sign-out" type="button" className="nav-pill nav-pill-btn glass-focus-ring" tabIndex={tabIndex}
+        key="sign-out" type="button" className="nav-pill nav-glass nav-pill-btn glass-focus-ring" tabIndex={tabIndex}
         onClick={() => setShowSignOutConfirm(true)}
         style={{ ...pillStyle(pt), justifyContent: 'center', cursor: 'pointer', color: pt.danger, fontWeight: 700 }}
       >
@@ -303,8 +304,7 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
     )] : []),
   ]
 
-  // Outer wrapper that clips the pills at the line under the toggle button with a plain rectangular overflow clip.
-  // It ignores pointer events so its bleed area never blocks the page.
+  // Clips the pills at the line under the toggle button; ignores pointer events so its bleed area never blocks the page.
   const clipStyle: CSSProperties = {
     position: 'absolute',
     top: BUTTON_SIZE,
@@ -330,7 +330,9 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
     ['--start' as string]: `${PILL_START}px`,
     ['--step' as string]: `${PILL_STEP}px`,
     ['--nav-align' as string]: cornerSide === 'right' ? 'flex-end' : 'flex-start',
-    ['--nav-pill-bg' as string]: pillTint(dark),
+    // Same glass recipe as LiquidGlassCard / PulseGlassRow (see theme/liquidGlass.js).
+    ['--nav-pill-backdrop' as string]: liquidGlassBackdrop().backdropFilter || 'none',
+    ['--nav-pill-tint' as string]: liquidGlassTint(dark),
     ['--nav-pill-shadow' as string]: liquidGlassShadow(dark),
     ['--nav-pill-hover' as string]: glassHoverTint(dark),
     ['--nav-placeholder' as string]: pt.faint,
@@ -345,8 +347,7 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
       style={{ position: 'relative', width: BUTTON_SIZE, height: BUTTON_SIZE }}
     >
       <style>{`
-        /* The clip wrapper's top edge sits right under the toggle button: the pills slide out from it and back behind it.
-           A plain overflow clip replaces clip-path, which forced a mask over every moving pill on each frame.
+        /* The clip wrapper's top edge sits under the toggle button: pills slide out from it and back behind it.
            The bottom bleed leaves room for the spring overshoot of the last pills. */
         .nav-panel {
           --open-ease: ${SMOOTH_EASE};
@@ -371,9 +372,8 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
         }
 
         /* Every pill lives in a node nested inside the previous pill's node, so it travels with the pill above it.
-           Closed, the first node sits above the clip line and every other node is pulled up exactly one step, which puts its pill
-           directly behind the pill above it. Only transform changes, on translate3d layers, so nothing is re-rasterized and each
-           layer stays the same from start to finish. */
+           Closed, each child node is pulled up one step, which puts its pill directly behind the pill above it.
+           Only transform changes, on translate3d layers. */
         .nav-node {
           --open-delay: calc(var(--i) * ${OPEN_STAGGER_MS}ms);
           --close-delay: calc((var(--count) - 1 - var(--i)) * ${CLOSE_STAGGER_MS}ms);
@@ -400,8 +400,7 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
           transition: transform ${OPEN_MS}ms var(--open-ease) var(--open-delay);
         }
 
-        /* Closed pills are invisible; the panel is also inert, aria-hidden and ignores pointer events.
-           The switch happens in one step, after the pill has folded away, so no pill fades while moving. */
+        /* Closed pills are invisible (the panel is also inert and aria-hidden); the switch happens after the pill has folded away. */
         .nav-pill {
           opacity: 0;
           transition: opacity 0s linear calc(${CLOSE_MS}ms + var(--close-delay));
@@ -411,18 +410,37 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
           transition: opacity 0s linear var(--open-delay);
         }
 
-        /* Pills after the first fade in once they have separated from the pill above, so stacked glows never add up. */
+        /* Pills after the first fade in once they have separated from the pill above. */
         .nav-panel[data-open="true"] .nav-node-child > .nav-pill {
           transition: opacity ${FADE_MS}ms linear calc(var(--open-delay) + ${FADE_DELAY_MS}ms);
         }
 
+        /* Glass pill, same three layers as PulseGlassRow: blur on the pill, then shadow, then tint, all under the content.
+           overflow hidden clips the outer glow exactly like the cards do. */
+        .nav-glass {
+          position: relative;
+          isolation: isolate;
+          overflow: hidden;
+          -webkit-backdrop-filter: var(--nav-pill-backdrop);
+          backdrop-filter: var(--nav-pill-backdrop);
+        }
+        .nav-glass::before,
+        .nav-glass::after {
+          content: '';
+          position: absolute; inset: 0; z-index: -1;
+          border-radius: inherit;
+          pointer-events: none;
+        }
+        .nav-glass::before { box-shadow: var(--nav-pill-shadow); }
+        .nav-glass::after { background: var(--nav-pill-tint); }
+
         @media (hover: hover) {
-          button.nav-pill-btn:hover {
-            background-image: linear-gradient(var(--nav-pill-hover), var(--nav-pill-hover));
+          button.nav-pill-btn:hover::after {
+            background: linear-gradient(var(--nav-pill-hover), var(--nav-pill-hover)), var(--nav-pill-tint);
           }
         }
-        button.nav-pill-btn:active {
-          background-image: linear-gradient(var(--nav-pill-hover), var(--nav-pill-hover));
+        button.nav-pill-btn:active::after {
+          background: linear-gradient(var(--nav-pill-hover), var(--nav-pill-hover)), var(--nav-pill-tint);
         }
 
         .nav-search-input {
