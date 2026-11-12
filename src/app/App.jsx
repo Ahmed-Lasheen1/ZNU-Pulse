@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { BrowserRouter as Router } from 'react-router-dom'
 import { supabase } from '@/core/supabase'
 import { getPulseTheme } from '@/shared/theme/premiumTheme'
+import { applyTheme } from '@/shared/theme/applyTheme'
 import { fetchModulesSorted } from '@/services/content/modules'
 import { subscribeOnlinePresence } from '@/services/presence/onlinePresence'
 import { migrateGuestDataIfNeeded } from '@/services/history/migrateGuestData'
@@ -22,11 +23,14 @@ import { SiteHeader, SiteFooter, ScrollToTop } from '@/app/AppShell'
 import { ensureProfile, readStoredUser } from '@/app/session'
 import { AuthContextProvider, ModulesContextProvider } from '@/app/ContextProviders'
 
+// Root component: color mode, auth session, modules list and the app shell.
 export default function App() {
   const [dark, setDark] = useState(() => storageGet('znu_theme') !== 'light')
 
-  useEffect(() => {
+  // Saves the color mode and applies it to the document before paint (index.html does the same on first load).
+  useLayoutEffect(() => {
     storageSet('znu_theme', dark ? 'dark' : 'light')
+    applyTheme(dark)
   }, [dark])
 
   const [user, setUser] = useState(null)
@@ -38,6 +42,7 @@ export default function App() {
 
   const lastHandledUserIdRef = useRef(null)
 
+  // Loads the modules list (optionally bypassing the cache) and keeps it fresh in the background.
   async function loadModules(force = false) {
     const result = await fetchModulesSorted({ force, onRevalidated: setModules })
     setModules(result.modules)
@@ -46,8 +51,10 @@ export default function App() {
     return result
   }
 
+  // Forces a fresh load of the modules list after an admin change.
   const refreshModules = useCallback(() => loadModules(true), [])
 
+  // Loads modules on mount and revalidates when the tab becomes visible or the connection returns.
   useEffect(() => {
     loadModules()
     const revalidate = () => { if (document.visibilityState === 'visible') loadModules() }
@@ -59,11 +66,13 @@ export default function App() {
     }
   }, [])
 
+  // Preloads every lazy page once the browser is idle.
   useEffect(() => {
     if (window.requestIdleCallback) window.requestIdleCallback(prefetchPages)
     else setTimeout(prefetchPages, 3000)
   }, [])
 
+  // Keeps cached content in step with server content versions.
   useEffect(() => {
     const sync = force => syncContentVersions({ force }).then(refChanged => { if (refChanged) loadModules(true) })
     const onVisible = () => { if (document.visibilityState === 'visible') sync(false) }
@@ -78,11 +87,13 @@ export default function App() {
     }
   }, [])
 
+  // Joins the online-presence channel while the app is open.
   useEffect(() => {
     const unsubscribe = subscribeOnlinePresence()
     return unsubscribe
   }, [])
 
+  // Loads the signed-in user's profile (network first, saved copy offline).
   const fetchProfile = useCallback(async (userId) => {
     const { data } = await networkFirst(
       `user:${userId}:profile`,
@@ -91,12 +102,14 @@ export default function App() {
     if (data) setProfile(data)
   }, [])
 
+  // Removes a leftover auth hash from the address bar.
   function cleanUpAuthHash() {
     if (window.location.hash && window.location.hash !== '#/') {
       window.history.replaceState(null, '', window.location.pathname + window.location.search)
     }
   }
 
+  // Creates the profile if needed, loads it and migrates guest data, once per signed-in user.
   async function handleSignedIn(sessionUser) {
     if (lastHandledUserIdRef.current === sessionUser.id) return
     if (!navigator.onLine) {
@@ -109,6 +122,7 @@ export default function App() {
     migrateGuestDataIfNeeded(sessionUser.id)
   }
 
+  // Restores the session on load and reacts to sign-in and sign-out events.
   useEffect(() => {
     async function initSession() {
       const { data: { session } } = await supabase.auth.getSession()
@@ -136,6 +150,7 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Saves pending work, signs out and clears the signed-in user's caches.
   const signOut = useCallback(async () => {
     await flushActiveExam().catch(() => {})
     await unsubscribeFromPush()
@@ -149,6 +164,7 @@ export default function App() {
     clearUserCaches()
   }, [user])
 
+  // Switches between dark and light mode.
   const toggleTheme = () => setDark(prev => !prev)
 
   return (
@@ -165,7 +181,7 @@ export default function App() {
           flexDirection: 'column',
           fontFamily: "'Segoe UI', sans-serif"
         }}>
-          <PulseBackground />
+          <PulseBackground dark={dark} />
 
           <ScrollToTop />
           <SiteHeader dark={dark} toggleTheme={toggleTheme} />

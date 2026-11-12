@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
 import { getPulseTheme, pulseType } from '@/shared/theme/premiumTheme'
+import { adaptColor } from '@/shared/theme/adaptColor'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
@@ -88,6 +89,8 @@ function toolBtn(color: string) {
 // Items open their lesson's summary, flashcards and practice, and tick themselves once the lesson is studied.
 export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOpen, onViewImage }: StudyPlanCardProps) {
   const pt = getPulseTheme(dark)
+  // The accent as text/icon color, adjusted to stay readable in the current mode (fills keep the original).
+  const accentText = adaptColor(accent, dark)
   const navigate = useNavigate()
   const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
   const items = schedule.items || []
@@ -148,7 +151,7 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
     const tools = itemTools(item)
     const lessonId = itemLessonId(item)
     const diff = item.date ? daysFromToday(item.date) : null
-    const dateColor = diff === 0 ? accent : diff !== null && diff < 0 && !isDone ? pt.amber : pt.textMuted
+    const dateColor = diff === 0 ? accentText : diff !== null && diff < 0 && !isDone ? pt.amber : pt.textMuted
     const summaries = lessonId ? lookups.summariesByLesson[lessonId] || [] : []
 
     return (
@@ -183,7 +186,7 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
               <div className="plan-item-actions">
                 {tools.map(kind => {
                   const meta = PLAN_TOOL_META[kind]
-                  const color = planToolColor(kind, pt)
+                  const color = adaptColor(planToolColor(kind, pt), dark)
                   return (
                     <button
                       key={kind} type="button" onClick={() => openTool(item, kind)}
@@ -253,7 +256,7 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
           background: `${accent}22`, border: `1px solid ${accent}55`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <ScheduleIcon color={accent} size={19} />
+          <ScheduleIcon color={accentText} size={19} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div dir="auto" style={{ ...pulseType.cardTitle, color: pt.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -297,34 +300,38 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
               style={{ padding: '0 12px 16px' }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {groups.map(group => (
-                  <div key={group.key}>
-                    {showHeaders && (
-                      <div style={{
-                        ...pulseType.sectionLabel, fontSize: 11, margin: '0 4px 8px',
-                        color: group.color || pt.textMuted, display: 'flex', alignItems: 'center', gap: 6,
-                      }}>
-                        {group.icon && <ModuleIcon value={group.icon} size={14} color={group.color || pt.textMuted} />}
-                        <span style={{ minWidth: 0, ...wrapText }}>{group.name}</span>
-                        <span style={{ color: pt.textMuted, fontWeight: 600, letterSpacing: 0, textTransform: 'none' }}>
-                          · {group.items.filter(item => isItemDone(item.id)).length}/{group.items.length}
-                        </span>
+                {groups.map(group => {
+                  // Subject color as text/icon color, adjusted for the current mode.
+                  const groupColor = group.color ? adaptColor(group.color, dark) : pt.textMuted
+                  return (
+                    <div key={group.key}>
+                      {showHeaders && (
+                        <div style={{
+                          ...pulseType.sectionLabel, fontSize: 11, margin: '0 4px 8px',
+                          color: groupColor, display: 'flex', alignItems: 'center', gap: 6,
+                        }}>
+                          {group.icon && <ModuleIcon value={group.icon} size={14} color={groupColor} />}
+                          <span style={{ minWidth: 0, ...wrapText }}>{group.name}</span>
+                          <span style={{ color: pt.textMuted, fontWeight: 600, letterSpacing: 0, textTransform: 'none' }}>
+                            · {group.items.filter(item => isItemDone(item.id)).length}/{group.items.length}
+                          </span>
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {group.items.map(renderItem)}
                       </div>
-                    )}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {group.items.map(renderItem)}
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
 
               {schedule.url && (
                 <button type="button" onClick={onViewImage} style={{
-                  marginTop: 16, background: 'transparent', border: `1px solid ${accent}66`, color: accent,
+                  marginTop: 16, background: 'transparent', border: `1px solid ${accentText}66`, color: accentText,
                   borderRadius: 999, padding: '7px 14px', fontWeight: 700, fontSize: 12, cursor: 'pointer',
                   fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6,
                 }}>
-                  <SearchIcon2 color={accent} size={12} /> View schedule image
+                  <SearchIcon2 color={accentText} size={12} /> View schedule image
                 </button>
               )}
             </div>

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/core/supabase'
-import { getPulseTheme, pulseFonts, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseFonts, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import PulseBrand from '@/shared/ui/display/PulseBrand'
 import { GlassField, PrimaryButton, GhostButton, AuthMessage, inputResetStyle } from '@/features/account/AuthPrimitives'
 
+// Reset-password page opened from the emailed link.
 export default function ResetPassword({ dark = true }: { dark?: boolean }) {
   const navigate = useNavigate()
   const pt = getPulseTheme(dark)
@@ -14,6 +15,7 @@ export default function ResetPassword({ dark = true }: { dark?: boolean }) {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
+  // Checks that the reset link produced a valid session.
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setReady(!!session)
@@ -21,6 +23,7 @@ export default function ResetPassword({ dark = true }: { dark?: boolean }) {
     })
   }, [])
 
+  // Saves the new password.
   async function handleSubmit() {
     if (!password || password.length < 8) return setMessage('❌ Password must be at least 8 characters')
     if (password !== confirm) return setMessage('❌ Passwords do not match')
@@ -42,7 +45,7 @@ export default function ResetPassword({ dark = true }: { dark?: boolean }) {
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
             <PulseBrand dark={dark} logoSize={56} fontSize={26} />
           </div>
-          <p style={{ textAlign: 'center', fontSize: 12, color: ON_GRADIENT_TOP.secondary, marginBottom: 20, fontFamily: pulseFonts.body }}>
+          <p style={{ textAlign: 'center', fontSize: 12, color: ON_BACKGROUND.secondary, marginBottom: 20, fontFamily: pulseFonts.body }}>
             Set a new password
           </p>
 

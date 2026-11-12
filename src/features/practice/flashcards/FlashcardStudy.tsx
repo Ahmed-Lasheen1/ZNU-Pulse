@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAnimate, motion } from 'framer-motion'
-import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseFonts, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
+import { adaptColor } from '@/shared/theme/adaptColor'
 import StudyShell from '@/shared/ui/study/StudyShell'
 import StudyHeader from '@/shared/ui/study/StudyHeader'
 import StudyCard, { STUDY_CARD_HEIGHT } from '@/shared/ui/study/StudyCard'
@@ -43,6 +44,7 @@ const VERDICT = {
   good: { bg: '#e5f7ec', fg: '#17773b', label: 'Got it' },
 } as const
 
+// Counter colors inside the action bar, which is dark in both color modes.
 const MISSED_COLOR = '#f87171'
 const KNOWN_COLOR = '#4ade80'
 
@@ -87,6 +89,8 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
   const current = queue[0] ?? null
   const finished = queue.length === 0
   const answered = right + wrong
+  // The accent as an icon color on the end-screen card, adjusted to stay readable in the current mode.
+  const accentText = adaptColor(accent, dark)
 
   // Applies an answer: rates the card (first round only) and moves to the next one.
   function commit(card: StudyCardItem, result: Answer) {
@@ -216,7 +220,7 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
             accent={accent}
           />
           <div style={{
-            ...pulseType.small, color: ON_GRADIENT_TOP.muted, margin: '-10px 2px 14px 0',
+            ...pulseType.small, color: ON_BACKGROUND.muted, margin: '-10px 2px 14px 0',
             display: 'flex', justifyContent: 'flex-end', gap: 12,
           }}>
             <span>{queue.length} left</span>
@@ -312,7 +316,7 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
       {finished && (
         <StudyCard dark={dark} style={{ alignItems: 'center', textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <CheckCircleIcon color={accent} size={40} />
+            <CheckCircleIcon color={accentText} size={40} />
           </div>
           <div style={{ ...pulseType.sectionLabel, color: pt.textMuted, marginTop: 14 }}>
             {round === 0 ? 'First-try accuracy' : 'Review accuracy'}

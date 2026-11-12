@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { X } from 'lucide-react'
-import { getPulseTheme, pulseFonts, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseFonts, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import { glassHoverTint } from '@/shared/theme/liquidGlass'
 
@@ -62,13 +62,13 @@ export default function StudyHeader({ dark, eyebrow, status, timer, fontScale = 
       <div style={{ textAlign: 'center' }}>
         <div style={{
           fontSize: 10, fontWeight: 700, letterSpacing: 2, lineHeight: 1.4,
-          maxWidth: 'min(56vw, 360px)', margin: '0 auto', color: ON_GRADIENT_TOP.muted
+          maxWidth: 'min(56vw, 360px)', margin: '0 auto', color: ON_BACKGROUND.muted
         }}>{eyebrow}</div>
         {status && (
-          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1, color: ON_GRADIENT_TOP.primary, marginTop: 8 }}>{status}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 1, color: ON_BACKGROUND.primary, marginTop: 8 }}>{status}</div>
         )}
         {timer && (
-          <div style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 24, marginTop: 8, color: ON_GRADIENT_TOP.primary }}>{timer}</div>
+          <div style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 24, marginTop: 8, color: ON_BACKGROUND.primary }}>{timer}</div>
         )}
       </div>
 

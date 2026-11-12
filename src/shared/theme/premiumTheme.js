@@ -1,5 +1,4 @@
-// ZNU Pulse — additive design tokens for the Home page redesign
-// (and shared glass pages like Checklist).
+// ZNU Pulse design tokens: fonts, type scale, page-text colors and the per-mode theme palette.
 import { FONT_FAMILY, type as pulseType } from '@/shared/theme/typography'
 
 export const pulseFonts = {
@@ -16,20 +15,18 @@ export const pulseWeights = {
   bold: 700,
 }
 
-// Text rendered directly on PULSE_BG (no glass surface underneath).
-export const ON_GRADIENT_TOP = {
-  primary: '#062B50',
-  secondary: '#062B50',
-  muted: 'rgba(6,43,80,0.62)',
+// Text drawn directly on the flat page background (no glass surface underneath). The values are CSS variables
+// defined per color mode in src/styles/index.css, so they switch with data-theme without a re-render.
+// Use them only where a whole color is expected, never with a hex alpha suffix appended.
+export const ON_BACKGROUND = {
+  primary: 'var(--on-bg-primary)',
+  secondary: 'var(--on-bg-secondary)',
+  muted: 'var(--on-bg-muted)',
+  divider: 'var(--on-bg-divider)',
 }
 
-export const ON_GRADIENT_BOTTOM = {
-  primary: '#FFFFFF',
-  secondary: 'rgba(255,255,255,0.80)',
-  muted: 'rgba(255,255,255,0.62)',
-}
-
-// Full theme token set, keyed by dark/light.
+// Full theme token set, keyed by dark/light. The light values are tuned for the #93C5FD page and its glass cards
+// (accents at least ~4.5:1 on the glass, text well above that).
 export function getPulseTheme(dark) {
   return dark
     ? {
@@ -72,33 +69,33 @@ export function getPulseTheme(dark) {
         surface: 'linear-gradient(160deg, #FFFFFF, #F7F9FC)',
         surfaceFlat: '#F7F9FC',
         surfaceRaised: '#FFFFFF',
-        border: '#C7D3E3',
-        borderStrong: '#AFC0D6',
+        border: 'rgba(6,43,80,0.32)',
+        borderStrong: 'rgba(6,43,80,0.5)',
 
         text: '#10243A',
         sub: '#29445C',
-        faint: '#405A70',
+        faint: '#375069',
         textPrimary: '#10243A',
         textSecondary: '#29445C',
-        textMuted: '#405A70',
+        textMuted: '#375069',
 
-        cobalt: '#0284C7',
-        cobaltSoft: 'rgba(2,132,199,0.10)',
-        cobaltBorder: 'rgba(2,132,199,0.35)',
-        textAccent: '#0284C7',
-        indigo: '#6C5CE3',
-        indigoSoft: 'rgba(108,92,227,0.10)',
-        terracotta: '#EA580C',
-        terracottaSoft: 'rgba(234,88,12,0.12)',
-        amber: '#EA580C',
-        warning: '#EA580C',
-        danger: '#D6543F',
-        error: '#D6543F',
-        success: '#16A34A',
+        cobalt: '#075985',
+        cobaltSoft: 'rgba(7,89,133,0.12)',
+        cobaltBorder: 'rgba(7,89,133,0.4)',
+        textAccent: '#075985',
+        indigo: '#4338CA',
+        indigoSoft: 'rgba(67,56,202,0.12)',
+        terracotta: '#9A3412',
+        terracottaSoft: 'rgba(154,52,18,0.12)',
+        amber: '#9A3412',
+        warning: '#9A3412',
+        danger: '#991B1B',
+        error: '#991B1B',
+        success: '#166534',
 
         ecgBase: '#C7D3E3',
         ecgLine: '#1E3F91',
-        ecgGlow: '#0284C7',
+        ecgGlow: '#075985',
       }
 }
 

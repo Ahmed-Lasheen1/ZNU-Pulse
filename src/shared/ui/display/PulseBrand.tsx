@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseFonts, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 
 const LOGO_SRC = '/icon-192.png'
 
@@ -32,6 +32,8 @@ const brandWordItem = {
 function goHome() {
   window.location.href = '/'
 }
+
+// Activates the brand link from the keyboard (Enter or Space).
 function handleBrandKeyDown(e: React.KeyboardEvent) {
   if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault()
@@ -39,8 +41,9 @@ function handleBrandKeyDown(e: React.KeyboardEvent) {
   }
 }
 
+// Site brand (logo, "ZNU PULSE" and tagline); animated when `animation` is given. Colors follow the current color mode.
 export default function PulseBrand({ dark, logoSize = 44, fontSize = 20, animation, instant = false }: PulseBrandProps) {
-  const pt = getPulseTheme(false)
+  const pt = getPulseTheme(dark)
 
   if (!animation) {
     return (
@@ -63,14 +66,14 @@ export default function PulseBrand({ dark, logoSize = 44, fontSize = 20, animati
           <div style={{
             ...pulseType.sectionTitle,
             fontFamily: pulseFonts.display, fontWeight: 800, fontSize, letterSpacing: 1.2,
-            color: ON_GRADIENT_TOP.primary, lineHeight: 1
+            color: ON_BACKGROUND.primary, lineHeight: 1
           }}>
             ZNU <span style={{ color: pt.cobalt }}>PULSE</span>
           </div>
           <div style={{
             ...pulseType.sectionLabel,
             fontSize: 9, letterSpacing: 2.5,
-            color: ON_GRADIENT_TOP.muted, marginTop: 5,
+            color: ON_BACKGROUND.muted, marginTop: 5,
           }}>For Future Doctors</div>
         </div>
       </div>
@@ -113,7 +116,7 @@ export default function PulseBrand({ dark, logoSize = 44, fontSize = 20, animati
           style={{
             ...pulseType.sectionTitle,
             fontFamily: pulseFonts.display, fontWeight: 800, fontSize, letterSpacing: 1.2,
-            color: ON_GRADIENT_TOP.primary, lineHeight: 1
+            color: ON_BACKGROUND.primary, lineHeight: 1
           }}
         >
           <motion.span variants={brandWordItem} style={{ display: 'inline-block' }}>ZNU</motion.span>
@@ -127,7 +130,7 @@ export default function PulseBrand({ dark, logoSize = 44, fontSize = 20, animati
           style={{
             ...pulseType.sectionLabel,
             fontSize: 9, letterSpacing: 2.5,
-            color: ON_GRADIENT_TOP.muted, marginTop: 5,
+            color: ON_BACKGROUND.muted, marginTop: 5,
           }}
         >For Future Doctors</motion.div>
       </div>

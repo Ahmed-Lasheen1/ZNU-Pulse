@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { LogIn } from 'lucide-react'
-import { getPulseTheme, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import { useAuth } from '@/core/contexts'
 import { useLimitedAppearance } from '@/shared/hooks/useLimitedAppearance'
 
@@ -13,6 +13,7 @@ import { useLimitedAppearance } from '@/shared/hooks/useLimitedAppearance'
 // bitten in the first few visits.
 const MAX_PROMPT_SHOWS = 3
 
+// Pill that invites guests to sign in (shown only a few times).
 export default function GuestSignInButton({ dark }) {
   const pt = getPulseTheme(dark)
   const navigate = useNavigate()
@@ -31,10 +32,10 @@ export default function GuestSignInButton({ dark }) {
   return (
     <button onClick={() => navigate('/auth')} style={{
       background: 'transparent', border: `1px solid ${pt.border}`, borderRadius: 20,
-      padding: '6px 16px', color: ON_GRADIENT_TOP.secondary, cursor: 'pointer', fontFamily: 'inherit',
+      padding: '6px 16px', color: ON_BACKGROUND.secondary, cursor: 'pointer', fontFamily: 'inherit',
       fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, margin: '0 auto 16px',
     }}>
-      <LogIn size={13} color={ON_GRADIENT_TOP.secondary} />
+      <LogIn size={13} color={ON_BACKGROUND.secondary} />
       Get started — sign in or create an account
     </button>
   )

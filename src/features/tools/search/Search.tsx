@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '@/core/supabase'
-import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
+import { adaptColor } from '@/shared/theme/adaptColor'
 import { glassInput } from '@/shared/ui/glass/PulseUI'
 import { useModules } from '@/core/contexts'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
@@ -127,12 +128,15 @@ export default function Search({ dark }: { dark: boolean }) {
   const searchIdRef = useRef(0)
   const modulesRef = useRef<SearchModule[]>(modules)
 
+  // Keeps the latest modules available to the debounced search.
   useEffect(() => { modulesRef.current = modules }, [modules])
 
+  // Focuses the field on devices with a mouse.
   useEffect(() => {
     if (window.matchMedia('(pointer: fine)').matches) inputRef.current?.focus()
   }, [])
 
+  // Runs the search shortly after the user stops typing.
   useEffect(() => {
     clearTimeout(debounceRef.current)
     const q = query.trim()
@@ -192,7 +196,7 @@ export default function Search({ dark }: { dark: boolean }) {
 
   return (
     <PageShell dark={dark} backFallback="/" maxWidth={700}>
-      <PageIntro dark={dark} emoji={<SearchIcon2 color={ON_GRADIENT_TOP.primary} size={40} />} title="Search" subtitle="Modules, files, questions, summaries & schedules" paddingBottom={20} />
+      <PageIntro dark={dark} emoji={<SearchIcon2 color={ON_BACKGROUND.primary} size={40} />} title="Search" subtitle="Modules, files, questions, summaries & schedules" paddingBottom={20} />
 
       <input
         ref={inputRef}
@@ -207,7 +211,7 @@ export default function Search({ dark }: { dark: boolean }) {
       {savedCopy && !loading && <OfflineNote dark={dark} message="Searching content saved on this device." />}
 
       {query.trim().length > 0 && query.trim().length < 2 && (
-        <p style={{ color: ON_GRADIENT_TOP.secondary, textAlign: 'center', fontSize: 13 }}>Keep typing — at least 2 characters.</p>
+        <p style={{ color: ON_BACKGROUND.secondary, textAlign: 'center', fontSize: 13 }}>Keep typing — at least 2 characters.</p>
       )}
 
       {loading && <LoadingText label="Searching..." />}
@@ -220,6 +224,8 @@ export default function Search({ dark }: { dark: boolean }) {
         <div style={{ display: 'grid', gap: 10 }}>
           {results.map((r, i) => {
             const meta = typeMeta[r.type]
+            // Icon color adjusted to stay readable on the cards in the current mode (the tile tint keeps the original).
+            const iconColor = adaptColor(meta.color, dark)
             return (
               <LiquidGlassCard
                 key={`${r.type}-${r.id}`}
@@ -232,7 +238,7 @@ export default function Search({ dark }: { dark: boolean }) {
                   width: 38, height: 38, borderRadius: 10, flexShrink: 0,
                   background: `${meta.color}20`, border: `1px solid ${meta.color}40`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}><meta.Icon color={meta.color} size={18} /></div>
+                }}><meta.Icon color={iconColor} size={18} /></div>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{
                     ...pulseType.cardTitle, color: pt.textPrimary,

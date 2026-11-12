@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
+import { adaptColor } from '@/shared/theme/adaptColor'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import SummaryOverlay from '@/features/study/summaries/SummaryOverlay'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
@@ -33,10 +34,13 @@ const TAB_ROW_STYLE = {
   flexWrap: 'wrap', overflowX: 'visible', rowGap: 10, marginBottom: 16,
 } as const
 
+// Summaries of one module: stage and subject filters, the list, and the full-screen viewer.
 function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
   mod: SummaryModule; dark: boolean; initialStage?: string; initialSummaryId?: string
 }) {
   const pt = getPulseTheme(dark)
+  // The module color as text/icon color, adjusted to stay readable in the current mode (fills keep the original).
+  const modColor = adaptColor(mod.color, dark)
   const [summaries, setSummaries] = useState<Summary[]>([])
   const [selected, setSelected] = useState<Summary | null>(null)
   const [loading, setLoading] = useState(true)
@@ -49,18 +53,21 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
 
   useHistoryOverlay(!!selected, () => setSelected(null))
 
+  // Loads the module's exam stages.
   useEffect(() => {
     let ignore = false
     fetchModuleStages(mod.id).then(result => { if (!ignore) setStages(result) })
     return () => { ignore = true }
   }, [mod.id])
 
+  // Loads which stages each lesson belongs to.
   useEffect(() => {
     let ignore = false
     fetchLessonStageMap().then(({ map }) => { if (!ignore) setLessonStageMap(map) })
     return () => { ignore = true }
   }, [])
 
+  // Loads the module's subjects for the subject filter.
   useEffect(() => {
     let ignore = false
     fetchSubjectsForModule(mod.id).then(({ subjects: list, error }) => {
@@ -71,6 +78,7 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
     return () => { ignore = true }
   }, [mod.id])
 
+  // Loads the module's summaries (saved copy first, then fresh).
   useEffect(() => {
     let ignore = false
     setLoading(true)
@@ -84,6 +92,7 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
     return () => { ignore = true }
   }, [mod.id])
 
+  // Opens the summary named in the link once the list has loaded.
   useEffect(() => {
     if (!initialSummaryId || summaries.length === 0) return
     const match = summaries.find(s => s.id === initialSummaryId)
@@ -110,10 +119,10 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
     <PageShell dark={dark} backFallback={`/module/${mod.id}`} maxWidth={PAGE_MAX_WIDTH}>
       <div style={{ textAlign: 'center', padding: '10px 0 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-          <ModuleIcon value={mod.icon} size={44} color={mod.color} />
+          <ModuleIcon value={mod.icon} size={44} color={modColor} />
         </div>
         <h1 style={{
-          ...pulseType.pageTitle, fontSize: 24, color: mod.color, marginBottom: 6,
+          ...pulseType.pageTitle, fontSize: 24, color: modColor, marginBottom: 6,
           wordBreak: 'break-word', overflowWrap: 'anywhere'
         }}>{mod.name}</h1>
       </div>
@@ -166,10 +175,10 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
           >
             <div style={{
               width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-              background: `${mod.color}20`, border: `1px solid ${mod.color}40`,
+              background: `${modColor}20`, border: `1px solid ${modColor}40`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <NotesIcon color={mod.color} size={20} />
+              <NotesIcon color={modColor} size={20} />
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{
@@ -190,6 +199,7 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
   )
 }
 
+// Summaries page: resolves the module from the link and shows its summaries.
 export default function Summaries({ dark }: { dark: boolean }) {
   const { modules, modulesLoaded, modulesError } = useModules() as { modules: SummaryModule[]; modulesLoaded: boolean; modulesError: boolean }
   const params = new URLSearchParams(useLocation().search)
@@ -212,7 +222,7 @@ export default function Summaries({ dark }: { dark: boolean }) {
 
   return (
     <PageShell dark={dark} backFallback="/" maxWidth={PAGE_MAX_WIDTH}>
-      <div style={{ textAlign: 'center', padding: 40, color: ON_GRADIENT_TOP.secondary }}>
+      <div style={{ textAlign: 'center', padding: 40, color: ON_BACKGROUND.secondary }}>
         {modulesError
           ? <ErrorBanner message="Couldn't load modules — check your connection." />
           : !modulesLoaded ? 'Loading...' : 'No modules available yet.'}

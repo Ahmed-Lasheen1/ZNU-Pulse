@@ -27,12 +27,13 @@ export function liquidGlassBackdrop() {
   }
 }
 
-// Glass background tint (more opaque when blur is unsupported).
+// Glass background tint (more opaque when blur is unsupported). The dark tint is a light blue wash so cards
+// separate from the navy page; the light tint is white over the light-blue page.
 export function liquidGlassTint(dark) {
   if (!SUPPORTS_BACKDROP_FILTER) {
-    return dark ? 'rgba(38, 44, 60, 0.82)' : 'rgba(255,255,255,0.82)'
+    return dark ? 'rgba(27, 45, 74, 0.88)' : 'rgba(255,255,255,0.82)'
   }
-  return dark ? 'rgba(60, 60, 70, 0.35)' : 'rgba(255,255,255,0.35)'
+  return dark ? 'rgba(110, 140, 195, 0.16)' : 'rgba(255,255,255,0.35)'
 }
 
 // Border color used on glass panels.

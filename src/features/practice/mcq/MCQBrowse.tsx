@@ -1,7 +1,8 @@
 import { useState, useEffect, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
-import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseFonts, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
+import { adaptColor } from '@/shared/theme/adaptColor'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import TabRow from '@/shared/ui/controls/TabRow'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
@@ -10,7 +11,6 @@ import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import { CardRowsSkeleton } from '@/shared/ui/feedback/Skeletons'
 import { ModuleIcon, ExamIcon } from '@/shared/icons/medicalIcons'
 import { OfflineIcon, BookIcon, PauseIcon, PlayIcon, EmptyBoxIcon, GraduationCapIcon, TargetIcon } from '@/shared/icons/tool-icons'
-import { EXAM_LOW_SHADOW } from '@/features/practice/mcqShared'
 import { useWeakSpots } from '@/features/practice/mcq/useWeakSpots'
 import { MCQ_ACCENT } from '@/shared/theme/accents'
 import { stagesOf, inStage } from '@/services/content/lessonStages'
@@ -67,11 +67,12 @@ interface MCQBrowseProps {
 const MAX_WEAK_SPOTS = 3
 
 // Small counter text shown under quiz cards.
-function CountText({ children }: { children: ReactNode }) {
+function CountText({ children, dark }: { children: ReactNode; dark: boolean }) {
+  const pt = getPulseTheme(dark)
   return (
     <span style={{
-      display: 'inline-block', color: '#fff', fontSize: 12, fontWeight: 600,
-      fontFamily: pulseFonts.body, whiteSpace: 'nowrap', textShadow: EXAM_LOW_SHADOW,
+      display: 'inline-block', color: pt.textSecondary, fontSize: 12, fontWeight: 600,
+      fontFamily: pulseFonts.body, whiteSpace: 'nowrap',
     }}>{children}</span>
   )
 }
@@ -103,7 +104,7 @@ function SourceChoiceDialog({
       <div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="source-choice-dialog-title" style={{ width: '100%', maxWidth: 380 }}>
         <LiquidGlassCard dark={dark} delay={0} instant style={{ padding: '26px 24px', textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
-            <GraduationCapIcon color={MCQ_ACCENT} size={30} />
+            <GraduationCapIcon color={adaptColor(MCQ_ACCENT, dark)} size={30} />
           </div>
           <h3 id="source-choice-dialog-title" style={{ ...pulseType.sectionTitle, fontSize: 16, color: pt.textPrimary, marginBottom: 6, fontFamily: pulseFonts.display }}>
             This selection has University Doctors' questions
@@ -181,7 +182,7 @@ function SubjectAccordionRow({
             cursor: canExpand ? 'pointer' : 'default', font: 'inherit', color: 'inherit'
           }}
         >
-          <ModuleIcon value={sub.icon} size={18} color={sub.color || tabAccentColor} />
+          <ModuleIcon value={sub.icon} size={18} color={adaptColor(sub.color || tabAccentColor, dark)} />
           <span style={{ minWidth: 0, flex: 1 }}>
             <div style={{ color: pt.textPrimary, fontWeight: 700, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub.name}</div>
             <div style={{ color: pt.textMuted, fontSize: 11.5, marginTop: 1 }}>
@@ -252,6 +253,10 @@ export default function MCQBrowse({
   const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null)
   const lessonAccuracy = useWeakSpots(questions)
 
+  // The accent and the module color as text/icon colors, adjusted to stay readable in the current mode (fills keep the original).
+  const mcqText = adaptColor(MCQ_ACCENT, dark)
+  const moduleText = activeModuleObj ? adaptColor(activeModuleObj.color, dark) : pt.cobalt
+
   const tabAccentColor = activeModuleObj?.color || pt.cobalt
   const stageActive = activeStage !== 'all'
 
@@ -287,6 +292,7 @@ export default function MCQBrowse({
 
   const moduleTotal = questions.filter(q => q.module_id === activeModuleObj?.id).length
 
+  // Resets the subject filter when the chosen subject has no questions in the selected stage.
   useEffect(() => {
     if (loading || !stageActive || activeSubject === 'all') return
     if (!tabSubjects.some(s => s.id === activeSubject)) onSelectSubject('all')
@@ -325,11 +331,11 @@ export default function MCQBrowse({
 
       <div style={{ textAlign: 'center', padding: '10px 0 16px' }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-          <ExamIcon color={MCQ_ACCENT} size={40} />
+          <ExamIcon color={mcqText} size={40} />
         </div>
-        <h1 style={{ fontFamily: pulseFonts.display, fontWeight: 800, fontSize: 24, color: ON_GRADIENT_TOP.primary, marginBottom: 4 }}>MCQ Bank</h1>
+        <h1 style={{ fontFamily: pulseFonts.display, fontWeight: 800, fontSize: 24, color: ON_BACKGROUND.primary, marginBottom: 4 }}>MCQ Bank</h1>
         {!loading && moduleTotal > 0 && (
-          <div style={{ color: ON_GRADIENT_TOP.secondary, fontSize: 12, fontWeight: 600 }}>
+          <div style={{ color: ON_BACKGROUND.secondary, fontSize: 12, fontWeight: 600 }}>
             {countLabel(moduleTotal)} · {moduleSubjects.length} subject{moduleSubjects.length === 1 ? '' : 's'}
           </div>
         )}
@@ -351,8 +357,8 @@ export default function MCQBrowse({
             padding: '14px 18px', display: 'flex', alignItems: 'center',
             justifyContent: 'space-between', gap: 10, flexWrap: 'wrap'
           }}>
-            <div style={{ color: MCQ_ACCENT, fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <PauseIcon color={MCQ_ACCENT} size={13} /> Paused {quizName(resumeData.quizMode, resumeStageTitle)} — {Object.keys(resumeData.answers || {}).length}/{(resumeData.quizQuestions || []).length} answered
+            <div style={{ color: mcqText, fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <PauseIcon color={mcqText} size={13} /> Paused {quizName(resumeData.quizMode, resumeStageTitle)} — {Object.keys(resumeData.answers || {}).length}/{(resumeData.quizQuestions || []).length} answered
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={onResume} style={{
@@ -361,7 +367,7 @@ export default function MCQBrowse({
                 display: 'inline-flex', alignItems: 'center', gap: 5
               }}><PlayIcon color="#0f172a" size={11} /> Continue</button>
               <button onClick={onDiscardResume} style={{
-                background: 'transparent', border: `1px solid ${MCQ_ACCENT}40`, color: MCQ_ACCENT,
+                background: 'transparent', border: `1px solid ${mcqText}40`, color: mcqText,
                 padding: '6px 14px', borderRadius: 999, cursor: 'pointer', fontWeight: 700, fontSize: 12, fontFamily: pulseFonts.body
               }}>Discard</button>
             </div>
@@ -372,9 +378,9 @@ export default function MCQBrowse({
       {activeModuleObj && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16,
-          color: activeModuleObj.color, fontWeight: 700, fontSize: 14
+          color: moduleText, fontWeight: 700, fontSize: 14
         }}>
-          <ModuleIcon value={activeModuleObj.icon} size={18} color={activeModuleObj.color} /> {activeModuleObj.name}
+          <ModuleIcon value={activeModuleObj.icon} size={18} color={moduleText} /> {activeModuleObj.name}
         </div>
       )}
 
@@ -405,11 +411,11 @@ export default function MCQBrowse({
                 background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>
-                <ExamIcon color={MCQ_ACCENT} size={28} />
+                <ExamIcon color={mcqText} size={28} />
               </div>
               <div style={{ flex: 1, minWidth: 160 }}>
-                <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: MCQ_ACCENT, marginBottom: 6 }}>Mock Exam</h3>
-                <CountText>
+                <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: mcqText, marginBottom: 6 }}>Mock Exam</h3>
+                <CountText dark={dark}>
                   {loading ? '…' : mockBank > QUIZ_MAX_QUESTIONS
                     ? `${mockCount} of ${mockBank} per exam`
                     : countLabel(mockCount)}
@@ -450,11 +456,11 @@ export default function MCQBrowse({
                 background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>
-                <TargetIcon color={MCQ_ACCENT} size={28} />
+                <TargetIcon color={mcqText} size={28} />
               </div>
               <div style={{ flex: 1, minWidth: 160 }}>
-                <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: MCQ_ACCENT, marginBottom: 6 }}>{stageTitle} Simulator</h3>
-                <CountText>
+                <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: mcqText, marginBottom: 6 }}>{stageTitle} Simulator</h3>
+                <CountText dark={dark}>
                   <span className="sim-sub-full">{countLabel(simTotal)} · {simSubjectCount} subject{simSubjectCount === 1 ? '' : 's'} · new mix each time</span>
                   <span className="sim-sub-short">{countLabel(simTotal)} · {simSubjectCount} subject{simSubjectCount === 1 ? '' : 's'}</span>
                 </CountText>
@@ -470,7 +476,7 @@ export default function MCQBrowse({
 
       {!loading && weakSpots.length > 0 && (
         <div style={{ marginBottom: 32 }}>
-          <h3 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16 }}>Weak Spots</h3>
+          <h3 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16 }}>Weak Spots</h3>
           <LiquidGlassCard dark={dark} delay={0} style={{ padding: '6px 16px' }}>
             {weakSpots.map(({ lesson, subject, stat }, i) => (
               <div key={lesson.id} style={{
@@ -498,7 +504,7 @@ export default function MCQBrowse({
         </div>
       )}
 
-      <h3 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16 }}>Practice by Subject</h3>
+      <h3 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16 }}>Practice by Subject</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {subjectRows.map(({ sub, count, lessonRows }, i) => (
           <SubjectAccordionRow

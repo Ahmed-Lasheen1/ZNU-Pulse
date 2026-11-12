@@ -1,10 +1,11 @@
 import { useOnlineStatus } from '@/shared/hooks/useOnlineStatus'
 import { useAttemptSync } from '@/services/offline/useAttemptSync'
 import { useChecklistSync } from '@/services/offline/useChecklistSync'
-import { pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
+import { pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import { OfflineIcon } from '@/shared/icons/tool-icons'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 
+// Shows an "Offline" pill while the connection is down, and runs the background syncs when it returns.
 export default function OfflineStatus({ dark }: { dark: boolean }) {
   const online = useOnlineStatus()
   useAttemptSync()
@@ -22,9 +23,9 @@ export default function OfflineStatus({ dark }: { dark: boolean }) {
       <PulseGlassRow dark={dark} radius={999}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 6, padding: '3px 12px',
-          ...pulseType.small, fontSize: 11, fontWeight: 700, color: ON_GRADIENT_TOP.primary,
+          ...pulseType.small, fontSize: 11, fontWeight: 700, color: ON_BACKGROUND.primary,
         }}>
-          <OfflineIcon color={ON_GRADIENT_TOP.primary} size={12} /> Offline
+          <OfflineIcon color={ON_BACKGROUND.primary} size={12} /> Offline
         </div>
       </PulseGlassRow>
     </div>

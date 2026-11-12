@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
-import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseFonts, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import { useModules } from '@/core/contexts'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import TabRow from '@/shared/ui/controls/TabRow'
@@ -53,10 +53,12 @@ const TYPE_META: Record<string, { Icon: (p: { color?: string; size?: number }) =
   courses: { Icon: GraduationCapIcon, label: 'Course Recordings' },
 }
 
+// Audio player dialog. The scrim behind it is dark in both color modes, so the card always uses the dark glass.
 function AudioViewer({ url, name, onClose, dark }: { url: string; name: string; onClose: () => void; dark: boolean }) {
   const pt = getPulseTheme(dark)
   useBodyScrollLock(true)
 
+  // Closes the player on Escape.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', onKeyDown)
@@ -70,7 +72,7 @@ function AudioViewer({ url, name, onClose, dark }: { url: string; name: string; 
       zIndex: 2000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
     }}>
       <div style={{ width: '90%', maxWidth: 400 }}>
-        <LiquidGlassCard dark={dark} delay={0} style={{ padding: 32, textAlign: 'center' }}>
+        <LiquidGlassCard dark delay={0} style={{ padding: 32, textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
             <AudioIcon color={FILE_ACCENT} size={48} />
           </div>
@@ -86,6 +88,7 @@ function AudioViewer({ url, name, onClose, dark }: { url: string; name: string; 
   )
 }
 
+// Files page: module, content type and subject filters, the file list and the PDF/video/audio viewers.
 export default function FilesPage({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const [files, setFiles] = useState<FileRow[]>([])
@@ -114,6 +117,7 @@ export default function FilesPage({ dark }: { dark: boolean }) {
   const appliedModuleParamRef = useRef<string | null>(null)
   const openedFileRef = useRef<string | null>(null)
 
+  // Picks the module from the link, or the first selectable one.
   useEffect(() => {
     if (moduleParam) {
       if (appliedModuleParamRef.current !== moduleParam) {
@@ -128,6 +132,7 @@ export default function FilesPage({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules, moduleParam])
 
+  // Loads the selected module's files (saved copy first, then fresh).
   useEffect(() => {
     if (!activeModule) return
     let ignore = false
@@ -148,6 +153,7 @@ export default function FilesPage({ dark }: { dark: boolean }) {
 
   const availableTypes = TYPE_ORDER.filter(t => files.some(f => f.type === t))
 
+  // Selects the content type from the link, or the first available one.
   useEffect(() => {
     if (loading) return
     if (typeParam && availableTypes.includes(typeParam as typeof availableTypes[number])) {
@@ -158,6 +164,7 @@ export default function FilesPage({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, activeModule, files])
 
+  // Loads the selected module's subjects for the subject filter.
   useEffect(() => {
     let ignore = false
     fetchSubjectsForModule(activeModule || '').then(({ subjects, error }) => {
@@ -168,6 +175,7 @@ export default function FilesPage({ dark }: { dark: boolean }) {
     return () => { ignore = true }
   }, [activeModule])
 
+  // Opens the file named in the link once the list has loaded.
   useEffect(() => {
     if (!fileParam || viewer || openedFileRef.current === fileParam) return
     const match = files.find(f => f.id === fileParam)
@@ -213,7 +221,7 @@ export default function FilesPage({ dark }: { dark: boolean }) {
 
       <PageIntro
         dark={dark}
-        emoji={typeMeta ? <typeMeta.Icon color={ON_GRADIENT_TOP.primary} size={40} /> : <FolderIcon color={ON_GRADIENT_TOP.primary} size={40} />}
+        emoji={typeMeta ? <typeMeta.Icon color={ON_BACKGROUND.primary} size={40} /> : <FolderIcon color={ON_BACKGROUND.primary} size={40} />}
         title={typeMeta ? typeMeta.label : 'Files'}
       />
 

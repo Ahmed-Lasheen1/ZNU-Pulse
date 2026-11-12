@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown } from 'lucide-react'
 import { useAuth, useModules, useHomeEntrance } from '@/core/contexts'
-import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP, ON_GRADIENT_BOTTOM } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseFonts, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
+import { adaptColor } from '@/shared/theme/adaptColor'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import { computeStreak } from '@/features/home/streak'
 import { nextUpcomingExam } from '@/features/home/upcomingExam'
@@ -58,9 +59,6 @@ const toolCards = [
   { Icon: AnonQAIcon, title: 'Pulse Check', sub: 'Ask, suggest & vote', to: '/pulse-check', accent: 'indigo' },
   { Icon: LeaderboardIcon, title: 'Leaderboard', sub: 'See where you stand', to: '/profile?tab=leaderboard', accent: 'amber' },
 ] as const
-
-const ACTIVE_MODULES_ACCENT = getPulseTheme(false).cobalt
-const FOOTER_LINE_COLOR = getPulseTheme(true).border
 
 const HOME_HISTORY_LIMIT = 200
 
@@ -149,6 +147,7 @@ export default function Home({ dark }: { dark: boolean }) {
 
   const [archiveOverflowVisible, setArchiveOverflowVisible] = useState(false)
 
+  // Lets the completed-modules list overflow visibly again once it is closed.
   useEffect(() => {
     if (!archiveOpen) setArchiveOverflowVisible(false)
   }, [archiveOpen])
@@ -299,6 +298,9 @@ export default function Home({ dark }: { dark: boolean }) {
   const upcomingExam = nextExam && nextExam.days <= EXAM_NOTICE_DAYS ? nextExam : null
   const examColor = upcomingExam && upcomingExam.days <= EXAM_URGENT_DAYS ? pt.amber : pt.cobalt
   const pausedModule = pausedExam ? modules.find(m => m.id === pausedExam.moduleId) : undefined
+  // Fixed accents as icon/badge colors, adjusted to stay readable in the current color mode.
+  const mcqAccent = adaptColor(MCQ_ACCENT, dark)
+  const flashcardAccent = adaptColor(FLASHCARD_ACCENT, dark)
 
   // Notices show together once every source has settled (due also waits for modules), or after the wait cap.
   const noticesReady = noticeWaitOver || (announcementLoaded && examsLoaded && pausedLoaded && dueLoaded)
@@ -350,7 +352,7 @@ export default function Home({ dark }: { dark: boolean }) {
         render: entrance => (
           <HomeNoticeCard
             dark={dark}
-            accent={MCQ_ACCENT}
+            accent={mcqAccent}
             Icon={ExamIcon}
             title={paused.title}
             body={`${pausedModule?.name ?? 'Module'} · ${paused.answered}/${paused.total} answered`}
@@ -368,7 +370,7 @@ export default function Home({ dark }: { dark: boolean }) {
         render: entrance => (
           <HomeNoticeCard
             dark={dark}
-            accent={FLASHCARD_ACCENT}
+            accent={flashcardAccent}
             Icon={FlashcardIcon}
             title={`${plural(dueByModule[mod.id], 'flashcard')} due`}
             body={mod.name}
@@ -391,13 +393,10 @@ export default function Home({ dark }: { dark: boolean }) {
   const sectionTitle = (
     text: string,
     delaySeconds: number,
-    zone: 'top' | 'bottom' = 'top',
     Icon?: (p: { color: string; size?: number }) => JSX.Element,
     strong: boolean = false
   ) => {
-    const color = zone === 'bottom'
-      ? (strong ? ON_GRADIENT_BOTTOM.secondary : ON_GRADIENT_BOTTOM.muted)
-      : (strong ? ON_GRADIENT_TOP.secondary : ON_GRADIENT_TOP.muted)
+    const color = strong ? ON_BACKGROUND.secondary : ON_BACKGROUND.muted
     return (
       <motion.h2
         initial={playEntrance ? { opacity: 0, y: 20 } : false}
@@ -570,7 +569,7 @@ export default function Home({ dark }: { dark: boolean }) {
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
                 <div className="pulse-hero-inner">
-                  <EcgHero height={400} />
+                  <EcgHero height={400} dark={dark} />
                 </div>
               </motion.div>
 
@@ -579,9 +578,9 @@ export default function Home({ dark }: { dark: boolean }) {
                   initial={playEntrance ? { opacity: 0, y: 16 } : false}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.7, delay: ACTIVE_MODULES_START }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, color: ACTIVE_MODULES_ACCENT, marginBottom: 14, ...pulseType.sectionLabel }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, color: pt.cobalt, marginBottom: 14, ...pulseType.sectionLabel }}
                 >
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: ACTIVE_MODULES_ACCENT, display: 'inline-block' }} />
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: pt.cobalt, display: 'inline-block' }} />
                   Active Modules
                 </motion.div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -604,22 +603,24 @@ export default function Home({ dark }: { dark: boolean }) {
                   )}
                   {activeModules.map((mod, i) => {
                     const entrance = cardEntrance(ACTIVE_MODULES_START + i * 0.165)
+                    // The module's own color, adjusted so the icon and dot stay readable in the current mode.
+                    const modColor = adaptColor(mod.color, dark)
                     return (
                       <LiquidGlassCard key={mod.id} dark={dark} delay={entrance.delay} instant={entrance.instant}
                         onClick={() => navigate(`/module/${mod.id}`)}
                         style={{ borderRadius: 999, padding: '10px 18px 10px 10px', display: 'flex', alignItems: 'center', gap: 14 }}>
                         <div style={{
                           width: 46, height: 46, borderRadius: '50%', flexShrink: 0,
-                          background: `${mod.color}22`, border: `1px solid ${mod.color}55`,
+                          background: `${modColor}22`, border: `1px solid ${modColor}55`,
                           display: 'flex', alignItems: 'center', justifyContent: 'center'
                         }}>
-                          <ModuleIcon value={mod.icon} size={20} color={mod.color} />
+                          <ModuleIcon value={mod.icon} size={20} color={modColor} />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>{mod.name}</div>
                           <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{moduleBlurb(mod.name)}</div>
                         </div>
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: mod.color, display: 'inline-block', flexShrink: 0 }} />
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: modColor, display: 'inline-block', flexShrink: 0 }} />
                       </LiquidGlassCard>
                     )
                   })}
@@ -629,7 +630,7 @@ export default function Home({ dark }: { dark: boolean }) {
           </div>
 
           <div className="pulse-wide" style={{ marginTop: 'clamp(8px, 2vh, 24px)' }}>
-            {sectionTitle('Tools', TOOLS_START, 'top', LightningIcon, true)}
+            {sectionTitle('Tools', TOOLS_START, LightningIcon, true)}
             <div className="pulse-tools-grid">
               {toolCards.map((card, i) => {
                 const accentColor = card.accent === 'amber' ? pt.amber : pt.indigo
@@ -664,12 +665,12 @@ export default function Home({ dark }: { dark: boolean }) {
             transition={{ duration: 0.7, delay: FOOTER_DELAY }}
             style={{ display: 'flex', alignItems: 'center', gap: 14, justifyContent: 'center' }}
           >
-            <div style={{ height: 1, background: FOOTER_LINE_COLOR, flex: 1, maxWidth: 120 }} />
-            <div style={{ ...pulseType.small, display: 'flex', alignItems: 'center', gap: 8, color: ON_GRADIENT_BOTTOM.muted }}>
+            <div style={{ height: 1, background: pt.border, flex: 1, maxWidth: 120 }} />
+            <div style={{ ...pulseType.small, display: 'flex', alignItems: 'center', gap: 8, color: ON_BACKGROUND.muted }}>
               <img src="/icon-192.png" alt="" style={{ width: 18, height: 18, borderRadius: 4, objectFit: 'cover' }} />
               Keep the pulse. Shape the future.
             </div>
-            <div style={{ height: 1, background: FOOTER_LINE_COLOR, flex: 1, maxWidth: 120 }} />
+            <div style={{ height: 1, background: pt.border, flex: 1, maxWidth: 120 }} />
           </motion.div>
         </div>
 

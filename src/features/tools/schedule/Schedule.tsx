@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '@/core/supabase'
-import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import TabRow from '@/shared/ui/controls/TabRow'
 import MediaOverlay from '@/shared/ui/overlay/MediaOverlay'
@@ -192,7 +192,7 @@ export default function Schedule({ dark }: { dark: boolean }) {
         />
       )}
 
-      <PageIntro dark={dark} emoji={<ScheduleIcon color={ON_GRADIENT_TOP.primary} size={40} />} title="Schedules" subtitle="Study plans and exam dates, module by module" />
+      <PageIntro dark={dark} emoji={<ScheduleIcon color={ON_BACKGROUND.primary} size={40} />} title="Schedules" subtitle="Study plans and exam dates, module by module" />
 
       {/* Module tabs stay on a single line and scroll sideways when they do not fit (no wrapping). */}
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: SECTION_GAP }}>

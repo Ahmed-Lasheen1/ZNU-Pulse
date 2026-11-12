@@ -5,7 +5,7 @@ import { useAuth } from '@/core/contexts'
 import { MenuToggleIcon } from '@/shared/ui/controls/menu-toggle-icon'
 import ThemeSwitch from '@/shared/ui/controls/theme-switch'
 import { HomeIcon, ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, BookIcon, SignOutIcon, UserIcon, StarIcon } from '@/shared/icons/tool-icons'
-import { getPulseTheme, pulseFonts } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseFonts, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import { liquidGlassShadow, liquidGlassBackdrop, liquidGlassTint, glassHoverTint } from '@/shared/theme/liquidGlass'
 import ConfirmDialog from '@/shared/ui/feedback/ConfirmDialog'
 import type { PulseTheme } from '@/shared/theme/types'
@@ -511,12 +511,14 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
             width: 44, height: 44, flexShrink: 0, padding: 0,
             background: 'transparent',
             border: 'none',
+            // The menu icon strokes with currentColor, so it follows the page text color in both modes.
+            color: ON_BACKGROUND.primary,
             cursor: 'pointer',
             WebkitTapHighlightColor: 'transparent',
             outline: 'none'
           }}
         >
-          <MenuToggleIcon open={open} width={44} height={44} stroke="#010c4a" duration={400} />
+          <MenuToggleIcon open={open} width={44} height={44} duration={400} />
         </button>
       </div>
     </div>

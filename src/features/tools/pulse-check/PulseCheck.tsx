@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '@/core/supabase'
 import { useAuth } from '@/core/contexts'
-import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseFonts, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
+import { adaptColor } from '@/shared/theme/adaptColor'
 import { glassInput } from '@/shared/ui/glass/PulseUI'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PageShell from '@/shared/ui/layout/PageShell'
@@ -67,6 +68,7 @@ async function currentPushEndpoint(): Promise<string | null> {
   }
 }
 
+// Tells admins a new question arrived (best effort).
 function pingAdmins(token: string) {
   fetch('/api/push/notify-admins', {
     method: 'POST',
@@ -75,6 +77,7 @@ function pingAdmins(token: string) {
   }).catch(() => {})
 }
 
+// Tells the asker their question was answered (best effort).
 async function pingAsker(questionId: string) {
   try {
     const { data: { session } } = await supabase.auth.getSession()
@@ -89,12 +92,24 @@ async function pingAsker(questionId: string) {
   }
 }
 
+// Pulse Check page: anonymous polls and questions, with admin tools to answer and manage them.
 export default function PulseCheck({ dark }: { dark: boolean }) {
   const { user, profile } = useAuth() as { user: any; profile?: { role?: string } | null }
   const isAdmin = profile?.role === 'admin'
   const pt = getPulseTheme(dark)
   const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
   const location = useLocation()
+
+  // Status colors follow the color mode; the suffixes are opacities (10%, 16%, 25%, 35%).
+  const okColor = pt.success
+  const okSoft = `${pt.success}1A`
+  const okTint = `${pt.success}29`
+  const okBorder = `${pt.success}40`
+  const okRing = `${pt.success}59`
+  const dangerTint = `${pt.danger}24`
+  const dangerBorder = `${pt.danger}59`
+  // The violet accent as text color (fills keep the original).
+  const questionsText = adaptColor(QUESTIONS_ACCENT, dark)
 
   // Old links used ?tab=ask and ?tab=answered; both now land on Questions.
   const [tab, setTab] = useState<PulseTab>(() => {
@@ -118,12 +133,14 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
   const msgTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const submittingRef = useRef(false)
 
+  // Shows a short message under the form that clears itself after 3 seconds.
   function flashMsg(text: string) {
     clearTimeout(msgTimerRef.current)
     setMsg(text)
     msgTimerRef.current = setTimeout(() => setMsg(''), 3000)
   }
 
+  // Loads the public questions and this device's own messages.
   useEffect(() => {
     let ignore = false
     openQuestions(() => ignore)
@@ -131,6 +148,7 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
     return () => { ignore = true }
   }, [])
 
+  // Ticks the submit cooldown every second.
   useEffect(() => {
     updateCooldownRemaining()
     cooldownTimerRef.current = setInterval(updateCooldownRemaining, 1000)
@@ -140,18 +158,21 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
     }
   }, [])
 
+  // Recomputes the time left before another question can be sent.
   function updateCooldownRemaining() {
     const lastSubmitAt = Number(storageGet(COOLDOWN_STORAGE_KEY) || 0)
     const remaining = Math.max(0, SUBMIT_COOLDOWN_MS - (Date.now() - lastSubmitAt))
     setCooldownRemaining(remaining)
   }
 
+  // Returns true when online; otherwise shows a toast and returns false.
   function requireOnline() {
     if (navigator.onLine) return true
     showToast("You're offline — try again when you're connected", 'info')
     return false
   }
 
+  // Shows a local notification when one of this device's questions has just been answered.
   useEffect(() => {
     if (!('Notification' in window) || Notification.permission !== 'granted') return
     const notified = getNotifiedTokens()
@@ -169,6 +190,7 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
     }
   }, [myQuestions])
 
+  // Loads the questions list (saved copy first, then fresh).
   async function openQuestions(isIgnored: () => boolean = () => false) {
     setLoading(true)
     const { data, error, fromCache } = await cachedSnapshot('anon-questions', () => supabase
@@ -195,6 +217,7 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
     setLoading(false)
   }
 
+  // Reloads the questions list from the server (saved copy only when offline).
   async function fetchQuestions(isIgnored: () => boolean = () => false) {
     setLoading(true)
     const { data, error, fromCache } = await networkFirst('anon-questions', () => supabase
@@ -214,6 +237,7 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
     setLoading(false)
   }
 
+  // Loads the next page of questions.
   async function loadMoreQuestions() {
     if (loadingMore || !requireOnline()) return
     setLoadingMore(true)
@@ -232,6 +256,7 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
     if (error) setLoadMoreError(true)
   }
 
+  // Loads the questions this device sent, using the saved tracking tokens.
   async function fetchMyQuestions(isIgnored: () => boolean = () => false) {
     const myTokens = getMyAnonTokens()
     if (myTokens.length === 0) { if (!isIgnored()) setMyQuestions([]); return }
@@ -241,6 +266,7 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
     if (error) console.warn('[PulseCheck] Could not load "My Questions":', error)
   }
 
+  // Sends the typed question anonymously after the cooldown, language and connection checks.
   async function submitQuestion() {
     if (!newQ.trim() || submittingRef.current) return
     if (!navigator.onLine) {
@@ -279,6 +305,7 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
     }
   }
 
+  // Saves an admin's answer to a question and notifies the asker.
   async function submitReply(id: string) {
     const reply = replyText[id]
     if (!reply?.trim() || !requireOnline()) return
@@ -289,6 +316,7 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
     fetchQuestions()
   }
 
+  // Deletes a question (admin).
   async function deleteQuestion(id: string) {
     if (!requireOnline()) return
     const { error } = await supabase.from('anonymous_questions').delete().eq('id', id)
@@ -310,7 +338,7 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
     <PageShell dark={dark} backFallback="/" maxWidth={900}>
       <PageIntro
         dark={dark}
-        emoji={<AnonQAIcon color={ON_GRADIENT_TOP.primary} size={40} />}
+        emoji={<AnonQAIcon color={ON_BACKGROUND.primary} size={40} />}
         title="Pulse Check"
         subtitle="Vote, ask and suggest — all anonymous"
         paddingBottom={16}
@@ -331,7 +359,7 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
               <div style={{ padding: '10px 22px', ...pulseType.button, color, display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}>
                 <t.Icon color={color} size={15} /> {t.label}
                 {badge > 0 && (
-                  <span style={{ background: pt.amber, color: '#0f172a', borderRadius: 999, padding: '0 7px', fontSize: 11, fontWeight: 800 }}>{badge}</span>
+                  <span style={{ background: pt.amber, color: dark ? '#0f172a' : '#ffffff', borderRadius: 999, padding: '0 7px', fontSize: 11, fontWeight: 800 }}>{badge}</span>
                 )}
               </div>
             </PulseGlassRow>
@@ -352,8 +380,8 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
 
           <div style={{ marginBottom: 24 }}>
             <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
-              <h3 style={{ ...pulseType.sectionLabel, color: QUESTIONS_ACCENT, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <QuestionMarkIcon color={QUESTIONS_ACCENT} size={14} /> Ask a question or share a suggestion
+              <h3 style={{ ...pulseType.sectionLabel, color: questionsText, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <QuestionMarkIcon color={questionsText} size={14} /> Ask a question or share a suggestion
               </h3>
               <textarea
                 dir="auto"
@@ -361,7 +389,7 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
                 value={newQ} onChange={e => setNewQ(e.target.value)}
                 style={{ ...inStyle, ...arabicFont(newQ), minHeight: 80, resize: 'vertical' }} />
               {msg && (
-                <div style={{ color: isSuccess ? '#4ade80' : pt.danger, fontSize: 13, marginBottom: 8 }}>{msg}</div>
+                <div style={{ color: isSuccess ? okColor : pt.danger, fontSize: 13, marginBottom: 8 }}>{msg}</div>
               )}
               <button onClick={submitQuestion} disabled={submitDisabled} style={{
                 width: '100%', padding: '13px', background: QUESTIONS_ACCENT,
@@ -377,25 +405,25 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
 
           {myQuestions.length > 0 && (
             <div style={{ marginBottom: 24 }}>
-              <h3 style={{ ...pulseType.sectionLabel, color: QUESTIONS_ACCENT, marginBottom: 12 }}>🔎 My Messages (this device)</h3>
+              <h3 style={{ ...pulseType.sectionLabel, color: questionsText, marginBottom: 12 }}>🔎 My Messages (this device)</h3>
               {myQuestions.map((q, i) => {
                 const isLast = i === myQuestions.length - 1
                 return (
                   <div key={q.id} style={{ marginBottom: isLast ? 0 : 10 }}>
                     <LiquidGlassCard dark={dark} delay={i * 60} style={{
                       padding: '16px 18px',
-                      boxShadow: `inset 0 0 0 1px ${q.answered ? 'rgba(74,222,128,0.35)' : 'transparent'}`
+                      boxShadow: `inset 0 0 0 1px ${q.answered ? okRing : 'transparent'}`
                     }}>
                       <div dir={textDir(q.question)}>
                         <AutoDirText text={q.question} style={{ color: pt.textPrimary, fontSize: 13, marginBottom: 8 }} />
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                           <span style={{
                             fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
-                            background: q.answered ? 'rgba(74,222,128,0.16)' : `${pt.amber}20`,
-                            color: q.answered ? '#4ade80' : pt.amber,
+                            background: q.answered ? okTint : `${pt.amber}20`,
+                            color: q.answered ? okColor : pt.amber,
                             display: 'inline-flex', alignItems: 'center', gap: 5
                           }}>
-                            {q.answered ? <CheckCircleIcon color="#4ade80" size={12} /> : <ClockIcon color={pt.amber} size={12} />}
+                            {q.answered ? <CheckCircleIcon color={okColor} size={12} /> : <ClockIcon color={pt.amber} size={12} />}
                             {q.answered ? 'Answered' : 'Waiting for an answer'}
                           </span>
                           <DateStamp value={q.created_at} color={pt.textMuted} />
@@ -403,7 +431,7 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
                       </div>
                       {q.answered && q.answer && (
                         <div dir={textDir(q.answer)} style={{
-                          background: 'rgba(74,222,128,0.10)', border: '1px solid rgba(74,222,128,0.25)',
+                          background: okSoft, border: `1px solid ${okBorder}`,
                           borderRadius: 10, padding: '10px 14px', marginTop: 10
                         }}>
                           <AutoDirText text={q.answer} style={{ color: pt.textPrimary, fontSize: 13 }} />
@@ -454,14 +482,14 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
                         style={{ ...inStyle, ...arabicFont(draft), minHeight: 60, resize: 'vertical' }} />
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button onClick={() => submitReply(q.id)} style={{
-                          flex: 1, padding: '10px', background: '#22c55e',
+                          flex: 1, padding: '10px', background: dark ? '#22c55e' : pt.success,
                           border: 'none', borderRadius: 999, cursor: 'pointer',
                           fontWeight: 700, color: '#fff', fontFamily: pulseFonts.body,
                           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
                         }}><CheckCircleIcon color="#fff" size={14} /> Answer</button>
                         <button onClick={() => setConfirmDeleteId(q.id)} aria-label="Delete question" style={{
-                          padding: '10px 16px', background: 'rgba(239,107,87,0.14)',
-                          border: '1px solid rgba(239,107,87,0.35)', borderRadius: 999, cursor: 'pointer',
+                          padding: '10px 16px', background: dangerTint,
+                          border: `1px solid ${dangerBorder}`, borderRadius: 999, cursor: 'pointer',
                           color: pt.danger, fontFamily: pulseFonts.body, fontWeight: 700,
                           display: 'flex', alignItems: 'center'
                         }}><TrashIcon color={pt.danger} size={15} /></button>
@@ -474,8 +502,8 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
           )}
 
           <div>
-            <h3 style={{ ...pulseType.sectionLabel, color: '#4ade80', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <CheckCircleIcon color="#4ade80" size={14} /> Answered ({answeredQs.length})
+            <h3 style={{ ...pulseType.sectionLabel, color: okColor, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <CheckCircleIcon color={okColor} size={14} /> Answered ({answeredQs.length})
             </h3>
             {loading && <QuestionCardsSkeleton />}
             {!loading && !loadError && answeredQs.length === 0 && (
@@ -496,18 +524,18 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
                       <DateStamp value={q.created_at} color={pt.textMuted} />
                     </div>
                     <div dir={textDir(q.answer || '')} style={{
-                      background: 'rgba(74,222,128,0.10)', border: '1px solid rgba(74,222,128,0.25)',
+                      background: okSoft, border: `1px solid ${okBorder}`,
                       borderRadius: 10, padding: '12px 16px'
                     }}>
-                      <div style={{ color: '#4ade80', fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <LightbulbIcon color="#4ade80" size={12} /> Answer
+                      <div style={{ color: okColor, fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <LightbulbIcon color={okColor} size={12} /> Answer
                       </div>
                       <AutoDirText text={q.answer || ''} style={{ color: pt.textPrimary, fontSize: 14 }} />
                     </div>
                     {isAdmin && (
                       <button onClick={() => setConfirmDeleteId(q.id)} style={{
                         marginTop: 8, padding: '6px 12px',
-                        background: 'rgba(239,107,87,0.14)', border: '1px solid rgba(239,107,87,0.35)',
+                        background: dangerTint, border: `1px solid ${dangerBorder}`,
                         borderRadius: 8, cursor: 'pointer',
                         color: pt.danger, fontFamily: pulseFonts.body, fontSize: 12,
                         display: 'inline-flex', alignItems: 'center', gap: 5

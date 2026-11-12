@@ -5,7 +5,7 @@ import confetti from 'canvas-confetti'
 import { Lock, Eye, EyeOff, ArrowLeft, GraduationCap, Mail } from 'lucide-react'
 import { supabase } from '@/core/supabase'
 import { containsProfanity } from '@/shared/utils/moderation'
-import { getPulseTheme, pulseFonts, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseFonts, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import PulseBrand from '@/shared/ui/display/PulseBrand'
 import {
   GlassField, PrimaryButton, GhostButton, TextLink, AccountToggle, AuthMessage, inputResetStyle
@@ -20,12 +20,14 @@ type AuthStep = 'form' | 'verify'
 // isn't accepted just because it contains the university domain.
 const UNIVERSITY_EMAIL_REGEX = /^[^\s@]+@med\.znu\.edu\.eg$/i
 
+// Fires a short confetti burst from both bottom corners.
 function fireConfetti() {
   const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 999 }
   confetti({ ...defaults, particleCount: 50, origin: { x: 0, y: 1 }, angle: 60 })
   confetti({ ...defaults, particleCount: 50, origin: { x: 1, y: 1 }, angle: 120 })
 }
 
+// Google "G" logo for the sign-in button.
 function GoogleIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
@@ -37,6 +39,7 @@ function GoogleIcon({ size = 18 }: { size?: number }) {
   )
 }
 
+// "OR" divider between the Google button and the email form.
 function OrDivider({ pt }: { pt: ReturnType<typeof getPulseTheme> }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '2px 0' }}>
@@ -47,6 +50,7 @@ function OrDivider({ pt }: { pt: ReturnType<typeof getPulseTheme> }) {
   )
 }
 
+// Sign-in / sign-up page with email verification and Google sign-in.
 export default function Auth({ dark = true }: { dark?: boolean }) {
   const navigate = useNavigate()
   const pt = getPulseTheme(dark)
@@ -70,11 +74,13 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
   const otpRef = useRef<HTMLInputElement>(null)
   const celebratedRef = useRef(false)
 
+  // Focuses the code field when the verify step opens.
   useEffect(() => {
     if (step !== 'verify') return
     const t = setTimeout(() => otpRef.current?.focus(), 300)
     return () => clearTimeout(t)
   }, [step])
+  // Celebrates once when the account is verified.
   useEffect(() => {
     if (message.includes('✅') && message.toLowerCase().includes('verified') && !celebratedRef.current) {
       celebratedRef.current = true
@@ -82,6 +88,7 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
     }
   }, [message])
 
+  // Tracks the desktop breakpoint to show the brand panel.
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 1024px)')
     setIsDesktop(mq.matches)
@@ -90,10 +97,12 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
     return () => mq.removeEventListener?.('change', handler)
   }, [])
 
+  // Clears the form and returns to its first step.
   function resetAll() {
     setStep('form'); setName(''); setEmail(''); setPassword(''); setConfirmPassword(''); setOtp(''); setMessage('')
   }
 
+  // Starts the Google sign-in redirect.
   async function handleGoogleSignIn() {
     setMessage('')
     setGoogleLoading(true)
@@ -109,6 +118,7 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
     }
   }
 
+  // Signs in with email and password.
   async function handleSignInSubmit() {
     setMessage('')
     if (!email.trim()) return setMessage('❌ Please enter your email')
@@ -120,6 +130,7 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
     else navigate('/')
   }
 
+  // Validates the sign-up form and sends the verification code.
   async function handleSignupSubmit() {
     setMessage('')
     const cleanEmail = email.trim()
@@ -154,6 +165,7 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
     setStep('verify')
   }
 
+  // Verifies the 6-digit code and finishes sign-up.
   async function handleVerify() {
     if (!otp || otp.trim().length < 6) return setMessage('❌ Please enter the 6-digit code')
     setMessage('')
@@ -175,6 +187,7 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
     setMessage(error ? '❌ ' + error.message : '✅ A new code was sent — check spam too.')
   }
 
+  // Sends a password reset link to the typed email.
   async function handleForgotPassword() {
     if (loading) return
     if (!email.trim()) return setMessage('Please enter your email address first')
@@ -238,8 +251,8 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
 
             {step === 'verify' ? (
               <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <p style={{ textAlign: 'center', fontSize: 12, color: ON_GRADIENT_TOP.secondary, fontFamily: pulseFonts.body }}>
-                  We sent a 6-digit code to <strong style={{ color: ON_GRADIENT_TOP.primary }}>{email}</strong>
+                <p style={{ textAlign: 'center', fontSize: 12, color: ON_BACKGROUND.secondary, fontFamily: pulseFonts.body }}>
+                  We sent a 6-digit code to <strong style={{ color: ON_BACKGROUND.primary }}>{email}</strong>
                 </p>
                 <GlassField dark={dark}>
                   <input ref={otpRef} inputMode="numeric" maxLength={6} value={otp}
@@ -258,7 +271,7 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
               </motion.div>
             ) : mode === 'signin' ? (
               <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <p style={{ fontSize: 22, fontWeight: 300, color: ON_GRADIENT_TOP.primary, textAlign: 'center', fontFamily: pulseFonts.display }}>Welcome back</p>
+                <p style={{ fontSize: 22, fontWeight: 300, color: ON_BACKGROUND.primary, textAlign: 'center', fontFamily: pulseFonts.display }}>Welcome back</p>
 
                 {googleButton}
                 <OrDivider pt={pt} />
@@ -295,7 +308,7 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
               </motion.div>
             ) : (
               <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <p style={{ fontSize: 22, fontWeight: 300, color: ON_GRADIENT_TOP.primary, textAlign: 'center', fontFamily: pulseFonts.display }}>Create your account</p>
+                <p style={{ fontSize: 22, fontWeight: 300, color: ON_BACKGROUND.primary, textAlign: 'center', fontFamily: pulseFonts.display }}>Create your account</p>
 
                 {googleButton}
                 <OrDivider pt={pt} />

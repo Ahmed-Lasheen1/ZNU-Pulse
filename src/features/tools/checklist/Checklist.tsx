@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
 import { supabase } from '@/core/supabase'
 import { useAuth, useModules } from '@/core/contexts'
-import { getPulseTheme, pulseFonts, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseFonts, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import { glassInput } from '@/shared/ui/glass/PulseUI'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PageShell from '@/shared/ui/layout/PageShell'
@@ -133,6 +133,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
   const activeModulesList = (modules as any[]).filter(m => m.status === 'active')
   const selectableModules = activeModulesList.length > 0 ? activeModulesList : (modules as any[])
 
+  // Selects the first module once the list has loaded.
   useEffect(() => {
     if (!modulesLoaded) return
     if (selectableModules.length === 0) setTasksLoading(false)
@@ -140,6 +141,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules])
 
+  // Cleans up guest checklists of modules that no longer exist.
   useEffect(() => {
     if (!modulesLoaded || modulesError) return
     const validIds = new Set((modules as any[]).map(m => m.id))
@@ -147,6 +149,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modulesError])
 
+  // Re-reads tasks whenever queued changes finish syncing.
   useEffect(() => subscribeChecklistOutbox(() => setSyncTick(t => t + 1)), [])
 
   // Keyed on user id, not the session object, so token refreshes don't refetch.
@@ -158,6 +161,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeModule, user?.id, online])
 
+  // Quietly reloads the tasks after a sync.
   useEffect(() => {
     if (syncTick === 0 || !activeModule || !user) return
     let ignore = false
@@ -166,6 +170,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syncTick])
 
+  // Collapses the completed list when switching modules.
   useEffect(() => { setShowCompleted(false) }, [activeModule])
 
   // Cache key of the signed-in user's tasks for the selected module.
@@ -387,7 +392,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
         />
       )}
 
-      <PageIntro dark={dark} emoji={<ChecklistIcon color={ON_GRADIENT_TOP.primary} size={40} />} title="Checklist" subtitle="Track what's left before exam day" />
+      <PageIntro dark={dark} emoji={<ChecklistIcon color={ON_BACKGROUND.primary} size={40} />} title="Checklist" subtitle="Track what's left before exam day" />
 
       <div style={{ marginBottom: SECTION_GAP }}>
         <NotifyPermissionButton dark={dark} label="Enable deadline reminders" />

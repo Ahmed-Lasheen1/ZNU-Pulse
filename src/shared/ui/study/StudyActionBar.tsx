@@ -1,10 +1,15 @@
 import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { pulseFonts, ON_GRADIENT_BOTTOM } from '@/shared/theme/premiumTheme'
+import { pulseFonts } from '@/shared/theme/premiumTheme'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 
 const BAR_Z_INDEX = 450
+// The bar is a dark glass strip in both color modes, so everything inside it uses light text.
 const BAR_TINT = 'rgba(1,12,74,0.55)'
+
+// Text colors for content placed inside the bar.
+export const BAR_TEXT = '#FFFFFF'
+export const BAR_TEXT_MUTED = 'rgba(255,255,255,0.7)'
 
 // Base look of the pill buttons placed inside the bar.
 export const BAR_BUTTON_BASE: CSSProperties = {
@@ -28,6 +33,7 @@ export default function StudyActionBar({
 }: StudyActionBarProps) {
   const barRef = useRef<HTMLDivElement>(null)
 
+  // Reports the bar height to the page and keeps toasts above the bar.
   useEffect(() => {
     const el = barRef.current
     if (!el) return
@@ -65,7 +71,7 @@ export default function StudyActionBar({
             {children}
             {hint && (
               <div className="kbd-hint" style={{
-                textAlign: 'center', color: ON_GRADIENT_BOTTOM.muted,
+                textAlign: 'center', color: BAR_TEXT_MUTED,
                 fontSize: 10, fontWeight: 600, letterSpacing: 0.3, marginTop: 4,
               }}>{hint}</div>
             )}

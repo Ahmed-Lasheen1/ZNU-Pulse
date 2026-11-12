@@ -22,14 +22,22 @@ const DOT_SPACING = 28;
 const LERP_SPEED = 0.08;
 const SNAP_DISTANCE = 0.05;
 
-const LINE_BASE = { r: 255, g: 255, b: 255, a: 0.13 };
+// Ink color of the idle grid per color mode: white on the dark page, navy on the light page.
+const INK = {
+  dark: { r: 255, g: 255, b: 255 },
+  light: { r: 6, g: 43, b: 80 },
+};
+// Opacity of the idle grid lines per color mode.
+const LINE_BASE_ALPHA = { dark: 0.13, light: 0.16 };
 const NODE_BASE_RADIUS = 1.8;
 const NODE_ACTIVE_RADIUS = 3.2;
 
+// Linear interpolation between two numbers.
 function lerpN(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
 
+// Blends two RGBA colors and returns the result as a CSS string.
 function lerpColor(
   base: { r: number; g: number; b: number; a: number },
   active: { r: number; g: number; b: number; a: number },
@@ -42,6 +50,7 @@ function lerpColor(
   return `rgba(${r},${g},${b},${a.toFixed(3)})`;
 }
 
+// Tracks the reduced-motion preference in a ref (read inside the animation loop without re-rendering).
 function usePrefersReducedMotion() {
   const ref = useRef(false);
   useEffect(() => {
@@ -54,18 +63,21 @@ function usePrefersReducedMotion() {
   return ref;
 }
 
+// Mouse-reactive grid drawn on a canvas, either as a full page (with children) or as a fixed overlay.
 export default function KineticGrid({
   children,
   className,
   globalColor = "default",
   overlay = false,
   opacity = 1,
+  dark = true,
 }: {
   children?: ReactNode;
   className?: string;
   globalColor?: "default" | "monochrome";
   overlay?: boolean;
   opacity?: number;
+  dark?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -81,6 +93,7 @@ export default function KineticGrid({
     cols: 0, rows: 0, pts: [], prox: [],
   });
 
+  // Computes one grid point's warped position (mouse pull and ripples) and returns its proximity to the mouse.
   const getWarpedPoint = useCallback(
     (
       gx: number,
@@ -137,6 +150,7 @@ export default function KineticGrid({
     [],
   );
 
+  // Draws one frame: background (full-page mode), ripples, grid lines, nodes and ripple rings.
   const draw = useCallback(
     (now: number) => {
       const canvas = canvasRef.current;
@@ -149,15 +163,25 @@ export default function KineticGrid({
       const ripples = ripplesRef.current;
 
       const overlayScale = overlay ? 0.55 : 1;
+      const mode = dark ? "dark" : "light";
+      const ink = INK[mode];
 
       const theme = {
-        default: {
-          bg: "#161618",
-          lineActive: { r: 74, g: 158, b: 255, a: 0.9 * overlayScale },
-          nodeActive: { r: 74, g: 158, b: 255, a: 1.0 * overlayScale },
-          glow: "74,158,255",
-          ripple: "100,180,255",
-        },
+        default: dark
+          ? {
+              bg: "#161618",
+              lineActive: { r: 74, g: 158, b: 255, a: 0.9 * overlayScale },
+              nodeActive: { r: 74, g: 158, b: 255, a: 1.0 * overlayScale },
+              glow: "74,158,255",
+              ripple: "100,180,255",
+            }
+          : {
+              bg: "#E9EEF5",
+              lineActive: { ...INK.light, a: 0.9 * overlayScale },
+              nodeActive: { ...INK.light, a: 1.0 * overlayScale },
+              glow: "255,255,255",
+              ripple: "255,255,255",
+            },
         monochrome: {
           bg: "#000000",
           lineActive: { r: 255, g: 255, b: 255, a: 0.9 * overlayScale },
@@ -212,8 +236,9 @@ export default function KineticGrid({
         }
       }
 
-      const lineBase = overlay ? { ...LINE_BASE, a: LINE_BASE.a * overlayScale } : LINE_BASE;
+      const lineBase = { ...ink, a: LINE_BASE_ALPHA[mode] * (overlay ? overlayScale : 1) };
 
+      // Draws one grid segment, tinted by how close its ends are to the mouse.
       const drawSeg = (p1: Point, p2: Point, pr1: number, pr2: number) => {
         const avg = (pr1 + pr2) / 2;
         const t = avg * avg * (3 - 2 * avg);
@@ -256,7 +281,7 @@ export default function KineticGrid({
           ctx.beginPath();
           ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
           ctx.fillStyle = lerpColor(
-            { r: 255, g: 255, b: 255, a: (overlay ? 0.12 : 0.2) * (overlay ? overlayScale : 1) },
+            { ...ink, a: (overlay ? 0.12 : 0.2) * (overlay ? overlayScale : 1) },
             theme.nodeActive,
             t,
           );
@@ -273,9 +298,10 @@ export default function KineticGrid({
         ctx.stroke();
       }
     },
-    [getWarpedPoint, globalColor, overlay],
+    [getWarpedPoint, globalColor, overlay, dark],
   );
 
+  // Animation loop: eases the mouse position toward its target and redraws only when something changed.
   const animate = useCallback(
     (now: number) => {
       const m = mouseRef.current;
@@ -301,6 +327,7 @@ export default function KineticGrid({
     [draw],
   );
 
+  // Sizes the canvas, wires pointer and visibility listeners, and starts the loop (one static frame when motion is reduced).
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;

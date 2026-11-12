@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/core/supabase'
 import { useAuth } from '@/core/contexts'
 import { getPulseTheme, pulseFonts, pulseType } from '@/shared/theme/premiumTheme'
+import { adaptColor } from '@/shared/theme/adaptColor'
 import { glassInput } from '@/shared/ui/glass/PulseUI'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PulseSwitch from '@/shared/ui/controls/pulse-switch'
@@ -61,9 +62,12 @@ const closesLabel = (iso: string) =>
 
 const fetchPollsRpc = () => supabase.rpc('get_polls', { p_guest_token: getGuestToken() })
 
+// Polls list: students vote anonymously, admins create, close and delete polls.
 export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProps) {
   const { user } = useAuth() as { user: { id: string } | null }
   const pt = getPulseTheme(dark)
+  // The accent as text and outline color, adjusted to stay readable in the current mode (fills keep the original).
+  const accentText = adaptColor(accent, dark)
   const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
   const cacheKey = user ? `user:${user.id}:polls` : 'polls'
 
@@ -81,6 +85,7 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
   const [allowMultiple, setAllowMultiple] = useState(false)
   const [creating, setCreating] = useState(false)
 
+  // Loads the polls (saved copy first, then fresh).
   async function openPolls(isIgnored: () => boolean = () => false) {
     setLoading(true)
     const { data, error, fromCache } = await cachedSnapshot(cacheKey, fetchPollsRpc, {
@@ -97,6 +102,7 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
     setLoading(false)
   }
 
+  // Reloads the polls from the server (saved copy only when offline).
   async function refreshPolls(isIgnored: () => boolean = () => false) {
     const { data, fromCache } = await networkFirst(cacheKey, fetchPollsRpc)
     if (isIgnored()) return
@@ -107,6 +113,7 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
     setSavedCopy(fromCache)
   }
 
+  // Loads the polls and refreshes them every few seconds while the page is visible.
   useEffect(() => {
     let ignore = false
     openPolls(() => ignore)
@@ -117,12 +124,14 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
 
+  // Returns true when online; otherwise shows a toast and returns false.
   function requireOnline() {
     if (navigator.onLine) return true
     showToast("You're offline — try again when you're connected", 'info')
     return false
   }
 
+  // Saves the chosen options for a poll and refreshes the results.
   async function saveVotes(poll: Poll, optionIds: string[], successMessage: string) {
     if (votingId || poll.closed || !requireOnline()) return
     setVotingId(poll.id)
@@ -153,6 +162,7 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
     saveVotes(poll, next, next.length === 0 ? 'Vote removed' : has ? 'Choice removed' : '✅ Vote saved')
   }
 
+  // Clears the new-poll form and closes it.
   function resetForm() {
     setTitle('')
     setOptions([newOption(), newOption()])
@@ -161,6 +171,7 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
     setFormOpen(false)
   }
 
+  // Creates a poll from the form (admin).
   async function createPoll() {
     if (creating || !requireOnline()) return
     const labels = options.map(o => o.value.trim()).filter(Boolean)
@@ -182,6 +193,7 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
     refreshPolls()
   }
 
+  // Closes or reopens a poll (admin).
   async function toggleClosed(poll: Poll) {
     if (!requireOnline()) return
     const { error } = await supabase.rpc('admin_set_poll_closed', { p_poll_id: poll.id, p_closed: !poll.closed })
@@ -190,6 +202,7 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
     refreshPolls()
   }
 
+  // Deletes a poll and its votes (admin).
   async function deletePoll(id: string) {
     if (!requireOnline()) return
     const { error } = await supabase.rpc('admin_delete_poll', { p_poll_id: id })
@@ -215,13 +228,13 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
         <div style={{ marginBottom: 20 }}>
           {!formOpen ? (
             <button onClick={() => setFormOpen(true)} style={{
-              ...pillBtn(accent), width: '100%', justifyContent: 'center', padding: '12px', borderStyle: 'dashed',
+              ...pillBtn(accentText), width: '100%', justifyContent: 'center', padding: '12px', borderStyle: 'dashed',
             }}>
-              <PlusIcon color={accent} size={12} /> New poll
+              <PlusIcon color={accentText} size={12} /> New poll
             </button>
           ) : (
             <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
-              <h3 style={{ ...pulseType.sectionLabel, color: accent, marginBottom: 14 }}>New poll</h3>
+              <h3 style={{ ...pulseType.sectionLabel, color: accentText, marginBottom: 14 }}>New poll</h3>
               <input
                 dir="auto" placeholder="What do you want to ask?" value={title} maxLength={200}
                 onChange={e => setTitle(e.target.value)} style={{ ...inStyle, ...arabicFont(title), marginBottom: 10 }}
@@ -299,10 +312,10 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
                   <span style={{
                     fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
                     background: poll.closed ? (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)') : `${accent}22`,
-                    color: poll.closed ? pt.textMuted : accent,
+                    color: poll.closed ? pt.textMuted : accentText,
                     display: 'inline-flex', alignItems: 'center', gap: 5,
                   }}>
-                    {poll.closed ? <CheckCircleIcon color={pt.textMuted} size={12} /> : <ClockIcon color={accent} size={12} />}
+                    {poll.closed ? <CheckCircleIcon color={pt.textMuted} size={12} /> : <ClockIcon color={accentText} size={12} />}
                     {poll.closed ? 'Closed' : poll.closes_at ? `Closes ${closesLabel(poll.closes_at)}` : 'Open'}
                   </span>
                   {poll.allow_multiple && (
@@ -331,7 +344,7 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
                         borderRadius: 12, fontFamily: rtl ? ARABIC_FONT : pulseFonts.body, color: pt.textPrimary,
                         cursor: poll.closed ? 'default' : 'pointer', opacity: isVoting ? 0.7 : 1,
                         background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                        border: `1.5px solid ${selected ? accent : pt.border}`,
+                        border: `1.5px solid ${selected ? accentText : pt.border}`,
                       }}
                     >
                       {poll.show_results && (
@@ -343,8 +356,8 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
                       <span aria-hidden style={{
                         position: 'relative', flexShrink: 0, width: 16, height: 16,
                         borderRadius: poll.allow_multiple ? 4 : '50%',
-                        border: `1.5px solid ${selected ? accent : pt.faint}`,
-                        background: selected ? accent : 'transparent',
+                        border: `1.5px solid ${selected ? accentText : pt.faint}`,
+                        background: selected ? accentText : 'transparent',
                       }} />
                       <span dir="auto" style={{
                         position: 'relative', flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600,

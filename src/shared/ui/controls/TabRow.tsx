@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { animate, motion, useMotionValue, useTransform, type Transition } from 'framer-motion'
 import { getPulseTheme, pulseFonts } from '@/shared/theme/premiumTheme'
+import { adaptColor } from '@/shared/theme/adaptColor'
 import { ModuleIcon } from '@/shared/icons/medicalIcons'
 import { usePrefersReducedMotion } from '@/shared/hooks/usePrefersReducedMotion'
 import { useMediaQuery } from '@/shared/hooks/useMediaQuery'
@@ -316,7 +317,8 @@ export default function TabRow({
             const isActive = item.value === active
             const color = item.color || accentColor || pt.cobalt
             const onColor = readableOn(color)
-            const iconColor = isActive ? onColor : color
+            // On the highlight the icon uses the contrasting text color; otherwise the item color, adjusted to stay readable on the glass.
+            const iconColor = isActive ? onColor : adaptColor(color, dark)
             const iconMotion = {
               animate: reduced ? undefined : { scale: isActive ? 1.15 : 1 },
               transition: { type: 'spring', stiffness: 380, damping: 11 } as Transition,

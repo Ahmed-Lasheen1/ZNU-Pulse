@@ -1,4 +1,5 @@
 import { getPulseTheme, pulseType } from '@/shared/theme/premiumTheme'
+import { adaptColor } from '@/shared/theme/adaptColor'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import { ExamIcon } from '@/shared/icons/medicalIcons'
 import { daysFromToday, formatShortDate, parseLocalDate, relativeDayLabel } from '@/features/tools/schedule/scheduleDates'
@@ -15,13 +16,15 @@ interface ExamScheduleCardProps {
 // Exam card: date block, title with its dates, and a countdown; opens the image only when one is attached.
 export default function ExamScheduleCard({ dark, schedule, accent, delay, onViewImage }: ExamScheduleCardProps) {
   const pt = getPulseTheme(dark)
+  // The accent as text/icon color, adjusted to stay readable in the current mode (tints keep the original).
+  const accentText = adaptColor(accent, dark)
   const dates = [...(schedule.dates || [])].sort()
   const next = dates.find(d => daysFromToday(d) >= 0) ?? null
   const finished = dates.length > 0 && !next
   const shown = next ?? (finished ? dates[dates.length - 1] : null)
   const diff = next ? daysFromToday(next) : null
   const urgent = diff !== null && diff <= 2
-  const countdownColor = urgent ? pt.amber : accent
+  const countdownColor = urgent ? pt.amber : accentText
 
   const subtitle = [schedule.week, dates.length > 0 ? dates.map(formatShortDate).join(' · ') : null].filter(Boolean).join(' · ')
 
@@ -39,13 +42,13 @@ export default function ExamScheduleCard({ dark, schedule, accent, delay, onView
       }}>
         {shown ? (
           <>
-            <span style={{ ...pulseType.sectionLabel, fontSize: 10, letterSpacing: '0.1em', color: accent }}>
+            <span style={{ ...pulseType.sectionLabel, fontSize: 10, letterSpacing: '0.1em', color: accentText }}>
               {parseLocalDate(shown).toLocaleDateString(undefined, { month: 'short' })}
             </span>
             <span style={{ fontWeight: 800, fontSize: 21, color: pt.textPrimary }}>{parseLocalDate(shown).getDate()}</span>
           </>
         ) : (
-          <ExamIcon color={accent} size={22} />
+          <ExamIcon color={accentText} size={22} />
         )}
       </div>
 
@@ -63,7 +66,7 @@ export default function ExamScheduleCard({ dark, schedule, accent, delay, onView
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
         {diff !== null && (
           <span style={{
-            background: `${countdownColor}22`, color: countdownColor, borderRadius: 999,
+            background: `${urgent ? pt.amber : accent}22`, color: countdownColor, borderRadius: 999,
             padding: '3px 11px', fontSize: 11.5, fontWeight: 800, whiteSpace: 'nowrap',
           }}>{relativeDayLabel(diff)}</span>
         )}

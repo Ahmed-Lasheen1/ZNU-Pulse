@@ -11,9 +11,9 @@
     <link rel="icon" type="image/png" href="/icon-192.png?v=3" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3" />
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#a6d2ef" />
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#a6d2ef" />
-    <meta name="color-scheme" content="light" />
+    <!-- One tag only: the app updates it when the color mode changes (a media-query variant would follow the OS instead). -->
+    <meta name="theme-color" content="#0B1F3B" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="description" content="ZNU Pulse — Your integrated medical study platform: schedules, checklists, question banks, lecture files, and smart summaries for ZNU medical students." />
 
     <meta property="og:type" content="website" />
@@ -29,11 +29,26 @@
     <meta name="twitter:image" content="https://znu-pulse.vercel.app/icon-512.png" />
 
     <style>
-      html, body {
-        margin: 0;
-        background-color: #010c4a;
-      }
+      /* Critical page background, painted before the app stylesheet loads. Keep in sync with --page-bg in src/styles/index.css. */
+      html { background-color: #0B1F3B; }
+      html[data-theme='light'] { background-color: #93C5FD; }
+      html, body { margin: 0; }
     </style>
+
+    <script>
+      // Applies the saved color mode before first paint so the page never flashes the wrong background.
+      // The key and values match znu_theme written by App.jsx; dark is the default.
+      (function () {
+        var theme = 'dark';
+        try {
+          if (localStorage.getItem('znu_theme') === 'light') theme = 'light';
+        } catch (e) {}
+        var root = document.documentElement;
+        root.setAttribute('data-theme', theme);
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', getComputedStyle(root).backgroundColor);
+      })();
+    </script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -55,11 +70,6 @@
     <title>ZNU Pulse</title>
   </head>
   <body>
-    <div
-      id="app-bg"
-      aria-hidden="true"
-      style="position:fixed;top:0;left:0;width:100%;height:100vh;height:100dvh;z-index:0;pointer-events:none;background:linear-gradient(180deg,#a6d2ef 0%,#97bcd7 15%,#81a6c3 30%,#6c8fad 45%,#497194 60%,#274e79 75%,#042a59 90%,#010c4a 100%);"
-    ></div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

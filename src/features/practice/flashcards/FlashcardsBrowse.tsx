@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseFonts, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
+import { adaptColor } from '@/shared/theme/adaptColor'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import EmptyState from '@/shared/ui/feedback/EmptyState'
 import TabRow from '@/shared/ui/controls/TabRow'
@@ -66,6 +67,8 @@ function SubjectRow({ dark, group, delay, expanded, forceOpen, onToggle, onStudy
   const isOpen = rows.length > 1 && (forceOpen || expanded)
   const panelId = `flashcard-subject-${subject.id}`
   const hoverTint = glassHoverTint(dark)
+  // The accent as text/icon color, adjusted to stay readable in the current mode (fills keep the original).
+  const accentText = adaptColor(FLASHCARD_ACCENT, dark)
 
   return (
     <LiquidGlassCard dark={dark} delay={delay} style={{ padding: 0 }}>
@@ -90,12 +93,12 @@ function SubjectRow({ dark, group, delay, expanded, forceOpen, onToggle, onStudy
             cursor: canExpand ? 'pointer' : 'default', font: 'inherit', color: 'inherit',
           }}
         >
-          <ModuleIcon value={subject.icon} size={18} color={subject.color || FLASHCARD_ACCENT} />
+          <ModuleIcon value={subject.icon} size={18} color={adaptColor(subject.color || FLASHCARD_ACCENT, dark)} />
           <span style={{ minWidth: 0, flex: 1 }}>
             <div style={{ color: pt.textPrimary, fontWeight: 700, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subject.name}</div>
             <div style={{ color: pt.textMuted, fontSize: 11.5, marginTop: 1 }}>
               {plural(total, 'card')}
-              {due > 0 && <span style={{ color: FLASHCARD_ACCENT }}> · {due} due</span>}
+              {due > 0 && <span style={{ color: accentText }}> · {due} due</span>}
             </div>
           </span>
           {canExpand && (
@@ -137,7 +140,7 @@ function SubjectRow({ dark, group, delay, expanded, forceOpen, onToggle, onStudy
                     <span style={{
                       flexShrink: 0, fontSize: 11, fontWeight: 700, borderRadius: 999, padding: '3px 10px', whiteSpace: 'nowrap',
                       background: toStudy > 0 ? `${FLASHCARD_ACCENT}26` : 'transparent',
-                      color: toStudy > 0 ? FLASHCARD_ACCENT : pt.textMuted,
+                      color: toStudy > 0 ? accentText : pt.textMuted,
                       border: toStudy > 0 ? 'none' : `1px solid ${pt.border}`,
                     }}>{toStudy > 0 ? `${toStudy} to study` : 'Review anyway'}</span>
                   </div>
@@ -159,6 +162,9 @@ export default function FlashcardsBrowse({
   const pt = getPulseTheme(dark)
   const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null)
   const singleSubject = groups.length === 1
+  // The accent and the module color as text/icon colors, adjusted to stay readable in the current mode.
+  const accentText = adaptColor(FLASHCARD_ACCENT, dark)
+  const modColor = adaptColor(mod.color, dark)
 
   return (
     <PageShell dark={dark} backFallback={`/module/${mod.id}`} maxWidth={PAGE_MAX_WIDTH}>
@@ -166,11 +172,11 @@ export default function FlashcardsBrowse({
 
       <div style={{ textAlign: 'center', padding: '10px 0 16px' }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-          <FlashcardIcon color={FLASHCARD_ACCENT} size={40} />
+          <FlashcardIcon color={accentText} size={40} />
         </div>
-        <h1 style={{ fontFamily: pulseFonts.display, fontWeight: 800, fontSize: 24, color: ON_GRADIENT_TOP.primary, marginBottom: 4 }}>Flashcards</h1>
+        <h1 style={{ fontFamily: pulseFonts.display, fontWeight: 800, fontSize: 24, color: ON_BACKGROUND.primary, marginBottom: 4 }}>Flashcards</h1>
         {!loading && totalCards > 0 && (
-          <div style={{ color: ON_GRADIENT_TOP.secondary, fontSize: 12, fontWeight: 600 }}>
+          <div style={{ color: ON_BACKGROUND.secondary, fontSize: 12, fontWeight: 600 }}>
             {plural(totalCards, 'card')} · {plural(groups.length, 'subject')}
           </div>
         )}
@@ -188,9 +194,9 @@ export default function FlashcardsBrowse({
 
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16,
-        color: mod.color, fontWeight: 700, fontSize: 14,
+        color: modColor, fontWeight: 700, fontSize: 14,
       }}>
-        <ModuleIcon value={mod.icon} size={18} color={mod.color} /> {mod.name}
+        <ModuleIcon value={mod.icon} size={18} color={modColor} /> {mod.name}
       </div>
 
       {stages.length > 0 && (
@@ -216,10 +222,10 @@ export default function FlashcardsBrowse({
                 background: `${FLASHCARD_ACCENT}22`, border: `1px solid ${FLASHCARD_ACCENT}55`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <FlashcardIcon color={FLASHCARD_ACCENT} size={28} />
+                <FlashcardIcon color={accentText} size={28} />
               </div>
               <div style={{ flex: 1, minWidth: 160 }}>
-                <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: FLASHCARD_ACCENT, marginBottom: 6 }}>Due Today</h3>
+                <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: accentText, marginBottom: 6 }}>Due Today</h3>
                 <div style={{ ...pulseType.small, color: pt.textMuted }}>
                   {plural(dueTotal, 'card')} · {plural(dueLessons, 'lesson')}
                 </div>
@@ -233,7 +239,7 @@ export default function FlashcardsBrowse({
         </div>
       )}
 
-      <h3 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16 }}>Study by Subject</h3>
+      <h3 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16 }}>Study by Subject</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {!loading && groups.map((group, i) => (
           <SubjectRow

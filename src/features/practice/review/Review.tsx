@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/core/supabase'
 import { useAuth, useModules } from '@/core/contexts'
-import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseFonts, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
+import { adaptColor } from '@/shared/theme/adaptColor'
 import { glassInput } from '@/shared/ui/glass/PulseUI'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
@@ -98,6 +99,7 @@ interface FlaggedItem {
 type ReviewTab = 'history' | 'flagged'
 type DetailFilter = 'incorrect' | 'all'
 
+// Converts an attempt saved on this device (not yet synced) into a history row.
 function pendingToHistoryRow(attempt: any): HistoryRow {
   return {
     id: `pending-${attempt.id}`,
@@ -115,6 +117,7 @@ function pendingToHistoryRow(attempt: any): HistoryRow {
   }
 }
 
+// Review page: exam history with per-question details, and flagged questions to retry.
 export default function Review({ dark }: { dark: boolean }) {
   const { user } = useAuth() as { user: { id: string } | null }
   const { modules } = useModules() as { modules: ReviewModule[] }
@@ -122,6 +125,15 @@ export default function Review({ dark }: { dark: boolean }) {
   const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
   const pt = getPulseTheme(dark)
   const online = useOnlineStatus()
+
+  // Status colors follow the color mode; the tints are the same colors at 16% opacity.
+  const okColor = pt.success
+  const badColor = pt.danger
+  const okTint = `${pt.success}29`
+  const badTint = `${pt.danger}29`
+  // The accent as text color (fills keep the original), and a module's color adjusted for text and icons.
+  const accentText = adaptColor(MCQ_ACCENT, dark)
+  const modText = (mod: ReviewModule) => adaptColor(mod.color, dark)
 
   const [tab, setTab] = useState<ReviewTab>('history')
 
@@ -143,6 +155,7 @@ export default function Review({ dark }: { dark: boolean }) {
 
   const flagEditedAtRef = useRef(0)
 
+  // Reloads the list when attempts waiting to sync change.
   useEffect(() => subscribePendingAttempts(() => { setSyncTick(t => t + 1); setSelectedHistory(null) }), [])
 
   // Keyed on user id, not the session object, so token refreshes don't refetch.
@@ -152,8 +165,10 @@ export default function Review({ dark }: { dark: boolean }) {
     return () => { ignore = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, user?.id, syncTick, online])
+  // Clears filters and the open attempt when switching tabs.
   useEffect(() => { setSearchQuery(''); setModuleFilter('all'); setSelectedHistory(null) }, [tab])
 
+  // Loads the stage titles used to name stage quizzes in the history.
   useEffect(() => {
     const moduleIds = [...new Set(history.filter(h => h.stage && h.module_id).map(h => h.module_id as string))]
     if (moduleIds.length === 0) return
@@ -167,6 +182,7 @@ export default function Review({ dark }: { dark: boolean }) {
     return () => { ignore = true }
   }, [history])
 
+  // Loads the full copy of the opened attempt (kept on this device only).
   useEffect(() => {
     setFullAttempt(null)
     setDetailFilter('incorrect')
@@ -181,6 +197,7 @@ export default function Review({ dark }: { dark: boolean }) {
 
   const flaggedKey = (userId: string) => `user:${userId}:review-flagged`
 
+  // Loads the active tab's data: history (account or guest) or flagged questions.
   async function fetchTab(isIgnored: () => boolean = () => false) {
     setLoading(true)
     setLoadError(false)
@@ -244,6 +261,7 @@ export default function Review({ dark }: { dark: boolean }) {
     setLoading(false)
   }
 
+  // Retries uploading attempts that are waiting to sync.
   async function retrySync() {
     if (!user || syncBusy) return
     setSyncBusy(true)
@@ -254,6 +272,7 @@ export default function Review({ dark }: { dark: boolean }) {
     else showToast("Still waiting — it will sync automatically once you're online", 'info')
   }
 
+  // Removes a flag from a question (account or guest).
   async function unflag(questionId: string) {
     if (user) {
       if (!navigator.onLine) { showToast("You're offline — try again when you're connected", 'info'); return }
@@ -269,6 +288,7 @@ export default function Review({ dark }: { dark: boolean }) {
     showToast('Flag removed')
   }
 
+  // Starts a retry quiz with the given questions.
   function retryAll(list: any[]) {
     const retryQuestions = list.map((item: any) => ({
       id: item.question_id || item.id,
@@ -279,6 +299,7 @@ export default function Review({ dark }: { dark: boolean }) {
     navigate('/mcq', { state: { retryQuestions } })
   }
 
+  // Finds a module by id.
   function moduleFor(id?: string | null) { return modules.find(m => m.id === id) }
 
   const optionsOf = (item: { option_a: string; option_b: string; option_c: string; option_d: string }) =>
@@ -319,7 +340,7 @@ export default function Review({ dark }: { dark: boolean }) {
         }
       `}</style>
 
-      <PageIntro dark={dark} emoji={<BookIcon color={ON_GRADIENT_TOP.primary} size={40} />} title="Review" subtitle="Your exam history, mistakes, and flagged questions" paddingBottom={16} />
+      <PageIntro dark={dark} emoji={<BookIcon color={ON_BACKGROUND.primary} size={40} />} title="Review" subtitle="Your exam history, mistakes, and flagged questions" paddingBottom={16} />
 
       <PillTabs dark={dark} tabs={reviewTabs} active={tab} onSelect={id => setTab(id)} marginBottom={SECTION_GAP} />
 
@@ -349,8 +370,8 @@ export default function Review({ dark }: { dark: boolean }) {
           <>
             {accuracy !== null && (
               <div style={{ textAlign: 'center', marginBottom: SECTION_GAP }}>
-                <span style={{ color: MCQ_ACCENT, fontWeight: 900, fontSize: 20, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <TargetIcon color={MCQ_ACCENT} size={18} /> {accuracy}%
+                <span style={{ color: accentText, fontWeight: 900, fontSize: 20, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <TargetIcon color={accentText} size={18} /> {accuracy}%
                 </span>
                 <span style={{ color: pt.sub, fontSize: 12, fontWeight: 600, marginLeft: 8 }}>
                   overall accuracy ({totalCorrect}/{totalAttempted})
@@ -372,7 +393,7 @@ export default function Review({ dark }: { dark: boolean }) {
                     padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                      {mod && <ModuleIcon value={mod.icon} size={20} color={mod.color} />}
+                      {mod && <ModuleIcon value={mod.icon} size={20} color={modText(mod)} />}
                       <div style={{ minWidth: 0 }}>
                         <div style={{ ...pulseType.cardTitle, fontSize: 14, color: pt.textPrimary }}>
                           {mod ? mod.name : 'Module'} · {historyName(h)}
@@ -389,8 +410,8 @@ export default function Review({ dark }: { dark: boolean }) {
                       </div>
                     </div>
                     <div style={{
-                      background: h.score >= 60 ? 'rgba(74,222,128,0.16)' : 'rgba(239,107,87,0.16)',
-                      color: h.score >= 60 ? pt.success : pt.danger,
+                      background: h.score >= 60 ? okTint : badTint,
+                      color: h.score >= 60 ? okColor : badColor,
                       borderRadius: 999, padding: '4px 14px', fontWeight: 900, fontSize: 14, flexShrink: 0
                     }}>{h.score}%</div>
                   </LiquidGlassCard>
@@ -424,8 +445,8 @@ export default function Review({ dark }: { dark: boolean }) {
 
             <div style={{ textAlign: 'center', marginBottom: SECTION_GAP }}>
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                {mod && <ModuleIcon value={mod.icon} size={20} color={mod.color} />}
-                <span style={{ ...pulseType.sectionTitle, color: mod?.color || MCQ_ACCENT, fontSize: 18 }}>{mod ? mod.name : 'Module'}</span>
+                {mod && <ModuleIcon value={mod.icon} size={20} color={modText(mod)} />}
+                <span style={{ ...pulseType.sectionTitle, color: mod ? modText(mod) : accentText, fontSize: 18 }}>{mod ? mod.name : 'Module'}</span>
               </div>
               <div style={{ color: pt.sub, fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{historyName(selectedHistory)}</div>
               <div style={{ color: pt.textMuted, fontSize: 13 }}>
@@ -517,8 +538,8 @@ export default function Review({ dark }: { dark: boolean }) {
                         {item.is_correct !== undefined && (
                           <span style={{
                             fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: '2px 9px', borderRadius: 20,
-                            background: item.is_correct ? 'rgba(74,222,128,0.16)' : 'rgba(248,113,113,0.16)',
-                            color: item.is_correct ? '#4ade80' : '#f87171'
+                            background: item.is_correct ? okTint : badTint,
+                            color: item.is_correct ? okColor : badColor
                           }}>{item.is_correct ? '✓ CORRECT' : item.answer ? '✕ INCORRECT' : '— UNANSWERED'}</span>
                         )}
                         {item.source && <QuestionSourceBadge source={item.source} dark={dark} />}
@@ -532,10 +553,10 @@ export default function Review({ dark }: { dark: boolean }) {
                       const isChosenWrong = !isCorrect && !!item.answer && item.answer === label
                       return (
                         <div key={ai} style={{
-                          background: isCorrect ? '#064e3b' : isChosenWrong ? 'rgba(248,113,113,0.16)' : (dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
-                          border: `1px solid ${isCorrect ? '#4ade80' : isChosenWrong ? '#f87171' : pt.border}`,
+                          background: isCorrect ? okTint : isChosenWrong ? badTint : (dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
+                          border: `1px solid ${isCorrect ? okColor : isChosenWrong ? badColor : pt.border}`,
                           borderRadius: 10, padding: '9px 14px', marginBottom: 6,
-                          color: isCorrect ? '#4ade80' : isChosenWrong ? '#f87171' : pt.sub, fontSize: 13, fontWeight: 600,
+                          color: isCorrect ? okColor : isChosenWrong ? badColor : pt.sub, fontSize: 13, fontWeight: 600,
                           display: 'flex', alignItems: 'flex-start', gap: 6, ...wrapText
                         }}>
                           <span style={{ flexShrink: 0 }}>{label.toUpperCase()}.</span>
@@ -630,8 +651,8 @@ export default function Review({ dark }: { dark: boolean }) {
                   {(mod || item.source) && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
                       {mod && (
-                        <div style={{ color: mod.color, ...pulseType.small, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <ModuleIcon value={mod.icon} size={14} color={mod.color} /> {mod.name}
+                        <div style={{ color: modText(mod), ...pulseType.small, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <ModuleIcon value={mod.icon} size={14} color={modText(mod)} /> {mod.name}
                         </div>
                       )}
                       {item.source && <QuestionSourceBadge source={item.source} dark={dark} />}
@@ -644,10 +665,10 @@ export default function Review({ dark }: { dark: boolean }) {
                     const isCorrect = item.attempted && label === item.correct_answer
                     return (
                       <div key={ai} style={{
-                        background: isCorrect ? '#064e3b' : (dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
-                        border: `1px solid ${isCorrect ? '#4ade80' : pt.border}`,
+                        background: isCorrect ? okTint : (dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
+                        border: `1px solid ${isCorrect ? okColor : pt.border}`,
                         borderRadius: 10, padding: '9px 14px', marginBottom: 6,
-                        color: isCorrect ? '#4ade80' : pt.sub, fontSize: 13, fontWeight: 600,
+                        color: isCorrect ? okColor : pt.sub, fontSize: 13, fontWeight: 600,
                         display: 'flex', alignItems: 'flex-start', gap: 6, ...wrapText
                       }}>
                         <span style={{ flexShrink: 0 }}>{label.toUpperCase()}.</span>
@@ -681,10 +702,10 @@ export default function Review({ dark }: { dark: boolean }) {
                       </div>
                     </PulseGlassRow>
                     <button onClick={() => unflag(qId)} style={{
-                      padding: '8px 12px', background: 'transparent', border: '1px solid #ef444440',
-                      borderRadius: 8, color: '#ef4444', cursor: 'pointer', fontFamily: pulseFonts.body,
+                      padding: '8px 12px', background: 'transparent', border: `1px solid ${badColor}40`,
+                      borderRadius: 8, color: badColor, cursor: 'pointer', fontFamily: pulseFonts.body,
                       fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5
-                    }}><FlagIcon color="#ef4444" size={12} /> Remove</button>
+                    }}><FlagIcon color={badColor} size={12} /> Remove</button>
                   </div>
                 </LiquidGlassCard>
               </div>

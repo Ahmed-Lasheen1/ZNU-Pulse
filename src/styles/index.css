@@ -1,3 +1,33 @@
+/* Color mode tokens. Dark is the default; index.html sets data-theme before first paint and App.jsx keeps it in sync.
+   --page-bg must match the critical style in index.html. */
+:root {
+  color-scheme: dark;
+  --page-bg: #0B1F3B;
+  --on-bg-primary: #FFFFFF;
+  --on-bg-secondary: rgba(255, 255, 255, 0.84);
+  --on-bg-muted: rgba(255, 255, 255, 0.66);
+  --on-bg-divider: rgba(255, 255, 255, 0.28);
+  /* Status text colors for messages drawn directly on the page (no glass), e.g. error banners. */
+  --danger-text: #F87171;
+  --success-text: #4ADE80;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --page-bg: #93C5FD;
+  --on-bg-primary: #062B50;
+  --on-bg-secondary: #062B50;
+  --on-bg-muted: rgba(6, 43, 80, 0.78);
+  --on-bg-divider: rgba(6, 43, 80, 0.28);
+  --danger-text: #991B1B;
+  --success-text: #166534;
+}
+
+/* The flat page background; the interactive grid is drawn over it. */
+html {
+  background-color: var(--page-bg);
+}
+
 * {
   margin: 0;
   padding: 0;

@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import { getPulseTheme, pulseFonts, pulseType } from '@/shared/theme/premiumTheme'
+import { adaptColor } from '@/shared/theme/adaptColor'
 import StudyShell from '@/shared/ui/study/StudyShell'
 import StudyHeader from '@/shared/ui/study/StudyHeader'
 import StudyCard, { STUDY_CARD_TALL } from '@/shared/ui/study/StudyCard'
 import ProgressRail from '@/shared/ui/study/ProgressRail'
-import StudyActionBar, { BAR_BUTTON_BASE } from '@/shared/ui/study/StudyActionBar'
+import StudyActionBar, { BAR_BUTTON_BASE, BAR_TEXT, BAR_TEXT_MUTED } from '@/shared/ui/study/StudyActionBar'
 import QuestionSourceBadge from '@/shared/ui/display/QuestionSourceBadge'
 import AutoDirText from '@/shared/ui/display/AutoDirText'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
@@ -13,7 +14,7 @@ import { GradingSkeleton } from '@/shared/ui/feedback/Skeletons'
 import ConfirmDialog from '@/shared/ui/feedback/ConfirmDialog'
 import { FlagIcon, SearchIcon2, LightbulbIcon } from '@/shared/icons/tool-icons'
 import { wrapText } from '@/shared/utils/textStyles'
-import { EXAM_LOW_TEXT, EXAM_LOW_SECONDARY, EXAM_DIVIDER, EXAM_LOW_SHADOW, optionLabels, optionTexts, formatTime, StatChip, InfoTag } from '@/features/practice/mcqShared'
+import { EXAM_LOW_TEXT, EXAM_LOW_SECONDARY, EXAM_DIVIDER, optionLabels, optionTexts, formatTime, StatChip, InfoTag } from '@/features/practice/mcqShared'
 import { MCQ_ACCENT } from '@/shared/theme/accents'
 import { accuracyTier, accuracyColor } from '@/shared/utils/accuracy'
 
@@ -50,12 +51,12 @@ interface MCQExamFlowProps {
   goNext: () => void
 }
 
-// Style of the translucent pill buttons on the results screen.
-function glassPillBtn(overrides: React.CSSProperties = {}): React.CSSProperties {
+// Style of the translucent pill buttons on the results screen (a blue wash on the dark page, a white wash on the light one).
+function glassPillBtn(dark: boolean, overrides: React.CSSProperties = {}): React.CSSProperties {
   return {
-    background: 'rgba(1,12,74,0.28)',
-    border: '1px solid rgba(255,255,255,0.35)', borderRadius: 999,
-    color: EXAM_LOW_TEXT, textShadow: EXAM_LOW_SHADOW,
+    background: dark ? 'rgba(110,140,195,0.16)' : 'rgba(255,255,255,0.35)',
+    border: `1px solid ${dark ? 'rgba(255,255,255,0.28)' : 'rgba(6,43,80,0.3)'}`, borderRadius: 999,
+    color: EXAM_LOW_TEXT,
     cursor: 'pointer', fontWeight: 700, fontSize: 13, letterSpacing: 0.5, fontFamily: pulseFonts.body,
     ...overrides
   }
@@ -85,6 +86,19 @@ export default function MCQExamFlow({
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false)
   const [confirmExitOpen, setConfirmExitOpen] = useState(false)
   const [barHeight, setBarHeight] = useState(96)
+
+  // Status colors (correct / incorrect) follow the color mode; the tints are the same colors at 16% opacity.
+  const okColor = pt.success
+  const badColor = pt.danger
+  const okTint = `${pt.success}29`
+  const badTint = `${pt.danger}29`
+  // Letter color on a solid correct/incorrect badge.
+  const onOk = dark ? '#08300f' : '#FFFFFF'
+  const onBad = dark ? '#3a0a0a' : '#FFFFFF'
+  // The accent as text color (the original stays for fills).
+  const accentText = adaptColor(MCQ_ACCENT, dark)
+  // The action bar is dark in both modes, so its flag button uses the dark theme's amber.
+  const barAmber = getPulseTheme(true).amber
 
   // Counts the questions answered correctly.
   function getScore() {
@@ -209,7 +223,7 @@ export default function MCQExamFlow({
 
       {total === 0 && !submitted && (
         <div style={{ textAlign: 'center', padding: 24 }}>
-          <h2 style={{ color: MCQ_ACCENT, fontSize: 16 }}>No questions available yet!</h2>
+          <h2 style={{ color: accentText, fontSize: 16 }}>No questions available yet!</h2>
         </div>
       )}
 
@@ -239,7 +253,7 @@ export default function MCQExamFlow({
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                   minWidth: 30, height: 24, padding: '0 9px', borderRadius: 8,
                   background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`,
-                  color: MCQ_ACCENT, fontWeight: 800, fontSize: 12, whiteSpace: 'nowrap'
+                  color: accentText, fontWeight: 800, fontSize: 12, whiteSpace: 'nowrap'
                 }}>Q{safeIndex + 1}</span>
                 {showCurrentSubjectTag && <InfoTag label={currentSubject.name} color={currentSubject.color || '#34d399'} dark={dark} />}
                 {showCurrentLessonTag && <InfoTag label={currentLesson.title} color="#818cf8" dark={dark} />}
@@ -280,11 +294,11 @@ export default function MCQExamFlow({
 
                       if (revealed && result) {
                         if (label === result.correct_answer) {
-                          bg = 'rgba(74,222,128,0.16)'; border = '#4ade80'; textColor = '#4ade80'
-                          badgeBg = '#4ade80'; badgeColor = '#08300f'
+                          bg = okTint; border = okColor; textColor = okColor
+                          badgeBg = okColor; badgeColor = onOk
                         } else if (label === answers[safeIndex]) {
-                          bg = 'rgba(248,113,113,0.16)'; border = '#f87171'; textColor = '#f87171'
-                          badgeBg = '#f87171'; badgeColor = '#3a0a0a'
+                          bg = badTint; border = badColor; textColor = badColor
+                          badgeBg = badColor; badgeColor = onBad
                         } else {
                           textColor = pt.faint
                         }
@@ -364,8 +378,8 @@ export default function MCQExamFlow({
                     }}>
                       <span style={{
                         fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: '3px 10px', borderRadius: 20,
-                        background: result.is_correct ? 'rgba(74,222,128,0.16)' : 'rgba(248,113,113,0.16)',
-                        color: result.is_correct ? '#4ade80' : '#f87171'
+                        background: result.is_correct ? okTint : badTint,
+                        color: result.is_correct ? okColor : badColor
                       }}>{result.is_correct ? '✓ CORRECT' : '✕ INCORRECT'}</span>
                     </div>
                   )}
@@ -391,14 +405,14 @@ export default function MCQExamFlow({
           <div style={{ height: 1, background: EXAM_DIVIDER, marginBottom: 18 }} />
 
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: EXAM_LOW_SECONDARY, textShadow: EXAM_LOW_SHADOW, marginBottom: 2 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: EXAM_LOW_SECONDARY, marginBottom: 2 }}>
               {completeLabel}
             </div>
             <div style={{
               fontFamily: pulseFonts.display, fontWeight: 800, fontSize: 'clamp(52px, 11vw, 104px)',
-              lineHeight: 1, color: resultColor, textShadow: '0 2px 14px rgba(1,12,74,0.55)'
+              lineHeight: 1, color: resultColor
             }}>{percent}</div>
-            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, color: resultColor, textShadow: EXAM_LOW_SHADOW, marginTop: 4 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, color: resultColor, marginTop: 4 }}>
               {resultVerdict}
             </div>
 
@@ -411,16 +425,16 @@ export default function MCQExamFlow({
 
           {subjectStats.length > 1 && (
             <div style={{ marginTop: 20 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: EXAM_LOW_SECONDARY, textShadow: EXAM_LOW_SHADOW, marginBottom: 10 }}>YOUR PERFORMANCE</div>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: EXAM_LOW_SECONDARY, marginBottom: 10 }}>YOUR PERFORMANCE</div>
               {subjectStats.map(s => (
                 <div key={s.id} style={{ marginBottom: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ color: EXAM_LOW_TEXT, textShadow: EXAM_LOW_SHADOW, fontSize: 12, fontWeight: 600 }}>{s.name}</span>
-                    <span style={{ color: EXAM_LOW_SECONDARY, textShadow: EXAM_LOW_SHADOW, fontSize: 12, fontWeight: 700 }}>{s.accuracy}</span>
+                    <span style={{ color: EXAM_LOW_TEXT, fontSize: 12, fontWeight: 600 }}>{s.name}</span>
+                    <span style={{ color: EXAM_LOW_SECONDARY, fontSize: 12, fontWeight: 700 }}>{s.accuracy}</span>
                   </div>
                   <div style={{
                     height: 4, borderRadius: 999, overflow: 'hidden',
-                    background: 'rgba(255,255,255,0.15)'
+                    background: dark ? 'rgba(255,255,255,0.15)' : 'rgba(6,43,80,0.15)'
                   }}>
                     <div style={{
                       height: '100%', width: `${s.accuracy}%`, borderRadius: 999,
@@ -435,9 +449,9 @@ export default function MCQExamFlow({
 
           {weakestSubject && (
             <div style={{ marginTop: 20 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: EXAM_LOW_SECONDARY, textShadow: EXAM_LOW_SHADOW, marginBottom: 8 }}>FOCUS NEXT</div>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: EXAM_LOW_SECONDARY, marginBottom: 8 }}>FOCUS NEXT</div>
               <LiquidGlassCard dark={dark} delay={0} style={{ padding: '16px 20px' }}>
-                <div style={{ color: MCQ_ACCENT, fontWeight: 800, fontSize: 15, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                <div style={{ color: accentText, fontWeight: 800, fontSize: 15, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                   {weakestSubject.name}
                 </div>
                 <div style={{ color: pt.sub, fontSize: 12, marginBottom: 12 }}>
@@ -452,14 +466,14 @@ export default function MCQExamFlow({
           )}
 
           <div style={{ marginTop: 20 }}>
-            <button onClick={() => setShowReview(true)} className="study-btn" style={glassPillBtn({
+            <button onClick={() => setShowReview(true)} className="study-btn" style={glassPillBtn(dark, {
               width: '100%', padding: '12px',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
             })}><SearchIcon2 color={EXAM_LOW_TEXT} size={14} /> REVIEW ANSWERS</button>
           </div>
 
           <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-            <button onClick={tryAgain} className="study-btn" style={glassPillBtn({ flex: 1, padding: '13px' })}>TRY AGAIN</button>
+            <button onClick={tryAgain} className="study-btn" style={glassPillBtn(dark, { flex: 1, padding: '13px' })}>TRY AGAIN</button>
             <button onClick={stopQuiz} className="study-btn" style={solidPillBtn(pt)}>DONE</button>
           </div>
         </div>
@@ -471,7 +485,7 @@ export default function MCQExamFlow({
 
           <button onClick={() => setShowReview(false)} className="study-btn" style={{
             background: 'transparent', border: 'none', cursor: 'pointer',
-            color: EXAM_LOW_TEXT, textShadow: EXAM_LOW_SHADOW,
+            color: EXAM_LOW_TEXT,
             fontSize: 12, fontWeight: 700, letterSpacing: 1, marginBottom: 16, display: 'block'
           }}>← BACK TO RESULTS</button>
 
@@ -488,19 +502,19 @@ export default function MCQExamFlow({
               <div key={qi} style={{ marginBottom: isLast ? 0 : 14 }}>
                 <LiquidGlassCard dark={dark} delay={0} style={{
                   padding: '18px 20px', width: '100%', boxSizing: 'border-box',
-                  boxShadow: `inset 0 0 0 2px ${isCorrect ? '#4ade80' : userAnswer ? '#f87171' : 'transparent'}`
+                  boxShadow: `inset 0 0 0 2px ${isCorrect ? okColor : userAnswer ? badColor : 'transparent'}`
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
                     <span style={{
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                       minWidth: 28, height: 22, padding: '0 8px', borderRadius: 7,
                       background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`,
-                      color: MCQ_ACCENT, fontWeight: 800, fontSize: 11
+                      color: accentText, fontWeight: 800, fontSize: 11
                     }}>Q{qi + 1}</span>
                     <span style={{
                       fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: '2px 9px', borderRadius: 20,
-                      background: isCorrect ? 'rgba(74,222,128,0.16)' : 'rgba(248,113,113,0.16)',
-                      color: isCorrect ? '#4ade80' : '#f87171'
+                      background: isCorrect ? okTint : badTint,
+                      color: isCorrect ? okColor : badColor
                     }}>{isCorrect ? '✓ CORRECT' : userAnswer ? '✕ INCORRECT' : '— UNANSWERED'}</span>
                     {showSubjectTag && <InfoTag label={subj.name} color={subj.color || '#34d399'} dark={dark} />}
                     {showLessonTag && <InfoTag label={lesson.title} color="#818cf8" dark={dark} />}
@@ -516,8 +530,8 @@ export default function MCQExamFlow({
                     let bg = dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'
                     let border = pt.border
                     let color = pt.sub
-                    if (result && label === result.correct_answer) { bg = 'rgba(74,222,128,0.16)'; border = '#4ade80'; color = '#4ade80' }
-                    if (result && userAnswer === label && label !== result.correct_answer) { bg = 'rgba(248,113,113,0.16)'; border = '#f87171'; color = '#f87171' }
+                    if (result && label === result.correct_answer) { bg = okTint; border = okColor; color = okColor }
+                    if (result && userAnswer === label && label !== result.correct_answer) { bg = badTint; border = badColor; color = badColor }
                     return (
                       <div key={ai} style={{
                         background: bg, border: `1px solid ${border}`,
@@ -549,7 +563,7 @@ export default function MCQExamFlow({
           })}
 
           <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-            <button onClick={() => setShowReview(false)} className="study-btn" style={glassPillBtn({ flex: 1, padding: '13px' })}>← BACK</button>
+            <button onClick={() => setShowReview(false)} className="study-btn" style={glassPillBtn(dark, { flex: 1, padding: '13px' })}>← BACK</button>
             <button onClick={stopQuiz} className="study-btn" style={solidPillBtn(pt)}>DONE</button>
           </div>
         </div>
@@ -576,7 +590,7 @@ export default function MCQExamFlow({
                 style={{
                   ...BAR_BUTTON_BASE,
                   background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.28)',
-                  color: EXAM_LOW_TEXT,
+                  color: BAR_TEXT,
                   opacity: safeIndex === 0 ? 0.4 : 1,
                   cursor: safeIndex === 0 ? 'not-allowed' : 'pointer',
                 }}
@@ -595,18 +609,18 @@ export default function MCQExamFlow({
                 title="Flag (F)"
                 style={{
                   ...BAR_BUTTON_BASE,
-                  background: currentFlagged ? `${pt.amber}26` : 'transparent',
-                  border: `1px solid ${currentFlagged ? `${pt.amber}80` : 'rgba(255,255,255,0.22)'}`,
-                  color: currentFlagged ? pt.amber : EXAM_LOW_SECONDARY,
+                  background: currentFlagged ? `${barAmber}26` : 'transparent',
+                  border: `1px solid ${currentFlagged ? `${barAmber}80` : 'rgba(255,255,255,0.22)'}`,
+                  color: currentFlagged ? barAmber : BAR_TEXT_MUTED,
                 }}
               >
-                <FlagIcon color={currentFlagged ? pt.amber : EXAM_LOW_SECONDARY} size={15} />
+                <FlagIcon color={currentFlagged ? barAmber : BAR_TEXT_MUTED} size={15} />
                 <span className="exam-bar-label">{currentFlagged ? 'Flagged' : 'Flag'}</span>
               </button>
               <span
                 aria-label={`${answeredCount} of ${total} answered`}
                 style={{
-                  color: EXAM_LOW_SECONDARY, fontSize: 12, fontWeight: 700,
+                  color: BAR_TEXT_MUTED, fontSize: 12, fontWeight: 700,
                   whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums',
                 }}
               >{answeredCount}/{total}</span>

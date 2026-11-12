@@ -1,7 +1,8 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
-import { getPulseTheme, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
+import { adaptColor } from '@/shared/theme/adaptColor'
 import { ModuleIcon, NotesIcon, ExamIcon } from '@/shared/icons/medicalIcons'
 import { StudyByLessonIcon, BookIcon } from '@/shared/icons/tool-icons'
 import { FlashcardIcon } from '@/shared/icons/FlashcardIcon'
@@ -67,6 +68,9 @@ export default function StudyByLessonSection({
   const [moduleQuestions, setModuleQuestions] = useState<any[]>([])
   const lessonAccuracy = useWeakSpots(moduleQuestions)
   const hoverTint = glassHoverTint(dark)
+  // Accents as text/icon colors, adjusted to stay readable in the current mode (fills keep the original).
+  const mcqText = adaptColor(MCQ_ACCENT, dark)
+  const flashcardText = adaptColor(FLASHCARD_ACCENT, dark)
 
   // Loads the module's questions (shared cache) so answers can be matched to lessons.
   useEffect(() => {
@@ -119,13 +123,14 @@ export default function StudyByLessonSection({
         }
       `}</style>
 
-      <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <StudyByLessonIcon color={ON_GRADIENT_TOP.muted} size={14} /> Study by Lesson
+      <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <StudyByLessonIcon color={ON_BACKGROUND.muted} size={14} /> Study by Lesson
       </h2>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {bySubject.map(({ sub, lessonsForSub }) => {
           const open = openSubjectId === sub.id
+          const subColor = adaptColor(sub.color || '#34d399', dark)
           return (
             <LiquidGlassCard key={sub.id} dark={dark} delay={0} style={{ padding: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px' }}>
@@ -143,8 +148,8 @@ export default function StudyByLessonSection({
                   }}
                 >
                   {sub.icon
-                    ? <ModuleIcon value={sub.icon} size={20} color={sub.color || '#34d399'} />
-                    : <BookIcon color={sub.color || '#34d399'} size={20} />}
+                    ? <ModuleIcon value={sub.icon} size={20} color={subColor} />
+                    : <BookIcon color={subColor} size={20} />}
                   <span style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ color: pt.textPrimary, fontWeight: 700, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub.name}</div>
                     <div style={{ color: pt.textMuted, fontSize: 11.5, marginTop: 1 }}>{lessonsForSub.length} lesson{lessonsForSub.length === 1 ? '' : 's'}</div>
@@ -198,13 +203,13 @@ export default function StudyByLessonSection({
                                   </button>
                                 )}
                                 {hasFlashcards && (
-                                  <button onClick={() => studyFlashcards(lesson.id)} style={pillBtn(FLASHCARD_ACCENT)}>
-                                    <FlashcardIcon color={FLASHCARD_ACCENT} size={12} /> Flashcards
+                                  <button onClick={() => studyFlashcards(lesson.id)} style={pillBtn(flashcardText)}>
+                                    <FlashcardIcon color={flashcardText} size={12} /> Flashcards
                                   </button>
                                 )}
                                 {hasQuestions && (
-                                  <button onClick={() => practiceLesson(lesson.id)} style={pillBtn(MCQ_ACCENT)}>
-                                    <ExamIcon color={MCQ_ACCENT} size={12} /> Practice
+                                  <button onClick={() => practiceLesson(lesson.id)} style={pillBtn(mcqText)}>
+                                    <ExamIcon color={mcqText} size={12} /> Practice
                                   </button>
                                 )}
                                 {!hasQuestions && !hasFlashcards && summaries.length === 0 && (

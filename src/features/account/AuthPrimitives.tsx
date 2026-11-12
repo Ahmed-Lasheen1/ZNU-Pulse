@@ -8,6 +8,7 @@ import type { PulseTheme } from '@/shared/theme/types'
 // Password): a pill-shaped glass field, a solid gradient primary
 // button, a glass ghost button, and a plain text link.
 
+// Pill-shaped glass field that wraps an input.
 export function GlassField({ dark, children }: { dark: boolean; children: ReactNode }) {
   return (
     <PulseGlassRow dark={dark} radius={999}>
@@ -18,6 +19,7 @@ export function GlassField({ dark, children }: { dark: boolean; children: ReactN
   )
 }
 
+// Full-width gradient button for the main action.
 export function PrimaryButton({ pt, disabled, onClick, children }: {
   pt: PulseTheme; disabled?: boolean; onClick?: () => void; children: ReactNode
 }) {
@@ -32,6 +34,7 @@ export function PrimaryButton({ pt, disabled, onClick, children }: {
   )
 }
 
+// Full-width glass button for secondary actions.
 export function GhostButton({ dark, onClick, disabled, children }: {
   dark: boolean; onClick?: () => void; disabled?: boolean; children: ReactNode
 }) {
@@ -52,6 +55,7 @@ export function GhostButton({ dark, onClick, disabled, children }: {
   )
 }
 
+// Plain text button used as a link.
 export function TextLink({ pt, onClick, muted, disabled, children }: {
   pt: PulseTheme; onClick?: () => void; muted?: boolean; disabled?: boolean; children: ReactNode
 }) {
@@ -64,6 +68,7 @@ export function TextLink({ pt, onClick, muted, disabled, children }: {
   )
 }
 
+// Glass toggle used to pick between two account types.
 export function AccountToggle({ dark, pt, active, onClick, children }: {
   dark: boolean; pt: PulseTheme; active: boolean; onClick: () => void; children: ReactNode
 }) {
@@ -83,17 +88,18 @@ export function AccountToggle({ dark, pt, active, onClick, children }: {
   )
 }
 
-// Success/error message banner shown at the top of an auth form.
+// Success/error message banner shown at the top of an auth form. Its colors follow the color mode.
 export function AuthMessage({ dark, message }: { dark: boolean; message: string }) {
   if (!message) return null
+  const pt = getPulseTheme(dark)
   const isSuccess = isSuccessMessage(message)
-  const tint = isSuccess ? 'rgba(74,222,128,0.18)' : 'rgba(239,107,87,0.18)'
+  const status = isSuccess ? pt.success : pt.danger
   return (
     <div style={{ marginBottom: 16 }}>
-      <PulseGlassRow dark={dark} radius={12} active activeTint={tint}>
+      <PulseGlassRow dark={dark} radius={12} active activeTint={`${status}2E`}>
         <div style={{
           padding: '11px 16px', fontSize: 12, fontWeight: 700,
-          color: isSuccess ? '#4ade80' : '#EF6B57', fontFamily: pulseFonts.body,
+          color: status, fontFamily: pulseFonts.body,
           textAlign: 'center'
         }}>
           {message}

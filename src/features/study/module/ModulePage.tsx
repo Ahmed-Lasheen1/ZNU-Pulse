@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseFonts, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
+import { adaptColor } from '@/shared/theme/adaptColor'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PageShell from '@/shared/ui/layout/PageShell'
 import ModuleNotFoundState from '@/features/study/module/ModuleNotFoundState'
@@ -47,6 +48,13 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   const { modules, modulesLoaded, modulesError } = useModules() as { modules: PageModule[]; modulesLoaded: boolean; modulesError: boolean }
   const module = modules.find(m => m.id === moduleId) || null
 
+  // Colors used as text or icons, adjusted to stay readable in the current mode (fills keep the original).
+  const modColor = module ? adaptColor(module.color, dark) : pt.cobalt
+  const mcqText = adaptColor(MCQ_ACCENT, dark)
+  const flashcardText = adaptColor(FLASHCARD_ACCENT, dark)
+  // The "Active" pill sits directly on the page, so its green is darker in light mode.
+  const activeColor = dark ? pt.success : '#14532D'
+
   const [loadError, setLoadError] = useState(false)
   const [driveUrl, setDriveUrl] = useState('')
   const [examStages, setExamStages] = useState<ExamStage[]>([])
@@ -81,12 +89,14 @@ export default function ModulePage({ dark }: { dark: boolean }) {
     : requestedStage
   const stageActive = activeStage !== 'all'
 
+  // Loads the Google Drive link setting.
   useEffect(() => {
     let ignore = false
     fetchDriveUrl().then(url => { if (!ignore && url) setDriveUrl(url) })
     return () => { ignore = true }
   }, [])
 
+  // Loads the module's stages, subjects, lessons, simulator settings, facets and summaries.
   useEffect(() => {
     let ignore = false
 
@@ -127,6 +137,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
     return () => { ignore = true }
   }, [moduleId])
 
+  // Counts the simulator questions available for the active stage.
   useEffect(() => {
     let ignore = false
     setSimStats({ total: 0, subjects: 0 })
@@ -220,14 +231,14 @@ export default function ModulePage({ dark }: { dark: boolean }) {
     <PageShell dark={dark} backFallback="/" maxWidth={900}>
       <div style={{ textAlign: 'center', padding: '20px 0 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-          <ModuleIcon value={module.icon} size={52} color={module.color} />
+          <ModuleIcon value={module.icon} size={52} color={modColor} />
         </div>
-        <h1 style={{ ...pulseType.pageTitle, fontSize: 26, color: module.color, marginBottom: 6, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{module.name}</h1>
+        <h1 style={{ ...pulseType.pageTitle, fontSize: 26, color: modColor, marginBottom: 6, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{module.name}</h1>
         <div style={{
           display: 'inline-block',
-          background: module.status === 'active' ? 'rgba(74,222,128,0.14)' : (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
-          color: module.status === 'active' ? '#4ade80' : ON_GRADIENT_TOP.muted,
-          border: `1px solid ${module.status === 'active' ? 'rgba(74,222,128,0.35)' : pt.border}`,
+          background: module.status === 'active' ? `${pt.success}24` : (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
+          color: module.status === 'active' ? activeColor : ON_BACKGROUND.muted,
+          border: `1px solid ${module.status === 'active' ? `${pt.success}59` : pt.border}`,
           borderRadius: 999, padding: '4px 14px', fontSize: 12, fontWeight: 700
         }}>
           {module.status === 'active' ? '● Active' : '✓ Completed'}
@@ -240,8 +251,8 @@ export default function ModulePage({ dark }: { dark: boolean }) {
 
       {visibleExamStages.length > 0 && (
         <div style={{ marginBottom: 32 }}>
-          <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <ExamStageIcon color={ON_GRADIENT_TOP.muted} size={14} /> Exam Stage
+          <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <ExamStageIcon color={ON_BACKGROUND.muted} size={14} /> Exam Stage
           </h2>
           <TabRow
             items={tabItems}
@@ -290,13 +301,13 @@ export default function ModulePage({ dark }: { dark: boolean }) {
               .sim-btn { padding: 10px 16px; font-size: 13px !important; }
             }
           `}</style>
-          <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <TargetIcon color={ON_GRADIENT_TOP.muted} size={14} /> Exam Simulator
+          <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <TargetIcon color={ON_BACKGROUND.muted} size={14} /> Exam Simulator
           </h2>
           <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 24px' }}>
             <div className="sim-row">
               <div className="sim-icon" style={{ background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55` }}>
-                <TargetIcon color={MCQ_ACCENT} size={28} />
+                <TargetIcon color={mcqText} size={28} />
               </div>
               <div className="sim-text">
                 <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>{meta.title} Simulator</div>
@@ -324,8 +335,8 @@ export default function ModulePage({ dark }: { dark: boolean }) {
       `}</style>
       <div className="module-actions-row" style={{ marginBottom: 32 }}>
         <div>
-          <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <SmartSummariesIcon color={ON_GRADIENT_TOP.muted} size={14} /> Smart Summaries
+          <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <SmartSummariesIcon color={ON_BACKGROUND.muted} size={14} /> Smart Summaries
           </h2>
           <LiquidGlassCard dark={dark} delay={0} onClick={openSummaries} style={{ padding: 24, textAlign: 'center' }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
@@ -344,12 +355,12 @@ export default function ModulePage({ dark }: { dark: boolean }) {
 
         {contentLoaded && hasFlashcards && (
           <div>
-            <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <FlashcardIcon color={ON_GRADIENT_TOP.muted} size={14} /> Flashcards
+            <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <FlashcardIcon color={ON_BACKGROUND.muted} size={14} /> Flashcards
             </h2>
             <LiquidGlassCard dark={dark} delay={0} onClick={openFlashcards} style={{ padding: 24, textAlign: 'center' }}>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-                <FlashcardIcon color={FLASHCARD_ACCENT} size={30} />
+                <FlashcardIcon color={flashcardText} size={30} />
               </div>
               <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>Flashcards</div>
               <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>
@@ -360,12 +371,12 @@ export default function ModulePage({ dark }: { dark: boolean }) {
         )}
 
         <div>
-          <h2 style={{ ...pulseType.sectionLabel, color: ON_GRADIENT_TOP.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <PracticeIcon color={ON_GRADIENT_TOP.muted} size={14} /> Practice
+          <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <PracticeIcon color={ON_BACKGROUND.muted} size={14} /> Practice
           </h2>
           <LiquidGlassCard dark={dark} delay={0} onClick={openPractice} style={{ padding: 24, textAlign: 'center' }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-              <ExamIcon color={MCQ_ACCENT} size={30} />
+              <ExamIcon color={mcqText} size={30} />
             </div>
             <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>MCQ Bank</div>
             <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>

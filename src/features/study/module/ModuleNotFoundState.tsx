@@ -1,6 +1,6 @@
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import LoadingText from '@/shared/ui/feedback/LoadingText'
-import { ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
+import { ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 
 interface ModuleNotFoundStateProps {
   hasError: boolean
@@ -17,7 +17,7 @@ export default function ModuleNotFoundState({
 }: ModuleNotFoundStateProps) {
   return (
     <div style={{ position: 'relative' }}>
-      <div style={{ position: 'relative', zIndex: 1, padding: 24, textAlign: 'center', color: ON_GRADIENT_TOP.secondary }}>
+      <div style={{ position: 'relative', zIndex: 1, padding: 24, textAlign: 'center', color: ON_BACKGROUND.secondary }}>
         {hasError
           ? <ErrorBanner message={errorMessage} />
           : !loaded

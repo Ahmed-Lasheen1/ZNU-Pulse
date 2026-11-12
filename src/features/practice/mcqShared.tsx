@@ -1,22 +1,21 @@
-import { pulseFonts, ON_GRADIENT_TOP, ON_GRADIENT_BOTTOM } from '@/shared/theme/premiumTheme'
+import { pulseFonts, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 
-export const EXAM_TOP_TEXT = ON_GRADIENT_TOP.primary
-export const EXAM_TOP_TEXT_MUTED = ON_GRADIENT_TOP.muted
-export const EXAM_LOW_TEXT = ON_GRADIENT_BOTTOM.primary
-export const EXAM_LOW_SECONDARY = ON_GRADIENT_BOTTOM.secondary
-export const EXAM_LOW_TEXT_MUTED = ON_GRADIENT_BOTTOM.muted
-export const EXAM_LOW_SHADOW = '0 1px 6px rgba(1,12,74,0.5)'
-export const EXAM_DIVIDER = 'rgba(255,255,255,0.28)'
+// Text and divider colors for the study screens' text drawn directly on the page background.
+// They follow the color mode (see ON_BACKGROUND).
+export const EXAM_LOW_TEXT = ON_BACKGROUND.primary
+export const EXAM_LOW_SECONDARY = ON_BACKGROUND.secondary
+export const EXAM_DIVIDER = ON_BACKGROUND.divider
 
 export const optionLabels = ['a', 'b', 'c', 'd']
 export const optionTexts = (q: any) => [q.option_a, q.option_b, q.option_c, q.option_d]
 export const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`
 
+// Big number with a small caption, used for the result stats.
 export function StatChip({ label, value, color }: { label: string; value: string | number; color: string }) {
   return (
     <div style={{ textAlign: 'center' }}>
-      <div style={{ fontFamily: pulseFonts.display, fontWeight: 800, fontSize: 22, color, textShadow: EXAM_LOW_SHADOW }}>{value}</div>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color, opacity: 0.75, marginTop: 2, textShadow: EXAM_LOW_SHADOW }}>{label}</div>
+      <div style={{ fontFamily: pulseFonts.display, fontWeight: 800, fontSize: 22, color }}>{value}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color, opacity: 0.75, marginTop: 2 }}>{label}</div>
     </div>
   )
 }
