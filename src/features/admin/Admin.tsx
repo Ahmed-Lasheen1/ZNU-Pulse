@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/core/supabase'
 import { useAuth, useModules } from '@/core/contexts'
-import { getPulseTheme, pulseFonts, pulseType, ON_GRADIENT_TOP } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseFonts, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import BackButton from '@/shared/ui/layout/BackButton'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import { fetchAllSubjects, invalidateSubjectsCache } from '@/services/content/subjects'
@@ -109,11 +109,12 @@ export default function Admin({ dark }: { dark: boolean }) {
     await Promise.all([reloadModules(), fetchSubjects(), fetchLessons()])
   }
 
+  // Waits for the auth check before deciding whether to show the panel or the not-found page.
   if (!authLoaded) {
     return (
       <div style={{ position: 'relative' }}>
         <div style={{ position: 'relative', zIndex: 1, height: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ color: ON_GRADIENT_TOP.secondary, fontSize: 14, fontWeight: 600 }}>Loading...</div>
+          <div style={{ color: ON_BACKGROUND.secondary, fontSize: 14, fontWeight: 600 }}>Loading...</div>
         </div>
       </div>
     )
