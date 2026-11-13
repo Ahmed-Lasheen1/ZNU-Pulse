@@ -10,6 +10,10 @@
   /* Status text colors for messages drawn directly on the page (no glass), e.g. error banners. */
   --danger-text: #F87171;
   --success-text: #4ADE80;
+  /* Medical backdrop (see src/app/shell/MedicalBackdrop.tsx): line color, line opacity and the glow behind the Home ECG. */
+  --blueprint-ink: #38BDF8;
+  --blueprint-opacity: 0.12;
+  --ecg-glow: rgba(56, 189, 248, 0.22);
 }
 
 :root[data-theme='light'] {
@@ -21,6 +25,9 @@
   --on-bg-divider: rgba(6, 43, 80, 0.28);
   --danger-text: #991B1B;
   --success-text: #166534;
+  --blueprint-ink: #075985;
+  --blueprint-opacity: 0.12;
+  --ecg-glow: rgba(7, 89, 133, 0.07);
 }
 
 /* The flat page background; the interactive grid is drawn over it. */
@@ -203,6 +210,21 @@ h1, h2, h3 {
     0 0 0 2px rgba(255, 255, 255, 0.95),
     0 0 0 4px #38bdf8,
     0 0 0 5px rgba(0, 0, 0, 0.18);
+}
+
+/* Soft local glow behind the Home ECG only (the page background stays flat).
+   A single radial gradient, so it is cheap to paint and never touches layout. */
+.pulse-hero-panel { position: relative; }
+.pulse-hero-panel::before {
+  content: '';
+  position: absolute;
+  inset: -5% -10% -20% -10%;
+  background: radial-gradient(closest-side, var(--ecg-glow), transparent);
+  pointer-events: none;
+}
+.pulse-hero-panel > .pulse-hero-inner { position: relative; }
+@media (max-width: 1000px) {
+  .pulse-hero-panel::before { inset: -15% -10%; }
 }
 
 /* Study screens (MCQ and flashcards) */
