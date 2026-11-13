@@ -32,7 +32,7 @@ const INK = {
 const LINE_BASE_ALPHA = { dark: 0.06, light: 0.07 };
 // Opacity of the idle grid nodes: full-page mode and overlay mode (overlay is fainter).
 const NODE_IDLE_ALPHA = 0.2;
-const NODE_IDLE_ALPHA_OVERLAY = 0.07;
+const NODE_IDLE_ALPHA_OVERLAY = 0;
 const NODE_BASE_RADIUS = 1.8;
 const NODE_ACTIVE_RADIUS = 3.2;
 
