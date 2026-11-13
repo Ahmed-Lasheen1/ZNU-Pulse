@@ -10,22 +10,42 @@
   /* Status text colors for messages drawn directly on the page (no glass), e.g. error banners. */
   --danger-text: #F87171;
   --success-text: #4ADE80;
+  /* Soft colour pools behind the glass: sky from the top left, a deeper blue on the right, a faint warm ember at the bottom left. */
+  --ambient:
+    radial-gradient(60% 50% at 12% 0%, rgba(110, 160, 230, 0.20), transparent 70%),
+    radial-gradient(50% 45% at 100% 35%, rgba(70, 120, 200, 0.16), transparent 70%),
+    radial-gradient(55% 45% at 0% 100%, rgba(255, 107, 0, 0.07), transparent 70%);
 }
 
 :root[data-theme='light'] {
   color-scheme: light;
-  --page-bg: #93C5FD;
+  --page-bg: #C9DDF2;
   --on-bg-primary: #062B50;
   --on-bg-secondary: #062B50;
   --on-bg-muted: rgba(6, 43, 80, 0.78);
   --on-bg-divider: rgba(6, 43, 80, 0.28);
   --danger-text: #991B1B;
   --success-text: #166534;
+  --ambient:
+    radial-gradient(60% 50% at 12% 0%, rgba(255, 255, 255, 0.70), transparent 70%),
+    radial-gradient(50% 45% at 100% 35%, rgba(120, 170, 235, 0.38), transparent 70%),
+    radial-gradient(55% 45% at 0% 100%, rgba(255, 170, 110, 0.20), transparent 70%);
 }
 
-/* The flat page background; the interactive grid is drawn over it. */
+/* The flat page background; the ambient layer and the interactive grid are drawn over it. */
 html {
   background-color: var(--page-bg);
+}
+
+/* Ambient depth: a static fixed layer of soft colour so the glass blur has something to show.
+   Plain gradients only (no blur filter), so it is painted once and costs nothing per frame. */
+html::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--ambient);
 }
 
 * {

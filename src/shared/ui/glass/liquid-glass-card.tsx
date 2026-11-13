@@ -3,7 +3,10 @@
 import { useState, type CSSProperties, type ReactNode, type KeyboardEvent } from "react"
 import { motion } from "framer-motion"
 import { ENTRANCE_PAUSE } from "@/shared/theme/pulseMotion"
-import { liquidGlassShadow, liquidGlassBackdrop, liquidGlassTint } from "@/shared/theme/liquidGlass"
+import { liquidGlassShadow, liquidGlassBackdrop, liquidGlassTint, glassLift } from "@/shared/theme/liquidGlass"
+
+// Visual weight of a card: 'hero' is the one main card of a page, 'quiet' is for repeated or secondary rows.
+export type GlassTone = "standard" | "hero" | "quiet"
 
 interface LiquidGlassCardProps {
   children: ReactNode
@@ -17,8 +20,11 @@ interface LiquidGlassCardProps {
   // straight into its final state by default — no reason to pay the
   // Home-only entrance pause on ordinary navigations.
   instant?: boolean
+  // Defaults to 'standard', which looks exactly like cards did before tones existed.
+  tone?: GlassTone
 }
 
+// Glass card with an optional entrance animation, click handling and a visual weight (tone).
 export default function LiquidGlassCard({
   children,
   dark,
@@ -27,10 +33,12 @@ export default function LiquidGlassCard({
   className,
   style = {},
   instant = true,
+  tone = "standard",
 }: LiquidGlassCardProps) {
   const interactive = !!onClick
   const [hovered, setHovered] = useState(false)
 
+  // Activates a clickable card from the keyboard (Enter or Space).
   function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (!interactive) return
     if (e.key === "Enter" || e.key === " ") {
@@ -55,7 +63,7 @@ export default function LiquidGlassCard({
       onMouseEnter={() => interactive && setHovered(true)}
       onMouseLeave={() => interactive && setHovered(false)}
       className={rootClassName}
-      style={{ position: 'relative', cursor: interactive ? 'pointer' : 'default', borderRadius }}
+      style={{ position: 'relative', cursor: interactive ? 'pointer' : 'default', borderRadius, boxShadow: glassLift(!!dark, tone) }}
       initial={instant ? false : { opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={instant ? { duration: 0 } : { duration: 0.75, delay: entranceDelay, ease: [0.34, 1.56, 0.64, 1] }}
@@ -85,7 +93,7 @@ export default function LiquidGlassCard({
           style={{
             position: 'absolute', inset: 0, zIndex: 0, borderRadius: 'inherit',
             pointerEvents: 'none',
-            background: liquidGlassTint(!!dark),
+            background: liquidGlassTint(!!dark, tone),
           }}
         />
 

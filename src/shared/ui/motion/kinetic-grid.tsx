@@ -27,12 +27,12 @@ const INK = {
   dark: { r: 255, g: 255, b: 255 },
   light: { r: 6, g: 43, b: 80 },
 };
-// Opacity of the idle grid lines per color mode. Kept barely visible so the grid reads as a texture
-// that the pointer reveals, not as ruled paper.
-const LINE_BASE_ALPHA = { dark: 0, light: 0 };
+// Opacity of the idle grid lines per color mode, before the overlay scale and the canvas opacity are applied.
+// Kept faint so the grid reads as a texture that the pointer brightens, not as ruled paper.
+const LINE_BASE_ALPHA = { dark: 0.09, light: 0.11 };
 // Opacity of the idle grid nodes: full-page mode and overlay mode (overlay is fainter).
-const NODE_IDLE_ALPHA = 0;
-const NODE_IDLE_ALPHA_OVERLAY = 0;
+const NODE_IDLE_ALPHA = 0.2;
+const NODE_IDLE_ALPHA_OVERLAY = 0.14;
 const NODE_BASE_RADIUS = 1.8;
 const NODE_ACTIVE_RADIUS = 3.2;
 
@@ -68,7 +68,7 @@ function usePrefersReducedMotion() {
 }
 
 // Mouse-reactive grid drawn on a canvas, either as a full page (with children) or as a fixed overlay.
-// At rest the grid is almost invisible; it shows up around the pointer and in tap ripples.
+// At rest the grid is a faint texture; it brightens around the pointer and in tap ripples.
 export default function KineticGrid({
   children,
   className,

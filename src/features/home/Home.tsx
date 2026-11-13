@@ -497,7 +497,7 @@ export default function Home({ dark }: { dark: boolean }) {
           <div className="pulse-wide">
             <div className="pulse-dash-grid">
               <div className="pulse-dash-report" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <LiquidGlassCard dark={dark} delay={msFor(WEEKLY_REPORT_START)} instant={!playEntrance} style={{ padding: '18px 20px' }}>
+                <LiquidGlassCard dark={dark} tone="hero" delay={msFor(WEEKLY_REPORT_START)} instant={!playEntrance} style={{ padding: '18px 20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
                     <WeeklyReportIcon color={pt.text} size={16} />
                     <div style={{ ...pulseType.sectionLabel, fontSize: 16, color: pt.text }}>
@@ -636,7 +636,7 @@ export default function Home({ dark }: { dark: boolean }) {
                 const accentColor = card.accent === 'amber' ? pt.amber : pt.indigo
                 const Icon = card.Icon
                 return (
-                  <LiquidGlassCard key={i} dark={dark} delay={msFor(TOOLS_START) + i * 110} instant={!playEntrance}
+                  <LiquidGlassCard key={i} dark={dark} tone="quiet" delay={msFor(TOOLS_START) + i * 110} instant={!playEntrance}
                     onClick={() => navigate(card.to)}
                     style={{ borderRadius: 22, padding: '18px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>

@@ -3,9 +3,11 @@
 // so colors that already read well pass through untouched. Use it for colors drawn as text or icons;
 // fills such as buttons, badges and bars can keep the original color.
 
-// Approximate relative luminance of the glass surface in each mode: white 35% over #93C5FD (light),
-// and the light-blue wash over #0B1F3B (dark).
-const SURFACE_LUMINANCE = { light: 0.67, dark: 0.03 }
+// Approximate relative luminance of the glass surface in each mode, taken at the worst (least favorable) spot of the
+// page's ambient layer (see --ambient in src/styles/index.css): white 50% over the pale blue page (light), and the
+// light-blue wash over the navy page with its sky glow (dark). Re-check these if the page background, the ambient
+// layer or the standard glass tint in theme/liquidGlass.js change.
+const SURFACE_LUMINANCE = { light: 0.74, dark: 0.05 }
 
 // Minimum contrast ratio against that surface. Slightly relaxed in dark mode so the existing dark accents keep their look.
 const TARGET_CONTRAST = { light: 4.5, dark: 4 }
