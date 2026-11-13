@@ -11,10 +11,11 @@
   --danger-text: #F87171;
   --success-text: #4ADE80;
   /* Medical backdrop (see src/app/shell/MedicalBackdrop.tsx): line color, line opacity and the glow behind the Home ECG.
-     The glow is lower in dark mode (light on dark reads strongly) and higher in light mode so both look equally present. */
+     A light glow on a dark page looks much stronger than a dark glow on a pale page at the same alpha,
+     so the dark value is kept low and the light value high to make both modes look equally present. */
   --blueprint-ink: #38BDF8;
   --blueprint-opacity: 0.12;
-  --ecg-glow: rgba(56, 189, 248, 0.14);
+  --ecg-glow: rgba(56, 189, 248, 0.10);
 }
 
 :root[data-theme='light'] {
@@ -28,7 +29,7 @@
   --success-text: #166534;
   --blueprint-ink: #075985;
   --blueprint-opacity: 0.12;
-  --ecg-glow: rgba(7, 89, 133, 0.16);
+  --ecg-glow: rgba(7, 89, 133, 0.26);
 }
 
 /* The flat page background; the interactive grid is drawn over it. */
