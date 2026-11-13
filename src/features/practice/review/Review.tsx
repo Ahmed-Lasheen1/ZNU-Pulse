@@ -571,7 +571,7 @@ export default function Review({ dark }: { dark: boolean }) {
                         borderRadius: 10, padding: '10px 14px', marginTop: 8, color: pt.sub, fontSize: 12,
                         display: 'flex', alignItems: 'flex-start', gap: 8
                       }}>
-                        <LightbulbIcon color={pt.sub} size={14} style={{ flexShrink: 0, marginTop: 2 }} />
+                        <LightbulbIcon color={pt.sub} size={14} />
                         <span style={wrapText}>{item.explanation}</span>
                       </div>
                     )}
@@ -683,7 +683,7 @@ export default function Review({ dark }: { dark: boolean }) {
                       borderRadius: 10, padding: '10px 14px', marginTop: 8, color: pt.sub, fontSize: 12,
                       display: 'flex', alignItems: 'flex-start', gap: 8
                     }}>
-                      <LightbulbIcon color={pt.sub} size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+                      <LightbulbIcon color={pt.sub} size={14} />
                       <span style={wrapText}>{item.explanation}</span>
                     </div>
                   )}

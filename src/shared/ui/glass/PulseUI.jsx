@@ -5,6 +5,8 @@ import { liquidGlassBackdrop, liquidGlassTint } from '@/shared/theme/liquidGlass
 // Auth, ResetPassword, and other pages — all backgrounds/blur derive
 // from lib/liquidGlass.js so tuning glass opacity is a one-file change.
 
+// Glass input style. Typed as CSSProperties so TSX callers can spread it into `style`.
+/** @returns {import('react').CSSProperties} */
 export function glassInput(pt, dark) {
   return {
     width: '100%', padding: '15px 20px', marginBottom: 14,

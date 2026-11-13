@@ -14,8 +14,10 @@ export function useNotificationStatus() {
   const { user } = useAuth()
   const userId = user?.id || null
   const supported = typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window
-  const [permission, setPermission] = useState(() =>
-    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : null
+  // The cast keeps all three permission values ("denied" included) visible to TypeScript callers.
+  const [permission, setPermission] = useState(
+    /** @type {() => NotificationPermission | null} */ (() =>
+      typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : null)
   )
   const [enabled, setEnabled] = useState(false)
   const [checked, setChecked] = useState(false)

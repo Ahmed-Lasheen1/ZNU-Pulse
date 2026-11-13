@@ -7,7 +7,16 @@ const OFFLINE_NOTICE = "This summary isn't saved for offline use. Open it once w
 
 // Full-screen summary viewer — thin adapter over the shared FullscreenViewer.
 // Online it shows the live page; the page is saved in the background so the
-// saved copy can be shown when there is no connection.
+// saved copy can be shown when there is no connection. `fileType` is optional.
+/**
+ * @param {{
+ *   dark: boolean,
+ *   onBack: () => void,
+ *   url: string,
+ *   title: string,
+ *   fileType?: string,
+ * }} props
+ */
 export default function SummaryOverlay({ dark, onBack, url, title, fileType }) {
   const offline = !useOnlineStatus()
   const [savedHtml, setSavedHtml] = useState(undefined)

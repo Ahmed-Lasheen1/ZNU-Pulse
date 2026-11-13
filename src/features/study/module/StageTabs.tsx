@@ -63,9 +63,11 @@ function glow(color: string) {
 
 // Ease-out transitions for the two edges of the highlight. The leading edge (toward the new tab) finishes first;
 // the trailing edge takes longer, so the pill stretches right after the click and then slowly settles into the tab.
-function edgeTransitions(direction: 1 | -1): { left: Transition; right: Transition } {
-  const leading: Transition = { duration: LEADING_SECONDS, ease: EASE_OUT_EXPO }
-  const trailing: Transition = { duration: TRAILING_SECONDS, ease: EASE_OUT_EXPO }
+// The return type is inferred (a plain duration/ease object) because animate() on a MotionValue
+// accepts a value transition, not the full `Transition` union.
+function edgeTransitions(direction: 1 | -1) {
+  const leading = { duration: LEADING_SECONDS, ease: EASE_OUT_EXPO }
+  const trailing = { duration: TRAILING_SECONDS, ease: EASE_OUT_EXPO }
   return direction > 0
     ? { right: leading, left: trailing }
     : { left: leading, right: trailing }

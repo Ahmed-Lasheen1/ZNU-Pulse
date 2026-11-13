@@ -14,6 +14,7 @@ export async function fetchLessonStageMap() {
     () => supabase.from('lesson_exam_stages').select('lesson_id, stage'),
     { ttl: REFERENCE_TTL, versioned: true }
   )
+  /** @type {Record<string, string[]>} */
   const map = {}
   ;(data || []).forEach(row => {
     if (!map[row.lesson_id]) map[row.lesson_id] = []

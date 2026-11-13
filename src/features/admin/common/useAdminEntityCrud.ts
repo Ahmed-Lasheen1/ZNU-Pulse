@@ -18,6 +18,7 @@ export async function deleteAdminEntity(table: string, id: string) {
   return error
 }
 
+// Custom save functions may return a Promise or a Supabase query builder (a thenable).
 interface CrudArgs<T> {
   table: string
   label: string
@@ -26,8 +27,8 @@ interface CrudArgs<T> {
   resetForm: () => void
   refresh: () => void
   showMessage: (msg: string) => void
-  updateFn?: (id: string, payload: T) => Promise<{ error: any }>
-  insertFn?: (payload: T) => Promise<{ error: any }>
+  updateFn?: (id: string, payload: T) => PromiseLike<{ error: any }>
+  insertFn?: (payload: T) => PromiseLike<{ error: any }>
 }
 
 // Shared save and delete handling for the admin tabs (insert or update, messages, cache refresh).
@@ -45,7 +46,7 @@ export function useAdminEntityCrud<T>({
     const payload = buildPayload()
     const { error } = editingId
       ? updateFn ? await updateFn(editingId, payload) : await supabase.from(table).update(payload as any).eq('id', editingId)
-      : insertFn ? await insertFn(payload) : await supabase.from(table).insert([payload])
+      : insertFn ? await insertFn(payload) : await supabase.from(table).insert([payload as unknown as Record<string, unknown>])
     savingRef.current = false
     setSaving(false)
     if (error) { showMessage('❌ ' + error.message); return }

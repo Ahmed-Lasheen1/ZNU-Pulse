@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, type ComponentType } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '@/core/supabase'
 import { getPulseTheme, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
@@ -34,7 +34,10 @@ interface SearchResult {
   raw?: any
 }
 
-const typeMeta: Record<SearchResult['type'], { Icon: (p: { color?: string; size?: number }) => JSX.Element; label: string; color: string }> = {
+// Any icon component (custom or lucide) that accepts a color and a size.
+type ResultIcon = ComponentType<{ color?: string; size?: number }>
+
+const typeMeta: Record<SearchResult['type'], { Icon: ResultIcon; label: string; color: string }> = {
   module: { Icon: Building2, label: 'Module', color: '#38bdf8' },
   file: { Icon: DocumentIcon, label: 'File', color: '#60a5fa' },
   question: { Icon: FlaskConical, label: 'MCQ Question', color: MCQ_ACCENT },

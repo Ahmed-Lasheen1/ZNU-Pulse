@@ -389,7 +389,7 @@ export default function MCQExamFlow({
                       borderRadius: 10, padding: '10px 14px', color: pt.sub, fontSize: 12,
                       flexShrink: 0, display: 'flex', alignItems: 'flex-start', gap: 8
                     }}>
-                      <LightbulbIcon color={pt.sub} size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+                      <LightbulbIcon color={pt.sub} size={14} />
                       <span style={{ flex: 1, minWidth: 0, ...wrapText }}>{result.explanation}</span>
                     </div>
                   )}
@@ -553,7 +553,7 @@ export default function MCQExamFlow({
                       borderRadius: 10, padding: '10px 14px', marginTop: 8, color: pt.sub, fontSize: 12,
                       display: 'flex', alignItems: 'flex-start', gap: 8
                     }}>
-                      <LightbulbIcon color={pt.sub} size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+                      <LightbulbIcon color={pt.sub} size={14} />
                       <span style={{ flex: 1, minWidth: 0, ...wrapText }}>{result.explanation}</span>
                     </div>
                   )}
