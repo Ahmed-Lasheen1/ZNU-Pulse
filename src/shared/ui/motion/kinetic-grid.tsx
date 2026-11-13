@@ -29,7 +29,7 @@ const INK = {
 };
 // Opacity of the idle grid lines per color mode. Kept barely visible so the grid reads as a texture
 // that the pointer reveals, not as ruled paper.
-const LINE_BASE_ALPHA = { dark: 0.06, light: 0.07 };
+const LINE_BASE_ALPHA = { dark: 0, light: 0 };
 // Opacity of the idle grid nodes: full-page mode and overlay mode (overlay is fainter).
 const NODE_IDLE_ALPHA = 0;
 const NODE_IDLE_ALPHA_OVERLAY = 0;
