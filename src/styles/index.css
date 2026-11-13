@@ -10,10 +10,11 @@
   /* Status text colors for messages drawn directly on the page (no glass), e.g. error banners. */
   --danger-text: #F87171;
   --success-text: #4ADE80;
-  /* Medical backdrop (see src/app/shell/MedicalBackdrop.tsx): line color, line opacity and the glow behind the Home ECG. */
+  /* Medical backdrop (see src/app/shell/MedicalBackdrop.tsx): line color, line opacity and the glow behind the Home ECG.
+     The glow is lower in dark mode (light on dark reads strongly) and higher in light mode so both look equally present. */
   --blueprint-ink: #38BDF8;
   --blueprint-opacity: 0.12;
-  --ecg-glow: rgba(56, 189, 248, 0.22);
+  --ecg-glow: rgba(56, 189, 248, 0.14);
 }
 
 :root[data-theme='light'] {
@@ -27,7 +28,7 @@
   --success-text: #166534;
   --blueprint-ink: #075985;
   --blueprint-opacity: 0.12;
-  --ecg-glow: rgba(7, 89, 133, 0.07);
+  --ecg-glow: rgba(7, 89, 133, 0.16);
 }
 
 /* The flat page background; the interactive grid is drawn over it. */

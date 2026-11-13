@@ -1,12 +1,11 @@
 import { createPortal } from 'react-dom'
-import type { CSSProperties, ReactNode } from 'react'
+import type { CSSProperties } from 'react'
+import { MEDICAL_ICONS } from '@/shared/icons/medicalIcons'
 
-// Edge length of each corner artwork; grows with the viewport but never gets tiny or huge.
-const CORNER_SIZE = 'clamp(180px, 34vw, 480px)'
-
-// Keeps strokes at a constant 1px however much the corner artwork is scaled.
-const STROKE_CSS = `
-  .mbd-art path, .mbd-art polyline, .mbd-art polygon, .mbd-art circle { vector-effect: non-scaling-stroke; }
+// Keeps stroked icons at a constant thin line however much they are scaled (fill-style icons are unaffected).
+const BACKDROP_CSS = `
+  .mbd-art path, .mbd-art polyline, .mbd-art polygon, .mbd-art circle, .mbd-art rect { vector-effect: non-scaling-stroke; }
+  @media (max-width: 640px) { .mbd-extra { display: none; } }
 `
 
 // Faint technical grid; the center is masked out so it only shows toward the edges.
@@ -23,106 +22,86 @@ const gridStyle: CSSProperties = {
   WebkitMaskImage: GRID_MASK,
 }
 
-// One decorative corner: a square SVG pinned to a viewport corner, drawn in the theme ink color.
-function Corner({ position, children }: { position: CSSProperties; children: ReactNode }) {
+// One scattered icon: a MEDICAL_ICONS key, position in % of the viewport, size in px, rotation in degrees.
+// `extra` icons are hidden on phones to keep small screens uncluttered.
+interface BackdropIcon {
+  key: string
+  top: number
+  left: number
+  size: number
+  rotate: number
+  extra?: boolean
+}
+
+// Hand-placed on a loose grid with jitter, so the artwork spreads across the whole page instead of the corners.
+const BACKDROP_ICONS: BackdropIcon[] = [
+  { key: 'heart', top: 5, left: 4, size: 56, rotate: -12 },
+  { key: 'brain', top: 4, left: 25, size: 52, rotate: 8, extra: true },
+  { key: 'lung', top: 10, left: 47, size: 54, rotate: -6 },
+  { key: 'dna strand', top: 5, left: 70, size: 50, rotate: 14, extra: true },
+  { key: 'stethoscope', top: 9, left: 90, size: 48, rotate: -10 },
+
+  { key: 'kidney', top: 28, left: 12, size: 46, rotate: 18, extra: true },
+  { key: 'microscope', top: 24, left: 35, size: 56, rotate: -8 },
+  { key: 'liver', top: 31, left: 60, size: 56, rotate: 6, extra: true },
+  { key: 'shot', top: 27, left: 84, size: 46, rotate: -20 },
+
+  { key: 'spine', top: 48, left: 3, size: 58, rotate: 10 },
+  { key: 'stomach', top: 46, left: 25, size: 48, rotate: -14, extra: true },
+  { key: 'thermometer', top: 51, left: 52, size: 44, rotate: 22, extra: true },
+  { key: 'eyeball', top: 47, left: 76, size: 50, rotate: -6 },
+  { key: 'tooth', top: 53, left: 93, size: 40, rotate: 12, extra: true },
+
+  { key: 'skeleton', top: 68, left: 8, size: 54, rotate: -8 },
+  { key: 'intestines', top: 70, left: 31, size: 52, rotate: 16, extra: true },
+  { key: 'cardiology', top: 66, left: 55, size: 50, rotate: -4 },
+  { key: 'bone', top: 72, left: 78, size: 46, rotate: 28, extra: true },
+  { key: 'blood', top: 69, left: 93, size: 40, rotate: -10 },
+
+  { key: 'pelvis', top: 88, left: 17, size: 50, rotate: 8 },
+  { key: 'scalpel', top: 90, left: 41, size: 44, rotate: -26, extra: true },
+  { key: 'pharmacy', top: 87, left: 64, size: 48, rotate: 10 },
+  { key: 'hand bones', top: 90, left: 86, size: 52, rotate: -12, extra: true },
+]
+
+// Renders one backdrop icon from the shared medical icon set, drawn in the theme ink color.
+function ScatteredIcon({ icon }: { icon: BackdropIcon }) {
+  const entry = MEDICAL_ICONS[icon.key]
+  if (!entry) return null
+  const { Icon } = entry
   return (
-    <svg
-      className="mbd-art"
-      viewBox="0 0 400 400"
-      aria-hidden="true"
-      focusable="false"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1}
-      strokeLinecap="round"
-      strokeLinejoin="round"
+    <div
+      className={icon.extra ? 'mbd-extra' : undefined}
       style={{
         position: 'absolute',
-        width: CORNER_SIZE,
-        height: CORNER_SIZE,
+        top: `${icon.top}%`,
+        left: `${icon.left}%`,
+        width: icon.size,
+        height: icon.size,
+        transform: `rotate(${icon.rotate}deg)`,
         opacity: 'var(--blueprint-opacity)' as unknown as number,
-        ...position,
       }}
     >
-      {children}
-    </svg>
+      <Icon color="currentColor" size={icon.size} />
+    </div>
   )
 }
 
-// Subtle medical-blueprint layer behind the UI: neurons, molecular links, contour lines and ECG fragments.
+// Subtle medical-blueprint layer behind the UI: a faint grid plus anatomy icons scattered across the page.
 // Static, non-interactive and rendered once; colors come from the --blueprint-* tokens in index.css.
 export default function MedicalBackdrop() {
   return createPortal(
     <div
       aria-hidden="true"
+      className="mbd-art"
       style={{
         position: 'fixed', inset: 0, overflow: 'hidden', pointerEvents: 'none',
         color: 'var(--blueprint-ink)', contain: 'paint',
       }}
     >
-      <style>{STROKE_CSS}</style>
+      <style>{BACKDROP_CSS}</style>
       <div style={gridStyle} />
-
-      {/* Upper-left: neuron with branching dendrites. */}
-      <Corner position={{ top: 0, left: 0 }}>
-        <path d="M60 70 C100 60 130 90 170 80 S240 40 290 60" />
-        <path d="M170 80 C190 120 160 150 190 190 S230 240 220 300" />
-        <path d="M60 70 C40 110 70 150 50 200 S30 260 60 320" />
-        <path d="M190 190 C230 180 260 200 300 190" />
-        <path d="M290 60 C320 40 350 50 380 30" />
-        <path d="M50 200 C90 210 110 240 140 235" />
-        <circle cx="60" cy="70" r="6" />
-        <circle cx="170" cy="80" r="3" />
-        <circle cx="290" cy="60" r="3" />
-        <circle cx="190" cy="190" r="3" />
-        <circle cx="220" cy="300" r="3" />
-        <circle cx="60" cy="320" r="3" />
-        <circle cx="300" cy="190" r="2.5" fill="currentColor" />
-        <circle cx="380" cy="30" r="2.5" fill="currentColor" />
-        <circle cx="140" cy="235" r="2.5" fill="currentColor" />
-      </Corner>
-
-      {/* Upper-right: molecular network with a hexagonal ring. */}
-      <Corner position={{ top: 0, right: 0 }}>
-        <polygon points="340,140 364,154 364,182 340,196 316,182 316,154" />
-        <path d="M340 140 L335 95 L290 70 L235 100 L255 150 L316 182" />
-        <path d="M335 95 L385 60" />
-        <path d="M290 70 L270 20" />
-        <path d="M235 100 L175 85 L150 130" />
-        <path d="M255 150 L225 205 L270 250" />
-        <path d="M364 182 L390 230" />
-        <circle cx="335" cy="95" r="4" />
-        <circle cx="290" cy="70" r="3" />
-        <circle cx="235" cy="100" r="4" />
-        <circle cx="255" cy="150" r="3" />
-        <circle cx="175" cy="85" r="2.5" fill="currentColor" />
-        <circle cx="150" cy="130" r="2.5" fill="currentColor" />
-        <circle cx="225" cy="205" r="3" />
-        <circle cx="270" cy="250" r="2.5" fill="currentColor" />
-        <circle cx="385" cy="60" r="2.5" fill="currentColor" />
-        <circle cx="270" cy="20" r="2.5" fill="currentColor" />
-        <circle cx="390" cy="230" r="2.5" fill="currentColor" />
-      </Corner>
-
-      {/* Lower-left: anatomical contour lines, like a scan or topographic map. */}
-      <Corner position={{ bottom: 0, left: 0 }}>
-        <path d="M0 250 C50 220 110 244 160 212 S250 160 330 172" />
-        <path d="M0 290 C60 262 120 290 190 258 S300 208 400 228" />
-        <path d="M0 330 C70 304 130 330 200 300 S310 260 400 276" />
-        <path d="M0 370 C70 346 140 368 210 342 S320 312 400 326" />
-        <path d="M60 400 C70 370 110 350 150 352" />
-        <circle cx="160" cy="212" r="2.5" fill="currentColor" />
-        <circle cx="330" cy="172" r="2.5" fill="currentColor" />
-      </Corner>
-
-      {/* Lower-right: ECG fragments and an axis with tick marks. */}
-      <Corner position={{ bottom: 0, right: 0 }}>
-        <path d="M120 320 H190 l8 -6 8 6 H236 l6 8 6 -64 8 90 6 -34 H300 l8 -8 8 8 H400" />
-        <path d="M200 366 H250 l5 -4 5 4 H290 l4 6 4 -30 5 42 4 -18 H340 H400" />
-        <path d="M120 392 H400" strokeDasharray="1 9" />
-        <path d="M200 380 V392 M280 380 V392 M360 380 V392" />
-        <circle cx="248" cy="264" r="3" />
-      </Corner>
+      {BACKDROP_ICONS.map(icon => <ScatteredIcon key={icon.key} icon={icon} />)}
     </div>,
     document.body,
   )
