@@ -27,8 +27,12 @@ const INK = {
   dark: { r: 255, g: 255, b: 255 },
   light: { r: 6, g: 43, b: 80 },
 };
-// Opacity of the idle grid lines per color mode.
-const LINE_BASE_ALPHA = { dark: 0.13, light: 0.16 };
+// Opacity of the idle grid lines per color mode. Kept barely visible so the grid reads as a texture
+// that the pointer reveals, not as ruled paper.
+const LINE_BASE_ALPHA = { dark: 0.06, light: 0.07 };
+// Opacity of the idle grid nodes: full-page mode and overlay mode (overlay is fainter).
+const NODE_IDLE_ALPHA = 0.2;
+const NODE_IDLE_ALPHA_OVERLAY = 0.07;
 const NODE_BASE_RADIUS = 1.8;
 const NODE_ACTIVE_RADIUS = 3.2;
 
@@ -64,6 +68,7 @@ function usePrefersReducedMotion() {
 }
 
 // Mouse-reactive grid drawn on a canvas, either as a full page (with children) or as a fixed overlay.
+// At rest the grid is almost invisible; it shows up around the pointer and in tap ripples.
 export default function KineticGrid({
   children,
   className,
@@ -260,6 +265,8 @@ export default function KineticGrid({
         for (let row = 0; row < rows - 1; row++)
           drawSeg(pts[row][col], pts[row + 1][col], prox[row][col], prox[row + 1][col]);
 
+      const nodeBaseAlpha = overlay ? NODE_IDLE_ALPHA_OVERLAY * overlayScale : NODE_IDLE_ALPHA;
+
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
           const p = pts[row][col];
@@ -280,11 +287,7 @@ export default function KineticGrid({
 
           ctx.beginPath();
           ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-          ctx.fillStyle = lerpColor(
-            { ...ink, a: (overlay ? 0.12 : 0.2) * (overlay ? overlayScale : 1) },
-            theme.nodeActive,
-            t,
-          );
+          ctx.fillStyle = lerpColor({ ...ink, a: nodeBaseAlpha }, theme.nodeActive, t);
           ctx.fill();
         }
       }
