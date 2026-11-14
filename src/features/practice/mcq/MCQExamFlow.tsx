@@ -51,7 +51,7 @@ interface MCQExamFlowProps {
   goNext: () => void
 }
 
-// Style of the translucent pill buttons on the results screen (a blue wash on the dark page, a white wash on the light one).
+// Translucent pill button style for the results screen.
 function glassPillBtn(dark: boolean, overrides: React.CSSProperties = {}): React.CSSProperties {
   return {
     background: dark ? 'rgba(110,140,195,0.16)' : 'rgba(255,255,255,0.35)',
@@ -62,7 +62,7 @@ function glassPillBtn(dark: boolean, overrides: React.CSSProperties = {}): React
   }
 }
 
-// Style of the solid "Done" pill button on the results screen.
+// Solid "Done" pill button style for the results screen.
 function solidPillBtn(pt: ReturnType<typeof getPulseTheme>): React.CSSProperties {
   return {
     flex: 1, background: pt.cobalt, border: 'none', borderRadius: 999, padding: '13px',
@@ -87,7 +87,7 @@ export default function MCQExamFlow({
   const [confirmExitOpen, setConfirmExitOpen] = useState(false)
   const [barHeight, setBarHeight] = useState(96)
 
-  // Status colors (correct / incorrect) follow the color mode; the tints are the same colors at 16% opacity.
+  // Status colors follow the color mode; the tints are the same colors at 16% opacity.
   const okColor = pt.success
   const badColor = pt.danger
   const okTint = `${pt.success}29`
@@ -246,6 +246,7 @@ export default function MCQExamFlow({
           <StudyCard
             dark={dark}
             minHeight={STUDY_CARD_TALL}
+            accent={MCQ_ACCENT}
             style={{ overflowY: 'auto', overflowX: 'hidden' }}
             header={
               <>

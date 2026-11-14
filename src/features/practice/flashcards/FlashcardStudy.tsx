@@ -89,7 +89,7 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
   const current = queue[0] ?? null
   const finished = queue.length === 0
   const answered = right + wrong
-  // The accent as an icon color on the end-screen card, adjusted to stay readable in the current mode.
+  // Accent as an icon color on the end-screen card, adjusted for the current mode.
   const accentText = adaptColor(accent, dark)
 
   // Applies an answer: rates the card (first round only) and moves to the next one.
@@ -184,7 +184,7 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
   const textStyle = {
     ...pulseType.cardTitle,
     fontSize: `calc(20px * ${fontScale})`,
-    lineHeight: 1.55, color: pt.textPrimary, ...wrapText,
+    lineHeight: 1.55, color: pt.textPrimary, textAlign: 'center' as const, ...wrapText,
   }
   const doneIndexes = new Set(Array.from({ length: answered }, (_, i) => i))
   const percent = total > 0 ? Math.round((right / total) * 100) : 0
@@ -232,12 +232,12 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
               flipped={flipped}
               onToggle={() => { if (!busyRef.current) setFlipped(f => !f) }}
               front={
-                <StudyCard dark={dark} height={STUDY_CARD_HEIGHT}>
+                <StudyCard dark={dark} height={STUDY_CARD_HEIGHT} accent={accent}>
                   <AutoDirText text={current.front} style={textStyle} />
                 </StudyCard>
               }
               back={
-                <StudyCard dark={dark} height={STUDY_CARD_HEIGHT}>
+                <StudyCard dark={dark} height={STUDY_CARD_HEIGHT} accent={accent}>
                   <AutoDirText text={current.back} style={textStyle} />
                 </StudyCard>
               }
@@ -314,7 +314,7 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
       )}
 
       {finished && (
-        <StudyCard dark={dark} style={{ alignItems: 'center', textAlign: 'center' }}>
+        <StudyCard dark={dark} accent={accent} style={{ alignItems: 'center', textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <CheckCircleIcon color={accentText} size={40} />
           </div>
