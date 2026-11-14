@@ -18,39 +18,57 @@ interface BackdropIcon {
   extra?: boolean
 }
 
-// Hand-placed around the four edges of the viewport so the center stays clear for page content.
-// Each key is used once, because the icons define their own clipPath ids.
+// Hand-placed in a loose band along the four edges (uneven spacing, sizes and rotations) so it feels scattered
+// while the center stays clear for page content. Each key is used once, because the icons define their own clipPath ids.
 const BACKDROP_ICONS: BackdropIcon[] = [
-  // Top edge.
-  { key: 'heart', top: 3, left: 3, size: 56, rotate: -12 },
-  { key: 'brain', top: 2, left: 17, size: 52, rotate: 8, extra: true },
-  { key: 'lung', top: 5, left: 31, size: 54, rotate: -6 },
-  { key: 'microscope', top: 2, left: 47, size: 52, rotate: 10, extra: true },
-  { key: 'dna strand', top: 5, left: 62, size: 50, rotate: 14 },
-  { key: 'stethoscope', top: 2, left: 77, size: 48, rotate: -10, extra: true },
-  { key: 'shot', top: 4, left: 91, size: 46, rotate: -20 },
+  // Top band.
+  { key: 'heart', top: 2, left: 3, size: 58, rotate: -14 },
+  { key: 'brain', top: 7, left: 12, size: 46, rotate: 9, extra: true },
+  { key: 'lung', top: 1, left: 22, size: 52, rotate: -7 },
+  { key: 'microscope', top: 10, left: 29, size: 40, rotate: 16, extra: true },
+  { key: 'dna strand', top: 3, left: 38, size: 48, rotate: 12 },
+  { key: 'stethoscope', top: 11, left: 46, size: 44, rotate: -12, extra: true },
+  { key: 'genome', top: 2, left: 56, size: 42, rotate: 20 },
+  { key: 'thermometer', top: 9, left: 64, size: 38, rotate: -24, extra: true },
+  { key: 'shot', top: 4, left: 73, size: 46, rotate: -18 },
+  { key: 'eyeball', top: 12, left: 81, size: 40, rotate: 8, extra: true },
+  { key: 'bandaid', top: 1, left: 89, size: 44, rotate: 26 },
 
-  // Left edge.
-  { key: 'kidney', top: 19, left: 3, size: 46, rotate: 18, extra: true },
-  { key: 'neurology', top: 34, left: 2, size: 52, rotate: -8 },
-  { key: 'stomach', top: 49, left: 4, size: 48, rotate: -14, extra: true },
-  { key: 'skeleton', top: 63, left: 2, size: 54, rotate: 8 },
-  { key: 'intestines', top: 78, left: 4, size: 50, rotate: 16, extra: true },
+  // Left band.
+  { key: 'kidney', top: 18, left: 6, size: 48, rotate: 18, extra: true },
+  { key: 'neurology', top: 25, left: 1, size: 54, rotate: -8 },
+  { key: 'stomach', top: 33, left: 10, size: 42, rotate: -16, extra: true },
+  { key: 'skeleton', top: 41, left: 3, size: 58, rotate: 8 },
+  { key: 'bladder', top: 49, left: 13, size: 38, rotate: 22, extra: true },
+  { key: 'intestines', top: 57, left: 2, size: 50, rotate: 14 },
+  { key: 'orthopedics', top: 65, left: 9, size: 44, rotate: -10, extra: true },
+  { key: 'sonogram', top: 73, left: 3, size: 46, rotate: 12 },
+  { key: 'female', top: 80, left: 12, size: 40, rotate: -20, extra: true },
 
-  // Right edge.
-  { key: 'eyeball', top: 19, left: 92, size: 48, rotate: -6, extra: true },
-  { key: 'tooth', top: 34, left: 93, size: 40, rotate: 12 },
-  { key: 'cardiology', top: 48, left: 91, size: 50, rotate: -4, extra: true },
-  { key: 'blood', top: 63, left: 93, size: 40, rotate: -10 },
-  { key: 'bone', top: 77, left: 91, size: 46, rotate: 28, extra: true },
+  // Right band.
+  { key: 'tooth', top: 17, left: 92, size: 40, rotate: 12, extra: true },
+  { key: 'cardiology', top: 23, left: 85, size: 52, rotate: -5 },
+  { key: 'blood', top: 31, left: 94, size: 38, rotate: -12 },
+  { key: 'bone', top: 39, left: 87, size: 46, rotate: 28, extra: true },
+  { key: 'vein', top: 47, left: 95, size: 44, rotate: 14 },
+  { key: 'hearing aid', top: 55, left: 84, size: 42, rotate: -18, extra: true },
+  { key: 'liver', top: 62, left: 92, size: 54, rotate: 6 },
+  { key: 'defibrillator', top: 70, left: 86, size: 44, rotate: -10, extra: true },
+  { key: 'nephrology', top: 77, left: 95, size: 46, rotate: 18 },
+  { key: 'urology', top: 82, left: 84, size: 40, rotate: -14, extra: true },
 
-  // Bottom edge.
-  { key: 'pelvis', top: 90, left: 3, size: 50, rotate: 8 },
-  { key: 'thermometer', top: 92, left: 17, size: 44, rotate: 22, extra: true },
-  { key: 'scalpel', top: 90, left: 32, size: 44, rotate: -26 },
-  { key: 'first aid', top: 92, left: 48, size: 46, rotate: 6, extra: true },
-  { key: 'hand bones', top: 90, left: 63, size: 50, rotate: -12 },
-  { key: 'liver', top: 92, left: 77, size: 52, rotate: 6, extra: true },
+  // Bottom band.
+  { key: 'pelvis', top: 90, left: 2, size: 50, rotate: 8 },
+  { key: 'glasses', top: 85, left: 11, size: 40, rotate: -12, extra: true },
+  { key: 'scalpel', top: 93, left: 19, size: 42, rotate: -26 },
+  { key: 'first aid', top: 86, left: 27, size: 44, rotate: 6, extra: true },
+  { key: 'hand bones', top: 92, left: 35, size: 52, rotate: -12 },
+  { key: 'pulse oximeter', top: 87, left: 44, size: 42, rotate: 16, extra: true },
+  { key: 'medical bag', top: 94, left: 52, size: 46, rotate: -6 },
+  { key: 'ultrasound wand', top: 86, left: 60, size: 44, rotate: 22, extra: true },
+  { key: 'emergency care', top: 92, left: 68, size: 44, rotate: -14 },
+  { key: 'internal medicine', top: 85, left: 76, size: 46, rotate: 10, extra: true },
+  { key: 'surgery', top: 94, left: 84, size: 42, rotate: -22 },
 ]
 
 // Renders one backdrop icon from the shared medical icon set, drawn in the theme ink color.
