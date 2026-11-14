@@ -1,6 +1,6 @@
 // ZNU Future Doctors — minimal service worker: installable app + offline shell.
 
-const CACHE_NAME = 'znu-shell-v9'
+const CACHE_NAME = 'znu-shell-v10'
 const SHELL_URLS = ['/', '/favicon.svg', '/logo.svg', '/icon-192.png', '/icon-512.png']
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com']
 const IMMUTABLE_PREFIX = '/assets/'
