@@ -51,5 +51,47 @@ const BACKDROP_ICONS: BackdropIcon[] = [
   { key: 'first aid', top: 92, left: 48, size: 46, rotate: 6, extra: true },
   { key: 'hand bones', top: 90, left: 63, size: 50, rotate: -12 },
   { key: 'liver', top: 92, left: 77, size: 52, rotate: 6, extra: true },
-  { key: 'tooth-spare', top: 0, left: 0, size: 0, rotate: 0 },
 ]
+
+// Renders one backdrop icon from the shared medical icon set, drawn in the theme ink color.
+// An unknown key renders nothing instead of crashing the page.
+function ScatteredIcon({ icon }: { icon: BackdropIcon }) {
+  const entry = MEDICAL_ICONS[icon.key]
+  if (!entry) return null
+  const { Icon } = entry
+  return (
+    <div
+      className={icon.extra ? 'mbd-extra' : undefined}
+      style={{
+        position: 'absolute',
+        top: `${icon.top}%`,
+        left: `${icon.left}%`,
+        width: icon.size,
+        height: icon.size,
+        transform: `rotate(${icon.rotate}deg)`,
+        opacity: 'var(--blueprint-opacity)' as unknown as number,
+      }}
+    >
+      <Icon color="currentColor" size={icon.size} />
+    </div>
+  )
+}
+
+// Subtle medical-blueprint layer behind the UI: anatomy icons scattered around the edges of the page.
+// Static, non-interactive and rendered once; colors come from the --blueprint-* tokens in index.css.
+export default function MedicalBackdrop() {
+  return createPortal(
+    <div
+      aria-hidden="true"
+      className="mbd-art"
+      style={{
+        position: 'fixed', inset: 0, overflow: 'hidden', pointerEvents: 'none',
+        color: 'var(--blueprint-ink)', contain: 'paint',
+      }}
+    >
+      <style>{BACKDROP_CSS}</style>
+      {BACKDROP_ICONS.map(icon => <ScatteredIcon key={icon.key} icon={icon} />)}
+    </div>,
+    document.body,
+  )
+}
