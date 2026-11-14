@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom'
+import type { CSSProperties } from 'react'
 import { MEDICAL_ICONS } from '@/shared/icons/medicalIcons'
 
 // Keeps stroked icons at a constant thin line however much they are scaled (fill-style icons are unaffected).
@@ -6,6 +7,20 @@ const BACKDROP_CSS = `
   .mbd-art path, .mbd-art polyline, .mbd-art polygon, .mbd-art circle, .mbd-art rect { vector-effect: non-scaling-stroke; }
   @media (max-width: 640px) { .mbd-extra { display: none; } }
 `
+
+// Faint technical grid; the center is masked out so it only shows toward the edges.
+const GRID_MASK = 'radial-gradient(ellipse at center, transparent 30%, #000 100%)'
+
+const gridStyle: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  opacity: 'calc(var(--blueprint-opacity) * 0.45)' as unknown as number,
+  backgroundImage:
+    'linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)',
+  backgroundSize: '56px 56px',
+  maskImage: GRID_MASK,
+  WebkitMaskImage: GRID_MASK,
+}
 
 // One scattered icon: a MEDICAL_ICONS key, position in % of the viewport, size in px, rotation in degrees.
 // `extra` icons are hidden on phones to keep small screens uncluttered.
@@ -72,7 +87,7 @@ function ScatteredIcon({ icon }: { icon: BackdropIcon }) {
   )
 }
 
-// Subtle medical-blueprint layer behind the UI: anatomy icons scattered across the page.
+// Subtle medical-blueprint layer behind the UI: a faint grid plus anatomy icons scattered across the page.
 // Static, non-interactive and rendered once; colors come from the --blueprint-* tokens in index.css.
 export default function MedicalBackdrop() {
   return createPortal(
@@ -85,6 +100,7 @@ export default function MedicalBackdrop() {
       }}
     >
       <style>{BACKDROP_CSS}</style>
+      <div style={gridStyle} />
       {BACKDROP_ICONS.map(icon => <ScatteredIcon key={icon.key} icon={icon} />)}
     </div>,
     document.body,
