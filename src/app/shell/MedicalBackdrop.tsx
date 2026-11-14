@@ -28,7 +28,7 @@ const BACKDROP_ICONS: BackdropIcon[] = [
   { key: 'lung', top: 1, left: 22, size: 52, rotate: -7 },
   { key: 'microscope', top: 10, left: 29, size: 40, rotate: 16, extra: true },
   { key: 'dna strand', top: 3, left: 38, size: 48, rotate: 12 },
-  { key: 'stethoscope', top: 11, left: 46, size: 44, rotate: -12, extra: true },
+  { key: 'stethoscope', top: 7, left: 51, size: 44, rotate: -12, extra: true },
   { key: 'shot', top: 4, left: 73, size: 46, rotate: -18 },
   { key: 'eyeball', top: 12, left: 81, size: 40, rotate: 8, extra: true },
 
