@@ -18,8 +18,9 @@ interface BackdropIcon {
   extra?: boolean
 }
 
-// Hand-placed in a loose band along the four edges (uneven spacing, sizes and rotations) so it feels scattered
-// while the center stays clear for page content. Each key is used once, because the icons define their own clipPath ids.
+// Hand-placed with uneven spacing, sizes and rotations so it feels scattered. Most icons sit in a band along the
+// four edges; a smaller group is spread through the interior. Each key is used once, because the icons define
+// their own clipPath ids.
 const BACKDROP_ICONS: BackdropIcon[] = [
   // Top band.
   { key: 'heart', top: 2, left: 3, size: 58, rotate: -14 },
@@ -69,6 +70,22 @@ const BACKDROP_ICONS: BackdropIcon[] = [
   { key: 'emergency care', top: 92, left: 68, size: 44, rotate: -14 },
   { key: 'internal medicine', top: 85, left: 76, size: 46, rotate: 10, extra: true },
   { key: 'surgery', top: 94, left: 84, size: 42, rotate: -22 },
+
+  // Interior (scattered through the middle of the page).
+  { key: 'ear nose and throat', top: 21, left: 24, size: 44, rotate: 14, extra: true },
+  { key: 'large intestine', top: 19, left: 51, size: 42, rotate: -10 },
+  { key: 'otoscope', top: 27, left: 70, size: 40, rotate: 24, extra: true },
+  { key: 'uterus', top: 36, left: 33, size: 44, rotate: -18 },
+  { key: 'heart rate up', top: 42, left: 58, size: 46, rotate: 8, extra: true },
+  { key: 'nose', top: 33, left: 78, size: 38, rotate: -14 },
+  { key: 'gastroenterology', top: 50, left: 24, size: 48, rotate: 20, extra: true },
+  { key: 'dermatology', top: 55, left: 46, size: 40, rotate: -6 },
+  { key: 'infant', top: 48, left: 72, size: 42, rotate: 16, extra: true },
+  { key: 'hair', top: 63, left: 31, size: 38, rotate: -22 },
+  { key: 'hospital building', top: 68, left: 55, size: 46, rotate: 6, extra: true },
+  { key: 'family medicine', top: 61, left: 74, size: 44, rotate: -12 },
+  { key: 'natural medicine', top: 75, left: 22, size: 40, rotate: 18, extra: true },
+  { key: 'pediatrics', top: 76, left: 44, size: 44, rotate: -8 },
 ]
 
 // Renders one backdrop icon from the shared medical icon set, drawn in the theme ink color.
@@ -95,7 +112,7 @@ function ScatteredIcon({ icon }: { icon: BackdropIcon }) {
   )
 }
 
-// Subtle medical-blueprint layer behind the UI: anatomy icons scattered around the edges of the page.
+// Subtle medical-blueprint layer behind the UI: anatomy icons scattered across the page, denser toward the edges.
 // Static, non-interactive and rendered once; colors come from the --blueprint-* tokens in index.css.
 export default function MedicalBackdrop() {
   return createPortal(
