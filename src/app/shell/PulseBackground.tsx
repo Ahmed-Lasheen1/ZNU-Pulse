@@ -9,7 +9,7 @@ export default function PulseBackground({ dark, interactive = true }: { dark: bo
   return (
     <>
       <MedicalBackdrop />
-      <KineticGrid overlay dark={dark} opacity={0.75} />
+      <KineticGrid dark={dark} opacity={0.75} />
     </>
   )
 }

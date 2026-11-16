@@ -3,9 +3,10 @@
 // so colors that already read well pass through untouched. Use it for colors drawn as text or icons;
 // fills such as buttons, badges and bars can keep the original color.
 
-// Approximate relative luminance of the glass surface in each mode: white 50% over the pale blue page (light),
+// Approximate relative luminance of the glass card surface in each mode: white 50% over the pale blue page (light),
 // and the light-blue wash over the navy page (dark). The values are deliberately a little less favorable than the
-// real flat-page figures (about 0.84 light, 0.03 dark), so colors keep a safety margin.
+// real card figures (about 0.84 light, 0.03 dark), so colors keep a safety margin. The bare light page (#C9DDF2)
+// is darker (about 0.70), but text drawn directly on the page uses ON_BACKGROUND, not this helper.
 // Re-check these if the page background or the standard glass tint in theme/liquidGlass.js change.
 const SURFACE_LUMINANCE = { light: 0.74, dark: 0.05 }
 

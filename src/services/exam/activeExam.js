@@ -103,17 +103,6 @@ export async function loadSavedActiveExamSummary(user) {
   }
 }
 
-// Existence only (Home's "continue" card) — shares the same memoized server read.
-export async function hasSavedActiveExam(user) {
-  if (!user) return !!getGuestActiveExam()
-
-  const local = await idbGet(localKey(user))
-  if (local?.cleared) return false
-  if (local && !local.synced) return true
-  const { data, error } = await fetchRemoteExam(user)
-  return error ? !!local : !!data
-}
-
 // Uploads the paused exam and marks the local copy as synced.
 async function uploadActiveExam({ user, payload }) {
   lastServerSave = Date.now()

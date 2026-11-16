@@ -1,10 +1,7 @@
-"use client"
-
 import { useEffect, useLayoutEffect, useRef, type CSSProperties } from "react"
 import { useInView, useMotionValue, useSpring } from "framer-motion"
 
-import { cn } from "@/shared/utils/cn"
-
+// Counts up (or down) to `value` once the number scrolls into view.
 export function NumberTicker({
   value,
   direction = "up",
@@ -40,6 +37,7 @@ export function NumberTicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Starts the count once the number is in view, after the optional delay.
   useEffect(() => {
     if (!isInView) return
     const timeout = setTimeout(() => {
@@ -48,6 +46,7 @@ export function NumberTicker({
     return () => clearTimeout(timeout)
   }, [motionValue, isInView, delay, value, direction])
 
+  // Writes each animated value into the element without re-rendering.
   useEffect(
     () =>
       springValue.on("change", (latest) => {
@@ -57,11 +56,5 @@ export function NumberTicker({
     [springValue, decimalPlaces],
   )
 
-  return (
-    <span
-      className={cn("inline-block tabular-nums tracking-wider", className)}
-      style={style}
-      ref={ref}
-    />
-  )
+  return <span className={className} style={style} ref={ref} />
 }

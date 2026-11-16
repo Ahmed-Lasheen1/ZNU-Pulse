@@ -3,14 +3,15 @@ import { pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 
 interface PageIntroProps {
   dark: boolean
+  // Icon element (or emoji) shown above the title; the prop keeps its old name so callers don't change.
   emoji: ReactNode
   title: ReactNode
   subtitle?: ReactNode
   paddingBottom?: number
 }
 
-// Shared "emoji + title + optional subtitle" header used at the top of
-// Schedule, Checklist, FilesPage, AnonQuestions, Search, and Review.
+// Shared "icon + title + optional subtitle" header used at the top of
+// Schedule, Checklist, FilesPage, PulseCheck, Search, and Review.
 // Sits directly on the flat page background (no glass surface), so it
 // uses the ON_BACKGROUND text tokens, which follow the color mode.
 export default function PageIntro({ dark, emoji, title, subtitle, paddingBottom = 24 }: PageIntroProps) {

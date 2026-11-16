@@ -8,13 +8,6 @@ export const pulseFonts = {
 
 export { pulseType }
 
-export const pulseWeights = {
-  regular: 400,
-  medium: 500,
-  semibold: 600,
-  bold: 700,
-}
-
 // Text drawn directly on the flat page background (no glass surface underneath). The values are CSS variables
 // defined per color mode in src/styles/index.css, so they switch with data-theme without a re-render.
 // Use them only where a whole color is expected, never with a hex alpha suffix appended.
@@ -25,8 +18,8 @@ export const ON_BACKGROUND = {
   divider: 'var(--on-bg-divider)',
 }
 
-// Full theme token set, keyed by dark/light. The light values are tuned for the #93C5FD page and its glass cards
-// (accents at least ~4.5:1 on the glass, text well above that).
+// Full theme token set, keyed by dark/light. The light values are tuned for the glass cards over the pale-blue page
+// (--page-bg in src/styles/index.css): accents at least ~4.5:1 on the glass, text well above that.
 export function getPulseTheme(dark) {
   return dark
     ? {
@@ -97,42 +90,4 @@ export function getPulseTheme(dark) {
         ecgLine: '#1E3F91',
         ecgGlow: '#075985',
       }
-}
-
-// Liquid-glass card treatment (background/blur/border/shadow bundle).
-export function pulseGlass(dark) {
-  return dark
-    ? {
-        background: 'linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03))',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
-        border: '1px solid rgba(255,255,255,0.10)',
-        boxShadow: [
-          '0 1px 0 rgba(255,255,255,0.04) inset',
-          '0 -1px 0 rgba(0,0,0,0.12) inset',
-          '0 4px 8px -2px rgba(0,0,0,0.40)',
-        ].join(', '),
-      }
-    : {
-        background: 'linear-gradient(160deg, rgba(255,255,255,0.65), rgba(255,255,255,0.35))',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
-        border: '1px solid rgba(255,255,255,0.6)',
-        boxShadow: [
-          '0 1px 0 rgba(255,255,255,0.4) inset',
-          '0 -1px 0 rgba(184,197,216,0.14) inset',
-          '0 4px 8px -2px rgba(37,60,97,0.20)',
-        ].join(', '),
-      }
-}
-
-// Shared "← Back" pill button (used by SummaryOverlay's viewer header).
-export function backBtnStyle() {
-  return {
-    background: 'rgba(255,255,255,0.08)',
-    border: '2px solid rgba(255,255,255,0.15)',
-    borderRadius: 10, padding: '6px 14px',
-    color: '#94a3b8', cursor: 'pointer',
-    fontSize: 12, fontWeight: 700, fontFamily: pulseFonts.body
-  }
 }
