@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { requireAdmin } from '../_lib/auth.js'
 
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -76,16 +77,9 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server misconfiguration — missing environment variables' })
   }
 
-  const token = (req.headers.authorization || '').replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Missing auth token' })
-
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
-  const { data: userData, error: userError } = await supabase.auth.getUser(token)
-  if (userError || !userData?.user) return res.status(401).json({ error: 'Invalid session' })
-
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', userData.user.id).single()
-  if (profile?.role !== 'admin') return res.status(403).json({ error: 'Admin access required' })
+  if (!(await requireAdmin(req, res, supabase))) return
 
   const { title, html, images, module_id, subject_id, lesson_id, exam_stage, module_name, subject_name } = req.body || {}
 

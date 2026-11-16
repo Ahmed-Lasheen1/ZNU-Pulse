@@ -1,7 +1,6 @@
 // api/push/notify-answer.js
 import { getAdminClient, sendToSubscriptions, safeHandler } from '../_lib/webpush.js'
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+import { requireAdmin, UUID_RE } from '../_lib/auth.js'
 
 // Admin-only. The asker is found through the subscription linked at submit time,
 // so the admin never sees who they are.
@@ -11,14 +10,7 @@ async function handler(req, res) {
   const supabase = getAdminClient('notify-answer')
   if (!supabase) return res.status(500).json({ error: 'Server misconfiguration (missing SUPABASE_URL)' })
 
-  const authToken = (req.headers.authorization || '').replace('Bearer ', '')
-  if (!authToken) return res.status(401).json({ error: 'Missing auth token' })
-
-  const { data: userData, error: userError } = await supabase.auth.getUser(authToken)
-  if (userError || !userData?.user) return res.status(401).json({ error: 'Invalid session' })
-
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', userData.user.id).single()
-  if (profile?.role !== 'admin') return res.status(403).json({ error: 'Admin access required' })
+  if (!(await requireAdmin(req, res, supabase))) return
 
   const questionId = req.body?.question_id
   if (typeof questionId !== 'string' || !UUID_RE.test(questionId)) return res.status(400).json({ error: 'Invalid question_id' })

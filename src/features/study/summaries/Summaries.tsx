@@ -10,6 +10,7 @@ import TabRow from '@/shared/ui/controls/TabRow'
 import { SummaryListSkeleton } from '@/shared/ui/feedback/Skeletons'
 import EmptyState from '@/shared/ui/feedback/EmptyState'
 import { useModules } from '@/core/contexts'
+import { resolveModule } from '@/services/content/modules'
 import { fetchModuleStages } from '@/services/content/moduleStages'
 import { fetchSubjectsForModule } from '@/services/content/subjects'
 import { fetchLessonStageMap, stagesOf, inStage } from '@/services/content/lessonStages'
@@ -29,10 +30,6 @@ interface SummarySubject { id: string; module_id: string; name: string }
 interface ExamStage { value: string; title: string; emoji?: string; Icon?: (p: { color: string; size?: number }) => JSX.Element; color: string }
 
 const PAGE_MAX_WIDTH = 900
-
-const TAB_ROW_STYLE = {
-  flexWrap: 'wrap', overflowX: 'visible', rowGap: 10, marginBottom: 16,
-} as const
 
 // Summaries of one module: stage and subject filters, the list, and the full-screen viewer.
 function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
@@ -143,7 +140,6 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
           onSelect={setActiveStage}
           dark={dark}
           accentColor={mod.color}
-          style={TAB_ROW_STYLE}
         />
       )}
 
@@ -154,7 +150,7 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
           onSelect={setActiveSubject}
           dark={dark}
           accentColor={mod.color}
-          style={{ ...TAB_ROW_STYLE, marginBottom: 20 }}
+          style={{ marginBottom: 20 }}
         />
       )}
 
@@ -203,13 +199,7 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
 export default function Summaries({ dark }: { dark: boolean }) {
   const { modules, modulesLoaded, modulesError } = useModules() as { modules: SummaryModule[]; modulesLoaded: boolean; modulesError: boolean }
   const params = new URLSearchParams(useLocation().search)
-  const moduleParam = params.get('module')
-
-  const resolvedModule: SummaryModule | null =
-    (moduleParam && modules.find(m => m.id === moduleParam)) ||
-    modules.find(m => m.status === 'active') ||
-    modules[0] ||
-    null
+  const resolvedModule = resolveModule(modules, params.get('module'))
 
   if (resolvedModule) return (
     <ModuleSummaries

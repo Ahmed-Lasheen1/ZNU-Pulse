@@ -1,5 +1,6 @@
 // api/push/broadcast.js
 import { getAdminClient, sendToSubscriptions, fetchAllRows, safeHandler } from '../_lib/webpush.js'
+import { requireAdmin } from '../_lib/auth.js'
 
 // Admin-triggered broadcast. Auth is a signed-in Supabase token whose profile has role='admin'.
 async function handler(req, res) {
@@ -8,14 +9,7 @@ async function handler(req, res) {
   const supabase = getAdminClient('broadcast')
   if (!supabase) return res.status(500).json({ error: 'Server misconfiguration (missing SUPABASE_URL)' })
 
-  const token = (req.headers.authorization || '').replace('Bearer ', '')
-  if (!token) return res.status(401).json({ error: 'Missing auth token' })
-
-  const { data: userData, error: userError } = await supabase.auth.getUser(token)
-  if (userError || !userData?.user) return res.status(401).json({ error: 'Invalid session' })
-
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', userData.user.id).single()
-  if (profile?.role !== 'admin') return res.status(403).json({ error: 'Admin access required' })
+  if (!(await requireAdmin(req, res, supabase))) return
 
   const { title, body, url } = req.body || {}
   if (!title || !body) return res.status(400).json({ error: 'title and body are required' })

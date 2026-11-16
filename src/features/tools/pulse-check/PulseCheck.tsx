@@ -21,6 +21,7 @@ import DateStamp from '@/shared/ui/display/DateStamp'
 import PollsSection from '@/features/tools/pulse-check/PollsSection'
 import { containsProfanity } from '@/shared/utils/moderation'
 import { isSuccessMessage } from '@/shared/utils/messageStyle'
+import { useTimedMessage } from '@/shared/hooks/useTimedMessage'
 import { storageGet, storageSet } from '@/core/safeStorage'
 import { networkFirst, cachedSnapshot } from '@/core/dataCache'
 import { getMyAnonTokens, addMyAnonToken, getNotifiedTokens, markTokensNotified } from '@/features/tools/pulse-check/anonTracking'
@@ -125,20 +126,13 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [savedCopy, setSavedCopy] = useState(false)
-  const [msg, setMsg] = useState('')
+  // Short message under the form that clears itself after 3 seconds.
+  const { message: msg, showMessage: flashMsg } = useTimedMessage(3000)
   const [replyText, setReplyText] = useState<Record<string, string>>({})
   const [cooldownRemaining, setCooldownRemaining] = useState(0)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const cooldownTimerRef = useRef<ReturnType<typeof setInterval>>()
-  const msgTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const submittingRef = useRef(false)
-
-  // Shows a short message under the form that clears itself after 3 seconds.
-  function flashMsg(text: string) {
-    clearTimeout(msgTimerRef.current)
-    setMsg(text)
-    msgTimerRef.current = setTimeout(() => setMsg(''), 3000)
-  }
 
   // Loads the public questions and this device's own messages.
   useEffect(() => {
@@ -154,7 +148,6 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
     cooldownTimerRef.current = setInterval(updateCooldownRemaining, 1000)
     return () => {
       clearInterval(cooldownTimerRef.current)
-      clearTimeout(msgTimerRef.current)
     }
   }, [])
 

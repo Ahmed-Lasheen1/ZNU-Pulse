@@ -13,8 +13,10 @@ import OfflineNote from '@/shared/ui/feedback/OfflineNote'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import TabRow from '@/shared/ui/controls/TabRow'
 import { NotifyPermissionButton } from '@/features/notifications'
+import { daysFromToday, parseLocalDate } from '@/features/tools/schedule'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { showLocalNotification } from '@/services/notifications/localNotification'
+import { selectableModules } from '@/services/content/modules'
 import { storageGet, storageSet } from '@/core/safeStorage'
 import { cachedSnapshot, saveCached } from '@/core/dataCache'
 import { listChecklistOps, queueChecklistOp, applyChecklistOps, subscribeChecklistOutbox } from '@/services/offline/checklistOutbox'
@@ -45,40 +47,22 @@ function pruneOrphanedGuestChecklists(validModuleIds: Set<string>) {
   }
 }
 
-// Parses a YYYY-MM-DD string as a local calendar date.
-function parseLocalDate(dateStr: string) {
-  const [y, m, d] = dateStr.split('-').map(Number)
-  return new Date(y, m - 1, d)
-}
-
-// Returns local midnight of the current day.
-function startOfToday() {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  return today
-}
-
-// Whole days from today to a deadline (negative when it has passed).
-function dayDiff(deadline: string) {
-  return Math.round((parseLocalDate(deadline).getTime() - startOfToday().getTime()) / (24 * 60 * 60 * 1000))
-}
-
 // True when the deadline is before today.
 function isOverdue(deadline: string | null) {
   if (!deadline) return false
-  return dayDiff(deadline) < 0
+  return daysFromToday(deadline) < 0
 }
 
 // True when the deadline is today or within the next two days.
 function isDueSoon(deadline: string | null) {
   if (!deadline) return false
-  const diff = dayDiff(deadline)
+  const diff = daysFromToday(deadline)
   return diff >= 0 && diff <= 2
 }
 
 // Readable deadline text such as "Due tomorrow" or "3 days overdue".
 function formatDeadlineLabel(deadline: string) {
-  const diff = dayDiff(deadline)
+  const diff = daysFromToday(deadline)
   if (diff === 0) return 'Due today'
   if (diff === 1) return 'Due tomorrow'
   if (diff === -1) return '1 day overdue'
@@ -102,7 +86,7 @@ function sortByUrgency(tasks: ChecklistTask[]) {
   return [...tasks].sort((a, b) => {
     const rankDiff = urgencyRank(a) - urgencyRank(b)
     if (rankDiff !== 0) return rankDiff
-    if (a.deadline && b.deadline) return dayDiff(a.deadline) - dayDiff(b.deadline)
+    if (a.deadline && b.deadline) return daysFromToday(a.deadline) - daysFromToday(b.deadline)
     return 0
   })
 }
@@ -130,14 +114,13 @@ export default function Checklist({ dark }: { dark: boolean }) {
   const [pendingCount, setPendingCount] = useState(0)
   const [syncTick, setSyncTick] = useState(0)
 
-  const activeModulesList = (modules as any[]).filter(m => m.status === 'active')
-  const selectableModules = activeModulesList.length > 0 ? activeModulesList : (modules as any[])
+  const tabModules = selectableModules(modules as any[])
 
   // Selects the first module once the list has loaded.
   useEffect(() => {
     if (!modulesLoaded) return
-    if (selectableModules.length === 0) setTasksLoading(false)
-    else if (!activeModule) setActiveModule(selectableModules[0].id)
+    if (tabModules.length === 0) setTasksLoading(false)
+    else if (!activeModule) setActiveModule(tabModules[0].id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules])
 
@@ -409,18 +392,15 @@ export default function Checklist({ dark }: { dark: boolean }) {
       )}
 
       {/* Module tabs stay on a single line and scroll sideways when they do not fit (no wrapping). */}
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: SECTION_GAP }}>
-        <TabRow
-          items={selectableModules.map((m: any) => ({
-            value: m.id, label: m.name, icon: m.icon, color: m.color, completed: m.status === 'completed'
-          }))}
-          active={activeModule}
-          onSelect={setActiveModule}
-          dark={dark}
-          scrollOnMobile
-          style={{ justifyContent: 'center', marginBottom: 0 }}
-        />
-      </div>
+      <TabRow
+        items={tabModules.map((m: any) => ({
+          value: m.id, label: m.name, icon: m.icon, color: m.color, completed: m.status === 'completed'
+        }))}
+        active={activeModule}
+        onSelect={setActiveModule}
+        dark={dark}
+        style={{ justifyContent: 'center', marginBottom: SECTION_GAP }}
+      />
 
       {totalTasks > 0 && (
         <div style={{ marginBottom: SECTION_GAP }}>

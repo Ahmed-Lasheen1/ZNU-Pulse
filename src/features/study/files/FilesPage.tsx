@@ -15,6 +15,7 @@ import { useHistoryOverlay } from '@/shared/hooks/useHistoryOverlay'
 import { useBodyScrollLock } from '@/shared/hooks/useBodyScrollLock'
 import { fetchSubjectsForModule } from '@/services/content/subjects'
 import { fetchModuleFiles } from '@/services/content/moduleContent'
+import { selectableModules } from '@/services/content/modules'
 import { getDriveOrRawUrl, getVideoEmbedUrl, isSafeExternalUrl } from '@/shared/utils/embedUrl'
 import { BookIcon, QuestionMarkIcon, VideoIcon, GraduationCapIcon, DocumentIcon, AudioIcon, FolderIcon } from '@/shared/icons/tool-icons'
 
@@ -111,8 +112,7 @@ export default function FilesPage({ dark }: { dark: boolean }) {
 
   useHistoryOverlay(!!viewer, () => setViewer(null))
 
-  const activeModules = modules.filter(m => m.status === 'active')
-  const selectableModules = activeModules.length > 0 ? activeModules : modules
+  const tabModules = selectableModules(modules)
 
   const appliedModuleParamRef = useRef<string | null>(null)
   const openedFileRef = useRef<string | null>(null)
@@ -124,9 +124,9 @@ export default function FilesPage({ dark }: { dark: boolean }) {
         appliedModuleParamRef.current = moduleParam
         setActiveModule(moduleParam)
       }
-    } else if (modulesLoaded && selectableModules.length > 0 && !activeModule) {
-      setActiveModule(selectableModules[0].id)
-    } else if (modulesLoaded && selectableModules.length === 0) {
+    } else if (modulesLoaded && tabModules.length > 0 && !activeModule) {
+      setActiveModule(tabModules[0].id)
+    } else if (modulesLoaded && tabModules.length === 0) {
       setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -226,7 +226,7 @@ export default function FilesPage({ dark }: { dark: boolean }) {
       />
 
       <TabRow
-        items={selectableModules.map(m => ({ value: m.id, label: m.name, icon: m.icon, color: m.color, completed: m.status === 'completed' }))}
+        items={tabModules.map(m => ({ value: m.id, label: m.name, icon: m.icon, color: m.color, completed: m.status === 'completed' }))}
         active={activeModule}
         onSelect={(id) => { setActiveModule(id); setActiveSubject('all'); setActiveType(null) }}
         dark={dark}

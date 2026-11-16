@@ -6,6 +6,7 @@ import PageShell from '@/shared/ui/layout/PageShell'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { fetchModuleFlashcards } from '@/services/content/moduleContent'
+import { resolveModule } from '@/services/content/modules'
 import { fetchLessonsForModule } from '@/services/content/lessons'
 import { fetchSubjectsForModule } from '@/services/content/subjects'
 import { fetchModuleStages } from '@/services/content/moduleStages'
@@ -255,13 +256,7 @@ function ModuleFlashcards({ mod, dark, stage: initialStage, initialLessonId }: {
 export default function Flashcards({ dark }: { dark: boolean }) {
   const { modules, modulesLoaded, modulesError } = useModules() as { modules: FlashcardModule[]; modulesLoaded: boolean; modulesError: boolean }
   const params = new URLSearchParams(useLocation().search)
-  const moduleParam = params.get('module')
-
-  const resolvedModule: FlashcardModule | null =
-    (moduleParam && modules.find(m => m.id === moduleParam)) ||
-    modules.find(m => m.status === 'active') ||
-    modules[0] ||
-    null
+  const resolvedModule = resolveModule(modules, params.get('module'))
 
   if (resolvedModule) return (
     <ModuleFlashcards

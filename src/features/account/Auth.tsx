@@ -5,6 +5,8 @@ import confetti from 'canvas-confetti'
 import { Lock, Eye, EyeOff, ArrowLeft, GraduationCap, Mail } from 'lucide-react'
 import { supabase } from '@/core/supabase'
 import { containsProfanity } from '@/shared/utils/moderation'
+import { isSuccessMessage } from '@/shared/utils/messageStyle'
+import { useMediaQuery } from '@/shared/hooks/useMediaQuery'
 import { getPulseTheme, pulseFonts, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import PulseBrand from '@/shared/ui/display/PulseBrand'
 import {
@@ -69,7 +71,8 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
   const [message, setMessage] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [showConfirmPw, setShowConfirmPw] = useState(false)
-  const [isDesktop, setIsDesktop] = useState(false)
+  // Desktop layout shows the brand panel beside the form; narrower screens show the brand above it.
+  const isDesktop = useMediaQuery('(min-width: 1024px)')
 
   const otpRef = useRef<HTMLInputElement>(null)
   const celebratedRef = useRef(false)
@@ -82,20 +85,11 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
   }, [step])
   // Celebrates once when the account is verified.
   useEffect(() => {
-    if (message.includes('✅') && message.toLowerCase().includes('verified') && !celebratedRef.current) {
+    if (isSuccessMessage(message) && message.toLowerCase().includes('verified') && !celebratedRef.current) {
       celebratedRef.current = true
       fireConfetti()
     }
   }, [message])
-
-  // Tracks the desktop breakpoint to show the brand panel.
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 1024px)')
-    setIsDesktop(mq.matches)
-    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches)
-    mq.addEventListener?.('change', handler)
-    return () => mq.removeEventListener?.('change', handler)
-  }, [])
 
   // Clears the form and returns to its first step.
   function resetAll() {

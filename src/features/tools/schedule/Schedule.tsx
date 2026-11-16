@@ -15,6 +15,7 @@ import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { cachedSnapshot } from '@/core/dataCache'
 import { getDriveOrRawUrl } from '@/shared/utils/embedUrl'
 import { useModules } from '@/core/contexts'
+import { selectableModules } from '@/services/content/modules'
 import { useHistoryOverlay } from '@/shared/hooks/useHistoryOverlay'
 import { usePrefersReducedMotion } from '@/shared/hooks/usePrefersReducedMotion'
 import { ScheduleIcon, EmptyBoxIcon } from '@/shared/icons/tool-icons'
@@ -83,10 +84,9 @@ export default function Schedule({ dark }: { dark: boolean }) {
   useHistoryOverlay(!!viewer, () => setViewer(null))
 
   // Tabs show active modules; a completed module stays listed while it is the selected one (e.g. from a search link).
-  const activeModules = modules.filter(m => m.status === 'active')
-  const baseModules = activeModules.length > 0 ? activeModules : modules
+  const baseModules = selectableModules(modules)
   const currentModule = modules.find(m => m.id === activeModule)
-  const selectableModules = currentModule && !baseModules.some(m => m.id === currentModule.id)
+  const tabModules = currentModule && !baseModules.some(m => m.id === currentModule.id)
     ? [...baseModules, currentModule]
     : baseModules
 
@@ -100,11 +100,11 @@ export default function Schedule({ dark }: { dark: boolean }) {
       return
     }
     if (!modulesLoaded) return
-    if (selectableModules.length === 0) {
+    if (tabModules.length === 0) {
       setLoading(false)
       return
     }
-    if (!activeModule) setActiveModule(selectableModules[0].id)
+    if (!activeModule) setActiveModule(tabModules[0].id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modulesLoaded, modules, moduleParam])
 
@@ -195,16 +195,13 @@ export default function Schedule({ dark }: { dark: boolean }) {
       <PageIntro dark={dark} emoji={<ScheduleIcon color={ON_BACKGROUND.primary} size={40} />} title="Schedules" subtitle="Study plans and exam dates, module by module" />
 
       {/* Module tabs stay on a single line and scroll sideways when they do not fit (no wrapping). */}
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: SECTION_GAP }}>
-        <TabRow
-          items={selectableModules.map(m => ({ value: m.id, label: m.name, icon: m.icon, color: m.color, completed: m.status === 'completed' }))}
-          active={activeModule}
-          onSelect={setActiveModule}
-          dark={dark}
-          scrollOnMobile
-          style={{ justifyContent: 'center', marginBottom: 0 }}
-        />
-      </div>
+      <TabRow
+        items={tabModules.map(m => ({ value: m.id, label: m.name, icon: m.icon, color: m.color, completed: m.status === 'completed' }))}
+        active={activeModule}
+        onSelect={setActiveModule}
+        dark={dark}
+        style={{ justifyContent: 'center', marginBottom: SECTION_GAP }}
+      />
 
       <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: SECTION_GAP }}>
         {(['study', 'exam'] as ScheduleType[]).map(type => {

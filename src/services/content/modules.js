@@ -21,3 +21,28 @@ export async function fetchModulesSorted({ force = false, onRevalidated } = {}) 
   })
   return { modules: data || [], error }
 }
+
+/**
+ * Modules offered in page tabs: the active ones, or every module when none is active.
+ * @template {{ status?: string }} T
+ * @param {T[]} modules
+ * @returns {T[]}
+ */
+export function selectableModules(modules) {
+  const active = modules.filter(m => m.status === 'active')
+  return active.length > 0 ? active : modules
+}
+
+/**
+ * Module a page opens: the one named in the link, else the first active one, else the first module.
+ * @template {{ id: string, status?: string }} T
+ * @param {T[]} modules
+ * @param {string | null | undefined} moduleId
+ * @returns {T | null}
+ */
+export function resolveModule(modules, moduleId) {
+  return (moduleId && modules.find(m => m.id === moduleId)) ||
+    modules.find(m => m.status === 'active') ||
+    modules[0] ||
+    null
+}

@@ -45,10 +45,8 @@ function execute(userId, op) {
   return table.delete().eq('id', op.id)
 }
 
-// True for failures worth retrying later (offline, server error or expired session).
-const shouldRetry = response => isTransientFailure(response) || response.status === 401
-
 // Sends queued changes in order and removes the ones that finished.
+// A retryable failure (offline, server error or expired session) stops the run and keeps the rest queued.
 export function flushChecklistOutbox(userId) {
   const run = flushChain.then(async () => {
     const ops = await listChecklistOps(userId)
@@ -68,7 +66,7 @@ export function flushChecklistOutbox(userId) {
       if (!response.error) {
         synced++
         finished.add(op.opId)
-      } else if (shouldRetry(response)) {
+      } else if (isTransientFailure(response)) {
         break
       } else {
         rejected.push({ op, message: response.error.message })

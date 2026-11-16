@@ -1,7 +1,7 @@
 // api/push/notify-admins.js
 import { getAdminClient, sendToSubscriptions, fetchAllRows, safeHandler } from '../_lib/webpush.js'
+import { UUID_RE } from '../_lib/auth.js'
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const PREVIEW_MAX = 120
 
 // Public but proof-gated: the caller must hold the tracking token of a fresh,

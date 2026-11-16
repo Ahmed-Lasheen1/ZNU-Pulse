@@ -4,7 +4,6 @@ import { getPulseTheme, pulseFonts } from '@/shared/theme/premiumTheme'
 import { adaptColor } from '@/shared/theme/adaptColor'
 import { ModuleIcon } from '@/shared/icons/medicalIcons'
 import { usePrefersReducedMotion } from '@/shared/hooks/usePrefersReducedMotion'
-import { useMediaQuery } from '@/shared/hooks/useMediaQuery'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 
 export interface TabRowItem {
@@ -26,14 +25,12 @@ interface TabRowProps {
   onSelect: (value: string | null) => void
   dark: boolean
   accentColor?: string
-  // Layout of the row. `flexWrap: 'wrap'` makes the tabs wrap onto several lines.
+  // Layout of the row (alignment, margins). A row that is too long stays on one line and scrolls sideways.
   style?: CSSProperties
   // 'lg' is the taller variant used for the exam-stage tabs.
   size?: 'md' | 'lg'
   // Lets a click on the active tab clear the selection.
   allowDeselect?: boolean
-  // Keeps a wrapping row on one scrollable line on phones.
-  scrollOnMobile?: boolean
   ariaLabel?: string
 }
 
@@ -44,12 +41,8 @@ interface HighlightBox {
   height: number
   color: string
   direction: 1 | -1
-  // True when the new tab sits on another line of a wrapped row (no stretch in that case).
-  lineChange: boolean
   jump: boolean
 }
-
-const MOBILE_QUERY = '(max-width: 640px)'
 
 // Exponential ease-out: almost all of the movement happens at the very start, then a long gentle tail.
 const EASE_OUT_EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1]
@@ -97,18 +90,17 @@ function edgeTransitions(direction: 1 | -1) {
 
 // Shared row of glass tabs with one highlight that launches fast, stretches, and settles on the selected tab.
 // Used for module switching, exam-stage filters and subject filters across the app.
+// The row always stays on a single line: when the tabs do not fit, it scrolls sideways and keeps the selected tab centered.
 export default function TabRow({
-  items, active, onSelect, dark, accentColor, style, size = 'md', allowDeselect = false, scrollOnMobile = false, ariaLabel,
+  items, active, onSelect, dark, accentColor, style, size = 'md', allowDeselect = false, ariaLabel,
 }: TabRowProps) {
   const pt = getPulseTheme(dark)
   const reduced = usePrefersReducedMotion()
-  const narrow = useMediaQuery(MOBILE_QUERY)
   const trackRef = useRef<HTMLDivElement>(null)
   const buttons = useRef<Record<string, HTMLButtonElement | null>>({})
   const wasVisible = useRef(false)
   const hasScrolled = useRef(false)
   const prevIndexRef = useRef(-1)
-  const prevTopRef = useRef<number | null>(null)
   const lastDirectionRef = useRef<1 | -1>(1)
   // Width of the selected tab; the stretch is measured against it.
   const targetWidthRef = useRef(0)
@@ -136,15 +128,6 @@ export default function TabRow({
   const leftControls = useRef<ReturnType<typeof animate> | null>(null)
   const rightControls = useRef<ReturnType<typeof animate> | null>(null)
   const topControls = useRef<ReturnType<typeof animate> | null>(null)
-
-  // Layout props go to the outer row; wrapping and scrolling are handled by the capsule's own track.
-  const wrapped = style?.flexWrap === 'wrap' && !(scrollOnMobile && narrow)
-  const rowGap = style?.rowGap
-  const justifyContent = style?.justifyContent
-  const outerStyle: CSSProperties = { ...style }
-  delete outerStyle.flexWrap
-  delete outerStyle.rowGap
-  delete outerStyle.overflowX
 
   const large = size === 'lg'
   const iconSize = large ? 18 : 14
@@ -180,8 +163,6 @@ export default function TabRow({
     const right = left + button.offsetWidth
     const top = button.offsetTop
     const height = button.offsetHeight
-    const lineChange = prevTopRef.current !== null && prevTopRef.current !== top
-    prevTopRef.current = top
     targetWidthRef.current = button.offsetWidth
     const direction = lastDirectionRef.current
 
@@ -189,7 +170,7 @@ export default function TabRow({
       prev && prev.left === left && prev.right === right && prev.top === top && prev.height === height
         && prev.color === color && prev.direction === direction
         ? prev
-        : { left, right, top, height, color, direction, lineChange, jump }
+        : { left, right, top, height, color, direction, jump }
     )
   }
 
@@ -198,7 +179,6 @@ export default function TabRow({
     if (!shown) {
       wasVisible.current = false
       prevIndexRef.current = -1
-      prevTopRef.current = null
       return
     }
     measure(!wasVisible.current)
@@ -209,7 +189,7 @@ export default function TabRow({
     items.forEach(item => { const el = buttons.current[item.value]; if (el) observer.observe(el) })
     return () => observer.disconnect()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, itemsKey, size, wrapped, shown])
+  }, [active, itemsKey, size, shown])
 
   // Moves the highlight toward the new target; stopping a running animation keeps its current position.
   useLayoutEffect(() => {
@@ -224,31 +204,28 @@ export default function TabRow({
       return
     }
     const leading: Transition = { duration: LEADING_SECONDS, ease: EASE_OUT_EXPO }
-    const edges = box.lineChange ? { left: leading, right: leading } : edgeTransitions(box.direction)
+    const edges = edgeTransitions(box.direction)
     leftControls.current = animate(leftMV, box.left, edges.left)
     rightControls.current = animate(rightMV, box.right, edges.right)
     topControls.current = animate(topMV, box.top, leading)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [box, reduced])
 
-  // Scrolls only the row itself (never the page) so the selected tab stays centered in a scrolling row.
+  // Scrolls only the row itself (never the page) so the selected tab stays centered when the row overflows.
   useEffect(() => {
     const track = trackRef.current
     const button = active ? buttons.current[active] : null
-    if (!track || !button || wrapped || track.scrollWidth <= track.clientWidth) return
+    if (!track || !button || track.scrollWidth <= track.clientWidth) return
     const smooth = hasScrolled.current && !reduced
     hasScrolled.current = true
     track.scrollTo({ left: button.offsetLeft - (track.clientWidth - button.offsetWidth) / 2, behavior: smooth ? 'smooth' : 'auto' })
-  }, [active, wrapped, reduced])
+  }, [active, reduced])
 
   const instant: Transition = { duration: 0 }
   const colorFade: Transition = box?.jump ? instant : { duration: 0.5, ease: 'easeInOut' }
 
-  const outerBase: CSSProperties = {
-    display: 'flex', marginBottom: 16,
-    ...(scrollOnMobile ? { minWidth: 0, maxWidth: '100%' } : {}),
-    ...outerStyle,
-  }
+  // minWidth/maxWidth let the row shrink to its parent (also inside a flex parent) so a long row scrolls instead of widening the page.
+  const outerBase: CSSProperties = { display: 'flex', marginBottom: 16, minWidth: 0, maxWidth: '100%', ...style }
   if (items.length === 0) return <div style={outerBase} />
 
   return (
@@ -261,7 +238,6 @@ export default function TabRow({
         }
         .tab-row-track::-webkit-scrollbar { display: none; }
         .tab-row-lg { gap: 6px; padding: 8px; }
-        .tab-row-wrapped { flex-wrap: wrap; overflow: visible; }
         .tab-row-highlight {
           position: absolute; top: 0; left: 0; z-index: 0;
           border-radius: 999px; pointer-events: none;
@@ -289,15 +265,14 @@ export default function TabRow({
 
       <PulseGlassRow
         dark={dark}
-        radius={wrapped ? 28 : 999}
+        radius={999}
         style={{ maxWidth: '100%', minWidth: 0, ['--tab-row-hover' as string]: dark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.55)' }}
       >
         <div
           ref={trackRef}
-          className={`tab-row-track${large ? ' tab-row-lg' : ''}${wrapped ? ' tab-row-wrapped' : ''}`}
+          className={`tab-row-track${large ? ' tab-row-lg' : ''}`}
           role="group"
           aria-label={ariaLabel}
-          style={{ justifyContent: wrapped ? justifyContent : undefined, rowGap: wrapped ? rowGap ?? 6 : undefined }}
         >
           {box && (
             <motion.span
