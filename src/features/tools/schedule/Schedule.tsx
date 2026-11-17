@@ -254,12 +254,13 @@ export default function Schedule({ dark }: { dark: boolean }) {
               {sch.type === 'exam' ? (
                 <ExamScheduleCard dark={dark} schedule={sch} accent={SCHEDULE_ACCENT} delay={i * 90} onViewImage={() => openSchedule(sch)} />
               ) : (
+                // The list is ordered oldest to newest, so the last plan is the newest and opens by default.
                 <StudyPlanCard
                   dark={dark}
                   schedule={sch}
                   accent={SCHEDULE_ACCENT}
                   delay={i * 90}
-                  defaultOpen={i === 0 || sch.id === itemParam}
+                  defaultOpen={i === visible.length - 1 || sch.id === itemParam}
                   onViewImage={() => openSchedule(sch)}
                 />
               )}
