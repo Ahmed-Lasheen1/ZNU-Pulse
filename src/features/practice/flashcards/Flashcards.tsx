@@ -4,6 +4,7 @@ import { useAuth, useModules } from '@/core/contexts'
 import { ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import PageShell from '@/shared/ui/layout/PageShell'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
+import LoadingText from '@/shared/ui/feedback/LoadingText'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { useGoBack } from '@/shared/hooks/useGoBack'
 import { fetchModuleFlashcards } from '@/services/content/moduleContent'
@@ -28,6 +29,9 @@ interface Session { lessonId: string | null; subjectId: string | null; title: st
 
 const PAGE_MAX_WIDTH = 900
 
+// Longest the loading screen waits for a link-started session before showing the browse page instead.
+const AUTO_START_TIMEOUT_MS = 10000
+
 // Loads a module's flashcards, runs study sessions and shows the browse page.
 function ModuleFlashcards({ mod, dark, stage: initialStage, initialLessonId }: {
   mod: FlashcardModule; dark: boolean; stage: string; initialLessonId?: string
@@ -48,7 +52,18 @@ function ModuleFlashcards({ mod, dark, stage: initialStage, initialLessonId }: {
   const [progressLoaded, setProgressLoaded] = useState(false)
   const [loadError, setLoadError] = useState(false)
   const [session, setSession] = useState<Session | null>(null)
+  // True once the link auto-start has run (it either began a session or found no cards).
+  const [autoStartDone, setAutoStartDone] = useState(false)
+  // True when the link auto-start took too long, so the browse page is shown instead of the loading screen.
+  const [autoStartGaveUp, setAutoStartGaveUp] = useState(false)
   const autoStartedRef = useRef(false)
+
+  // Stops waiting on the link auto-start after a while, so a problem we did not foresee can never trap the student on the loading screen.
+  useEffect(() => {
+    if (!initialLessonId) return
+    const timer = setTimeout(() => setAutoStartGaveUp(true), AUTO_START_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  }, [initialLessonId])
 
   // Loads the module's cards (cached), lessons, subjects, stages and lesson stages.
   useEffect(() => {
@@ -173,6 +188,7 @@ function ModuleFlashcards({ mod, dark, stage: initialStage, initialLessonId }: {
     if (!initialLessonId || autoStartedRef.current || loading || !progressLoaded) return
     autoStartedRef.current = true
     start(initialLessonId, 0, true)
+    setAutoStartDone(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, progressLoaded])
 
@@ -215,6 +231,13 @@ function ModuleFlashcards({ mod, dark, stage: initialStage, initialLessonId }: {
       }}
       onExit={exitSession}
     />
+  )
+
+  // While a link-started session is still waiting for its cards, a loading screen replaces the browse page.
+  if (initialLessonId && !autoStartDone && !autoStartGaveUp && !loadError) return (
+    <PageShell dark={dark} backFallback={`/module/${mod.id}`} maxWidth={PAGE_MAX_WIDTH}>
+      <LoadingText label="Starting your flashcards..." />
+    </PageShell>
   )
 
   const now = new Date()
