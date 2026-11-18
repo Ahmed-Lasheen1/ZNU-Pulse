@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { pulseFonts } from '@/shared/theme/premiumTheme'
+import { useLockBrandWhile } from '@/shared/hooks/useBrandLock'
 
 interface StudyShellProps {
   children: ReactNode
@@ -10,7 +11,10 @@ interface StudyShellProps {
 }
 
 // Full-screen container for study sessions; overlays stay outside the animated wrapper so fixed dialogs aren't affected by its transform.
+// While it is mounted the header brand is locked, so a stray tap on the logo cannot leave the session.
 export default function StudyShell({ children, overlays, bottomPadding = 16, maxWidth = 'min(1080px, 92vw)' }: StudyShellProps) {
+  useLockBrandWhile(true)
+
   return (
     <div style={{ position: 'relative', minHeight: '100dvh' }}>
       <motion.div

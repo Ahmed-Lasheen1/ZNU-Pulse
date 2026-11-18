@@ -16,6 +16,8 @@ interface PulseBrandProps {
   fontSize?: number
   animation?: BrandAnimationTiming
   instant?: boolean
+  // When true the brand is plain, non-interactive artwork (no click, no focus, no link role).
+  locked?: boolean
 }
 
 const brandWordItem = {
@@ -41,20 +43,26 @@ function handleBrandKeyDown(e: React.KeyboardEvent) {
   }
 }
 
+// Props that make the brand act as a link to Home; empty when the brand is locked.
+function brandLinkProps(locked: boolean) {
+  if (locked) return {}
+  return {
+    onClick: goHome,
+    onKeyDown: handleBrandKeyDown,
+    role: 'link',
+    tabIndex: 0,
+    'aria-label': 'ZNU Pulse — go to home',
+  }
+}
+
 // Site brand (logo, "ZNU PULSE" and tagline); animated when `animation` is given. Colors follow the current color mode.
-export default function PulseBrand({ dark, logoSize = 44, fontSize = 20, animation, instant = false }: PulseBrandProps) {
+export default function PulseBrand({ dark, logoSize = 44, fontSize = 20, animation, instant = false, locked = false }: PulseBrandProps) {
   const pt = getPulseTheme(dark)
+  const rootStyle = { display: 'flex', alignItems: 'center', gap: 14, cursor: locked ? 'default' : 'pointer' } as const
 
   if (!animation) {
     return (
-      <div
-        onClick={goHome}
-        onKeyDown={handleBrandKeyDown}
-        role="link"
-        tabIndex={0}
-        aria-label="ZNU Pulse — go to home"
-        style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
-      >
+      <div {...brandLinkProps(locked)} style={rootStyle}>
         <div style={{
           width: logoSize, height: logoSize, flexShrink: 0,
           borderRadius: 12, overflow: 'hidden',
@@ -87,14 +95,7 @@ export default function PulseBrand({ dark, logoSize = 44, fontSize = 20, animati
   }
 
   return (
-    <div
-      onClick={goHome}
-      onKeyDown={handleBrandKeyDown}
-      role="link"
-      tabIndex={0}
-      aria-label="ZNU Pulse — go to home"
-      style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
-    >
+    <div {...brandLinkProps(locked)} style={rootStyle}>
       <motion.div
         initial={instant ? false : { opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}

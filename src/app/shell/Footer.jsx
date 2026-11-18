@@ -1,5 +1,5 @@
-import { useState, useEffect, useLayoutEffect, useRef } from 'react'
-import { motion, useInView } from 'framer-motion'
+import { useState, useEffect, useLayoutEffect } from 'react'
+import { motion } from 'framer-motion'
 import { getPulseTheme, pulseFonts, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import { glassHoverTint } from '@/shared/theme/liquidGlass'
 import { HOME_ENTRANCE_END } from '@/shared/theme/pulseMotion'
@@ -12,13 +12,12 @@ const HIDDEN = { opacity: 0, y: 20 }
 const VISIBLE = { opacity: 1, y: 0 }
 
 // Site footer: wordmark, credit, contact and back-to-top buttons; colors follow the current color mode.
+// Its only animation is the Home entrance (it fades in once Home's own entrance has finished); there is no scroll reveal.
 export default function Footer({ dark, animate = false }) {
   const pt = getPulseTheme(dark)
   const hoverTint = glassHoverTint(dark)
   const year = new Date().getFullYear()
 
-  const ref = useRef(null)
-  const inView = useInView(ref, { once: true, amount: 0.2 })
   const [armed, setArmed] = useState(animate)
   const [released, setReleased] = useState(!animate)
 
@@ -35,7 +34,7 @@ export default function Footer({ dark, animate = false }) {
     return () => clearTimeout(t)
   }, [armed])
 
-  const show = !armed || (released && inView)
+  const show = !armed || released
 
   // Scrolls back to the top of the page.
   function backToTop() {
@@ -44,7 +43,6 @@ export default function Footer({ dark, animate = false }) {
 
   return (
     <motion.footer
-      ref={ref}
       initial={armed ? HIDDEN : false}
       animate={show ? VISIBLE : HIDDEN}
       transition={{ duration: 0.7 }}

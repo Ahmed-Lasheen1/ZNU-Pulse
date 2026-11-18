@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import NavMenu from '@/app/shell/NavMenu'
 import PulseBrand from '@/shared/ui/display/PulseBrand'
 import { useHomeEntrance } from '@/core/contexts'
+import { useBrandLocked } from '@/shared/hooks/useBrandLock'
 import { LOGO_DELAY, BRAND_WORDS_START, BRAND_WORD_STAGGER, BRAND_TAGLINE_DELAY } from '@/shared/theme/pulseMotion'
 
 const BRAND_ANIMATION = {
@@ -14,8 +15,12 @@ const BRAND_ANIMATION = {
 // The one site header, mounted once in App.jsx on every page (Home included).
 // The brand and menu animate in only when `entranceRun` flips to 1 (first Home
 // visit per page load); it is used as a key so they re-mount exactly then.
+// The header strip itself is click-through: only the brand and the menu take pointer events,
+// so the empty space between them never blocks the page underneath.
+// During exam and flashcard sessions the brand is locked so a stray tap cannot leave the session.
 export default function PulseOverlayHeader({ dark, toggleTheme }) {
   const { entranceRun } = useHomeEntrance()
+  const brandLocked = useBrandLocked()
   const playEntrance = entranceRun > 0
 
   return (
@@ -27,21 +32,25 @@ export default function PulseOverlayHeader({ dark, toggleTheme }) {
         // Clears the notch (viewport-fit=cover); 0px where there is none.
         paddingTop: 'calc(16px + env(safe-area-inset-top, 0px))',
         paddingBottom: 16,
-        pointerEvents: 'auto'
+        pointerEvents: 'none'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <PulseBrand
-            key={`brand-${entranceRun}`}
-            dark={dark}
-            instant={!playEntrance}
-            animation={BRAND_ANIMATION}
-          />
+          <div style={{ pointerEvents: brandLocked ? 'none' : 'auto' }}>
+            <PulseBrand
+              key={`brand-${entranceRun}`}
+              dark={dark}
+              instant={!playEntrance}
+              animation={BRAND_ANIMATION}
+              locked={brandLocked}
+            />
+          </div>
 
           <motion.div
             key={`nav-${entranceRun}`}
             initial={playEntrance ? { opacity: 0, x: 20 } : false}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.7, delay: LOGO_DELAY }}
+            style={{ pointerEvents: 'auto' }}
           >
             <NavMenu dark={dark} toggleTheme={toggleTheme} align="right" />
           </motion.div>
