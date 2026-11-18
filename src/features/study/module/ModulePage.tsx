@@ -7,6 +7,7 @@ import PageShell from '@/shared/ui/layout/PageShell'
 import ModuleNotFoundState from '@/features/study/module/ModuleNotFoundState'
 import StudyMaterialsSection from '@/features/study/module/StudyMaterialsSection'
 import StudyByLessonSection from '@/features/study/module/StudyByLessonSection'
+import StageSubjectSummaries from '@/features/study/module/StageSubjectSummaries'
 import TabRow from '@/shared/ui/controls/TabRow'
 import { PageSectionsSkeleton } from '@/shared/ui/feedback/Skeletons'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
@@ -33,12 +34,13 @@ interface PageModule {
 }
 interface PageSubject { id: string; module_id: string; name: string; icon?: string | null; color?: string | null }
 interface PageLesson { id: string; title: string; icon?: string | null; subject_id: string }
-interface ModuleSummary { id: string; title: string; url: string; exam_stage?: string | null; lesson_id?: string | null }
+interface ModuleSummary { id: string; title: string; url: string; exam_stage?: string | null; lesson_id?: string | null; subject_id?: string | null }
 interface ExamStage { value: string; title: string; emoji?: string; Icon?: (p: { color: string; size?: number }) => JSX.Element; color: string }
 interface ContentFacet { kind: 'file' | 'question' | 'summary' | 'flashcard'; item_type: string | null; exam_stage: string | null; lesson_id: string | null }
 interface SimulatorRow { stage: string; subject_id: string; question_count: number }
 
-// Module page: stage tabs, study by lesson, materials, simulator, summaries, flashcards and practice.
+// Module page: stage tabs, then study by lesson, materials, simulator, summaries, flashcards and practice.
+// A stage that only has summaries shows just a per-subject summaries list.
 export default function ModulePage({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const { moduleId } = useParams()
@@ -191,6 +193,12 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   stageFacets.forEach(r => { if (r.lesson_id) stageLessonIds.add(r.lesson_id) })
   const visibleLessons = stageActive ? lessons.filter(l => stageLessonIds.has(l.id)) : lessons
 
+  // A stage with summaries but no questions, flashcards or files shows only its summaries, grouped by subject.
+  const summariesOnly = stageActive && contentLoaded && stageSummaries.length > 0
+    && !hasQuestions && !hasFlashcards && presentFileTypes.size === 0
+  // The MCQ card is hidden once a stage is known to have no questions.
+  const practiceVisible = !stageActive || !contentLoaded || hasQuestions
+
   const meta = stageActive ? stageMetaFrom(examStages, activeStage) : null
   const stageName = meta ? meta.title : 'this module'
 
@@ -267,7 +275,16 @@ export default function ModulePage({ dark }: { dark: boolean }) {
         </div>
       )}
 
-      {contentLoaded && (
+      {contentLoaded && summariesOnly && (
+        <StageSubjectSummaries
+          dark={dark}
+          subjects={subjects}
+          summaries={stageSummaries}
+          onOpenSummary={setSelectedSummary}
+        />
+      )}
+
+      {contentLoaded && !summariesOnly && (
         <>
           <StudyByLessonSection
             dark={dark}
@@ -327,64 +344,70 @@ export default function ModulePage({ dark }: { dark: boolean }) {
         </div>
       )}
 
-      <style>{`
-        .module-actions-row { display: grid; grid-template-columns: 1fr; gap: 20px; align-items: start; }
-        @media (min-width: 768px) {
-          .module-actions-row { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); grid-template-columns: none; }
-        }
-      `}</style>
-      <div className="module-actions-row" style={{ marginBottom: 32 }}>
-        <div>
-          <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <SmartSummariesIcon color={ON_BACKGROUND.muted} size={14} /> Smart Summaries
-          </h2>
-          <LiquidGlassCard dark={dark} delay={0} onClick={openSummaries} style={{ padding: 24, textAlign: 'center' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-              <NotesIcon color={pt.success} size={30} />
+      {!summariesOnly && (
+        <>
+          <style>{`
+            .module-actions-row { display: grid; grid-template-columns: 1fr; gap: 20px; align-items: start; }
+            @media (min-width: 768px) {
+              .module-actions-row { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); grid-template-columns: none; }
+            }
+          `}</style>
+          <div className="module-actions-row" style={{ marginBottom: 32 }}>
+            <div>
+              <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <SmartSummariesIcon color={ON_BACKGROUND.muted} size={14} /> Smart Summaries
+              </h2>
+              <LiquidGlassCard dark={dark} delay={0} onClick={openSummaries} style={{ padding: 24, textAlign: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+                  <NotesIcon color={pt.success} size={30} />
+                </div>
+                <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>{stageActive ? 'Summaries' : 'All Summaries'}</div>
+                <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>
+                  {!stageActive
+                    ? 'View summaries for this module'
+                    : stageSummaries.length === 0
+                      ? `${stageName} summaries`
+                      : stageSummaries.length === 1 ? stageSummaries[0].title : `${stageSummaries.length} available`}
+                </div>
+              </LiquidGlassCard>
             </div>
-            <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>{stageActive ? 'Summaries' : 'All Summaries'}</div>
-            <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>
-              {!stageActive
-                ? 'View summaries for this module'
-                : stageSummaries.length === 0
-                  ? `${stageName} summaries`
-                  : stageSummaries.length === 1 ? stageSummaries[0].title : `${stageSummaries.length} available`}
-            </div>
-          </LiquidGlassCard>
-        </div>
 
-        {contentLoaded && hasFlashcards && (
-          <div>
-            <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <FlashcardIcon color={ON_BACKGROUND.muted} size={14} /> Flashcards
-            </h2>
-            <LiquidGlassCard dark={dark} delay={0} onClick={openFlashcards} style={{ padding: 24, textAlign: 'center' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-                <FlashcardIcon color={flashcardText} size={30} />
+            {contentLoaded && hasFlashcards && (
+              <div>
+                <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <FlashcardIcon color={ON_BACKGROUND.muted} size={14} /> Flashcards
+                </h2>
+                <LiquidGlassCard dark={dark} delay={0} onClick={openFlashcards} style={{ padding: 24, textAlign: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+                    <FlashcardIcon color={flashcardText} size={30} />
+                  </div>
+                  <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>Flashcards</div>
+                  <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>
+                    {stageActive ? `Review ${stageName} cards` : 'Review with spaced repetition'}
+                  </div>
+                </LiquidGlassCard>
               </div>
-              <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>Flashcards</div>
-              <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>
-                {stageActive ? `Review ${stageName} cards` : 'Review with spaced repetition'}
+            )}
+
+            {practiceVisible && (
+              <div>
+                <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <PracticeIcon color={ON_BACKGROUND.muted} size={14} /> Practice
+                </h2>
+                <LiquidGlassCard dark={dark} delay={0} onClick={openPractice} style={{ padding: 24, textAlign: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+                    <ExamIcon color={mcqText} size={30} />
+                  </div>
+                  <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>MCQ Bank</div>
+                  <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>
+                    {stageActive ? `Practice ${stageName} questions` : 'Practice questions for this module'}
+                  </div>
+                </LiquidGlassCard>
               </div>
-            </LiquidGlassCard>
+            )}
           </div>
-        )}
-
-        <div>
-          <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <PracticeIcon color={ON_BACKGROUND.muted} size={14} /> Practice
-          </h2>
-          <LiquidGlassCard dark={dark} delay={0} onClick={openPractice} style={{ padding: 24, textAlign: 'center' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-              <ExamIcon color={mcqText} size={30} />
-            </div>
-            <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>MCQ Bank</div>
-            <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>
-              {stageActive ? `Practice ${stageName} questions` : 'Practice questions for this module'}
-            </div>
-          </LiquidGlassCard>
-        </div>
-      </div>
+        </>
+      )}
     </PageShell>
   )
 }
