@@ -1,10 +1,15 @@
 // ZNU Future Doctors — minimal service worker: installable app + offline shell.
 
-const CACHE_NAME = 'znu-shell-v10'
+// The shell cache is versioned. Hashed build assets live in their own cache that is never wiped on activate,
+// so a shell version bump cannot delete the chunks an already-open tab still needs.
+const CACHE_NAME = 'znu-shell-v11'
+const ASSET_CACHE = 'znu-assets-v1'
+const KEEP_CACHES = [CACHE_NAME, ASSET_CACHE]
 const SHELL_URLS = ['/', '/favicon.svg', '/logo.svg', '/icon-192.png', '/icon-512.png']
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com']
 const IMMUTABLE_PREFIX = '/assets/'
-const MAX_CACHE_ENTRIES = 150
+const MAX_SHELL_ENTRIES = 100
+const MAX_ASSET_ENTRIES = 250
 // How long a page load waits for the network before falling back to the saved shell.
 const NAV_TIMEOUT_MS = 2500
 
@@ -15,27 +20,38 @@ self.addEventListener('install', (event) => {
   )
 })
 
+// Removes caches from older shell versions; the asset cache is kept on purpose.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(keys.filter((k) => !KEEP_CACHES.includes(k)).map((k) => caches.delete(k)))
     ).then(() => self.clients.claim())
   )
 })
 
-// Stops old hashed assets from piling up.
-async function trimCache(cache) {
+// Drops the oldest entries once a cache grows past its limit (the shell URLs are never removed).
+async function trimCache(cache, maxEntries) {
   const keys = await cache.keys()
-  if (keys.length <= MAX_CACHE_ENTRIES) return
+  if (keys.length <= maxEntries) return
   const removable = keys.filter((req) => !SHELL_URLS.includes(new URL(req.url).pathname))
-  await Promise.all(removable.slice(0, keys.length - MAX_CACHE_ENTRIES).map((req) => cache.delete(req)))
+  await Promise.all(removable.slice(0, keys.length - maxEntries).map((req) => cache.delete(req)))
 }
 
-function fetchAndCache(request) {
+// Decides whether a response may be saved. The host rewrites unknown paths to index.html with a 200,
+// so a missing hashed file must never be cached as if it were the real script or stylesheet.
+function shouldCache(response, immutable) {
+  if (!response) return false
+  if (response.type === 'opaque') return !immutable
+  if (!response.ok) return false
+  return !(immutable && (response.headers.get('content-type') || '').includes('text/html'))
+}
+
+// Fetches a request and saves a copy in the given cache.
+function fetchAndCache(request, cacheName, maxEntries, immutable) {
   return fetch(request).then((response) => {
-    if (response && (response.ok || response.type === 'opaque')) {
+    if (shouldCache(response, immutable)) {
       const copy = response.clone()
-      caches.open(CACHE_NAME).then((cache) => cache.put(request, copy).then(() => trimCache(cache)))
+      caches.open(cacheName).then((cache) => cache.put(request, copy).then(() => trimCache(cache, maxEntries)))
     }
     return response
   })
@@ -43,10 +59,15 @@ function fetchAndCache(request) {
 
 // Hashed build assets never change, so a cached copy is used as-is;
 // everything else is refreshed in the background.
-async function cachedAsset(request, revalidate) {
+async function cachedAsset(request, immutable) {
   const cached = await caches.match(request)
-  if (cached && !revalidate) return cached
-  const network = fetchAndCache(request).catch(() => cached)
+  if (cached && immutable) return cached
+  const network = fetchAndCache(
+    request,
+    immutable ? ASSET_CACHE : CACHE_NAME,
+    immutable ? MAX_ASSET_ENTRIES : MAX_SHELL_ENTRIES,
+    immutable
+  ).catch(() => cached)
   return cached || network
 }
 
@@ -82,7 +103,7 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  event.respondWith(cachedAsset(request, !url.pathname.startsWith(IMMUTABLE_PREFIX)))
+  event.respondWith(cachedAsset(request, url.pathname.startsWith(IMMUTABLE_PREFIX)))
 })
 
 // Shows the notification even when no tab is open.

@@ -3,14 +3,17 @@ import { fetchAllRows } from '@/core/fetchAllRows'
 import { idbGet, idbSet, idbDelete, idbKeys } from '@/core/idb'
 import { isDue, newerProgress, type ProgressMap } from '@/services/flashcards/scheduler'
 
-// Saved progress of one module and the ids of cards not yet uploaded.
+// Saved progress of one module, the ids of cards not yet uploaded, and when the server was last pulled.
 interface Store {
   cards: ProgressMap
   dirty: string[]
+  pulledAt: number
 }
 
 const BATCH_SIZE = 500
 const GUEST_PREFIX = 'flashcard-progress:guest:'
+// A module's server progress is downloaded at most this often (uploads are never delayed).
+const PULL_TTL_MS = 5 * 60 * 1000
 
 // Key prefix shared by every module store of one owner (null = guest).
 // Signed-in data lives under "user:" so sign-out clears it with the other per-user caches.
@@ -30,8 +33,8 @@ function queue<T>(task: () => Promise<T>): Promise<T> {
 async function readStore(key: string): Promise<Store> {
   const saved: any = await idbGet(key)
   return saved?.cards
-    ? { cards: saved.cards, dirty: saved.dirty || [] }
-    : { cards: {}, dirty: [] }
+    ? { cards: saved.cards, dirty: saved.dirty || [], pulledAt: saved.pulledAt || 0 }
+    : { cards: {}, dirty: [], pulledAt: 0 }
 }
 
 // Reads every saved module store of one owner as [moduleId, cards] pairs.
@@ -85,15 +88,34 @@ export function saveReview(userId: string | null, moduleId: string, cardId: stri
   })
 }
 
-// Uploads pending reviews, pulls newer server progress, and returns the merged map (null when skipped).
-export async function syncProgress(userId: string | null, moduleId: string): Promise<ProgressMap | null> {
+interface SyncOptions {
+  // False for upload-only syncs (leaving a page, hiding the tab): the server is never downloaded.
+  pull?: boolean
+  // Downloads the server progress even when it was pulled recently.
+  force?: boolean
+}
+
+// Uploads pending reviews and, when due, pulls newer server progress. Returns the merged map, or null when nothing happened.
+// The server is downloaded at most once per PULL_TTL_MS per module. A review uploaded late from another device can carry an
+// older timestamp than anything already pulled, so a timestamp cursor would miss it; the full pull stays, but far less often.
+export async function syncProgress(
+  userId: string | null,
+  moduleId: string,
+  { pull = true, force = false }: SyncOptions = {}
+): Promise<ProgressMap | null> {
   if (!userId || !navigator.onLine) return null
   const key = keyFor(userId, moduleId)
 
-  const pending = await queue(async () => {
+  const { pending, pulledAt } = await queue(async () => {
     const store = await readStore(key)
-    return store.dirty.filter(id => store.cards[id]).map(id => ({ id, progress: store.cards[id] }))
+    return {
+      pending: store.dirty.filter(id => store.cards[id]).map(id => ({ id, progress: store.cards[id] })),
+      pulledAt: store.pulledAt,
+    }
   })
+
+  const shouldPull = pull && (force || Date.now() - pulledAt >= PULL_TTL_MS)
+  if (pending.length === 0 && !shouldPull) return null
 
   const uploaded = new Map<string, string>()
   for (let i = 0; i < pending.length; i += BATCH_SIZE) {
@@ -107,22 +129,31 @@ export async function syncProgress(userId: string | null, moduleId: string): Pro
     slice.forEach(({ id, progress }) => uploaded.set(id, progress.last_review))
   }
 
-  const { data: serverRows } = await fetchAllRows(() => supabase
-    .from('flashcard_progress')
-    .select('card_id, due, last_review, card')
-    .eq('user_id', userId)
-    .eq('module_id', moduleId)
-    .order('card_id'))
+  let serverRows: any[] = []
+  let pulled = false
+  if (shouldPull) {
+    const result = await fetchAllRows(() => supabase
+      .from('flashcard_progress')
+      .select('card_id, due, last_review, card')
+      .eq('user_id', userId)
+      .eq('module_id', moduleId)
+      .order('card_id'))
+    if (!result.error) {
+      serverRows = (result.data || []) as any[]
+      pulled = true
+    }
+  }
 
   return queue(async () => {
     const store = await readStore(key)
     store.dirty = store.dirty.filter(id => !(uploaded.has(id) && store.cards[id]?.last_review === uploaded.get(id)))
-    for (const row of (serverRows || []) as any[]) {
+    for (const row of serverRows) {
       const local = store.cards[row.card_id]
       if (!local || Date.parse(row.last_review) > Date.parse(local.last_review)) {
         store.cards[row.card_id] = { due: row.due, last_review: row.last_review, card: row.card }
       }
     }
+    if (pulled) store.pulledAt = Date.now()
     await idbSet(key, store)
     return store.cards
   })

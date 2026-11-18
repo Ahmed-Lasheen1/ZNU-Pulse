@@ -1,15 +1,25 @@
 import { supabase } from '@/core/supabase'
 import { idbGet, idbSet, idbDelete, idbKeys } from '@/core/idb'
+import { requestPersistentStorage } from '@/core/storagePersistence'
 import { loadAnswerKeys } from '@/services/content/moduleContent'
 import { isTransientFailure } from '@/services/offline/isTransientFailure'
 
 const ATTEMPT_PREFIX = 'attempt:'
+
+// An attempt the server keeps refusing for permission reasons is marked failed after this many tries.
+const MAX_PERMISSION_RETRIES = 5
+// This many permission failures in a row point to a session problem, so the run stops.
+const MAX_PERMISSION_STREAK = 3
+const PERMISSION_MESSAGE = 'The server keeps refusing this attempt (permission denied).'
 
 const listeners = new Set()
 // Tells subscribers that the pending-attempts list changed.
 const notify = () => listeners.forEach(listener => listener())
 
 let syncing = false
+
+// True when the server refused this one request for permission reasons (not a network or server outage).
+const isPermissionDenied = ({ error, status }) => !!error && (status === 403 || error.code === '42501')
 
 // Registers a listener for pending-attempt changes; returns an unsubscribe function.
 export function subscribePendingAttempts(listener) {
@@ -36,7 +46,7 @@ export async function gradeLocally(questions, answers) {
 // Keeps the caller's attempt id so the server row and the device copy share one id.
 export async function savePendingAttempt(attempt) {
   const record = { ...attempt, id: attempt.id || crypto.randomUUID(), error: null }
-  Promise.resolve(navigator.storage?.persist?.()).catch(() => {})
+  requestPersistentStorage()
   const saved = (await idbSet(ATTEMPT_PREFIX + record.id, record)) != null
   if (saved) notify()
   return saved
@@ -57,12 +67,14 @@ export async function discardPendingAttempt(id) {
   notify()
 }
 
-// Uploads pending attempts, stopping at the first retryable failure.
+// Uploads pending attempts. Network errors, server errors and expired sessions stop the run (everything behind
+// would fail too); a permission refusal only counts against that attempt so it cannot block the ones behind it.
 export async function syncPendingAttempts(userId, { includeFailed = false } = {}) {
   if (syncing) return { synced: 0, rejected: 0 }
   syncing = true
   let synced = 0
   let rejected = 0
+  let permissionStreak = 0
   try {
     const attempts = (await listPendingAttempts(userId)).filter(attempt => includeFailed || !attempt.error)
     for (const attempt of attempts) {
@@ -78,11 +90,23 @@ export async function syncPendingAttempts(userId, { includeFailed = false } = {}
         p_stage: attempt.stage || null,
       })
       if (!response.error && response.data?.length) {
+        permissionStreak = 0
         await idbDelete(ATTEMPT_PREFIX + attempt.id)
         synced++
+      } else if (isPermissionDenied(response)) {
+        permissionStreak++
+        const retries = (attempt.retries || 0) + 1
+        if (retries >= MAX_PERMISSION_RETRIES) {
+          rejected++
+          await idbSet(ATTEMPT_PREFIX + attempt.id, { ...attempt, retries, error: PERMISSION_MESSAGE })
+        } else {
+          await idbSet(ATTEMPT_PREFIX + attempt.id, { ...attempt, retries })
+        }
+        if (permissionStreak >= MAX_PERMISSION_STREAK) break
       } else if (isTransientFailure(response)) {
         break
       } else {
+        permissionStreak = 0
         rejected++
         await idbSet(ATTEMPT_PREFIX + attempt.id, {
           ...attempt,

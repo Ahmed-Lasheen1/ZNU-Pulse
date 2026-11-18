@@ -70,7 +70,8 @@ function ModuleFlashcards({ mod, dark, stage: initialStage, initialLessonId }: {
     return () => { ignore = true }
   }, [mod.id])
 
-  // Loads saved progress from the device, then syncs with the server on open, reconnect, tab hide and leave.
+  // Loads saved progress from the device, then syncs with the server: a full sync (upload and, at most every few minutes,
+  // download) on open and reconnect, and upload-only syncs when the tab is hidden or the page is left.
   useEffect(() => {
     let ignore = false
     setProgressLoaded(false)
@@ -86,9 +87,9 @@ function ModuleFlashcards({ mod, dark, stage: initialStage, initialLessonId }: {
         if (!ignore && merged) setProgress(prev => newerProgress(prev, merged))
       })
     }
-    // Uploads pending reviews when the tab is hidden.
+    // Uploads pending reviews when the tab is hidden (no download).
     function onHidden() {
-      if (document.visibilityState === 'hidden') syncProgress(userId, mod.id)
+      if (document.visibilityState === 'hidden') syncProgress(userId, mod.id, { pull: false })
     }
 
     pull()
@@ -98,7 +99,7 @@ function ModuleFlashcards({ mod, dark, stage: initialStage, initialLessonId }: {
       ignore = true
       window.removeEventListener('online', pull)
       document.removeEventListener('visibilitychange', onHidden)
-      syncProgress(userId, mod.id)
+      syncProgress(userId, mod.id, { pull: false })
     }
   }, [userId, mod.id])
 
@@ -180,9 +181,9 @@ function ModuleFlashcards({ mod, dark, stage: initialStage, initialLessonId }: {
     saveReview(userId, mod.id, cardId, next)
   }
 
-  // Uploads reviews made in the session.
+  // Uploads reviews made in the session (upload only, no download).
   function pushProgress() {
-    syncProgress(userId, mod.id).then(merged => { if (merged) setProgress(prev => newerProgress(prev, merged)) })
+    syncProgress(userId, mod.id, { pull: false }).then(merged => { if (merged) setProgress(prev => newerProgress(prev, merged)) })
   }
 
   if (session) return (

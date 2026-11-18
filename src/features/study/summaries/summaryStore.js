@@ -147,11 +147,26 @@ async function trackSavedSummary(url) {
   await Promise.all([idbSet(INDEX_KEY, index), ...evicted.map(old => idbDelete(KEY_PREFIX + old))])
 }
 
-async function saveSummary(url) {
+// Downloads the lesson page text (revalidated with the server); null when it cannot be loaded.
+async function fetchLessonText(url) {
+  try {
+    const response = await fetch(url, { cache: 'no-cache' })
+    if (!response.ok) return null
+    return await response.text()
+  } catch {
+    return null
+  }
+}
+
+// Saves a lesson for offline use. When the caller already downloaded the page text, it is reused instead of fetching it again.
+async function saveSummary(url, knownSource = null) {
   const baseUrl = new URL(url)
-  const response = await fetch(url, { cache: 'no-cache' })
-  if (!response.ok) throw new Error(`Summary failed to load (${response.status})`)
-  const source = await response.text()
+  let source = knownSource
+  if (source === null) {
+    const response = await fetch(url, { cache: 'no-cache' })
+    if (!response.ok) throw new Error(`Summary failed to load (${response.status})`)
+    source = await response.text()
+  }
   const htmlHash = await hashText(source)
   const doc = new DOMParser().parseFromString(source, 'text/html')
   const sharedVersion = await inlineShared(doc, baseUrl, url)
@@ -162,33 +177,26 @@ async function saveSummary(url) {
   return html
 }
 
-async function fetchLessonHash(url) {
-  try {
-    const response = await fetch(url, { cache: 'no-cache' })
-    if (!response.ok) return null
-    return await hashText(await response.text())
-  } catch {
-    return null
-  }
-}
-
 // A saved copy is outdated when it was saved by an older version of this code,
 // when the lesson's own HTML has changed, or when it was saved with shared files
 // and the shared version number has changed since.
 // Any problem running a check counts as "not outdated", so the saved copy is kept.
-async function isOutdated(url, saved) {
-  if (saved.format !== FORMAT) return true
+// Also returns the lesson text when the check downloaded it, so a re-save does not download it twice.
+async function checkSaved(url, saved) {
+  if (saved.format !== FORMAT) return { outdated: true, source: null }
 
+  let source = null
   if (saved.htmlHash) {
-    const current = await fetchLessonHash(url)
-    if (current && current !== saved.htmlHash) return true
+    source = await fetchLessonText(url)
+    const current = source === null ? null : await hashText(source)
+    if (current && current !== saved.htmlHash) return { outdated: true, source }
   }
 
-  if (!saved.sharedVersion) return false
+  if (!saved.sharedVersion) return { outdated: false, source }
   try {
-    return (await fetchSharedVersion(url)) !== saved.sharedVersion
+    return { outdated: (await fetchSharedVersion(url)) !== saved.sharedVersion, source }
   } catch {
-    return false
+    return { outdated: false, source }
   }
 }
 
@@ -196,9 +204,15 @@ export async function prepareOfflineSummary(url) {
   if (!canSaveOffline(url)) return null
   const saved = await idbGet(KEY_PREFIX + url)
   if (!navigator.onLine) return saved ? saved.html : null
-  if (saved && !(await isOutdated(url, saved))) return saved.html
+
+  let knownSource = null
+  if (saved) {
+    const check = await checkSaved(url, saved)
+    if (!check.outdated) return saved.html
+    knownSource = check.source
+  }
   try {
-    return await saveSummary(url)
+    return await saveSummary(url, knownSource)
   } catch {
     return saved ? saved.html : null
   }

@@ -81,14 +81,14 @@ function refreshAfterCheck(key, fetcher, entry, onUpdate) {
   }, VALIDATION_GRACE_MS)
 }
 
-// Returns a cached result, refreshing it in the background once its TTL expires.
+// Returns a cached result, refreshing it in the background once its TTL expires (REFERENCE_TTL when none is given).
 // The JSDoc types the options so TSX callers can pass `ttl` and `onUpdate`.
 /**
  * @param {string} key
  * @param {() => any} fetcher
  * @param {{ ttl?: number, onUpdate?: (result: { data: any, error: any }) => void, versioned?: boolean }} [options]
  */
-export async function cachedQuery(key, fetcher, { ttl, onUpdate, versioned = false } = {}) {
+export async function cachedQuery(key, fetcher, { ttl = REFERENCE_TTL, onUpdate, versioned = false } = {}) {
   const entry = await readEntry(key)
   if (!entry) return refresh(key, fetcher)
   if (Date.now() - entry.savedAt >= ttl) {

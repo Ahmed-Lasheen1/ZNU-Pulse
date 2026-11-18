@@ -1,15 +1,17 @@
 import { useOnlineStatus } from '@/shared/hooks/useOnlineStatus'
 import { useAttemptSync } from '@/services/offline/useAttemptSync'
 import { useChecklistSync } from '@/services/offline/useChecklistSync'
+import { useStorageSafety } from '@/services/offline/useStorageSafety'
 import { pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import { OfflineIcon } from '@/shared/icons/tool-icons'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 
-// Shows an "Offline" pill while the connection is down, and runs the background syncs when it returns.
+// Shows an "Offline" pill while the connection is down, and runs the background syncs and storage protection.
 export default function OfflineStatus({ dark }: { dark: boolean }) {
   const online = useOnlineStatus()
   useAttemptSync()
   useChecklistSync()
+  useStorageSafety()
   if (online) return null
 
   return (

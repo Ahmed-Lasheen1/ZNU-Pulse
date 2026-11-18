@@ -11,12 +11,15 @@ function openDb() {
       request.onupgradeneeded = () => request.result.createObjectStore(STORE)
       request.onsuccess = () => resolve(request.result)
       request.onerror = () => reject(request.error)
-    }).catch(() => null)
+    }).catch(error => {
+      console.warn('[idb] Could not open the database:', error?.name || error)
+      return null
+    })
   }
   return dbPromise
 }
 
-// Runs one IndexedDB transaction and resolves its result, or null on any failure.
+// Runs one IndexedDB transaction and resolves its result, or null on any failure (logged, e.g. a full disk).
 async function run(mode, action) {
   const db = await openDb()
   if (!db) return null
@@ -27,7 +30,8 @@ async function run(mode, action) {
       tx.oncomplete = () => resolve(request.result)
       tx.onerror = tx.onabort = () => reject(tx.error)
     })
-  } catch {
+  } catch (error) {
+    console.warn('[idb] Operation failed:', error?.name || error)
     return null
   }
 }
