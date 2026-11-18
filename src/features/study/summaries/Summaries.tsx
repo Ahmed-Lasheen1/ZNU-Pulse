@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { getPulseTheme, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import { adaptColor } from '@/shared/theme/adaptColor'
@@ -16,6 +16,7 @@ import { fetchSubjectsForModule } from '@/services/content/subjects'
 import { fetchLessonStageMap, stagesOf, inStage } from '@/services/content/lessonStages'
 import { fetchModuleSummaries } from '@/services/content/moduleContent'
 import { useHistoryOverlay } from '@/shared/hooks/useHistoryOverlay'
+import { useGoBack } from '@/shared/hooks/useGoBack'
 import { getPreviewUrl } from '@/shared/utils/embedUrl'
 import { ModuleIcon, NotesIcon } from '@/shared/icons/medicalIcons'
 import { ConstructionIcon } from '@/shared/icons/tool-icons'
@@ -38,8 +39,11 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
   const pt = getPulseTheme(dark)
   // The module color as text/icon color, adjusted to stay readable in the current mode (fills keep the original).
   const modColor = adaptColor(mod.color, dark)
+  const goBack = useGoBack(`/module/${mod.id}`)
   const [summaries, setSummaries] = useState<Summary[]>([])
   const [selected, setSelected] = useState<Summary | null>(null)
+  // True when the open summary came from the URL (Schedule, Search); closing it then leaves the page through history.
+  const [linkedOpen, setLinkedOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [activeStage, setActiveStage] = useState(initialStage || 'all')
@@ -47,8 +51,10 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
   const [stages, setStages] = useState<ExamStage[]>([])
   const [subjects, setSubjects] = useState<SummarySubject[]>([])
   const [lessonStageMap, setLessonStageMap] = useState<Record<string, string[]>>({})
+  const openedLinkRef = useRef<string | null>(null)
 
-  useHistoryOverlay(!!selected, () => setSelected(null))
+  // A summary opened from the list needs a history entry for the back button; a linked one already has its route entry.
+  useHistoryOverlay(!!selected && !linkedOpen, () => setSelected(null))
 
   // Loads the module's exam stages.
   useEffect(() => {
@@ -89,19 +95,26 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
     return () => { ignore = true }
   }, [mod.id])
 
-  // Opens the summary named in the link once the list has loaded.
+  // Opens the summary named in the link once, after the list has loaded.
   useEffect(() => {
-    if (!initialSummaryId || summaries.length === 0) return
+    if (!initialSummaryId || summaries.length === 0 || openedLinkRef.current === initialSummaryId) return
     const match = summaries.find(s => s.id === initialSummaryId)
     if (match) {
+      openedLinkRef.current = initialSummaryId
+      setLinkedOpen(true)
       setSelected(match)
       if (match.exam_stage) setActiveStage(match.exam_stage)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSummaryId, summaries])
 
+  // Closes the viewer: a linked summary returns to the page that linked it, a list summary just closes.
+  function closeSummary() {
+    if (linkedOpen) goBack()
+    else setSelected(null)
+  }
+
   if (selected) return (
-    <SummaryOverlay dark={dark} onBack={() => setSelected(null)} title={selected.title} url={getPreviewUrl(selected.url)} />
+    <SummaryOverlay dark={dark} onBack={closeSummary} title={selected.title} url={getPreviewUrl(selected.url)} />
   )
 
   const stagesWithSummaries = new Set(summaries.flatMap(s => stagesOf(s, lessonStageMap)))
@@ -163,7 +176,8 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {filtered.map((sum, i) => (
           <LiquidGlassCard
-            key={sum.id} dark={dark} delay={i * 70} onClick={() => setSelected(sum)}
+            key={sum.id} dark={dark} delay={i * 70}
+            onClick={() => { setLinkedOpen(false); setSelected(sum) }}
             style={{
               padding: 'clamp(14px, 3vw, 18px) clamp(14px, 3vw, 22px)',
               display: 'flex', alignItems: 'center', gap: 12,

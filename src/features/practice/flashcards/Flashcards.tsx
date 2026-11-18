@@ -5,6 +5,7 @@ import { ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import PageShell from '@/shared/ui/layout/PageShell'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
+import { useGoBack } from '@/shared/hooks/useGoBack'
 import { fetchModuleFlashcards } from '@/services/content/moduleContent'
 import { resolveModule } from '@/services/content/modules'
 import { fetchLessonsForModule } from '@/services/content/lessons'
@@ -22,7 +23,8 @@ interface FlashcardRow { id: string; lesson_id: string; front: string; back: str
 interface FlashcardLesson { id: string; title: string; subject_id: string }
 interface FlashcardSubject { id: string; name: string; icon?: string | null; color?: string | null }
 // `lessonId` and `subjectId` are both null for the "study all due" session; `practice` sessions never change the saved schedule.
-interface Session { lessonId: string | null; subjectId: string | null; title: string; queue: FlashcardRow[]; run: number; practice: boolean }
+// `fromLink` is true when the session was auto-started from a link (Schedule, module page), so leaving it returns there.
+interface Session { lessonId: string | null; subjectId: string | null; title: string; queue: FlashcardRow[]; run: number; practice: boolean; fromLink: boolean }
 
 const PAGE_MAX_WIDTH = 900
 
@@ -32,6 +34,7 @@ function ModuleFlashcards({ mod, dark, stage: initialStage, initialLessonId }: {
 }) {
   const { user } = useAuth() as { user: { id: string } | null }
   const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
+  const goBack = useGoBack(`/module/${mod.id}`)
   const userId = user?.id ?? null
 
   const [cards, setCards] = useState<FlashcardRow[]>([])
@@ -118,7 +121,7 @@ function ModuleFlashcards({ mod, dark, stage: initialStage, initialLessonId }: {
   }, [cards, lessons, lessonStageMap, stage])
 
   // Starts a session for a card list: due and new cards first, or a "review anyway" practice session when none are left.
-  function begin(pool: FlashcardRow[], meta: Pick<Session, 'lessonId' | 'subjectId' | 'title'>, run: number) {
+  function begin(pool: FlashcardRow[], meta: Pick<Session, 'lessonId' | 'subjectId' | 'title'>, run: number, fromLink = false) {
     const due = buildSession(pool, progress, new Date())
     const practice = due.length === 0
     const queue = practice ? buildPracticeSession(pool) : due
@@ -127,16 +130,17 @@ function ModuleFlashcards({ mod, dark, stage: initialStage, initialLessonId }: {
       setSession(null)
       return
     }
-    setSession({ ...meta, queue, run, practice })
+    setSession({ ...meta, queue, run, practice, fromLink })
     window.scrollTo({ top: 0 })
   }
 
   // Starts a session for one lesson.
-  function start(lessonId: string, run = 0) {
+  function start(lessonId: string, run = 0, fromLink = false) {
     begin(
       cards.filter(c => c.lesson_id === lessonId),
       { lessonId, subjectId: null, title: lessons.find(l => l.id === lessonId)?.title || 'Flashcards' },
-      run
+      run,
+      fromLink
     )
   }
 
@@ -160,7 +164,7 @@ function ModuleFlashcards({ mod, dark, stage: initialStage, initialLessonId }: {
       setSession(null)
       return
     }
-    setSession({ lessonId: null, subjectId: null, title: 'All due cards', queue, run, practice: false })
+    setSession({ lessonId: null, subjectId: null, title: 'All due cards', queue, run, practice: false, fromLink: false })
     window.scrollTo({ top: 0 })
   }
 
@@ -168,7 +172,7 @@ function ModuleFlashcards({ mod, dark, stage: initialStage, initialLessonId }: {
   useEffect(() => {
     if (!initialLessonId || autoStartedRef.current || loading || !progressLoaded) return
     autoStartedRef.current = true
-    start(initialLessonId)
+    start(initialLessonId, 0, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, progressLoaded])
 
@@ -186,6 +190,14 @@ function ModuleFlashcards({ mod, dark, stage: initialStage, initialLessonId }: {
     syncProgress(userId, mod.id, { pull: false }).then(merged => { if (merged) setProgress(prev => newerProgress(prev, merged)) })
   }
 
+  // Ends the session and uploads its reviews; a session started from a link returns to the page that linked it.
+  function exitSession() {
+    const returnToOrigin = session?.fromLink
+    setSession(null)
+    pushProgress()
+    if (returnToOrigin) goBack()
+  }
+
   if (session) return (
     <FlashcardStudy
       key={`${session.lessonId ?? session.subjectId ?? 'due'}-${session.run}`}
@@ -197,11 +209,11 @@ function ModuleFlashcards({ mod, dark, stage: initialStage, initialLessonId }: {
       onRate={rate}
       onFinish={pushProgress}
       onMore={() => {
-        if (session.lessonId) start(session.lessonId, session.run + 1)
+        if (session.lessonId) start(session.lessonId, session.run + 1, session.fromLink)
         else if (session.subjectId) startSubject(session.subjectId, session.run + 1)
         else startAllDue(session.run + 1)
       }}
-      onExit={() => { setSession(null); pushProgress() }}
+      onExit={exitSession}
     />
   )
 

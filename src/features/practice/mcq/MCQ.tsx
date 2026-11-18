@@ -121,6 +121,13 @@ export default function MCQ({ dark }: { dark: boolean }) {
   const autoStartedLessonRef = useRef(false)
   const autoStartedSubjectRef = useRef(false)
   const autoStartedSimulatorRef = useRef(false)
+  // Set by the URL auto-start effects; the next quiz that actually begins takes it over as its own flag.
+  const linkedStartRef = useRef(false)
+  // True while the running quiz was started from a link (Schedule, module page), so leaving it returns there.
+  const linkedSessionRef = useRef(false)
+  // Whether this page was opened with real history behind it; captured before the auto-start params are
+  // stripped with replace, which gives the page a new router key and would otherwise hide a direct link.
+  const canGoBackRef = useRef(location.key !== 'default')
   const isMountedRef = useRef(true)
   const userRef = useRef(user)
   useEffect(() => { userRef.current = user }, [user])
@@ -138,6 +145,12 @@ export default function MCQ({ dark }: { dark: boolean }) {
     params.delete('simulator')
     const search = params.toString()
     navigate({ pathname: location.pathname, search: search ? `?${search}` : '' }, { replace: true })
+  }
+
+  // Returns to the page that linked here, or to the module page when this was a direct link.
+  function leaveToOrigin() {
+    if (canGoBackRef.current) navigate(-1)
+    else navigate(activeModule ? `/module/${activeModule}` : '/', { replace: true })
   }
 
   useEffect(() => {
@@ -217,6 +230,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   useEffect(() => {
     if (lessonFilter && !quizMode && questions.length > 0 && lessonStageMapLoaded && !autoStartedLessonRef.current) {
       autoStartedLessonRef.current = true
+      linkedStartRef.current = true
       requestStart('practice', null, lessonFilter)
       clearAutoStartParams()
     }
@@ -227,6 +241,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   useEffect(() => {
     if (subjectFilter && !lessonFilter && !quizMode && questions.length > 0 && lessonStageMapLoaded && !autoStartedSubjectRef.current) {
       autoStartedSubjectRef.current = true
+      linkedStartRef.current = true
       requestStart('practice', subjectFilter, null)
       clearAutoStartParams()
     }
@@ -238,6 +253,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     if (!activeModule || !simLoaded || !lessonStageMapLoaded || activeStage === 'all') return
     if (!questions.some(q => q.module_id === activeModule)) return
     autoStartedSimulatorRef.current = true
+    linkedStartRef.current = true
     requestStart('simulator', null, null, activeStage)
     clearAutoStartParams()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -432,9 +448,11 @@ export default function MCQ({ dark }: { dark: boolean }) {
     timerRef.current = setInterval(tick, 1000)
   }
 
-  // Resets quiz state and begins a new quiz with the given questions.
+  // Resets quiz state and begins a new quiz with the given questions; a pending link-start flag becomes this quiz's own.
   function beginQuiz(qs: any[], type: string, config: QuizConfig | null) {
     lastQuizConfigRef.current = config
+    linkedSessionRef.current = linkedStartRef.current
+    linkedStartRef.current = false
 
     setQuizStage(stageOf(config))
     setQuizQuestions(qs)
@@ -467,6 +485,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     )
 
     if (qs.length === 0) {
+      linkedStartRef.current = false
       showToast('❌ No questions available for this selection yet', 'error')
       return
     }
@@ -479,6 +498,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     const rows = simRows.filter(r => r.stage === stage)
     const qs = drawSimulator(questions, rows, stage, lessonStageMap, sourceFilter)
     if (qs.length === 0) {
+      linkedStartRef.current = false
       showToast('❌ No simulator questions available for this stage yet', 'error')
       return
     }
@@ -531,6 +551,12 @@ export default function MCQ({ dark }: { dark: boolean }) {
     launch(type, subjectId, lessonId, stage, source)
   }
 
+  // Closes the source dialog without starting; a cancelled link-start must not mark the next manual quiz.
+  function cancelSourceChoice() {
+    linkedStartRef.current = false
+    setSourceChoice(null)
+  }
+
   // Starts a retry quiz from a list of previously missed or flagged questions.
   function startRetryQuiz(list: any[]) {
     if (!list || list.length === 0) {
@@ -547,6 +573,8 @@ export default function MCQ({ dark }: { dark: boolean }) {
       ? Date.now() - (resumeData.savedAt - resumeData.startedAt)
       : resumeData.startedAt
     lastQuizConfigRef.current = resumeData.quizConfig || null
+    linkedStartRef.current = false
+    linkedSessionRef.current = false
     setQuizStage(stageOf(resumeData.quizConfig || null))
     setActiveModule(resumeData.activeModule)
     setQuizQuestions(resumeData.quizQuestions || [])
@@ -576,8 +604,10 @@ export default function MCQ({ dark }: { dark: boolean }) {
     setResumeData(null)
   }
 
-  // Leaves the current quiz and resets all quiz state.
+  // Leaves the current quiz and resets all quiz state; a quiz started from a link returns to the page that linked it.
   function stopQuiz() {
+    const returnToOrigin = linkedSessionRef.current
+    linkedSessionRef.current = false
     clearInterval(timerRef.current)
     setQuizMode(null)
     setQuizStage(null)
@@ -592,6 +622,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
     setStruckOut({})
     gradingInFlightRef.current.clear()
     sessionIdRef.current++
+    if (returnToOrigin) leaveToOrigin()
   }
 
   const isTutorMode = quizMode === 'practice' || quizMode === 'retry'
@@ -648,9 +679,10 @@ export default function MCQ({ dark }: { dark: boolean }) {
   // Moves to the next question.
   function goNext() { setCurrentIndex(i => Math.min(quizQuestions.length - 1, i + 1)) }
 
-  // Restarts the same kind of quiz that was just finished.
+  // Restarts the same kind of quiz that was just finished; a link-started quiz stays link-started.
   function tryAgain() {
     if (quizMode === 'retry') { startRetryQuiz(quizQuestions); return }
+    linkedStartRef.current = linkedSessionRef.current
     const config = lastQuizConfigRef.current
     if (config?.simulatorStage) { startSimulator(config.simulatorStage, config.sourceFilter); return }
     if (config) startQuiz(config.type, config.subjectId, config.lessonId, config.sourceFilter)
@@ -876,7 +908,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
       sourceChoice={sourceChoice}
       onChooseAll={() => chooseSource(null)}
       onChooseDoctors={() => chooseSource('university')}
-      onCancelChoice={() => setSourceChoice(null)}
+      onCancelChoice={cancelSourceChoice}
     />
   )
 }
