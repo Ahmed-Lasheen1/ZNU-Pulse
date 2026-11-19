@@ -30,32 +30,37 @@ interface StageSubjectSummariesProps<T extends StageSummary> {
   dark: boolean
   subjects: StageSubject[]
   summaries: T[]
+  // Module look used when a subject has no icon or color of its own, and for summaries without a subject.
+  fallbackIcon?: string | null
+  fallbackColor: string
   onOpenSummary: (summary: T) => void
 }
 
-const DEFAULT_SUBJECT_COLOR = '#34d399'
-const DEFAULT_SUBJECT_ICON = '📖'
-
 // Pairs each summary with its subject in the module's subject order; summaries without a known subject go last under "General".
-function entriesBySubject<T extends StageSummary>(subjects: StageSubject[], summaries: T[]): SummaryEntry<T>[] {
+function entriesBySubject<T extends StageSummary>(
+  subjects: StageSubject[],
+  summaries: T[],
+  fallbackIcon: string | null,
+  fallbackColor: string
+): SummaryEntry<T>[] {
   const known = new Set(subjects.map(s => s.id))
   const entries: SummaryEntry<T>[] = subjects.flatMap(s =>
     summaries
       .filter(item => item.subject_id === s.id)
-      .map(summary => ({ summary, name: s.name, icon: s.icon || null, color: s.color || DEFAULT_SUBJECT_COLOR }))
+      .map(summary => ({ summary, name: s.name, icon: s.icon || fallbackIcon, color: s.color || fallbackColor }))
   )
   summaries
     .filter(item => !item.subject_id || !known.has(item.subject_id))
-    .forEach(summary => entries.push({ summary, name: 'General', icon: null, color: DEFAULT_SUBJECT_COLOR }))
+    .forEach(summary => entries.push({ summary, name: 'General', icon: fallbackIcon, color: fallbackColor }))
   return entries
 }
 
 // Summaries of a summaries-only exam stage: one large card per summary, titled with its subject, tap to open.
 export default function StageSubjectSummaries<T extends StageSummary>({
-  dark, subjects, summaries, onOpenSummary,
+  dark, subjects, summaries, fallbackIcon = null, fallbackColor, onOpenSummary,
 }: StageSubjectSummariesProps<T>) {
   const pt = getPulseTheme(dark)
-  const entries = entriesBySubject(subjects, summaries)
+  const entries = entriesBySubject(subjects, summaries, fallbackIcon, fallbackColor)
 
   if (entries.length === 0) return null
 
@@ -81,7 +86,7 @@ export default function StageSubjectSummaries<T extends StageSummary>({
                 background: `${color}20`, border: `1px solid ${color}40`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <ModuleIcon value={icon} size={24} color={iconColor} fallbackEmoji={DEFAULT_SUBJECT_ICON} />
+                <ModuleIcon value={icon} size={24} color={iconColor} />
               </div>
 
               <div style={{ minWidth: 0, flex: 1 }}>

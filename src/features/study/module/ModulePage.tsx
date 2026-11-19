@@ -280,6 +280,8 @@ export default function ModulePage({ dark }: { dark: boolean }) {
           dark={dark}
           subjects={subjects}
           summaries={stageSummaries}
+          fallbackIcon={module.icon}
+          fallbackColor={module.color}
           onOpenSummary={setSelectedSummary}
         />
       )}
