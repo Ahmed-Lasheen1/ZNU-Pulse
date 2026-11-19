@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/core/supabase'
 import { useAuth } from '@/core/contexts'
 import { getPulseTheme, pulseFonts, pulseType } from '@/shared/theme/premiumTheme'
@@ -16,14 +17,24 @@ import OfflineNote from '@/shared/ui/feedback/OfflineNote'
 import { ProfileSkeleton, LeaderboardSkeleton } from '@/shared/ui/feedback/Skeletons'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import ConfirmDialog from '@/shared/ui/feedback/ConfirmDialog'
+import { NumberTicker } from '@/shared/ui/motion/number-ticker'
 import { LeaderboardIcon, ClockIcon } from '@/shared/icons/tool-icons'
-import { Lock, User, Star, ClipboardList, Pencil, Award } from 'lucide-react'
+import { Lock, User, Star, ClipboardList, Pencil, Award, ChevronRight } from 'lucide-react'
 import { glassHoverTint } from '@/shared/theme/liquidGlass'
 import { MIN_PASSWORD_LENGTH } from '@/features/account/passwordRules'
 import PillTabs from '@/shared/ui/controls/PillTabs'
+import StudentCard, { medalColor } from '@/features/account/StudentCard'
+import { useHistoryOverlay } from '@/shared/hooks/useHistoryOverlay'
+import { usePrefersReducedMotion } from '@/shared/hooks/usePrefersReducedMotion'
+import {
+  fetchCurrentSemester, fetchLeaderboardRpc, fetchMyRankRpc,
+  leaderboardCacheKey, myRankCacheKey, rankFrom,
+  type LeaderboardEntry,
+} from '@/services/leaderboard/leaderboard'
 
 const MAX_NAME_LENGTH = 60
 const OFFLINE_MESSAGE = "❌ You're offline — try again when you're connected"
+const LEADERBOARD_SIZE = 10
 
 // Tabs shown at the top of the profile page.
 const PROFILE_TABS = [
@@ -35,12 +46,15 @@ interface Profile {
   id: string
   name: string
   points: number
+  semester_points?: number
 }
 
-function PointsBadge({ points, dark, size = 'md', borderColor }: {
-  points: number; dark: boolean; size?: 'md' | 'lg'; borderColor?: string
+// Pill showing a point total; the large one counts up when it appears.
+function PointsBadge({ points, dark, size = 'md', borderColor, animate = false }: {
+  points: number; dark: boolean; size?: 'md' | 'lg'; borderColor?: string; animate?: boolean
 }) {
   const pt = getPulseTheme(dark)
+  const reduced = usePrefersReducedMotion()
   const lg = size === 'lg'
   return (
     <div style={{
@@ -53,12 +67,91 @@ function PointsBadge({ points, dark, size = 'md', borderColor }: {
       <span style={{
         color: pt.textPrimary, fontWeight: lg ? 800 : 700, fontSize: lg ? 24 : 14, lineHeight: 1,
         fontVariantNumeric: 'tabular-nums', textAlign: 'right'
-      }}>{points.toLocaleString()}</span>
+      }}>{animate && !reduced ? <NumberTicker value={points} delay={0.1} /> : points.toLocaleString()}</span>
       {lg && <span style={{ color: pt.textSecondary, fontSize: 13, fontWeight: 600 }}>pts</span>}
     </div>
   )
 }
 
+// Round rank marker: a medal for the first three ranks, the number otherwise.
+function RankCircle({ rank, dark }: { rank: number; dark: boolean }) {
+  const pt = getPulseTheme(dark)
+  const medal = medalColor(rank, pt)
+  return (
+    <div style={{
+      width: 36, height: 36, borderRadius: '50%',
+      background: medal ? `${medal}30` : (dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'),
+      border: `2px solid ${medal ?? pt.border}`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontWeight: 900, fontSize: rank > 99 ? 12 : 16, color: medal ?? pt.textSecondary, flexShrink: 0
+    }}>
+      {medal ? <Award size={18} color={medal} /> : rank}
+    </div>
+  )
+}
+
+// One tappable leaderboard row; opens the student's card.
+function LeaderboardRow({ entry, rank, index, isLast, dark, reduced, onOpen }: {
+  entry: LeaderboardEntry; rank: number; index: number; isLast: boolean; dark: boolean; reduced: boolean; onOpen: () => void
+}) {
+  const pt = getPulseTheme(dark)
+  return (
+    <motion.div
+      initial={reduced ? false : { opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, delay: reduced ? 0 : index * 0.05, ease: [0.22, 1, 0.36, 1] }}
+      style={{ marginBottom: isLast ? 0 : 10 }}
+    >
+      <LiquidGlassCard dark={dark} delay={0} onClick={onOpen} style={{
+        padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16,
+        boxShadow: entry.is_me ? `inset 0 0 0 2px ${pt.cobalt}` : undefined
+      }}>
+        <RankCircle rank={rank} dark={dark} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            ...pulseType.cardTitle, fontSize: 17, fontWeight: 700, color: pt.textPrimary,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+          }}>Dr. {entry.name}{entry.is_me && <span style={{ color: pt.cobalt, fontSize: 12, fontWeight: 800 }}> · You</span>}</div>
+        </div>
+        <PointsBadge points={entry.points} dark={dark} />
+        <ChevronRight size={16} color={pt.textMuted} aria-hidden style={{ flexShrink: 0 }} />
+      </LiquidGlassCard>
+    </motion.div>
+  )
+}
+
+// Pinned row under the list showing the signed-in student's own rank.
+function MyRankRow({ rank, name, points, dark, reduced, delay }: {
+  rank: number; name?: string; points: number; dark: boolean; reduced: boolean; delay: number
+}) {
+  const pt = getPulseTheme(dark)
+  return (
+    <motion.div
+      initial={reduced ? false : { opacity: 0, y: 20, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={reduced ? { duration: 0 } : { type: 'spring', stiffness: 260, damping: 24, delay }}
+    >
+      <div aria-hidden style={{ textAlign: 'center', color: pt.textMuted, letterSpacing: 6, margin: '10px 0' }}>···</div>
+      <LiquidGlassCard dark={dark} delay={0} style={{
+        padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16,
+        boxShadow: `inset 0 0 0 2px ${pt.cobalt}`
+      }}>
+        <RankCircle rank={rank} dark={dark} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ ...pulseType.cardTitle, fontSize: 17, fontWeight: 700, color: pt.textPrimary }}>Your rank #{rank}</div>
+          {name && (
+            <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              Dr. {name}
+            </div>
+          )}
+        </div>
+        <PointsBadge points={points} dark={dark} />
+      </LiquidGlassCard>
+    </motion.div>
+  )
+}
+
+// Inline form for changing the display name and password.
 function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
   profile: Profile; dark: boolean; onUpdated: (name: string) => void; onProfileRefresh: () => void
 }) {
@@ -74,6 +167,7 @@ function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
   const isSuccess = isSuccessMessage(msg)
   const inStyle = { ...glassInput(pt, dark), padding: '13px 20px' }
 
+  // Saves the new display name after the offline and profanity checks.
   async function saveName() {
     if (!navigator.onLine) return setMsg(OFFLINE_MESSAGE)
     if (!name.trim()) return setMsg('❌ Name cannot be empty')
@@ -89,6 +183,7 @@ function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
     onProfileRefresh()
   }
 
+  // Saves the new password after the length and match checks.
   async function savePassword() {
     if (!navigator.onLine) return setMsg(OFFLINE_MESSAGE)
     if (!newPassword || newPassword.length < MIN_PASSWORD_LENGTH) return setMsg(`❌ Password must be at least ${MIN_PASSWORD_LENGTH} characters`)
@@ -145,6 +240,7 @@ function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
   )
 }
 
+// Profile page: the student's points and account on one tab, the semester leaderboard on the other.
 export default function Profile({ dark }: { dark: boolean }) {
   const { user, signOut, fetchProfile } = useAuth() as {
     user: { id: string; email?: string } | null
@@ -154,9 +250,13 @@ export default function Profile({ dark }: { dark: boolean }) {
   const navigate = useNavigate()
   const location = useLocation()
   const pt = getPulseTheme(dark)
+  const reduced = usePrefersReducedMotion()
 
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [leaderboard, setLeaderboard] = useState<Profile[]>([])
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
+  const [myRank, setMyRank] = useState<number | null>(null)
+  const [semester, setSemester] = useState('')
+  const [selected, setSelected] = useState<{ entry: LeaderboardEntry; rank: number } | null>(null)
   const [tab, setTab] = useState<'profile' | 'leaderboard'>(() => {
     const params = new URLSearchParams(location.search)
     const t = params.get('tab')
@@ -168,6 +268,9 @@ export default function Profile({ dark }: { dark: boolean }) {
   const [editing, setEditing] = useState(false)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
 
+  // Lets the phone's back button close the student card instead of leaving the page.
+  useHistoryOverlay(!!selected, () => setSelected(null))
+
   // Keyed on user id, not the session object, so token refreshes don't refetch.
   useEffect(() => {
     let ignore = false
@@ -176,6 +279,14 @@ export default function Profile({ dark }: { dark: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
 
+  // Loads the current semester name (saved copy first, then fresh).
+  useEffect(() => {
+    let ignore = false
+    fetchCurrentSemester(name => { if (!ignore) setSemester(name) }).then(name => { if (!ignore) setSemester(name) })
+    return () => { ignore = true }
+  }, [])
+
+  // Loads the profile, the leaderboard and the student's own rank (saved copies first, then fresh).
   async function fetchData(isIgnored: () => boolean = () => false) {
     setLoading(true)
     setLoadError(false)
@@ -193,27 +304,36 @@ export default function Profile({ dark }: { dark: boolean }) {
         )
       : Promise.resolve({ data: null, error: null, fromCache: false })
     const lbPromise = cachedSnapshot(
-      'leaderboard',
-      () => supabase.rpc('get_leaderboard'),
+      leaderboardCacheKey(user?.id ?? null),
+      fetchLeaderboardRpc,
       {
         onUpdate: fresh => {
           if (isIgnored() || !fresh) return
-          setLeaderboard(fresh as Profile[])
+          setLeaderboard(fresh as LeaderboardEntry[])
           setSavedCopy(false)
         },
       }
     )
-    const [profileRes, lbRes] = await Promise.all([profilePromise, lbPromise])
+    // The rank is a bonus: a failure here never shows the error banner.
+    const rankPromise = user
+      ? cachedSnapshot(myRankCacheKey(user.id), fetchMyRankRpc, {
+          onUpdate: fresh => { if (!isIgnored() && fresh) setMyRank(rankFrom(fresh)) },
+        })
+      : Promise.resolve({ data: null, error: null, fromCache: false })
+    const [profileRes, lbRes, rankRes] = await Promise.all([profilePromise, lbPromise, rankPromise])
     if (isIgnored()) return
     setProfile((profileRes.data as Profile) || null)
-    if (lbRes.data) setLeaderboard(lbRes.data as Profile[])
+    if (lbRes.data) setLeaderboard(lbRes.data as LeaderboardEntry[])
+    setMyRank(rankFrom(rankRes.data))
     setSavedCopy(profileRes.fromCache || lbRes.fromCache)
     if (profileRes.error || lbRes.error) setLoadError(true)
     setLoading(false)
   }
 
-  const medalColors = [pt.amber, '#94a3b8', '#cd7c2f']
   const hoverTint = glassHoverTint(dark)
+  // Older saved profile copies have no semester_points yet; they refresh as soon as the device is online.
+  const semesterPoints = profile ? (profile.semester_points ?? profile.points) : 0
+  const showRankRow = !!user && myRank !== null && !leaderboard.some(entry => entry.is_me)
 
   return (
     <div style={{ position: 'relative' }}>
@@ -255,7 +375,10 @@ export default function Profile({ dark }: { dark: boolean }) {
                       Dr. {profile.name}
                     </h2>
                     <p style={{ color: pt.textMuted, fontSize: 17, marginBottom: 16 }}>ZNU Medical Student</p>
-                    <PointsBadge points={profile.points} dark={dark} size="lg" />
+                    <PointsBadge points={semesterPoints} dark={dark} size="lg" animate />
+                    <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 12 }}>
+                      {semester ? `${semester} points` : 'This semester'} · Lifetime: <strong style={{ color: pt.textSecondary }}>{profile.points.toLocaleString()}</strong>
+                    </div>
                   </LiquidGlassCard>
                 </div>
 
@@ -337,45 +460,55 @@ export default function Profile({ dark }: { dark: boolean }) {
         {tab === 'leaderboard' && (
           <div>
             <h2 style={{ ...pulseType.sectionTitle, color: pt.amber, textAlign: 'center', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <LeaderboardIcon color={pt.amber} size={20} /> Top 10 Students
+              <LeaderboardIcon color={pt.amber} size={20} /> Top {LEADERBOARD_SIZE} Students{semester ? ` · ${semester}` : ''}
             </h2>
             {loading && <LeaderboardSkeleton />}
             {!loading && leaderboard.length === 0 && (
               <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-                <p style={{ color: pt.sub }}>No data yet 🚧</p>
+                <p style={{ color: pt.sub }}>No points this semester yet — be the first to score.</p>
               </LiquidGlassCard>
             )}
-            {leaderboard.map((student, i) => {
-              const isLast = i === leaderboard.length - 1
-              const isTop3 = i < 3
+            {leaderboard.map((entry, i) => {
+              const rank = entry.rank_position ?? i + 1
               return (
-                <div key={i} style={{ marginBottom: isLast ? 0 : 10 }}>
-                  <LiquidGlassCard dark={dark} delay={i * 60} style={{
-                    padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16
-                  }}>
-                    <div style={{
-                      width: 36, height: 36, borderRadius: '50%',
-                      background: isTop3 ? `${medalColors[i]}30` : (dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'),
-                      border: `2px solid ${isTop3 ? medalColors[i] : pt.border}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontWeight: 900, fontSize: 16, color: isTop3 ? medalColors[i] : pt.textSecondary, flexShrink: 0
-                    }}>
-                      {isTop3 ? <Award size={18} color={medalColors[i]} /> : i + 1}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{
-                        ...pulseType.cardTitle, fontSize: 17, fontWeight: 700, color: pt.textPrimary,
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-                      }}>Dr. {student.name}</div>
-                    </div>
-                    <PointsBadge points={student.points} dark={dark} />
-                  </LiquidGlassCard>
-                </div>
+                <LeaderboardRow
+                  key={i}
+                  entry={entry}
+                  rank={rank}
+                  index={i}
+                  isLast={i === leaderboard.length - 1}
+                  dark={dark}
+                  reduced={reduced}
+                  onOpen={() => setSelected({ entry, rank })}
+                />
               )
             })}
+            {!loading && showRankRow && myRank !== null && (
+              <MyRankRow
+                rank={myRank}
+                name={profile?.name}
+                points={semesterPoints}
+                dark={dark}
+                reduced={reduced}
+                delay={0.1 + leaderboard.length * 0.05}
+              />
+            )}
           </div>
         )}
       </div>
+
+      <AnimatePresence>
+        {selected && (
+          <StudentCard
+            key="student-card"
+            dark={dark}
+            entry={selected.entry}
+            rank={selected.rank}
+            semester={semester}
+            onClose={() => setSelected(null)}
+          />
+        )}
+      </AnimatePresence>
 
       <ConfirmDialog
         dark={dark}
