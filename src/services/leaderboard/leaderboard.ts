@@ -34,11 +34,17 @@ export const leaderboardCacheKey = (userId: string | null) =>
 // Cache key of the signed-in user's own rank.
 export const myRankCacheKey = (userId: string) => `user:${userId}:my-rank`
 
+// Cache key of the signed-in user's own past semesters.
+export const myHistoryCacheKey = (userId: string) => `user:${userId}:my-semester-history`
+
 // Top 10 of the current semester with lifetime points and past semesters.
 export const fetchLeaderboardRpc = () => supabase.rpc('get_leaderboard')
 
 // The caller's own rank (empty until the site has enough accounts).
 export const fetchMyRankRpc = () => supabase.rpc('get_my_rank')
+
+// The caller's own finished semesters, newest first.
+export const fetchMyHistoryRpc = () => supabase.rpc('get_my_semester_history')
 
 // Reads the rank number out of a get_my_rank response; null when there is none.
 export function rankFrom(rows: unknown): number | null {

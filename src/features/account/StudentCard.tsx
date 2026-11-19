@@ -4,9 +4,9 @@ import { motion } from 'framer-motion'
 import { Award, X } from 'lucide-react'
 import { getPulseTheme, pulseFonts, pulseType } from '@/shared/theme/premiumTheme'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
-import { NumberTicker } from '@/shared/ui/motion/number-ticker'
 import { useBodyScrollLock } from '@/shared/hooks/useBodyScrollLock'
 import { usePrefersReducedMotion } from '@/shared/hooks/usePrefersReducedMotion'
+import { PointsTiles, PastSemesters } from '@/features/account/PointsTiles'
 import type { PulseTheme } from '@/shared/theme/types'
 import type { LeaderboardEntry } from '@/services/leaderboard/leaderboard'
 
@@ -23,8 +23,6 @@ interface SectionContext {
   entry: LeaderboardEntry
   semester: string
   dark: boolean
-  pt: PulseTheme
-  reduced: boolean
 }
 
 // A block of the card. To show something new later, add one entry to SECTIONS below.
@@ -42,74 +40,26 @@ export function medalColor(rank: number, pt: PulseTheme): string | null {
   return null
 }
 
-// Small heading above a section.
-function SectionTitle({ pt, children }: { pt: PulseTheme; children: ReactNode }) {
-  return <div style={{ ...pulseType.sectionLabel, fontSize: 11, color: pt.textMuted, marginBottom: 10 }}>{children}</div>
-}
-
-// One number with a caption; counts up unless the user prefers reduced motion.
-function StatTile({ label, value, color, delay, dark, pt, reduced }: {
-  label: string; value: number; color: string; delay: number; dark: boolean; pt: PulseTheme; reduced: boolean
-}) {
-  return (
-    <div style={{
-      flex: '1 1 130px', textAlign: 'center', padding: '14px 16px', borderRadius: 16,
-      background: dark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.55)', border: `1px solid ${pt.border}`,
-    }}>
-      <div style={{ ...pulseType.display, fontSize: 30, color }}>
-        {reduced ? value.toLocaleString() : <NumberTicker value={value} delay={delay} />}
-      </div>
-      <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>{label}</div>
-    </div>
-  )
-}
-
-// Semester and lifetime points of the student.
-function PointsSection({ entry, semester, dark, pt, reduced }: SectionContext) {
-  return (
-    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-      <StatTile label={semester ? `${semester} points` : 'This semester'} value={entry.points} color={pt.amber} delay={0.25} dark={dark} pt={pt} reduced={reduced} />
-      {typeof entry.lifetime_points === 'number' && (
-        <StatTile label="Lifetime points" value={entry.lifetime_points} color={pt.cobalt} delay={0.35} dark={dark} pt={pt} reduced={reduced} />
-      )}
-    </div>
-  )
-}
-
-// Results of the student in earlier semesters, newest first.
-function HistorySection({ entry, dark, pt, reduced }: SectionContext) {
-  const past = entry.past ?? []
-  return (
-    <div>
-      <SectionTitle pt={pt}>Past semesters</SectionTitle>
-      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {past.map((item, i) => (
-          <motion.li
-            key={`${item.semester}-${i}`}
-            initial={reduced ? false : { opacity: 0, x: -12 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3, delay: reduced ? 0 : 0.4 + i * 0.06 }}
-            style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
-              padding: '10px 14px', borderRadius: 12,
-              background: dark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.5)', border: `1px solid ${pt.border}`,
-            }}
-          >
-            <span style={{ ...pulseType.cardTitle, fontSize: 14, color: pt.textPrimary }}>{item.semester}</span>
-            <span style={{ ...pulseType.small, fontWeight: 700, color: pt.textSecondary, whiteSpace: 'nowrap' }}>
-              #{item.rank} · {item.points.toLocaleString()} pts
-            </span>
-          </motion.li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
 // Sections of the card in display order; a section with isVisible false is skipped.
 const SECTIONS: CardSection[] = [
-  { id: 'points', isVisible: () => true, render: ctx => <PointsSection {...ctx} /> },
-  { id: 'history', isVisible: entry => (entry.past?.length ?? 0) > 0, render: ctx => <HistorySection {...ctx} /> },
+  {
+    id: 'points',
+    isVisible: () => true,
+    render: ({ entry, semester, dark }) => (
+      <PointsTiles
+        dark={dark}
+        semesterLabel={semester ? `${semester} points` : 'This semester'}
+        semesterPoints={entry.points}
+        lifetimePoints={entry.lifetime_points}
+        delay={0.2}
+      />
+    ),
+  },
+  {
+    id: 'history',
+    isVisible: entry => (entry.past?.length ?? 0) > 0,
+    render: ({ entry, dark }) => <PastSemesters dark={dark} items={entry.past ?? []} delay={0.45} />,
+  },
 ]
 
 // Bottom sheet (dialog on wide screens) with the details of one leaderboard student.
@@ -126,7 +76,7 @@ export default function StudentCard({ dark, entry, rank, semester, onClose }: St
   const medal = medalColor(rank, pt)
   const accent = medal ?? pt.cobalt
   const spring = reduced ? { duration: 0 } : { type: 'spring' as const, stiffness: 380, damping: 32 }
-  const ctx: SectionContext = { entry, semester, dark, pt, reduced }
+  const ctx: SectionContext = { entry, semester, dark }
   const sections = SECTIONS.filter(section => section.isVisible(entry))
 
   // Handles Escape and keeps Tab inside the dialog; focus returns to the tapped row on close.
@@ -217,15 +167,8 @@ export default function StudentCard({ dark, entry, rank, semester, onClose }: St
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {sections.map((section, i) => (
-                <motion.section
-                  key={section.id}
-                  initial={reduced ? false : { opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.35, delay: reduced ? 0 : 0.15 + i * 0.08, ease: [0.22, 1, 0.36, 1] }}
-                >
-                  {section.render(ctx)}
-                </motion.section>
+              {sections.map(section => (
+                <section key={section.id}>{section.render(ctx)}</section>
               ))}
             </div>
           </div>

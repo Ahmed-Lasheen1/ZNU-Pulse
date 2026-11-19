@@ -17,19 +17,19 @@ import OfflineNote from '@/shared/ui/feedback/OfflineNote'
 import { ProfileSkeleton, LeaderboardSkeleton } from '@/shared/ui/feedback/Skeletons'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import ConfirmDialog from '@/shared/ui/feedback/ConfirmDialog'
-import { NumberTicker } from '@/shared/ui/motion/number-ticker'
 import { LeaderboardIcon, ClockIcon } from '@/shared/icons/tool-icons'
-import { Lock, User, Star, ClipboardList, Pencil, Award, ChevronRight } from 'lucide-react'
+import { Lock, User, Star, ClipboardList, Pencil, Award } from 'lucide-react'
 import { glassHoverTint } from '@/shared/theme/liquidGlass'
 import { MIN_PASSWORD_LENGTH } from '@/features/account/passwordRules'
 import PillTabs from '@/shared/ui/controls/PillTabs'
 import StudentCard, { medalColor } from '@/features/account/StudentCard'
+import { PointsTiles, PastSemesters } from '@/features/account/PointsTiles'
 import { useHistoryOverlay } from '@/shared/hooks/useHistoryOverlay'
 import { usePrefersReducedMotion } from '@/shared/hooks/usePrefersReducedMotion'
 import {
-  fetchCurrentSemester, fetchLeaderboardRpc, fetchMyRankRpc,
-  leaderboardCacheKey, myRankCacheKey, rankFrom,
-  type LeaderboardEntry,
+  fetchCurrentSemester, fetchLeaderboardRpc, fetchMyRankRpc, fetchMyHistoryRpc,
+  leaderboardCacheKey, myRankCacheKey, myHistoryCacheKey, rankFrom,
+  type LeaderboardEntry, type PastSemester,
 } from '@/services/leaderboard/leaderboard'
 
 const MAX_NAME_LENGTH = 60
@@ -49,27 +49,16 @@ interface Profile {
   semester_points?: number
 }
 
-// Pill showing a point total; the large one counts up when it appears.
-function PointsBadge({ points, dark, size = 'md', borderColor, animate = false }: {
-  points: number; dark: boolean; size?: 'md' | 'lg'; borderColor?: string; animate?: boolean
-}) {
+// Bold point total with a small star, used on the leaderboard rows.
+function PointsText({ points, dark }: { points: number; dark: boolean }) {
   const pt = getPulseTheme(dark)
-  const reduced = usePrefersReducedMotion()
-  const lg = size === 'lg'
   return (
-    <div style={{
-      display: 'inline-flex', alignItems: 'center', gap: lg ? 8 : 5, flexShrink: 0,
-      background: lg ? (dark ? `${pt.amber}38` : `${pt.amber}22`) : (dark ? `${pt.amber}26` : `${pt.amber}18`),
-      border: `1px solid ${borderColor || `${pt.amber}${lg ? '66' : '4D'}`}`,
-      borderRadius: 999, padding: lg ? '8px 20px' : '4px 10px 4px 8px'
-    }}>
-      <Star size={lg ? 20 : 12} color={pt.amber} fill={pt.amber} />
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+      <Star size={13} color={pt.amber} fill={pt.amber} aria-hidden />
       <span style={{
-        color: pt.textPrimary, fontWeight: lg ? 800 : 700, fontSize: lg ? 24 : 14, lineHeight: 1,
-        fontVariantNumeric: 'tabular-nums', textAlign: 'right'
-      }}>{animate && !reduced ? <NumberTicker value={points} delay={0.1} /> : points.toLocaleString()}</span>
-      {lg && <span style={{ color: pt.textSecondary, fontSize: 13, fontWeight: 600 }}>pts</span>}
-    </div>
+        color: pt.textPrimary, fontWeight: 800, fontSize: 15, lineHeight: 1, fontVariantNumeric: 'tabular-nums',
+      }}>{points.toLocaleString()}</span>
+    </span>
   )
 }
 
@@ -103,18 +92,16 @@ function LeaderboardRow({ entry, rank, index, isLast, dark, reduced, onOpen }: {
       style={{ marginBottom: isLast ? 0 : 10 }}
     >
       <LiquidGlassCard dark={dark} delay={0} onClick={onOpen} style={{
-        padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16,
-        boxShadow: entry.is_me ? `inset 0 0 0 2px ${pt.cobalt}` : undefined
+        padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16
       }}>
         <RankCircle rank={rank} dark={dark} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             ...pulseType.cardTitle, fontSize: 17, fontWeight: 700, color: pt.textPrimary,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-          }}>Dr. {entry.name}{entry.is_me && <span style={{ color: pt.cobalt, fontSize: 12, fontWeight: 800 }}> · You</span>}</div>
+          }}>Dr. {entry.name}</div>
         </div>
-        <PointsBadge points={entry.points} dark={dark} />
-        <ChevronRight size={16} color={pt.textMuted} aria-hidden style={{ flexShrink: 0 }} />
+        <PointsText points={entry.points} dark={dark} />
       </LiquidGlassCard>
     </motion.div>
   )
@@ -132,10 +119,7 @@ function MyRankRow({ rank, name, points, dark, reduced, delay }: {
       transition={reduced ? { duration: 0 } : { type: 'spring', stiffness: 260, damping: 24, delay }}
     >
       <div aria-hidden style={{ textAlign: 'center', color: pt.textMuted, letterSpacing: 6, margin: '10px 0' }}>···</div>
-      <LiquidGlassCard dark={dark} delay={0} style={{
-        padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16,
-        boxShadow: `inset 0 0 0 2px ${pt.cobalt}`
-      }}>
+      <LiquidGlassCard dark={dark} delay={0} style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
         <RankCircle rank={rank} dark={dark} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ ...pulseType.cardTitle, fontSize: 17, fontWeight: 700, color: pt.textPrimary }}>Your rank #{rank}</div>
@@ -145,7 +129,7 @@ function MyRankRow({ rank, name, points, dark, reduced, delay }: {
             </div>
           )}
         </div>
-        <PointsBadge points={points} dark={dark} />
+        <PointsText points={points} dark={dark} />
       </LiquidGlassCard>
     </motion.div>
   )
@@ -255,6 +239,7 @@ export default function Profile({ dark }: { dark: boolean }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [myRank, setMyRank] = useState<number | null>(null)
+  const [myHistory, setMyHistory] = useState<PastSemester[]>([])
   const [semester, setSemester] = useState('')
   const [selected, setSelected] = useState<{ entry: LeaderboardEntry; rank: number } | null>(null)
   const [tab, setTab] = useState<'profile' | 'leaderboard'>(() => {
@@ -286,7 +271,7 @@ export default function Profile({ dark }: { dark: boolean }) {
     return () => { ignore = true }
   }, [])
 
-  // Loads the profile, the leaderboard and the student's own rank (saved copies first, then fresh).
+  // Loads the profile, the leaderboard, the student's own rank and past semesters (saved copies first, then fresh).
   async function fetchData(isIgnored: () => boolean = () => false) {
     setLoading(true)
     setLoadError(false)
@@ -314,17 +299,23 @@ export default function Profile({ dark }: { dark: boolean }) {
         },
       }
     )
-    // The rank is a bonus: a failure here never shows the error banner.
+    // The rank and past semesters are extras: a failure here never shows the error banner.
     const rankPromise = user
       ? cachedSnapshot(myRankCacheKey(user.id), fetchMyRankRpc, {
           onUpdate: fresh => { if (!isIgnored() && fresh) setMyRank(rankFrom(fresh)) },
         })
       : Promise.resolve({ data: null, error: null, fromCache: false })
-    const [profileRes, lbRes, rankRes] = await Promise.all([profilePromise, lbPromise, rankPromise])
+    const historyPromise = user
+      ? cachedSnapshot(myHistoryCacheKey(user.id), fetchMyHistoryRpc, {
+          onUpdate: fresh => { if (!isIgnored() && Array.isArray(fresh)) setMyHistory(fresh as PastSemester[]) },
+        })
+      : Promise.resolve({ data: null, error: null, fromCache: false })
+    const [profileRes, lbRes, rankRes, historyRes] = await Promise.all([profilePromise, lbPromise, rankPromise, historyPromise])
     if (isIgnored()) return
     setProfile((profileRes.data as Profile) || null)
     if (lbRes.data) setLeaderboard(lbRes.data as LeaderboardEntry[])
     setMyRank(rankFrom(rankRes.data))
+    setMyHistory(Array.isArray(historyRes.data) ? (historyRes.data as PastSemester[]) : [])
     setSavedCopy(profileRes.fromCache || lbRes.fromCache)
     if (profileRes.error || lbRes.error) setLoadError(true)
     setLoading(false)
@@ -374,11 +365,18 @@ export default function Profile({ dark }: { dark: boolean }) {
                     <h2 style={{ ...pulseType.sectionTitle, color: pt.cobalt, fontSize: 30, marginBottom: 8 }}>
                       Dr. {profile.name}
                     </h2>
-                    <p style={{ color: pt.textMuted, fontSize: 17, marginBottom: 16 }}>ZNU Medical Student</p>
-                    <PointsBadge points={semesterPoints} dark={dark} size="lg" animate />
-                    <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 12 }}>
-                      {semester ? `${semester} points` : 'This semester'} · Lifetime: <strong style={{ color: pt.textSecondary }}>{profile.points.toLocaleString()}</strong>
-                    </div>
+                    <p style={{ color: pt.textMuted, fontSize: 17, marginBottom: 20 }}>ZNU Medical Student</p>
+                    <PointsTiles
+                      dark={dark}
+                      semesterLabel={semester ? `${semester} points` : 'This semester'}
+                      semesterPoints={semesterPoints}
+                      lifetimePoints={profile.points}
+                    />
+                    {myHistory.length > 0 && (
+                      <div style={{ marginTop: 22, textAlign: 'left' }}>
+                        <PastSemesters dark={dark} items={myHistory} delay={0.3} />
+                      </div>
+                    )}
                   </LiquidGlassCard>
                 </div>
 

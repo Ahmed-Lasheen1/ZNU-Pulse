@@ -19,6 +19,7 @@ interface AuthUser {
 interface AuthProfile {
   name?: string | null
   points?: number | null
+  semester_points?: number | null
   role?: string | null
 }
 
@@ -167,6 +168,8 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
 
   const cornerSide: Align = align === 'right' ? 'right' : 'left'
   const tabIndex = open ? 0 : -1
+  // Semester points, matching the leaderboard; older saved profile copies fall back to lifetime points until they refresh.
+  const menuPoints = (profile?.semester_points ?? profile?.points) || 0
 
   // Closes the menu on outside click/tap or Escape while it is open.
   useEffect(() => {
@@ -250,7 +253,7 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: pt.amber, fontSize: 12, fontWeight: 700 }}>
           <StarIcon color={pt.amber} size={12} />
-          {profile?.points || 0} points
+          {menuPoints.toLocaleString()} points
         </span>
       </button>
     ) : (
