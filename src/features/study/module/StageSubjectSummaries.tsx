@@ -1,6 +1,6 @@
 import { getPulseTheme, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
-import { glassHoverTint } from '@/shared/theme/liquidGlass'
-import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
+import { adaptColor } from '@/shared/theme/adaptColor'
+import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import { ModuleIcon } from '@/shared/icons/medicalIcons'
 import { wrapText } from '@/shared/utils/textStyles'
 
@@ -15,13 +15,15 @@ interface StageSubject {
   id: string
   name: string
   icon?: string | null
+  color?: string | null
 }
 
-interface SubjectGroup<T> {
-  key: string
+// One card of the list: a summary together with the subject it belongs to.
+interface SummaryEntry<T> {
+  summary: T
   name: string
   icon: string | null
-  summaries: T[]
+  color: string
 }
 
 interface StageSubjectSummariesProps<T extends StageSummary> {
@@ -31,68 +33,69 @@ interface StageSubjectSummariesProps<T extends StageSummary> {
   onOpenSummary: (summary: T) => void
 }
 
-const GENERAL_KEY = 'general'
+const DEFAULT_SUBJECT_COLOR = '#34d399'
+const DEFAULT_SUBJECT_ICON = '📖'
 
-// Groups summaries by subject in the module's subject order; summaries without a known subject go last under "General".
-function groupBySubject<T extends StageSummary>(subjects: StageSubject[], summaries: T[]): SubjectGroup<T>[] {
+// Pairs each summary with its subject in the module's subject order; summaries without a known subject go last under "General".
+function entriesBySubject<T extends StageSummary>(subjects: StageSubject[], summaries: T[]): SummaryEntry<T>[] {
   const known = new Set(subjects.map(s => s.id))
-  const groups: SubjectGroup<T>[] = subjects
-    .map(s => ({
-      key: s.id,
-      name: s.name,
-      icon: s.icon || null,
-      summaries: summaries.filter(item => item.subject_id === s.id),
-    }))
-    .filter(group => group.summaries.length > 0)
-
-  const loose = summaries.filter(item => !item.subject_id || !known.has(item.subject_id))
-  if (loose.length > 0) groups.push({ key: GENERAL_KEY, name: 'General', icon: null, summaries: loose })
-  return groups
+  const entries: SummaryEntry<T>[] = subjects.flatMap(s =>
+    summaries
+      .filter(item => item.subject_id === s.id)
+      .map(summary => ({ summary, name: s.name, icon: s.icon || null, color: s.color || DEFAULT_SUBJECT_COLOR }))
+  )
+  summaries
+    .filter(item => !item.subject_id || !known.has(item.subject_id))
+    .forEach(summary => entries.push({ summary, name: 'General', icon: null, color: DEFAULT_SUBJECT_COLOR }))
+  return entries
 }
 
-// Summaries of a summaries-only exam stage: a flat list with one labelled section per subject, each row opens a summary.
+// Summaries of a summaries-only exam stage: one large card per summary, titled with its subject, tap to open.
 export default function StageSubjectSummaries<T extends StageSummary>({
   dark, subjects, summaries, onOpenSummary,
 }: StageSubjectSummariesProps<T>) {
   const pt = getPulseTheme(dark)
-  const hoverTint = glassHoverTint(dark)
-  const groups = groupBySubject(subjects, summaries)
+  const entries = entriesBySubject(subjects, summaries)
 
-  if (groups.length === 0) return null
+  if (entries.length === 0) return null
 
   return (
     <div style={{ marginBottom: 32 }}>
       <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16 }}>Summaries</h2>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        {groups.map(group => (
-          <div key={group.key}>
-            {/* Subject label sits directly on the page background, so it uses the page text colors. */}
-            <div style={{
-              ...pulseType.sectionLabel, fontSize: 11, margin: '0 4px 8px',
-              color: ON_BACKGROUND.secondary, display: 'flex', alignItems: 'center', gap: 6,
-            }}>
-              {group.icon && <ModuleIcon value={group.icon} size={14} color={ON_BACKGROUND.secondary} />}
-              <span style={{ minWidth: 0, ...wrapText }}>{group.name}</span>
-            </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {entries.map(({ summary, name, icon, color }) => {
+          // Icon color adjusted to stay readable on the card; fills keep the original color.
+          const iconColor = adaptColor(color, dark)
+          return (
+            <LiquidGlassCard
+              key={summary.id} dark={dark} delay={0}
+              onClick={() => onOpenSummary(summary)}
+              style={{
+                padding: 'clamp(16px, 3vw, 20px) clamp(16px, 3vw, 24px)',
+                display: 'flex', alignItems: 'center', gap: 14,
+              }}
+            >
+              <div style={{
+                width: 48, height: 48, borderRadius: 14, flexShrink: 0,
+                background: `${color}20`, border: `1px solid ${color}40`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <ModuleIcon value={icon} size={24} color={iconColor} fallbackEmoji={DEFAULT_SUBJECT_ICON} />
+              </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {group.summaries.map(item => (
-                <PulseGlassRow
-                  key={item.id} dark={dark} radius={12} hoverTint={hoverTint}
-                  onClick={() => onOpenSummary(item)}
-                  role="button" tabIndex={0}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenSummary(item) } }}
-                >
-                  <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span dir="auto" style={{ flex: 1, minWidth: 0, color: pt.textPrimary, fontSize: 13.5, fontWeight: 600, ...wrapText }}>{item.title}</span>
-                    <span style={{ flexShrink: 0, color: pt.sub, fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>Open →</span>
-                  </div>
-                </PulseGlassRow>
-              ))}
-            </div>
-          </div>
-        ))}
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ ...pulseType.cardTitle, fontSize: 16, color: pt.textPrimary, ...wrapText }}>{name}</div>
+                <div dir="auto" style={{ ...pulseType.small, color: pt.textMuted, marginTop: 3, ...wrapText }}>{summary.title}</div>
+              </div>
+
+              <div style={{
+                background: color, color: '#0f172a', borderRadius: 999,
+                padding: '7px 16px', fontSize: 12, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap',
+              }}>Open →</div>
+            </LiquidGlassCard>
+          )
+        })}
       </div>
     </div>
   )
