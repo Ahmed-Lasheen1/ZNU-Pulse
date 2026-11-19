@@ -12,7 +12,6 @@ import TabRow from '@/shared/ui/controls/TabRow'
 import { PageSectionsSkeleton } from '@/shared/ui/feedback/Skeletons'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import { SummaryOverlay } from '@/features/study/summaries'
-import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { useModules } from '@/core/contexts'
 import { fetchModuleStages, stageMetaFrom } from '@/services/content/moduleStages'
 import { fetchSubjectsForModule } from '@/services/content/subjects'
@@ -39,14 +38,13 @@ interface ExamStage { value: string; title: string; emoji?: string; Icon?: (p: {
 interface ContentFacet { kind: 'file' | 'question' | 'summary' | 'flashcard'; item_type: string | null; exam_stage: string | null; lesson_id: string | null }
 interface SimulatorRow { stage: string; subject_id: string; question_count: number }
 
-// Module page: stage tabs, then study by lesson, materials, simulator, summaries, flashcards and practice.
-// A stage that only has summaries shows just a per-subject summaries list.
+// Module page: stage tabs, then study by lesson, materials, simulator, and the summaries, flashcards and practice cards
+// (each card is shown only when it has content). A stage that only has summaries shows just a per-subject summaries list.
 export default function ModulePage({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const { moduleId } = useParams()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const showToast = useToast() as (message: string, type?: 'success' | 'error') => void
   const { modules, modulesLoaded, modulesError } = useModules() as { modules: PageModule[]; modulesLoaded: boolean; modulesError: boolean }
   const module = modules.find(m => m.id === moduleId) || null
 
@@ -179,6 +177,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
 
   const presentFileTypes = new Set(stageFacets.filter(r => r.kind === 'file').map(r => r.item_type as string))
   const hasQuestions = stageFacets.some(r => r.kind === 'question')
+  const hasSummaries = stageSummaries.length > 0
   const lessonQuestionIds = new Set(stageFacets.filter(r => r.kind === 'question' && r.lesson_id).map(r => r.lesson_id as string))
   const lessonFlashcardIds = new Set(stageFacets.filter(r => r.kind === 'flashcard' && r.lesson_id).map(r => r.lesson_id as string))
   const hasFlashcards = lessonFlashcardIds.size > 0
@@ -194,10 +193,10 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   const visibleLessons = stageActive ? lessons.filter(l => stageLessonIds.has(l.id)) : lessons
 
   // A stage with summaries but no questions, flashcards or files shows only its summaries, grouped by subject.
-  const summariesOnly = stageActive && contentLoaded && stageSummaries.length > 0
+  const summariesOnly = stageActive && contentLoaded && hasSummaries
     && !hasQuestions && !hasFlashcards && presentFileTypes.size === 0
-  // The MCQ card is hidden once a stage is known to have no questions.
-  const practiceVisible = !stageActive || !contentLoaded || hasQuestions
+  // The summaries, flashcards and practice cards appear only when they have content; with none, the whole row is skipped.
+  const showActions = contentLoaded && !summariesOnly && (hasSummaries || hasFlashcards || hasQuestions)
 
   const meta = stageActive ? stageMetaFrom(examStages, activeStage) : null
   const stageName = meta ? meta.title : 'this module'
@@ -214,13 +213,11 @@ export default function ModulePage({ dark }: { dark: boolean }) {
 
   // Opens the summary list, or the only summary of the stage directly.
   function openSummaries() {
-    if (contentLoaded && stageSummaries.length === 0) { showToast(`No summaries added for ${stageName} yet`); return }
     if (stageActive && stageSummaries.length === 1) { setSelectedSummary(stageSummaries[0]); return }
     navigate(`/summaries?module=${moduleId}${stageActive ? `&stage=${activeStage}` : ''}`)
   }
   // Opens the MCQ bank for this module and stage.
   function openPractice() {
-    if (contentLoaded && !hasQuestions) { showToast(`No questions added for ${stageName} yet`); return }
     navigate(`/mcq?module=${moduleId}${stageActive ? `&stage=${activeStage}` : ''}`)
   }
   // Opens the flashcards lesson list for this module and stage.
@@ -346,7 +343,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
         </div>
       )}
 
-      {!summariesOnly && (
+      {showActions && (
         <>
           <style>{`
             .module-actions-row { display: grid; grid-template-columns: 1fr; gap: 20px; align-items: start; }
@@ -355,26 +352,26 @@ export default function ModulePage({ dark }: { dark: boolean }) {
             }
           `}</style>
           <div className="module-actions-row" style={{ marginBottom: 32 }}>
-            <div>
-              <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <SmartSummariesIcon color={ON_BACKGROUND.muted} size={14} /> Smart Summaries
-              </h2>
-              <LiquidGlassCard dark={dark} delay={0} onClick={openSummaries} style={{ padding: 24, textAlign: 'center' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-                  <NotesIcon color={pt.success} size={30} />
-                </div>
-                <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>{stageActive ? 'Summaries' : 'All Summaries'}</div>
-                <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>
-                  {!stageActive
-                    ? 'View summaries for this module'
-                    : stageSummaries.length === 0
-                      ? `${stageName} summaries`
+            {hasSummaries && (
+              <div>
+                <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <SmartSummariesIcon color={ON_BACKGROUND.muted} size={14} /> Smart Summaries
+                </h2>
+                <LiquidGlassCard dark={dark} delay={0} onClick={openSummaries} style={{ padding: 24, textAlign: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+                    <NotesIcon color={pt.success} size={30} />
+                  </div>
+                  <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>{stageActive ? 'Summaries' : 'All Summaries'}</div>
+                  <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>
+                    {!stageActive
+                      ? 'View summaries for this module'
                       : stageSummaries.length === 1 ? stageSummaries[0].title : `${stageSummaries.length} available`}
-                </div>
-              </LiquidGlassCard>
-            </div>
+                  </div>
+                </LiquidGlassCard>
+              </div>
+            )}
 
-            {contentLoaded && hasFlashcards && (
+            {hasFlashcards && (
               <div>
                 <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <FlashcardIcon color={ON_BACKGROUND.muted} size={14} /> Flashcards
@@ -391,7 +388,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
               </div>
             )}
 
-            {practiceVisible && (
+            {hasQuestions && (
               <div>
                 <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <PracticeIcon color={ON_BACKGROUND.muted} size={14} /> Practice
