@@ -14,7 +14,7 @@ import { usePrefersReducedMotion } from '@/shared/hooks/usePrefersReducedMotion'
 import { wrapText } from '@/shared/utils/textStyles'
 import { accuracyColor } from '@/shared/utils/accuracy'
 import { CheckCircleIcon, XCircleIcon } from '@/shared/icons/tool-icons'
-import { EXAM_DIVIDER, formatTime } from '@/features/practice/mcqShared'
+import { EXAM_DIVIDER, formatTime, StatChip } from '@/features/practice/mcqShared'
 import type { Answer } from '@/services/flashcards/scheduler'
 
 export interface StudyCardItem {
@@ -53,17 +53,8 @@ const TILT_MS = 180
 const HOLD_MS = 320
 const FLY_MS = 300
 
+// Resolves after the given number of milliseconds.
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-
-// One number with a small caption, used on the end screen.
-function Stat({ label, value, color, mutedColor }: { label: string; value: string | number; color: string; mutedColor: string }) {
-  return (
-    <div style={{ textAlign: 'center' }}>
-      <div style={{ fontFamily: pulseFonts.display, fontWeight: 800, fontSize: 22, color }}>{value}</div>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: mutedColor, marginTop: 2 }}>{label}</div>
-    </div>
-  )
-}
 
 // Runs one study session: "Again" sets a card aside for later, "Got it" removes it (nothing is saved in practice sessions).
 export default function FlashcardStudy({ dark, accent, title, queue: initialQueue, practice = false, onRate, onFinish, onMore, onExit }: FlashcardStudyProps) {
@@ -325,9 +316,9 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
           <div style={{ ...pulseType.small, color: pt.textMuted }}>of cards known</div>
 
           <div style={{ display: 'flex', justifyContent: 'center', gap: 28, margin: '24px 0', flexWrap: 'wrap' }}>
-            <Stat label="KNOWN" value={right} color={pt.success} mutedColor={pt.textMuted} />
-            <Stat label="MISSED" value={wrong} color={wrong > 0 ? pt.danger : pt.textPrimary} mutedColor={pt.textMuted} />
-            <Stat label="TIME" value={formatTime(finishSec)} color={pt.textPrimary} mutedColor={pt.textMuted} />
+            <StatChip label="KNOWN" value={right} color={pt.success} labelColor={pt.textMuted} />
+            <StatChip label="MISSED" value={wrong} color={wrong > 0 ? pt.danger : pt.textPrimary} labelColor={pt.textMuted} />
+            <StatChip label="TIME" value={formatTime(finishSec)} color={pt.textPrimary} labelColor={pt.textMuted} />
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>

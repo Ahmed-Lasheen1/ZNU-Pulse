@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import { getPulseTheme, pulseFonts, pulseType } from '@/shared/theme/premiumTheme'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import { WarningIcon } from '@/shared/icons/tool-icons'
+import { useDialogKeyboard } from '@/shared/hooks/useDialogKeyboard'
 
 // Generic glass confirmation modal. Clicking the backdrop or pressing
 // Escape both count as Cancel. Tab is trapped inside the dialog while open.
@@ -14,29 +15,7 @@ export default function ConfirmDialog({
   const cancelRef = useRef(null)
   const dialogRef = useRef(null)
 
-  useEffect(() => {
-    if (!open) return
-
-    function onKeyDown(e) {
-      if (e.key === 'Escape') { onCancel(); return }
-      if (e.key !== 'Tab' || !dialogRef.current) return
-      const focusable = dialogRef.current.querySelectorAll(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      )
-      if (focusable.length === 0) return
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault(); last.focus()
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault(); first.focus()
-      }
-    }
-
-    document.addEventListener('keydown', onKeyDown)
-    cancelRef.current?.focus()
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [open, onCancel])
+  useDialogKeyboard({ open, onClose: onCancel, dialogRef, initialFocusRef: cancelRef })
 
   if (!open) return null
   const accent = confirmColor || pt.danger

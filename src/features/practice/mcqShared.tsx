@@ -11,11 +11,15 @@ export const optionTexts = (q: any) => [q.option_a, q.option_b, q.option_c, q.op
 export const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`
 
 // Big number with a small caption, used for the result stats.
-export function StatChip({ label, value, color }: { label: string; value: string | number; color: string }) {
+// The caption follows the number's color (slightly faded) unless `labelColor` is given.
+export function StatChip({ label, value, color, labelColor }: { label: string; value: string | number; color: string; labelColor?: string }) {
   return (
     <div style={{ textAlign: 'center' }}>
       <div style={{ fontFamily: pulseFonts.display, fontWeight: 800, fontSize: 22, color }}>{value}</div>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color, opacity: 0.75, marginTop: 2 }}>{label}</div>
+      <div style={{
+        fontSize: 10, fontWeight: 700, letterSpacing: 1.5,
+        color: labelColor ?? color, opacity: labelColor ? 1 : 0.75, marginTop: 2,
+      }}>{label}</div>
     </div>
   )
 }

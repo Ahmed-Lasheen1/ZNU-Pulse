@@ -39,6 +39,7 @@ export default function App() {
   const [modules, setModules] = useState([])
   const [modulesLoaded, setModulesLoaded] = useState(false)
   const [modulesError, setModulesError] = useState(false)
+  const isAdmin = profile?.role === 'admin'
 
   const lastHandledUserIdRef = useRef(null)
 
@@ -87,11 +88,8 @@ export default function App() {
     }
   }, [])
 
-  // Joins the online-presence channel while the app is open.
-  useEffect(() => {
-    const unsubscribe = subscribeOnlinePresence()
-    return unsubscribe
-  }, [])
+  // Joins the online-presence channel while the app is open; only admins listen for the live count.
+  useEffect(() => subscribeOnlinePresence({ listen: isAdmin }), [isAdmin])
 
   // Loads the signed-in user's profile (network first, saved copy offline).
   const fetchProfile = useCallback(async (userId) => {

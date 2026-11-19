@@ -1,4 +1,4 @@
-import { useState, useEffect, type ReactNode } from 'react'
+import { useState, useEffect, useRef, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
 import { getPulseTheme, pulseFonts, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
@@ -12,6 +12,7 @@ import { CardRowsSkeleton } from '@/shared/ui/feedback/Skeletons'
 import { ModuleIcon, ExamIcon } from '@/shared/icons/medicalIcons'
 import { OfflineIcon, BookIcon, PauseIcon, PlayIcon, EmptyBoxIcon, GraduationCapIcon, TargetIcon } from '@/shared/icons/tool-icons'
 import { useWeakSpots } from '@/features/practice/mcq/useWeakSpots'
+import { useDialogKeyboard } from '@/shared/hooks/useDialogKeyboard'
 import { MCQ_ACCENT } from '@/shared/theme/accents'
 import { stagesOf, inStage } from '@/services/content/lessonStages'
 import { simulatorPool, simulatorTotal, QUIZ_MAX_QUESTIONS } from '@/services/exam/stageSimulator'
@@ -78,6 +79,7 @@ function CountText({ children, dark }: { children: ReactNode; dark: boolean }) {
 }
 
 // Dialog asking whether to practice with every question or only University Doctors' questions.
+// Escape cancels and Tab stays inside, like ConfirmDialog.
 function SourceChoiceDialog({
   dark, open, allCount, doctorCount, onCancel, onChooseAll, onChooseDoctors
 }: {
@@ -90,6 +92,11 @@ function SourceChoiceDialog({
   onChooseDoctors: () => void
 }) {
   const pt = getPulseTheme(dark)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const cancelRef = useRef<HTMLButtonElement>(null)
+
+  useDialogKeyboard({ open, onClose: onCancel, dialogRef, initialFocusRef: cancelRef })
+
   if (!open) return null
   return (
     <div
@@ -101,7 +108,7 @@ function SourceChoiceDialog({
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
       }}
     >
-      <div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="source-choice-dialog-title" style={{ width: '100%', maxWidth: 380 }}>
+      <div ref={dialogRef} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="source-choice-dialog-title" style={{ width: '100%', maxWidth: 380 }}>
         <LiquidGlassCard dark={dark} delay={0} instant style={{ padding: '26px 24px', textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
             <GraduationCapIcon color={adaptColor(MCQ_ACCENT, dark)} size={30} />
@@ -123,7 +130,7 @@ function SourceChoiceDialog({
               fontWeight: 800, fontSize: 13, fontFamily: pulseFonts.body,
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6
             }}><GraduationCapIcon color={pt.cobalt} size={14} /> University Doctors Only ({doctorCount})</button>
-            <button onClick={onCancel} style={{
+            <button ref={cancelRef} onClick={onCancel} style={{
               padding: '10px', background: 'transparent', border: 'none', cursor: 'pointer',
               color: pt.sub, fontSize: 12, fontWeight: 700, fontFamily: pulseFonts.body
             }}>Cancel</button>

@@ -2,7 +2,7 @@ name: Supabase Keep Alive
 
 on:
   schedule:
-    # Runs at midnight every 3 days
+    # Runs at midnight UTC every 3 days
     - cron: '0 0 */3 * *'
   # Allows you to run this manually from the Actions tab if needed
   workflow_dispatch:
@@ -10,28 +10,33 @@ on:
 jobs:
   ping-database:
     runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
       - name: Check required secrets are set
         run: |
-          if [ -z "${{ secrets.SUPABASE_URL }}" ]; then
+          if [ -z "$SUPABASE_URL" ]; then
             echo "❌ Missing repo secret: SUPABASE_URL — add it in Settings → Secrets and variables → Actions"
             exit 1
           fi
-          if [ -z "${{ secrets.SUPABASE_ANON_KEY }}" ]; then
+          if [ -z "$SUPABASE_ANON_KEY" ]; then
             echo "❌ Missing repo secret: SUPABASE_ANON_KEY — add it in Settings → Secrets and variables → Actions"
             exit 1
           fi
           echo "✅ Required secrets are present"
 
-      - name: Ping Supabase API
+      - name: Query a real table
         run: |
-          status=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
-            "${{ secrets.SUPABASE_URL }}/rest/v1/?limit=1")
+          status=$(curl -sS -o response.txt -w "%{http_code}" --retry 2 --retry-delay 10 \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            "${SUPABASE_URL%/}/rest/v1/content_versions?select=scope&limit=1")
           echo "HTTP status: $status"
-          if [ "$status" = "000" ]; then
-            echo "❌ Could not reach Supabase at all — check that SUPABASE_URL is correct and reachable"
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "❌ Request failed — check that SUPABASE_URL and SUPABASE_ANON_KEY are correct"
+            cat response.txt
+            echo
             exit 1
           fi
+          echo "✅ Database responded"
           
