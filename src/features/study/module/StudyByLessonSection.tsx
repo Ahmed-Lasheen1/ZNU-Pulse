@@ -11,6 +11,7 @@ import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import { glassHoverTint } from '@/shared/theme/liquidGlass'
 import { MCQ_ACCENT, FLASHCARD_ACCENT } from '@/shared/theme/accents'
 import { accuracyColor } from '@/shared/utils/accuracy'
+import { storageGet, storageSet } from '@/core/safeStorage'
 import { useWeakSpots } from '@/features/practice'
 import { fetchModuleQuestions } from '@/services/content/moduleContent'
 import { WEAK_BELOW } from '@/services/history/weakSpots'
@@ -45,6 +46,18 @@ interface StudyByLessonSectionProps {
   onOpenSummary: (summary: AccordionSummary) => void
 }
 
+// Storage key of the lessons a student has ticked in a module on this device.
+const doneKey = (moduleId: string) => `module_lessons_done_${moduleId}`
+
+// Reads the ticked lesson ids of a module from this device.
+function readDone(moduleId: string): Set<string> {
+  try {
+    return new Set(JSON.parse(storageGet(doneKey(moduleId)) || '[]'))
+  } catch {
+    return new Set()
+  }
+}
+
 // Style of the small colored action buttons on a lesson row.
 function pillBtn(color: string): CSSProperties {
   return {
@@ -55,9 +68,8 @@ function pillBtn(color: string): CSSProperties {
   }
 }
 
-// Subject accordion — expands in place to lesson rows with inline
-// Summary/Flashcards/Practice actions, replacing the old Subject/Lesson pages.
-// Lessons the student is struggling with carry a small accuracy badge next to their title.
+// Subject accordion — expands in place to lesson rows with a done checkbox and inline
+// Summary/Flashcards/Practice actions. Lessons the student is struggling with carry an accuracy badge.
 export default function StudyByLessonSection({
   dark, moduleId, stage, subjects, lessons, lessonQuestionIds, lessonFlashcardIds, lessonSummaries, onOpenSummary
 }: StudyByLessonSectionProps) {
@@ -66,11 +78,14 @@ export default function StudyByLessonSection({
   const [openSubjectId, setOpenSubjectId] = useState<string | null>(null)
   const [openPickerLessonId, setOpenPickerLessonId] = useState<string | null>(null)
   const [moduleQuestions, setModuleQuestions] = useState<any[]>([])
+  const [doneLessons, setDoneLessons] = useState<Set<string>>(() => readDone(moduleId))
   const lessonAccuracy = useWeakSpots(moduleQuestions)
   const hoverTint = glassHoverTint(dark)
   // Accents as text/icon colors, adjusted to stay readable in the current mode (fills keep the original).
   const mcqText = adaptColor(MCQ_ACCENT, dark)
   const flashcardText = adaptColor(FLASHCARD_ACCENT, dark)
+  // Letter color on the solid checked box.
+  const onDone = dark ? '#08300f' : '#FFFFFF'
 
   // Loads the module's questions (shared cache) so answers can be matched to lessons.
   useEffect(() => {
@@ -78,6 +93,9 @@ export default function StudyByLessonSection({
     fetchModuleQuestions(moduleId).then(({ data }: { data: any[] | null }) => { if (!ignore && data) setModuleQuestions(data) })
     return () => { ignore = true }
   }, [moduleId])
+
+  // Reloads the ticks when the module changes.
+  useEffect(() => { setDoneLessons(readDone(moduleId)) }, [moduleId])
 
   // Carries the selected exam stage into the MCQ page, like the simulator link does.
   const stageQuery = stage ? `&stage=${encodeURIComponent(stage)}` : ''
@@ -87,6 +105,15 @@ export default function StudyByLessonSection({
     .filter(g => g.lessonsForSub.length > 0)
 
   if (bySubject.length === 0) return null
+
+  // Ticks or unticks a lesson and saves the result on this device.
+  function toggleDone(lessonId: string) {
+    const next = new Set(doneLessons)
+    if (next.has(lessonId)) next.delete(lessonId)
+    else next.add(lessonId)
+    setDoneLessons(next)
+    storageSet(doneKey(moduleId), JSON.stringify([...next]))
+  }
 
   // Opens practice questions of one lesson.
   function practiceLesson(lessonId: string) {
@@ -117,6 +144,7 @@ export default function StudyByLessonSection({
         .study-lesson-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .study-lesson-badge { flex-shrink: 0; font-size: 10.5px; font-weight: 800; line-height: 1; border-radius: 999px; padding: 3px 8px; font-variant-numeric: tabular-nums; }
         .study-lesson-actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .study-lesson-check { flex-shrink: 0; width: 28px; height: 28px; margin: -5px 0 -5px -5px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: none; border-radius: 8px; cursor: pointer; }
         @media (max-width: 480px) {
           .study-lesson-main { min-width: 100%; }
           .study-lesson-actions { min-width: 100%; justify-content: center; flex-wrap: wrap; }
@@ -178,15 +206,34 @@ export default function StudyByLessonSection({
                       const stat = lessonAccuracy[lesson.id]
                       const weak = hasQuestions && !!stat && stat.accuracy < WEAK_BELOW
                       const weakColor = stat ? accuracyColor(stat.accuracy, pt) : pt.textMuted
+                      const isDone = doneLessons.has(lesson.id)
                       return (
                         <div key={lesson.id}>
                           <PulseGlassRow dark={dark} radius={12}>
                             <div className="study-lesson-row">
                               <div className="study-lesson-main">
+                                <button
+                                  type="button" role="checkbox" aria-checked={isDone}
+                                  aria-label={`Mark ${lesson.title} as done`}
+                                  tabIndex={open ? 0 : -1}
+                                  className="study-lesson-check glass-focus-ring"
+                                  onClick={() => toggleDone(lesson.id)}
+                                >
+                                  <span aria-hidden style={{
+                                    width: 18, height: 18, borderRadius: 6, boxSizing: 'border-box',
+                                    border: `1.5px solid ${isDone ? pt.success : pt.faint}`,
+                                    background: isDone ? pt.success : 'transparent', color: onDone,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: 11, fontWeight: 900, transition: 'background 0.15s ease, border-color 0.15s ease',
+                                  }}>{isDone && '✓'}</span>
+                                </button>
                                 {lesson.icon
                                   ? <ModuleIcon value={lesson.icon} size={16} color={pt.success} />
                                   : <NotesIcon color={pt.success} size={16} />}
-                                <span className="study-lesson-title" style={{ color: pt.textPrimary, fontSize: 13, fontWeight: 600 }}>{lesson.title}</span>
+                                <span className="study-lesson-title" style={{
+                                  color: isDone ? pt.textMuted : pt.textPrimary, fontSize: 13, fontWeight: 600,
+                                  textDecoration: isDone ? 'line-through' : 'none',
+                                }}>{lesson.title}</span>
                                 {weak && (
                                   <span
                                     className="study-lesson-badge"
