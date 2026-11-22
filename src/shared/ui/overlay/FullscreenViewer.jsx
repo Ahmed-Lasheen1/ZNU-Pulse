@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { previewKindFor } from '@/shared/utils/embedUrl'
 import { useBodyScrollLock } from '@/shared/hooks/useBodyScrollLock'
+import { useDialogKeyboard } from '@/shared/hooks/useDialogKeyboard'
 import { getPulseTheme, pulseFonts } from '@/shared/theme/premiumTheme'
 import { Z } from '@/shared/theme/tokens'
 
@@ -25,10 +26,14 @@ function isTrustedEmbedHost(url) {
 // competes globally against the site header. `srcDoc` renders saved HTML
 // (always without allow-same-origin, since it would inherit the app's origin);
 // `notice` replaces the preview with a message.
+// Escape, focus trapping and focus restore come from the shared dialog keyboard hook.
 export default function FullscreenViewer({ dark, onClose, src, srcDoc, notice, title, fileType, allow, allowFullScreen }) {
   const pt = getPulseTheme(dark)
   const kind = previewKindFor(src, fileType)
+  const dialogRef = useRef(null)
+  const closeRef = useRef(null)
   useBodyScrollLock(true)
+  useDialogKeyboard({ open: true, onClose, dialogRef, initialFocusRef: closeRef })
 
   // allow-modals lets a summary open the browser's print dialog (its "Print" button).
   const trustedHost = !srcDoc && isTrustedEmbedHost(src)
@@ -36,20 +41,21 @@ export default function FullscreenViewer({ dark, onClose, src, srcDoc, notice, t
     ? 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation allow-modals'
     : 'allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation allow-modals'
 
-  // Closes the viewer on Escape.
-  useEffect(() => {
-    function onKeyDown(e) { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
-
   return createPortal(
-    <div style={{
-      position: 'fixed', inset: 0, height: '100dvh',
-      background: pt.canvas, zIndex: Z.viewer, overflowY: 'auto'
-    }}>
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      style={{
+        position: 'fixed', inset: 0, height: '100dvh',
+        background: pt.canvas, zIndex: Z.viewer, overflowY: 'auto'
+      }}
+    >
       <button
+        ref={closeRef}
         onClick={onClose}
+        className="glass-focus-ring"
         style={{
           position: 'fixed',
           top: 14, left: 16,

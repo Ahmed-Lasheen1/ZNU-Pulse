@@ -3,6 +3,7 @@ import { useAttemptSync } from '@/services/offline/useAttemptSync'
 import { useChecklistSync } from '@/services/offline/useChecklistSync'
 import { useStorageSafety } from '@/services/offline/useStorageSafety'
 import { pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
+import { Z } from '@/shared/theme/tokens'
 import { OfflineIcon } from '@/shared/icons/tool-icons'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 
@@ -19,7 +20,7 @@ export default function OfflineStatus({ dark }: { dark: boolean }) {
       role="status"
       style={{
         position: 'fixed', top: 'calc(60px + env(safe-area-inset-top, 0px))', left: '50%',
-        transform: 'translateX(-50%)', zIndex: 600, pointerEvents: 'none',
+        transform: 'translateX(-50%)', zIndex: Z.offline, pointerEvents: 'none',
       }}
     >
       <PulseGlassRow dark={dark} radius={999}>

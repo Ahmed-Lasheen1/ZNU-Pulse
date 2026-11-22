@@ -11,6 +11,7 @@ interface AdminPillProps {
   onSelect: () => void
 }
 
+// Glass pill used for admin tabs and sections.
 export default function AdminPill({ dark, active, label, Icon, onSelect }: AdminPillProps) {
   const pt = getPulseTheme(dark)
 
@@ -22,9 +23,6 @@ export default function AdminPill({ dark, active, label, Icon, onSelect }: Admin
       activeTint={`${pt.cobalt}26`}
       hoverTint={glassHoverTint(dark)}
       onClick={onSelect}
-      role="button"
-      tabIndex={0}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
       style={{ flexShrink: 0 }}
     >
       <div style={{

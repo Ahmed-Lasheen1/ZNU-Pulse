@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown } from 'lucide-react'
 import { getPulseTheme, pulseFonts, pulseType } from '@/shared/theme/premiumTheme'
 import { adaptColor } from '@/shared/theme/adaptColor'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
@@ -8,8 +7,9 @@ import OfflineNote from '@/shared/ui/feedback/OfflineNote'
 import DialogShell from '@/shared/ui/feedback/DialogShell'
 import Button from '@/shared/ui/controls/Button'
 import TabRow from '@/shared/ui/controls/TabRow'
-import Collapse from '@/shared/ui/layout/Collapse'
+import ActionCard from '@/shared/ui/layout/ActionCard'
 import SectionHeader from '@/shared/ui/layout/SectionHeader'
+import SubjectAccordion from '@/shared/ui/layout/SubjectAccordion'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PageShell from '@/shared/ui/layout/PageShell'
 import PageIntro from '@/shared/ui/layout/PageIntro'
@@ -83,8 +83,7 @@ function CountText({ children, dark }: { children: ReactNode; dark: boolean }) {
   )
 }
 
-// Dialog asking whether to practice with every question or only University Doctors' questions.
-// Escape cancels and Tab stays inside, through the shared DialogShell.
+// Asks whether to practice with every question or only University Doctors' questions.
 function SourceChoiceDialog({
   dark, open, allCount, doctorCount, onCancel, onChooseAll, onChooseDoctors
 }: {
@@ -153,75 +152,48 @@ function SubjectAccordionRow({
   const hasLessons = lessonRows.length > 0
   const canExpand = hasLessons && !forceOpen
   const isOpen = hasLessons && (forceOpen || expanded)
-  const panelId = `subject-lessons-${sub.id}`
   const hoverTint = glassHoverTint(dark)
 
   return (
-    <LiquidGlassCard dark={dark} delay={delay} style={{ padding: 0 }}>
-      <style>{`
-        .mcq-subject-toggle { transition: background 0.15s ease; }
-        .mcq-subject-toggle:active { background: var(--mcq-sbl-hover); }
-        @media (hover: hover) { .mcq-subject-toggle:hover { background: var(--mcq-sbl-hover); } }
-      `}</style>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px' }}>
-        <button
-          type="button"
-          onClick={canExpand ? onToggle : undefined}
-          aria-expanded={canExpand ? isOpen : undefined}
-          aria-controls={canExpand ? panelId : undefined}
-          disabled={!canExpand}
-          className="mcq-subject-toggle"
-          style={{
-            ['--mcq-sbl-hover' as any]: canExpand ? hoverTint : 'transparent',
-            flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10,
-            background: 'transparent', border: 'none', padding: 0, textAlign: 'left',
-            cursor: canExpand ? 'pointer' : 'default', font: 'inherit', color: 'inherit'
-          }}
-        >
-          <ModuleIcon value={sub.icon} size={18} color={adaptColor(sub.color || tabAccentColor, dark)} />
-          <span style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ color: pt.textPrimary, fontWeight: 700, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub.name}</div>
-            <div style={{ color: pt.textMuted, fontSize: 11.5, marginTop: 1 }}>
-              {countLabel(count)}
-              {count > QUIZ_MAX_QUESTIONS && (
-                <span style={{ color: pt.faint }}> · quiz uses {QUIZ_MAX_QUESTIONS}</span>
-              )}
-            </div>
-          </span>
-          {canExpand && (
-            <span style={{ display: 'inline-flex', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease', flexShrink: 0 }}>
-              <ChevronDown size={16} color={pt.textMuted} />
-            </span>
+    <SubjectAccordion
+      dark={dark}
+      id={`subject-lessons-${sub.id}`}
+      label={`${sub.name} lessons`}
+      delay={delay}
+      icon={<ModuleIcon value={sub.icon} size={18} color={adaptColor(sub.color || tabAccentColor, dark)} />}
+      title={sub.name}
+      subtitle={
+        <>
+          {countLabel(count)}
+          {count > QUIZ_MAX_QUESTIONS && (
+            <span style={{ color: pt.faint }}> · quiz uses {QUIZ_MAX_QUESTIONS}</span>
           )}
-        </button>
+        </>
+      }
+      action={
         <Button dark={dark} variant="solid" size="sm" color={MCQ_ACCENT} onClick={onPracticeSubject} style={{ flexShrink: 0 }}>
           Practice All
         </Button>
-      </div>
-
-      {hasLessons && (
-        <Collapse
-          open={isOpen} id={panelId} label={`${sub.name} lessons`}
-          panelStyle={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}
+      }
+      expandable={canExpand}
+      open={isOpen}
+      hasPanel={hasLessons}
+      onToggle={onToggle}
+    >
+      {lessonRows.map(({ lesson, count: lessonQCount }) => (
+        <PulseGlassRow
+          key={lesson.id} dark={dark} radius={12}
+          hoverTint={hoverTint}
+          onClick={() => onPracticeLesson(lesson.id)}
+          tabIndex={isOpen ? 0 : -1}
         >
-          {lessonRows.map(({ lesson, count: lessonQCount }) => (
-            <PulseGlassRow
-              key={lesson.id} dark={dark} radius={12}
-              hoverTint={hoverTint}
-              onClick={() => onPracticeLesson(lesson.id)}
-              role="button" tabIndex={isOpen ? 0 : -1}
-              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPracticeLesson(lesson.id) } }}
-            >
-              <div style={{ padding: '9px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                <span style={{ color: pt.textPrimary, fontSize: 13, fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lesson.title}</span>
-                <span style={{ color: pt.textMuted, fontSize: 11, flexShrink: 0 }}>{countLabel(lessonQCount)}</span>
-              </div>
-            </PulseGlassRow>
-          ))}
-        </Collapse>
-      )}
-    </LiquidGlassCard>
+          <div style={{ padding: '9px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+            <span style={{ color: pt.textPrimary, fontSize: 13, fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lesson.title}</span>
+            <span style={{ color: pt.textMuted, fontSize: 11, flexShrink: 0 }}>{countLabel(lessonQCount)}</span>
+          </div>
+        </PulseGlassRow>
+      ))}
+    </SubjectAccordion>
   )
 }
 
@@ -325,9 +297,7 @@ export default function MCQBrowse({
       />
 
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-        <PulseGlassRow dark={dark} radius={999} hoverTint={hoverTint} onClick={() => navigate('/review')}
-          role="button" tabIndex={0}
-          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/review') } }}>
+        <PulseGlassRow dark={dark} radius={999} hoverTint={hoverTint} onClick={() => navigate('/review')}>
           <div style={{ padding: '8px 18px', ...pulseType.small, fontWeight: 700, color: pt.sub, display: 'flex', alignItems: 'center', gap: 6 }}>
             <BookIcon color={pt.sub} size={14} /> Review Incorrect & Flagged
           </div>
@@ -385,27 +355,25 @@ export default function MCQBrowse({
 
       {!mockHidden && (
         <div style={{ marginBottom: 32 }}>
-          <LiquidGlassCard dark={dark} delay={0} style={{ padding: '22px 24px 20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap', marginBottom: tabSubjects.length > 0 ? 16 : 0 }}>
-              <div style={{
-                width: 60, height: 60, borderRadius: 18, flexShrink: 0,
-                background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>
-                <ExamIcon color={mcqText} size={28} />
-              </div>
-              <div style={{ flex: 1, minWidth: 160 }}>
-                <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: mcqText, marginBottom: 6 }}>Mock Exam</h3>
-                <CountText dark={dark}>
-                  {loading ? '…' : mockBank > QUIZ_MAX_QUESTIONS
-                    ? `${mockCount} of ${mockBank} per exam`
-                    : countLabel(mockCount)}
-                </CountText>
-              </div>
+          <ActionCard
+            dark={dark}
+            accent={MCQ_ACCENT}
+            padding="22px 24px 20px"
+            icon={<ExamIcon color={mcqText} size={28} />}
+            title="Mock Exam"
+            subtitle={
+              <CountText dark={dark}>
+                {loading ? '…' : mockBank > QUIZ_MAX_QUESTIONS
+                  ? `${mockCount} of ${mockBank} per exam`
+                  : countLabel(mockCount)}
+              </CountText>
+            }
+            action={
               <Button dark={dark} variant="solid" size="md" color={MCQ_ACCENT} onClick={() => onStartQuiz('mock', null, null)} style={{ flexShrink: 0 }}>
                 Start →
               </Button>
-            </div>
+            }
+          >
             {tabSubjects.length > 0 && (
               <TabRow
                 items={[{ value: 'all', label: 'All' }, ...tabSubjects.map(sub => ({ value: sub.id, label: sub.name }))]}
@@ -416,7 +384,7 @@ export default function MCQBrowse({
                 style={{ marginBottom: 0 }}
               />
             )}
-          </LiquidGlassCard>
+          </ActionCard>
         </div>
       )}
 
@@ -429,27 +397,23 @@ export default function MCQBrowse({
               .sim-sub-short { display: inline; }
             }
           `}</style>
-          <LiquidGlassCard dark={dark} delay={0} style={{ padding: '22px 24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
-              <div style={{
-                width: 60, height: 60, borderRadius: 18, flexShrink: 0,
-                background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>
-                <TargetIcon color={mcqText} size={28} />
-              </div>
-              <div style={{ flex: 1, minWidth: 160 }}>
-                <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: mcqText, marginBottom: 6 }}>{stageTitle} Simulator</h3>
-                <CountText dark={dark}>
-                  <span className="sim-sub-full">{countLabel(simTotal)} · {simSubjectCount} subject{simSubjectCount === 1 ? '' : 's'} · new mix each time</span>
-                  <span className="sim-sub-short">{countLabel(simTotal)} · {simSubjectCount} subject{simSubjectCount === 1 ? '' : 's'}</span>
-                </CountText>
-              </div>
+          <ActionCard
+            dark={dark}
+            accent={MCQ_ACCENT}
+            icon={<TargetIcon color={mcqText} size={28} />}
+            title={`${stageTitle} Simulator`}
+            subtitle={
+              <CountText dark={dark}>
+                <span className="sim-sub-full">{countLabel(simTotal)} · {simSubjectCount} subject{simSubjectCount === 1 ? '' : 's'} · new mix each time</span>
+                <span className="sim-sub-short">{countLabel(simTotal)} · {simSubjectCount} subject{simSubjectCount === 1 ? '' : 's'}</span>
+              </CountText>
+            }
+            action={
               <Button dark={dark} variant="solid" size="md" color={MCQ_ACCENT} onClick={() => onStartSimulator(activeStage)} style={{ flexShrink: 0 }}>
                 Start →
               </Button>
-            </div>
-          </LiquidGlassCard>
+            }
+          />
         </div>
       )}
 

@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { ChevronDown } from 'lucide-react'
 import { getPulseTheme, pulseType } from '@/shared/theme/premiumTheme'
 import { adaptColor } from '@/shared/theme/adaptColor'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
@@ -7,9 +6,9 @@ import EmptyState from '@/shared/ui/feedback/EmptyState'
 import InfoNotice from '@/shared/ui/feedback/InfoNotice'
 import Button from '@/shared/ui/controls/Button'
 import TabRow from '@/shared/ui/controls/TabRow'
-import Collapse from '@/shared/ui/layout/Collapse'
+import ActionCard from '@/shared/ui/layout/ActionCard'
 import SectionHeader from '@/shared/ui/layout/SectionHeader'
-import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
+import SubjectAccordion from '@/shared/ui/layout/SubjectAccordion'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import PageShell from '@/shared/ui/layout/PageShell'
 import PageIntro from '@/shared/ui/layout/PageIntro'
@@ -68,84 +67,57 @@ function SubjectRow({ dark, group, delay, expanded, forceOpen, onToggle, onStudy
 }) {
   const pt = getPulseTheme(dark)
   const { subject, rows, total, due } = group
-  const canExpand = rows.length > 1 && !forceOpen
-  const isOpen = rows.length > 1 && (forceOpen || expanded)
-  const panelId = `flashcard-subject-${subject.id}`
+  const hasPanel = rows.length > 1
+  const canExpand = hasPanel && !forceOpen
+  const isOpen = hasPanel && (forceOpen || expanded)
   const hoverTint = glassHoverTint(dark)
-  // The accent as text/icon color, adjusted to stay readable in the current mode (fills keep the original).
   const accentText = adaptColor(FLASHCARD_ACCENT, dark)
 
   return (
-    <LiquidGlassCard dark={dark} delay={delay} style={{ padding: 0 }}>
-      <style>{`
-        .fc-subject-toggle { transition: background 0.15s ease; }
-        .fc-subject-toggle:active { background: var(--fc-hover); }
-        @media (hover: hover) { .fc-subject-toggle:hover { background: var(--fc-hover); } }
-      `}</style>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px' }}>
-        <button
-          type="button"
-          onClick={canExpand ? onToggle : undefined}
-          aria-expanded={canExpand ? isOpen : undefined}
-          aria-controls={canExpand ? panelId : undefined}
-          disabled={!canExpand}
-          className="fc-subject-toggle"
-          style={{
-            ['--fc-hover' as any]: canExpand ? hoverTint : 'transparent',
-            flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10,
-            background: 'transparent', border: 'none', padding: 0, textAlign: 'left',
-            cursor: canExpand ? 'pointer' : 'default', font: 'inherit', color: 'inherit',
-          }}
-        >
-          <ModuleIcon value={subject.icon} size={18} color={adaptColor(subject.color || FLASHCARD_ACCENT, dark)} />
-          <span style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ color: pt.textPrimary, fontWeight: 700, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subject.name}</div>
-            <div style={{ color: pt.textMuted, fontSize: 11.5, marginTop: 1 }}>
-              {plural(total, 'card')}
-              {due > 0 && <span style={{ color: accentText }}> · {due} due</span>}
-            </div>
-          </span>
-          {canExpand && (
-            <span style={{ display: 'inline-flex', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease', flexShrink: 0 }}>
-              <ChevronDown size={16} color={pt.textMuted} />
-            </span>
-          )}
-        </button>
+    <SubjectAccordion
+      dark={dark}
+      id={`flashcard-subject-${subject.id}`}
+      label={`${subject.name} lessons`}
+      delay={delay}
+      icon={<ModuleIcon value={subject.icon} size={18} color={adaptColor(subject.color || FLASHCARD_ACCENT, dark)} />}
+      title={subject.name}
+      subtitle={
+        <>
+          {plural(total, 'card')}
+          {due > 0 && <span style={{ color: accentText }}> · {due} due</span>}
+        </>
+      }
+      action={
         <Button dark={dark} variant="solid" size="sm" color={FLASHCARD_ACCENT} onClick={onStudySubject} style={{ flexShrink: 0 }}>
           Study All
         </Button>
-      </div>
-
-      {rows.length > 1 && (
-        <Collapse
-          open={isOpen} id={panelId} label={`${subject.name} lessons`}
-          panelStyle={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}
+      }
+      expandable={canExpand}
+      open={isOpen}
+      hasPanel={hasPanel}
+      onToggle={onToggle}
+    >
+      {rows.map(({ lesson, total: lessonTotal, toStudy }) => (
+        <PulseGlassRow
+          key={lesson.id} dark={dark} radius={12} hoverTint={hoverTint}
+          onClick={() => onStudyLesson(lesson.id)}
+          tabIndex={isOpen ? 0 : -1}
         >
-          {rows.map(({ lesson, total: lessonTotal, toStudy }) => (
-            <PulseGlassRow
-              key={lesson.id} dark={dark} radius={12} hoverTint={hoverTint}
-              onClick={() => onStudyLesson(lesson.id)}
-              role="button" tabIndex={isOpen ? 0 : -1}
-              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onStudyLesson(lesson.id) } }}
-            >
-              <div style={{ padding: '9px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                <span style={{ minWidth: 0 }}>
-                  <div style={{ color: pt.textPrimary, fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lesson.title}</div>
-                  <div style={{ color: pt.textMuted, fontSize: 11, marginTop: 1 }}>{plural(lessonTotal, 'card')}</div>
-                </span>
-                <span style={{
-                  flexShrink: 0, fontSize: 11, fontWeight: 700, borderRadius: 999, padding: '3px 10px', whiteSpace: 'nowrap',
-                  background: toStudy > 0 ? `${FLASHCARD_ACCENT}26` : 'transparent',
-                  color: toStudy > 0 ? accentText : pt.textMuted,
-                  border: toStudy > 0 ? 'none' : `1px solid ${pt.border}`,
-                }}>{toStudy > 0 ? `${toStudy} to study` : 'Review anyway'}</span>
-              </div>
-            </PulseGlassRow>
-          ))}
-        </Collapse>
-      )}
-    </LiquidGlassCard>
+          <div style={{ padding: '9px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+            <span style={{ minWidth: 0 }}>
+              <div style={{ color: pt.textPrimary, fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lesson.title}</div>
+              <div style={{ color: pt.textMuted, fontSize: 11, marginTop: 1 }}>{plural(lessonTotal, 'card')}</div>
+            </span>
+            <span style={{
+              flexShrink: 0, fontSize: 11, fontWeight: 700, borderRadius: 999, padding: '3px 10px', whiteSpace: 'nowrap',
+              background: toStudy > 0 ? `${FLASHCARD_ACCENT}26` : 'transparent',
+              color: toStudy > 0 ? accentText : pt.textMuted,
+              border: toStudy > 0 ? 'none' : `1px solid ${pt.border}`,
+            }}>{toStudy > 0 ? `${toStudy} to study` : 'Review anyway'}</span>
+          </div>
+        </PulseGlassRow>
+      ))}
+    </SubjectAccordion>
   )
 }
 
@@ -157,7 +129,6 @@ export default function FlashcardsBrowse({
   const pt = getPulseTheme(dark)
   const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null)
   const singleSubject = groups.length === 1
-  // The accent and the module color as text/icon colors, adjusted to stay readable in the current mode.
   const accentText = adaptColor(FLASHCARD_ACCENT, dark)
   const modColor = adaptColor(mod.color, dark)
 
@@ -202,26 +173,22 @@ export default function FlashcardsBrowse({
 
       {!loading && progressLoaded && dueTotal > 0 && (
         <div style={{ marginBottom: 32 }}>
-          <LiquidGlassCard dark={dark} delay={0} style={{ padding: '22px 24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
-              <div style={{
-                width: 60, height: 60, borderRadius: 18, flexShrink: 0,
-                background: `${FLASHCARD_ACCENT}22`, border: `1px solid ${FLASHCARD_ACCENT}55`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <FlashcardIcon color={accentText} size={28} />
+          <ActionCard
+            dark={dark}
+            accent={FLASHCARD_ACCENT}
+            icon={<FlashcardIcon color={accentText} size={28} />}
+            title="Due Today"
+            subtitle={
+              <div style={{ ...pulseType.small, color: pt.textMuted }}>
+                {plural(dueTotal, 'card')} · {plural(dueLessons, 'lesson')}
               </div>
-              <div style={{ flex: 1, minWidth: 160 }}>
-                <h3 style={{ ...pulseType.sectionLabel, fontSize: 15, color: accentText, marginBottom: 6 }}>Due Today</h3>
-                <div style={{ ...pulseType.small, color: pt.textMuted }}>
-                  {plural(dueTotal, 'card')} · {plural(dueLessons, 'lesson')}
-                </div>
-              </div>
+            }
+            action={
               <Button dark={dark} variant="solid" size="md" color={FLASHCARD_ACCENT} onClick={onStartDue} style={{ flexShrink: 0 }}>
                 Start →
               </Button>
-            </div>
-          </LiquidGlassCard>
+            }
+          />
         </div>
       )}
 

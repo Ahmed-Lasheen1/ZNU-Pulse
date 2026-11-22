@@ -7,13 +7,10 @@ import { WarningIcon, RefreshIcon } from '@/shared/icons/tool-icons'
 // an error isn't caught — without this, one bad component can blank
 // the entire app). Wrapped once around the routed pages in App.jsx.
 //
-// BUG FIX: `hasError` used to never reset once set, since this
-// component never unmounts on client-side navigation. That meant one
-// render crash on any page permanently showed this fallback for every
-// route visited afterward, until a full manual reload. App.jsx now
-// passes `resetKey={location.pathname}` — whenever the route actually
-// changes, componentDidUpdate below clears the error state so the new
-// page gets a real chance to render.
+// `hasError` is cleared when `resetKey` (the route path) changes, so one
+// crash on a page does not block every route visited afterward.
+// Colors come from the CSS variables in src/styles/index.css, so the screen
+// stays readable in both color modes.
 export default class ErrorBoundary extends Component {
   constructor(props) {
     super(props)
@@ -41,13 +38,13 @@ export default class ErrorBoundary extends Component {
           minHeight: '60vh', display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center'
         }}>
-          <div style={{ marginBottom: 16 }}><WarningIcon color="#ef4444" size={48} /></div>
-          <h2 style={{ color: '#ef4444', marginBottom: 8, fontSize: 20 }}>Something went wrong</h2>
-          <p style={{ color: '#94a3b8', marginBottom: 20, fontSize: 14, maxWidth: 400 }}>
+          <div style={{ marginBottom: 16 }}><WarningIcon color="var(--danger-text)" size={48} /></div>
+          <h2 style={{ color: 'var(--danger-text)', marginBottom: 8, fontSize: 20 }}>Something went wrong</h2>
+          <p style={{ color: 'var(--on-bg-muted)', marginBottom: 20, fontSize: 14, maxWidth: 400 }}>
             This page hit an unexpected error. Reloading usually fixes it — if it keeps happening,
             open the browser console (F12) and share what's shown there.
           </p>
-          <button onClick={() => window.location.reload()} style={{
+          <button onClick={() => window.location.reload()} className="glass-focus-ring" style={{
             background: '#38bdf8', color: '#0f172a', border: 'none',
             padding: '12px 24px', borderRadius: 10, cursor: 'pointer',
             fontWeight: 700, fontFamily: 'inherit', fontSize: 14,

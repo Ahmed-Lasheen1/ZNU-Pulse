@@ -27,8 +27,9 @@ const SIZES: Record<ButtonSize, CSSProperties> = {
 }
 
 // Shared pill button with the app's four recurring looks; replaces the per-page inline button styles.
+// It carries the app-wide keyboard focus ring and press feedback (see index.css).
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { dark, variant = 'solid', size = 'sm', color, onColor, fullWidth = false, type = 'button', disabled, style, children, ...rest },
+  { dark, variant = 'solid', size = 'sm', color, onColor, fullWidth = false, type = 'button', disabled, className, style, children, ...rest },
   ref
 ) {
   const pt = getPulseTheme(dark)
@@ -47,6 +48,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
       type={type}
       disabled={disabled}
       {...rest}
+      className={['study-btn', 'glass-focus-ring', className].filter(Boolean).join(' ')}
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
         borderRadius: RADIUS.pill, fontFamily: pulseFonts.body, whiteSpace: 'nowrap',

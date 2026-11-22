@@ -1,9 +1,9 @@
 import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { pulseFonts } from '@/shared/theme/premiumTheme'
+import { Z } from '@/shared/theme/tokens'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 
-const BAR_Z_INDEX = 450
 // The bar is a dark glass strip in both color modes, so everything inside it uses light text.
 const BAR_TINT = 'rgba(1,12,74,0.55)'
 
@@ -56,7 +56,7 @@ export default function StudyActionBar({
     <div
       ref={barRef}
       style={{
-        position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: BAR_Z_INDEX,
+        position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: Z.actionBar,
         display: 'flex', justifyContent: 'center', pointerEvents: 'none',
         paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
         fontFamily: pulseFonts.body,

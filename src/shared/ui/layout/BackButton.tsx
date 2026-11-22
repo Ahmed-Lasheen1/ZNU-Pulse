@@ -3,6 +3,7 @@ import { useGoBack } from '@/shared/hooks/useGoBack'
 import { getPulseTheme, pulseType } from '@/shared/theme/premiumTheme'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import { glassHoverTint } from '@/shared/theme/liquidGlass'
+import { Z } from '@/shared/theme/tokens'
 
 interface BackButtonProps {
   dark: boolean
@@ -27,13 +28,11 @@ export default function BackButton({ dark, fallback = '/', onClick, style }: Bac
         position: 'fixed',
         top: 'calc(16px + 60px + env(safe-area-inset-top, 0px))',
         left: 'clamp(20px, 4vw, 64px)',
-        zIndex: 400,
+        zIndex: Z.backBar,
       }}
     >
       <PulseGlassRow
         dark={dark} radius={999} hoverTint={hoverTint} onClick={handleClick}
-        role="button" tabIndex={0}
-        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick() } }}
         style={{ display: 'inline-flex', width: 'fit-content', ...style }}
       >
         <div style={{ padding: '8px 18px', ...pulseType.small, fontWeight: 700, color: pt.sub }}>← Back</div>

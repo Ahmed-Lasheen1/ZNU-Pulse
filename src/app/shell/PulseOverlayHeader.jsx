@@ -4,6 +4,7 @@ import PulseBrand from '@/shared/ui/display/PulseBrand'
 import { useHomeEntrance } from '@/core/contexts'
 import { useBrandLocked } from '@/shared/hooks/useBrandLock'
 import { LOGO_DELAY, BRAND_WORDS_START, BRAND_WORD_STAGGER, BRAND_TAGLINE_DELAY } from '@/shared/theme/pulseMotion'
+import { Z } from '@/shared/theme/tokens'
 
 const BRAND_ANIMATION = {
   logoDelay: LOGO_DELAY,
@@ -26,7 +27,7 @@ export default function PulseOverlayHeader({ dark, toggleTheme }) {
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0,
-      zIndex: 500, pointerEvents: 'none'
+      zIndex: Z.header, pointerEvents: 'none'
     }}>
       <div className="pulse-wide" style={{
         // Clears the notch (viewport-fit=cover); 0px where there is none.

@@ -59,8 +59,7 @@ export default function PillTabs<T extends string>({ dark, tabs, active, onSelec
           <PulseGlassRow
             key={t.id} dark={dark} radius={999} active={isActive}
             activeTint={tint} hoverTint={hoverTint}
-            onClick={() => onSelect(t.id)} role="button" tabIndex={0}
-            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(t.id) } }}
+            onClick={() => onSelect(t.id)}
             style={fixed ? { textAlign: 'center', width: 150 } : undefined}
           >
             <div

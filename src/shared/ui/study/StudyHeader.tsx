@@ -22,8 +22,7 @@ function TopButton({ dark, onClick, ariaLabel, children }: {
   return (
     <PulseGlassRow
       dark={dark} radius={999} hoverTint={glassHoverTint(dark)} onClick={onClick}
-      role="button" tabIndex={0} aria-label={ariaLabel}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
+      aria-label={ariaLabel}
     >
       <div className="study-top-btn" style={{
         height: 44, boxSizing: 'border-box',

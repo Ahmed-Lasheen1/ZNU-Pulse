@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), iframe, [tabindex]:not([tabindex="-1"])'
 
 // Closes an open modal on Escape, keeps Tab focus inside it, focuses one element when it opens,
 // and returns focus to the element that was focused before it opened.

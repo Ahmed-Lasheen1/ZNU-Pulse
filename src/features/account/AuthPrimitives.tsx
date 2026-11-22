@@ -24,7 +24,7 @@ export function PrimaryButton({ pt, disabled, onClick, children }: {
   pt: PulseTheme; disabled?: boolean; onClick?: () => void; children: ReactNode
 }) {
   return (
-    <button onClick={onClick} disabled={disabled} style={{
+    <button onClick={onClick} disabled={disabled} className="glass-focus-ring" style={{
       width: '100%', padding: '15px', borderRadius: 999, border: 'none',
       background: disabled ? 'rgba(255,255,255,0.15)' : `linear-gradient(135deg, ${pt.cobalt}cc, ${pt.indigo}cc)`,
       color: disabled ? pt.sub : '#fff', fontWeight: 800, fontSize: 14, fontFamily: pulseFonts.body,
@@ -39,13 +39,9 @@ export function GhostButton({ dark, onClick, disabled, children }: {
   dark: boolean; onClick?: () => void; disabled?: boolean; children: ReactNode
 }) {
   const pt = getPulseTheme(dark)
-  const handleClick = disabled ? undefined : onClick
   return (
     <PulseGlassRow
-      dark={dark} radius={999} onClick={handleClick}
-      role={handleClick ? 'button' : undefined}
-      tabIndex={handleClick ? 0 : undefined}
-      onKeyDown={handleClick ? (e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick() } }) : undefined}
+      dark={dark} radius={999} onClick={disabled ? undefined : onClick}
       style={disabled ? { opacity: 0.6, pointerEvents: 'none' } : undefined}
     >
       <div style={{ padding: '11px', textAlign: 'center', fontSize: 13, fontWeight: 700, color: pt.text, fontFamily: pulseFonts.body }}>
@@ -75,8 +71,7 @@ export function AccountToggle({ dark, pt, active, onClick, children }: {
   return (
     <PulseGlassRow
       dark={dark} radius={999} active={active} activeTint={`${pt.cobalt}26`}
-      onClick={onClick} role="button" tabIndex={0}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
+      onClick={onClick}
       style={{ flex: 1 }}
     >
       <div style={{

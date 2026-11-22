@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown } from 'lucide-react'
 import { getPulseTheme, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import { adaptColor } from '@/shared/theme/adaptColor'
 import { ModuleIcon, NotesIcon, ExamIcon } from '@/shared/icons/medicalIcons'
@@ -8,10 +7,8 @@ import { StudyByLessonIcon, BookIcon } from '@/shared/icons/tool-icons'
 import { FlashcardIcon } from '@/shared/icons/FlashcardIcon'
 import Button from '@/shared/ui/controls/Button'
 import Checkbox from '@/shared/ui/controls/Checkbox'
-import Collapse from '@/shared/ui/layout/Collapse'
-import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
+import SubjectAccordion from '@/shared/ui/layout/SubjectAccordion'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
-import { glassHoverTint } from '@/shared/theme/liquidGlass'
 import { MCQ_ACCENT, FLASHCARD_ACCENT } from '@/shared/theme/accents'
 import { accuracyColor } from '@/shared/utils/accuracy'
 import { storageGet, storageSet } from '@/core/safeStorage'
@@ -73,7 +70,6 @@ export default function StudyByLessonSection({
   const [moduleQuestions, setModuleQuestions] = useState<any[]>([])
   const [doneLessons, setDoneLessons] = useState<Set<string>>(() => readDone(moduleId))
   const lessonAccuracy = useWeakSpots(moduleQuestions)
-  const hoverTint = glassHoverTint(dark)
   // Accents as text/icon colors, adjusted to stay readable in the current mode (fills keep the original).
   const mcqText = adaptColor(MCQ_ACCENT, dark)
   const flashcardText = adaptColor(FLASHCARD_ACCENT, dark)
@@ -129,9 +125,6 @@ export default function StudyByLessonSection({
   return (
     <div style={{ marginBottom: 32 }}>
       <style>{`
-        .study-subject-toggle { transition: background 0.15s ease; }
-        .study-subject-toggle:active { background: var(--sbl-hover); }
-        @media (hover: hover) { .study-subject-toggle:hover { background: var(--sbl-hover); } }
         .study-lesson-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; flex-wrap: wrap; }
         .study-lesson-main { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 160px; }
         .study-lesson-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -153,118 +146,101 @@ export default function StudyByLessonSection({
           const open = openSubjectId === sub.id
           const subColor = adaptColor(sub.color || '#34d399', dark)
           return (
-            <LiquidGlassCard key={sub.id} dark={dark} delay={0} style={{ padding: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px' }}>
-                <button
-                  type="button"
-                  onClick={() => setOpenSubjectId(open ? null : sub.id)}
-                  aria-expanded={open}
-                  aria-controls={`subject-lessons-${sub.id}`}
-                  className="study-subject-toggle"
-                  style={{
-                    ['--sbl-hover' as any]: hoverTint,
-                    flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10,
-                    background: 'transparent', border: 'none', padding: 0, textAlign: 'left',
-                    cursor: 'pointer', font: 'inherit', color: 'inherit'
-                  }}
-                >
-                  {sub.icon
-                    ? <ModuleIcon value={sub.icon} size={20} color={subColor} />
-                    : <BookIcon color={subColor} size={20} />}
-                  <span style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ color: pt.textPrimary, fontWeight: 700, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub.name}</div>
-                    <div style={{ color: pt.textMuted, fontSize: 11.5, marginTop: 1 }}>{lessonsForSub.length} lesson{lessonsForSub.length === 1 ? '' : 's'}</div>
-                  </span>
-                  <span style={{ display: 'inline-flex', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease', flexShrink: 0 }}>
-                    <ChevronDown size={16} color={pt.textMuted} />
-                  </span>
-                </button>
+            <SubjectAccordion
+              key={sub.id}
+              dark={dark}
+              id={`subject-lessons-${sub.id}`}
+              label={`${sub.name} lessons`}
+              icon={sub.icon
+                ? <ModuleIcon value={sub.icon} size={20} color={subColor} />
+                : <BookIcon color={subColor} size={20} />}
+              title={sub.name}
+              subtitle={`${lessonsForSub.length} lesson${lessonsForSub.length === 1 ? '' : 's'}`}
+              action={
                 <Button dark={dark} variant="solid" size="sm" color={MCQ_ACCENT} onClick={() => practiceSubject(sub.id)} style={{ flexShrink: 0 }}>
                   Practice All
                 </Button>
-              </div>
-
-              <Collapse
-                open={open} id={`subject-lessons-${sub.id}`} label={`${sub.name} lessons`}
-                panelStyle={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}
-              >
-                {lessonsForSub.map(lesson => {
-                  const summaries = lessonSummaries[lesson.id] || []
-                  const hasQuestions = lessonQuestionIds.has(lesson.id)
-                  const hasFlashcards = lessonFlashcardIds.has(lesson.id)
-                  const pickerOpen = openPickerLessonId === lesson.id
-                  const stat = lessonAccuracy[lesson.id]
-                  const weak = hasQuestions && !!stat && stat.accuracy < WEAK_BELOW
-                  const weakColor = stat ? accuracyColor(stat.accuracy, pt) : pt.textMuted
-                  const isDone = doneLessons.has(lesson.id)
-                  return (
-                    <div key={lesson.id}>
-                      <PulseGlassRow dark={dark} radius={12}>
-                        <div className="study-lesson-row">
-                          <div className="study-lesson-main">
-                            <Checkbox
-                              dark={dark}
-                              checked={isDone}
-                              onChange={() => toggleDone(lesson.id)}
-                              label={`Mark ${lesson.title} as done`}
-                              color={pt.success}
-                              checkColor={onDone}
-                              tabIndex={open ? 0 : -1}
-                              className="study-lesson-check glass-focus-ring"
-                            />
-                            {lesson.icon
-                              ? <ModuleIcon value={lesson.icon} size={16} color={pt.success} />
-                              : <NotesIcon color={pt.success} size={16} />}
-                            <span className="study-lesson-title" style={{
-                              color: isDone ? pt.textMuted : pt.textPrimary, fontSize: 13, fontWeight: 600,
-                              textDecoration: isDone ? 'line-through' : 'none',
-                            }}>{lesson.title}</span>
-                            {weak && (
-                              <span
-                                className="study-lesson-badge"
-                                title="Your recent accuracy in this lesson"
-                                aria-label={`Accuracy ${stat.accuracy} percent, needs practice`}
-                                style={{ color: weakColor, background: `${weakColor}22`, border: `1px solid ${weakColor}44` }}
-                              >{stat.accuracy}%</span>
-                            )}
-                          </div>
-                          <div className="study-lesson-actions">
-                            {summaries.length > 0 && (
-                              <Button dark={dark} variant="tinted" size="xs" color={pt.success} onClick={() => handleSummary(lesson.id, summaries)} style={{ gap: 5 }}>
-                                <NotesIcon color={pt.success} size={12} /> Summary
-                              </Button>
-                            )}
-                            {hasFlashcards && (
-                              <Button dark={dark} variant="tinted" size="xs" color={flashcardText} onClick={() => studyFlashcards(lesson.id)} style={{ gap: 5 }}>
-                                <FlashcardIcon color={flashcardText} size={12} /> Flashcards
-                              </Button>
-                            )}
-                            {hasQuestions && (
-                              <Button dark={dark} variant="tinted" size="xs" color={mcqText} onClick={() => practiceLesson(lesson.id)} style={{ gap: 5 }}>
-                                <ExamIcon color={mcqText} size={12} /> Practice
-                              </Button>
-                            )}
-                            {!hasQuestions && !hasFlashcards && summaries.length === 0 && (
-                              <span style={{ color: pt.faint, fontSize: 11 }}>No content yet</span>
-                            )}
-                          </div>
+              }
+              expandable
+              open={open}
+              onToggle={() => setOpenSubjectId(open ? null : sub.id)}
+            >
+              {lessonsForSub.map(lesson => {
+                const summaries = lessonSummaries[lesson.id] || []
+                const hasQuestions = lessonQuestionIds.has(lesson.id)
+                const hasFlashcards = lessonFlashcardIds.has(lesson.id)
+                const pickerOpen = openPickerLessonId === lesson.id
+                const stat = lessonAccuracy[lesson.id]
+                const weak = hasQuestions && !!stat && stat.accuracy < WEAK_BELOW
+                const weakColor = stat ? accuracyColor(stat.accuracy, pt) : pt.textMuted
+                const isDone = doneLessons.has(lesson.id)
+                return (
+                  <div key={lesson.id}>
+                    <PulseGlassRow dark={dark} radius={12}>
+                      <div className="study-lesson-row">
+                        <div className="study-lesson-main">
+                          <Checkbox
+                            dark={dark}
+                            checked={isDone}
+                            onChange={() => toggleDone(lesson.id)}
+                            label={`Mark ${lesson.title} as done`}
+                            color={pt.success}
+                            checkColor={onDone}
+                            tabIndex={open ? 0 : -1}
+                            className="study-lesson-check glass-focus-ring"
+                          />
+                          {lesson.icon
+                            ? <ModuleIcon value={lesson.icon} size={16} color={pt.success} />
+                            : <NotesIcon color={pt.success} size={16} />}
+                          <span className="study-lesson-title" style={{
+                            color: isDone ? pt.textMuted : pt.textPrimary, fontSize: 13, fontWeight: 600,
+                            textDecoration: isDone ? 'line-through' : 'none',
+                          }}>{lesson.title}</span>
+                          {weak && (
+                            <span
+                              className="study-lesson-badge"
+                              title="Your recent accuracy in this lesson"
+                              aria-label={`Accuracy ${stat.accuracy} percent, needs practice`}
+                              style={{ color: weakColor, background: `${weakColor}22`, border: `1px solid ${weakColor}44` }}
+                            >{stat.accuracy}%</span>
+                          )}
                         </div>
-                      </PulseGlassRow>
-                      {pickerOpen && summaries.length > 1 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '4px 4px 0 34px' }}>
-                          {summaries.map(s => (
-                            <button key={s.id} onClick={() => onOpenSummary(s)} style={{
-                              background: 'transparent', border: 'none', textAlign: 'left', cursor: 'pointer',
-                              color: pt.sub, fontSize: 12, fontWeight: 600, padding: '4px 0', fontFamily: 'inherit'
-                            }}>• {s.title}</button>
-                          ))}
+                        <div className="study-lesson-actions">
+                          {summaries.length > 0 && (
+                            <Button dark={dark} variant="tinted" size="xs" color={pt.success} onClick={() => handleSummary(lesson.id, summaries)} style={{ gap: 5 }}>
+                              <NotesIcon color={pt.success} size={12} /> Summary
+                            </Button>
+                          )}
+                          {hasFlashcards && (
+                            <Button dark={dark} variant="tinted" size="xs" color={flashcardText} onClick={() => studyFlashcards(lesson.id)} style={{ gap: 5 }}>
+                              <FlashcardIcon color={flashcardText} size={12} /> Flashcards
+                            </Button>
+                          )}
+                          {hasQuestions && (
+                            <Button dark={dark} variant="tinted" size="xs" color={mcqText} onClick={() => practiceLesson(lesson.id)} style={{ gap: 5 }}>
+                              <ExamIcon color={mcqText} size={12} /> Practice
+                            </Button>
+                          )}
+                          {!hasQuestions && !hasFlashcards && summaries.length === 0 && (
+                            <span style={{ color: pt.faint, fontSize: 11 }}>No content yet</span>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </Collapse>
-            </LiquidGlassCard>
+                      </div>
+                    </PulseGlassRow>
+                    {pickerOpen && summaries.length > 1 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '4px 4px 0 34px' }}>
+                        {summaries.map(s => (
+                          <button key={s.id} onClick={() => onOpenSummary(s)} style={{
+                            background: 'transparent', border: 'none', textAlign: 'left', cursor: 'pointer',
+                            color: pt.sub, fontSize: 12, fontWeight: 600, padding: '4px 0', fontFamily: 'inherit'
+                          }}>• {s.title}</button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </SubjectAccordion>
           )
         })}
       </div>
