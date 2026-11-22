@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react'
 
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
-// Closes an open modal on Escape, keeps Tab focus inside it, and focuses one element when it opens.
+// Closes an open modal on Escape, keeps Tab focus inside it, focuses one element when it opens,
+// and returns focus to the element that was focused before it opened.
 // The latest onClose is read through a ref, so a new callback on every render never re-runs the effect or steals focus.
 export function useDialogKeyboard({ open, onClose, dialogRef, initialFocusRef }) {
   const onCloseRef = useRef(onClose)
@@ -10,6 +11,8 @@ export function useDialogKeyboard({ open, onClose, dialogRef, initialFocusRef })
 
   useEffect(() => {
     if (!open) return
+
+    const previouslyFocused = document.activeElement
 
     // Closes on Escape and wraps Tab between the first and last focusable elements.
     function onKeyDown(e) {
@@ -28,6 +31,12 @@ export function useDialogKeyboard({ open, onClose, dialogRef, initialFocusRef })
 
     document.addEventListener('keydown', onKeyDown)
     initialFocusRef?.current?.focus()
-    return () => document.removeEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      // The opener may have been removed meanwhile (for example after navigating), so check it still exists.
+      if (previouslyFocused instanceof HTMLElement && previouslyFocused !== document.body && document.contains(previouslyFocused)) {
+        previouslyFocused.focus()
+      }
+    }
   }, [open, dialogRef, initialFocusRef])
 }

@@ -3,11 +3,11 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '@/core/supabase'
 import { getPulseTheme, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import { adaptColor } from '@/shared/theme/adaptColor'
-import { glassInput } from '@/shared/ui/glass/PulseUI'
 import { useModules } from '@/core/contexts'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PageShell from '@/shared/ui/layout/PageShell'
 import PageIntro from '@/shared/ui/layout/PageIntro'
+import SearchInput from '@/shared/ui/controls/SearchInput'
 import LoadingText from '@/shared/ui/feedback/LoadingText'
 import EmptyState from '@/shared/ui/feedback/EmptyState'
 import OfflineNote from '@/shared/ui/feedback/OfflineNote'
@@ -195,20 +195,20 @@ export default function Search({ dark }: { dark: boolean }) {
     if (r.type === 'schedule') return navigate(`/schedule?module=${r.raw.module_id}&type=${r.raw.type}&item=${r.raw.id}`)
   }
 
-  const inStyle = { ...glassInput(pt, dark), padding: '15px 20px', marginBottom: 0, borderRadius: 999, fontSize: 16 }
-
   return (
     <PageShell dark={dark} backFallback="/" maxWidth={700}>
       <PageIntro dark={dark} emoji={<SearchIcon2 color={ON_BACKGROUND.primary} size={40} />} title="Search" subtitle="Modules, files, questions, summaries & schedules" paddingBottom={20} />
 
-      <input
-        ref={inputRef}
-        type="search"
-        aria-label="Search modules, files, questions, summaries and schedules"
-        placeholder="Search..."
+      <SearchInput
+        dark={dark}
+        inputRef={inputRef}
         value={query}
-        onChange={e => setQuery(e.target.value)}
-        style={{ ...inStyle, marginBottom: 20, width: '100%' }}
+        onChange={setQuery}
+        placeholder="Search..."
+        ariaLabel="Search modules, files, questions, summaries and schedules"
+        iconLeft={18}
+        wrapperStyle={{ marginBottom: 20, width: '100%' }}
+        style={{ paddingTop: 15, paddingBottom: 15, paddingRight: 20, paddingLeft: 42, borderRadius: 999, fontSize: 16 }}
       />
 
       {savedCopy && !loading && <OfflineNote dark={dark} message="Searching content saved on this device." />}

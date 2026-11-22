@@ -150,6 +150,8 @@ function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
 
   const isSuccess = isSuccessMessage(msg)
   const inStyle = { ...glassInput(pt, dark), padding: '13px 20px' }
+  // Banner colors come from the theme status color (12% fill, 35% border).
+  const statusColor = isSuccess ? pt.success : pt.danger
 
   // Saves the new display name after the offline and profanity checks.
   async function saveName() {
@@ -192,10 +194,10 @@ function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
 
         {msg && (
           <div style={{
-            background: isSuccess ? 'rgba(74,222,128,0.12)' : 'rgba(239,107,87,0.12)',
-            border: `1px solid ${isSuccess ? 'rgba(74,222,128,0.35)' : 'rgba(239,107,87,0.35)'}`,
+            background: `${statusColor}1F`,
+            border: `1px solid ${statusColor}59`,
             borderRadius: 12, padding: '10px 16px', marginBottom: 16,
-            color: isSuccess ? pt.success : pt.danger, fontSize: 13, textAlign: 'center', fontWeight: 600
+            color: statusColor, fontSize: 13, textAlign: 'center', fontWeight: 600
           }}>{msg}</div>
         )}
 
@@ -437,7 +439,7 @@ export default function Profile({ dark }: { dark: boolean }) {
 
                 <button onClick={() => setShowSignOutConfirm(true)} style={{
                   width: '100%', padding: '14px',
-                  background: 'rgba(239,107,87,0.14)', border: '1px solid rgba(239,107,87,0.35)',
+                  background: pt.dangerTint, border: `1px solid ${pt.danger}59`,
                   borderRadius: 999, cursor: 'pointer',
                   color: pt.danger, fontFamily: pulseFonts.body, fontSize: 14, fontWeight: 700
                 }}>

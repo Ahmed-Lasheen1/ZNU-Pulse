@@ -8,7 +8,7 @@ import { glassInput } from '@/shared/ui/glass/PulseUI'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PageShell from '@/shared/ui/layout/PageShell'
 import PageIntro from '@/shared/ui/layout/PageIntro'
-import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
+import PillTabs from '@/shared/ui/controls/PillTabs'
 import { QuestionCardsSkeleton } from '@/shared/ui/feedback/Skeletons'
 import EmptyState from '@/shared/ui/feedback/EmptyState'
 import OfflineNote from '@/shared/ui/feedback/OfflineNote'
@@ -30,7 +30,6 @@ import { getSwRegistration } from '@/services/notifications/pushNotifications'
 import { isArabicText, textDir, ARABIC_FONT } from '@/shared/utils/bidi'
 import { AnonQAIcon, QuestionMarkIcon, ClockIcon, CheckCircleIcon, TrashIcon, LightbulbIcon, EmptyBoxIcon, ChartBarIcon } from '@/shared/icons/tool-icons'
 import { Lock } from 'lucide-react'
-import { glassHoverTint } from '@/shared/theme/liquidGlass'
 
 const QUESTIONS_ACCENT = '#a78bfa'
 const POLLS_ACCENT = '#2dd4bf'
@@ -325,7 +324,9 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
   const arabicFont = (text: string) => (isArabicText(text) ? { fontFamily: ARABIC_FONT } : {})
   const submitDisabled = cooldownRemaining > 0
   const cooldownSeconds = Math.ceil(cooldownRemaining / 1000)
-  const hoverTint = glassHoverTint(dark)
+
+  // Tabs with the admin's unanswered count shown as a badge on Questions.
+  const pulseTabs = TABS.map(t => ({ ...t, badge: isAdmin && t.id === 'questions' ? unansweredQs.length : 0 }))
 
   return (
     <PageShell dark={dark} backFallback="/" maxWidth={900}>
@@ -337,28 +338,7 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
         paddingBottom={16}
       />
 
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginBottom: 22, flexWrap: 'wrap' }}>
-        {TABS.map(t => {
-          const active = tab === t.id
-          const color = active ? (dark ? '#ffffff' : '#062B50') : pt.sub
-          const badge = isAdmin && t.id === 'questions' ? unansweredQs.length : 0
-          return (
-            <PulseGlassRow
-              key={t.id} dark={dark} radius={999} active={active}
-              activeTint={`${t.accent}33`} hoverTint={hoverTint}
-              onClick={() => setTab(t.id)} role="button" tabIndex={0}
-              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTab(t.id) } }}
-            >
-              <div style={{ padding: '10px 22px', ...pulseType.button, color, display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap' }}>
-                <t.Icon color={color} size={15} /> {t.label}
-                {badge > 0 && (
-                  <span style={{ background: pt.amber, color: dark ? '#0f172a' : '#ffffff', borderRadius: 999, padding: '0 7px', fontSize: 11, fontWeight: 800 }}>{badge}</span>
-                )}
-              </div>
-            </PulseGlassRow>
-          )
-        })}
-      </div>
+      <PillTabs dark={dark} tabs={pulseTabs} active={tab} onSelect={setTab} marginBottom={22} size="auto" />
 
       {tab === 'polls' && <PollsSection dark={dark} accent={POLLS_ACCENT} isAdmin={isAdmin} />}
 

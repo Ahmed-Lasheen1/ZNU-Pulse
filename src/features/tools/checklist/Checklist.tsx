@@ -11,6 +11,9 @@ import PageIntro from '@/shared/ui/layout/PageIntro'
 import { ChecklistSkeleton } from '@/shared/ui/feedback/Skeletons'
 import OfflineNote from '@/shared/ui/feedback/OfflineNote'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
+import InfoNotice from '@/shared/ui/feedback/InfoNotice'
+import Button from '@/shared/ui/controls/Button'
+import Checkbox from '@/shared/ui/controls/Checkbox'
 import TabRow from '@/shared/ui/controls/TabRow'
 import { NotifyPermissionButton } from '@/features/notifications'
 import { daysFromToday, parseLocalDate } from '@/features/tools/schedule'
@@ -21,7 +24,7 @@ import { storageGet, storageSet } from '@/core/safeStorage'
 import { cachedSnapshot, saveCached } from '@/core/dataCache'
 import { listChecklistOps, queueChecklistOp, applyChecklistOps, subscribeChecklistOutbox } from '@/services/offline/checklistOutbox'
 import { useOnlineStatus } from '@/shared/hooks/useOnlineStatus'
-import { ChecklistIcon, LightbulbIcon, CalendarDotIcon, WarningIcon, ClockIcon, CelebrationIcon, TrashIcon, BookIcon, CheckCircleIcon } from '@/shared/icons/tool-icons'
+import { ChecklistIcon, CalendarDotIcon, WarningIcon, ClockIcon, CelebrationIcon, TrashIcon, BookIcon, CheckCircleIcon } from '@/shared/icons/tool-icons'
 import type { ChecklistTask } from '@/features/tools/checklist/types'
 import { SECTION_GAP } from '@/shared/theme/layout'
 
@@ -297,18 +300,17 @@ export default function Checklist({ dark }: { dark: boolean }) {
     return (
       <LiquidGlassCard key={task.id} dark={dark} delay={delay} style={{ padding: '16px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div
-            role="checkbox" aria-checked={task.done} aria-label={task.text} tabIndex={0}
-            onClick={() => toggleTask(task)}
-            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleTask(task) } }}
-            style={{
-              width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
-              background: task.done ? `${pt.cobalt}22` : 'transparent',
-              border: `1px solid ${task.done ? pt.cobaltBorder : pt.border}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: pt.cobalt, fontWeight: 900, fontSize: 13
-            }}
-          >{task.done && '✓'}</div>
+          <Checkbox
+            dark={dark}
+            checked={task.done}
+            onChange={() => toggleTask(task)}
+            label={task.text}
+            color={pt.cobalt}
+            shape="round"
+            variant="soft"
+            size={26}
+            markSize={13}
+          />
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
@@ -382,13 +384,9 @@ export default function Checklist({ dark }: { dark: boolean }) {
       </div>
 
       {!user && (
-        <div style={{ marginBottom: SECTION_GAP }}>
-          <LiquidGlassCard dark={dark} delay={0} style={{ padding: '12px 18px', textAlign: 'center' }}>
-            <span style={{ color: pt.cobalt, fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <LightbulbIcon color={pt.cobalt} size={14} /> <span style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => navigate('/auth')}>Sign in</span> to save your checklist across devices
-            </span>
-          </LiquidGlassCard>
-        </div>
+        <InfoNotice dark={dark} marginBottom={SECTION_GAP}>
+          <span style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => navigate('/auth')}>Sign in</span> to save your checklist across devices
+        </InfoNotice>
       )}
 
       {/* Module tabs stay on a single line and scroll sideways when they do not fit (no wrapping). */}
@@ -436,20 +434,14 @@ export default function Checklist({ dark }: { dark: boolean }) {
               value={newTask} onChange={e => setNewTask(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addTask()}
               style={inStyle} />
-            <button
-              onClick={addTask}
-              disabled={addingTask}
+            <Button
+              dark={dark} variant="solid" size="md" color={pt.cobalt} onColor="#fff"
+              onClick={addTask} disabled={addingTask}
               className="checklist-add-btn"
-              style={{
-                background: pt.cobalt, color: '#fff', border: 'none',
-                borderRadius: 999, padding: '0 22px', minHeight: 46,
-                cursor: addingTask ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 14,
-                opacity: addingTask ? 0.7 : 1,
-                fontFamily: pulseFonts.body
-              }}
+              style={{ padding: '0 22px', minHeight: 46, fontWeight: 700 }}
             >
               {addingTask ? '...' : '+ Add'}
-            </button>
+            </Button>
           </div>
           <div className="checklist-deadline-row">
             <span style={{ color: pt.faint, fontSize: 12, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 5 }}>

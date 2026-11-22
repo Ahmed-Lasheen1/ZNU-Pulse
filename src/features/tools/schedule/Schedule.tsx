@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '@/core/supabase'
-import { getPulseTheme, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import TabRow from '@/shared/ui/controls/TabRow'
+import PillTabs from '@/shared/ui/controls/PillTabs'
 import MediaOverlay from '@/shared/ui/overlay/MediaOverlay'
-import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import PageShell from '@/shared/ui/layout/PageShell'
 import PageIntro from '@/shared/ui/layout/PageIntro'
 import EmptyState from '@/shared/ui/feedback/EmptyState'
@@ -20,7 +20,6 @@ import { useHistoryOverlay } from '@/shared/hooks/useHistoryOverlay'
 import { usePrefersReducedMotion } from '@/shared/hooks/usePrefersReducedMotion'
 import { ScheduleIcon, EmptyBoxIcon } from '@/shared/icons/tool-icons'
 import { ExamIcon } from '@/shared/icons/medicalIcons'
-import { glassHoverTint } from '@/shared/theme/liquidGlass'
 import { SECTION_GAP } from '@/shared/theme/layout'
 import StudyPlanCard from '@/features/tools/schedule/StudyPlanCard'
 import ExamScheduleCard from '@/features/tools/schedule/ExamScheduleCard'
@@ -43,6 +42,12 @@ interface ScheduleModule {
 }
 
 type ScheduleType = 'study' | 'exam'
+
+// Tabs that switch between study plans and exam schedules.
+const SCHEDULE_TABS: { id: ScheduleType; label: string; Icon: (p: { color: string; size?: number }) => JSX.Element }[] = [
+  { id: 'study', label: 'Study Planner', Icon: ScheduleIcon },
+  { id: 'exam', label: 'Exam Schedule', Icon: ExamIcon },
+]
 
 // Sort key for an exam: upcoming first (soonest), then undated, then finished (most recent first).
 function examSortKey(exam: ScheduleRow) {
@@ -169,16 +174,9 @@ export default function Schedule({ dark }: { dark: boolean }) {
   // Only the selected module's schedules are shown, so a failed load never leaks another module's rows.
   const filtered = schedules.filter(s => s.module_id === activeModule && s.type === activeType)
   const visible = activeType === 'exam' ? [...filtered].sort((a, b) => examSortKey(a) - examSortKey(b)) : filtered
-  const hoverTint = glassHoverTint(dark)
 
   return (
     <PageShell dark={dark} backFallback="/" maxWidth={900}>
-      <style>{`
-        @media (max-width: 400px) {
-          .schedule-type-btn { padding: 10px 12px !important; font-size: 13px !important; gap: 6px !important; }
-        }
-      `}</style>
-
       {(loadError || modulesError) && <ErrorBanner />}
       {savedCopy && <OfflineNote dark={dark} message="You're offline — showing the last saved schedules." />}
 
@@ -203,35 +201,7 @@ export default function Schedule({ dark }: { dark: boolean }) {
         style={{ justifyContent: 'center', marginBottom: SECTION_GAP }}
       />
 
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: SECTION_GAP }}>
-        {(['study', 'exam'] as ScheduleType[]).map(type => {
-          const active = activeType === type
-          const color = active ? (dark ? '#ffffff' : '#062B50') : pt.sub
-          return (
-            <PulseGlassRow
-              key={type}
-              dark={dark}
-              radius={999}
-              active={active}
-              activeTint={`${pt.cobalt}26`}
-              hoverTint={hoverTint}
-              onClick={() => setActiveType(type)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveType(type) } }}
-              aria-label={type === 'study' ? 'Study Planner' : 'Exam Schedule'}
-            >
-              <div className="schedule-type-btn" style={{
-                padding: '10px 20px', whiteSpace: 'nowrap',
-                ...pulseType.button, color, display: 'flex', alignItems: 'center', gap: 8
-              }}>
-                {type === 'study' ? <ScheduleIcon color={color} size={15} /> : <ExamIcon color={color} size={15} />}
-                {type === 'study' ? 'Study Planner' : 'Exam Schedule'}
-              </div>
-            </PulseGlassRow>
-          )
-        })}
-      </div>
+      <PillTabs dark={dark} tabs={SCHEDULE_TABS} active={activeType} onSelect={setActiveType} marginBottom={SECTION_GAP} size="auto" />
 
       {!modulesLoaded || loading ? (
         <ScheduleSkeleton />

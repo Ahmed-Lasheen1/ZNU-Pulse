@@ -1,6 +1,7 @@
-import { getPulseTheme, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseType } from '@/shared/theme/premiumTheme'
 import { adaptColor } from '@/shared/theme/adaptColor'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
+import SectionHeader from '@/shared/ui/layout/SectionHeader'
 import { ModuleIcon } from '@/shared/icons/medicalIcons'
 import { wrapText } from '@/shared/utils/textStyles'
 
@@ -66,7 +67,7 @@ export default function StageSubjectSummaries<T extends StageSummary>({
 
   return (
     <div style={{ marginBottom: 32 }}>
-      <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16 }}>Summaries</h2>
+      <SectionHeader>Summaries</SectionHeader>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {entries.map(({ summary, name, icon, color }) => {

@@ -3,8 +3,7 @@ import { createPortal } from 'react-dom'
 import { previewKindFor } from '@/shared/utils/embedUrl'
 import { useBodyScrollLock } from '@/shared/hooks/useBodyScrollLock'
 import { getPulseTheme, pulseFonts } from '@/shared/theme/premiumTheme'
-
-const OVERLAY_Z = 2100
+import { Z } from '@/shared/theme/tokens'
 
 // allow-same-origin is only granted to hosts we actually trust (Drive
 // previews, YouTube embeds, our own GitHub Pages summaries) — combined
@@ -12,6 +11,7 @@ const OVERLAY_Z = 2100
 // escape the sandbox entirely.
 const TRUSTED_EMBED_HOSTS = /(^|\.)google\.com$|(^|\.)youtube\.com$|(^|\.)github\.io$/
 
+// True when the URL points at a host trusted to keep its own origin inside the sandbox.
 function isTrustedEmbedHost(url) {
   try {
     return TRUSTED_EMBED_HOSTS.test(new URL(url, window.location.origin).hostname)
@@ -36,6 +36,7 @@ export default function FullscreenViewer({ dark, onClose, src, srcDoc, notice, t
     ? 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation allow-modals'
     : 'allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-presentation allow-modals'
 
+  // Closes the viewer on Escape.
   useEffect(() => {
     function onKeyDown(e) { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', onKeyDown)
@@ -45,7 +46,7 @@ export default function FullscreenViewer({ dark, onClose, src, srcDoc, notice, t
   return createPortal(
     <div style={{
       position: 'fixed', inset: 0, height: '100dvh',
-      background: pt.canvas, zIndex: OVERLAY_Z, overflowY: 'auto'
+      background: pt.canvas, zIndex: Z.viewer, overflowY: 'auto'
     }}>
       <button
         onClick={onClose}

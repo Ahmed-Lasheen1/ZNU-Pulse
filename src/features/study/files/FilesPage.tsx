@@ -3,7 +3,9 @@ import { useLocation } from 'react-router-dom'
 import { getPulseTheme, pulseFonts, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import { useModules } from '@/core/contexts'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
+import DialogShell from '@/shared/ui/feedback/DialogShell'
 import TabRow from '@/shared/ui/controls/TabRow'
+import Button from '@/shared/ui/controls/Button'
 import MediaOverlay from '@/shared/ui/overlay/MediaOverlay'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PageShell from '@/shared/ui/layout/PageShell'
@@ -17,6 +19,7 @@ import { fetchSubjectsForModule } from '@/services/content/subjects'
 import { fetchModuleFiles } from '@/services/content/moduleContent'
 import { selectableModules } from '@/services/content/modules'
 import { getDriveOrRawUrl, getVideoEmbedUrl, isSafeExternalUrl } from '@/shared/utils/embedUrl'
+import { Z } from '@/shared/theme/tokens'
 import { BookIcon, QuestionMarkIcon, VideoIcon, GraduationCapIcon, DocumentIcon, AudioIcon, FolderIcon } from '@/shared/icons/tool-icons'
 
 interface FilesModule {
@@ -54,38 +57,23 @@ const TYPE_META: Record<string, { Icon: (p: { color?: string; size?: number }) =
   courses: { Icon: GraduationCapIcon, label: 'Course Recordings' },
 }
 
-// Audio player dialog. The scrim behind it is dark in both color modes, so the card always uses the dark glass.
+// Audio player dialog built on the shared DialogShell (Escape, backdrop click, focus trap). The card always uses the dark glass.
 function AudioViewer({ url, name, onClose, dark }: { url: string; name: string; onClose: () => void; dark: boolean }) {
   const pt = getPulseTheme(dark)
+  const closeRef = useRef<HTMLButtonElement>(null)
   useBodyScrollLock(true)
 
-  // Closes the player on Escape.
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
-
   return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
-      zIndex: 2000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
-    }}>
-      <div style={{ width: '90%', maxWidth: 400 }}>
-        <LiquidGlassCard dark delay={0} style={{ padding: 32, textAlign: 'center' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-            <AudioIcon color={FILE_ACCENT} size={48} />
-          </div>
-          <h3 style={{ ...pulseType.sectionTitle, color: FILE_ACCENT, marginBottom: 20 }}>{name}</h3>
-          <audio controls src={url} style={{ width: '100%', marginBottom: 20 }} />
-          <button onClick={onClose} style={{
-            background: pt.danger, color: '#fff', border: 'none', borderRadius: 999,
-            padding: '10px 24px', cursor: 'pointer', fontWeight: 700, fontFamily: pulseFonts.body
-          }}>✕ Close</button>
-        </LiquidGlassCard>
-      </div>
-    </div>
+    <DialogShell open onClose={onClose} labelledBy="audio-viewer-title" maxWidth={400} zIndex={Z.viewer} initialFocusRef={closeRef}>
+      <LiquidGlassCard dark delay={0} style={{ padding: 32, textAlign: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+          <AudioIcon color={FILE_ACCENT} size={48} />
+        </div>
+        <h3 id="audio-viewer-title" style={{ ...pulseType.sectionTitle, color: FILE_ACCENT, marginBottom: 20 }}>{name}</h3>
+        <audio controls src={url} style={{ width: '100%', marginBottom: 20 }} />
+        <Button ref={closeRef} dark={dark} variant="solid" size="md" color={pt.danger} onColor="#fff" onClick={onClose}>✕ Close</Button>
+      </LiquidGlassCard>
+    </DialogShell>
   )
 }
 
@@ -279,14 +267,13 @@ export default function FilesPage({ dark }: { dark: boolean }) {
                   {file.name}
                 </span>
               </div>
-              <button onClick={() => setViewer(file)} style={{
-                background: FILE_ACCENT, color: '#0f172a', border: 'none',
-                padding: '8px 16px', borderRadius: 999, cursor: 'pointer',
-                fontWeight: 700, fontSize: 13, fontFamily: pulseFonts.body, whiteSpace: 'nowrap', flexShrink: 0,
-                display: 'inline-flex', alignItems: 'center', gap: 6
-              }}>
+              <Button
+                dark={dark} variant="solid" size="sm" color={FILE_ACCENT}
+                onClick={() => setViewer(file)}
+                style={{ fontSize: 13, flexShrink: 0 }}
+              >
                 <FileActionIcon type={file.file_type} color="#0f172a" size={13} /> {fileActionLabel(file.file_type)}
-              </button>
+              </Button>
             </LiquidGlassCard>
           </div>
         )

@@ -1,18 +1,23 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
-import { getPulseTheme, pulseFonts, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseFonts, pulseType } from '@/shared/theme/premiumTheme'
 import { adaptColor } from '@/shared/theme/adaptColor'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
+import OfflineNote from '@/shared/ui/feedback/OfflineNote'
+import DialogShell from '@/shared/ui/feedback/DialogShell'
+import Button from '@/shared/ui/controls/Button'
 import TabRow from '@/shared/ui/controls/TabRow'
+import Collapse from '@/shared/ui/layout/Collapse'
+import SectionHeader from '@/shared/ui/layout/SectionHeader'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PageShell from '@/shared/ui/layout/PageShell'
+import PageIntro from '@/shared/ui/layout/PageIntro'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import { CardRowsSkeleton } from '@/shared/ui/feedback/Skeletons'
 import { ModuleIcon, ExamIcon } from '@/shared/icons/medicalIcons'
-import { OfflineIcon, BookIcon, PauseIcon, PlayIcon, EmptyBoxIcon, GraduationCapIcon, TargetIcon } from '@/shared/icons/tool-icons'
+import { BookIcon, PauseIcon, PlayIcon, EmptyBoxIcon, GraduationCapIcon, TargetIcon } from '@/shared/icons/tool-icons'
 import { useWeakSpots } from '@/features/practice/mcq/useWeakSpots'
-import { useDialogKeyboard } from '@/shared/hooks/useDialogKeyboard'
 import { MCQ_ACCENT } from '@/shared/theme/accents'
 import { stagesOf, inStage } from '@/services/content/lessonStages'
 import { simulatorPool, simulatorTotal, QUIZ_MAX_QUESTIONS } from '@/services/exam/stageSimulator'
@@ -79,7 +84,7 @@ function CountText({ children, dark }: { children: ReactNode; dark: boolean }) {
 }
 
 // Dialog asking whether to practice with every question or only University Doctors' questions.
-// Escape cancels and Tab stays inside, like ConfirmDialog.
+// Escape cancels and Tab stays inside, through the shared DialogShell.
 function SourceChoiceDialog({
   dark, open, allCount, doctorCount, onCancel, onChooseAll, onChooseDoctors
 }: {
@@ -92,52 +97,37 @@ function SourceChoiceDialog({
   onChooseDoctors: () => void
 }) {
   const pt = getPulseTheme(dark)
-  const dialogRef = useRef<HTMLDivElement>(null)
   const cancelRef = useRef<HTMLButtonElement>(null)
 
-  useDialogKeyboard({ open, onClose: onCancel, dialogRef, initialFocusRef: cancelRef })
-
-  if (!open) return null
   return (
-    <div
-      role="presentation"
-      onClick={onCancel}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 4000,
-        background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
-      }}
-    >
-      <div ref={dialogRef} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="source-choice-dialog-title" style={{ width: '100%', maxWidth: 380 }}>
-        <LiquidGlassCard dark={dark} delay={0} instant style={{ padding: '26px 24px', textAlign: 'center' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
-            <GraduationCapIcon color={adaptColor(MCQ_ACCENT, dark)} size={30} />
-          </div>
-          <h3 id="source-choice-dialog-title" style={{ ...pulseType.sectionTitle, fontSize: 16, color: pt.textPrimary, marginBottom: 6, fontFamily: pulseFonts.display }}>
-            This selection has University Doctors' questions
-          </h3>
-          <p style={{ color: pt.sub, fontSize: 13, lineHeight: 1.5, marginBottom: 20, fontFamily: pulseFonts.body }}>
-            Include every question, or practice only the ones tagged by University Doctors?
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <button onClick={onChooseAll} style={{
-              padding: '12px', borderRadius: 999, border: 'none', cursor: 'pointer',
-              background: MCQ_ACCENT, color: '#0f172a', fontWeight: 800, fontSize: 13, fontFamily: pulseFonts.body
-            }}>All Questions ({allCount})</button>
-            <button onClick={onChooseDoctors} style={{
-              padding: '12px', borderRadius: 999, cursor: 'pointer',
-              background: 'transparent', border: `1.5px solid ${pt.cobalt}`, color: pt.cobalt,
-              fontWeight: 800, fontSize: 13, fontFamily: pulseFonts.body,
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6
-            }}><GraduationCapIcon color={pt.cobalt} size={14} /> University Doctors Only ({doctorCount})</button>
-            <button ref={cancelRef} onClick={onCancel} style={{
-              padding: '10px', background: 'transparent', border: 'none', cursor: 'pointer',
-              color: pt.sub, fontSize: 12, fontWeight: 700, fontFamily: pulseFonts.body
-            }}>Cancel</button>
-          </div>
-        </LiquidGlassCard>
-      </div>
-    </div>
+    <DialogShell open={open} onClose={onCancel} labelledBy="source-choice-dialog-title" maxWidth={380} initialFocusRef={cancelRef}>
+      <LiquidGlassCard dark={dark} delay={0} instant style={{ padding: '26px 24px', textAlign: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+          <GraduationCapIcon color={adaptColor(MCQ_ACCENT, dark)} size={30} />
+        </div>
+        <h3 id="source-choice-dialog-title" style={{ ...pulseType.sectionTitle, fontSize: 16, color: pt.textPrimary, marginBottom: 6, fontFamily: pulseFonts.display }}>
+          This selection has University Doctors' questions
+        </h3>
+        <p style={{ color: pt.sub, fontSize: 13, lineHeight: 1.5, marginBottom: 20, fontFamily: pulseFonts.body }}>
+          Include every question, or practice only the ones tagged by University Doctors?
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <Button dark={dark} variant="solid" size="md" color={MCQ_ACCENT} fullWidth onClick={onChooseAll} style={{ padding: '12px', fontSize: 13 }}>
+            All Questions ({allCount})
+          </Button>
+          <Button
+            dark={dark} variant="outline" size="md" color={pt.cobalt} fullWidth onClick={onChooseDoctors}
+            style={{ padding: '12px', fontSize: 13, border: `1.5px solid ${pt.cobalt}` }}
+          >
+            <GraduationCapIcon color={pt.cobalt} size={14} /> University Doctors Only ({doctorCount})
+          </Button>
+          <button ref={cancelRef} onClick={onCancel} style={{
+            padding: '10px', background: 'transparent', border: 'none', cursor: 'pointer',
+            color: pt.sub, fontSize: 12, fontWeight: 700, fontFamily: pulseFonts.body
+          }}>Cancel</button>
+        </div>
+      </LiquidGlassCard>
+    </DialogShell>
   )
 }
 
@@ -205,41 +195,31 @@ function SubjectAccordionRow({
             </span>
           )}
         </button>
-        <button onClick={onPracticeSubject} style={{
-          background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '8px 16px',
-          borderRadius: 999, fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: pulseFonts.body,
-          flexShrink: 0
-        }}>Practice All</button>
+        <Button dark={dark} variant="solid" size="sm" color={MCQ_ACCENT} onClick={onPracticeSubject} style={{ flexShrink: 0 }}>
+          Practice All
+        </Button>
       </div>
 
       {hasLessons && (
-        <div style={{
-          display: 'grid', gridTemplateRows: isOpen ? '1fr' : '0fr',
-          visibility: isOpen ? 'visible' : 'hidden',
-          transition: 'grid-template-rows 0.25s ease, visibility 0.25s'
-        }}>
-          <div style={{ overflow: 'hidden' }}>
-            <div
-              id={panelId} role="region" aria-label={`${sub.name} lessons`} aria-hidden={!isOpen}
-              style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}
+        <Collapse
+          open={isOpen} id={panelId} label={`${sub.name} lessons`}
+          panelStyle={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}
+        >
+          {lessonRows.map(({ lesson, count: lessonQCount }) => (
+            <PulseGlassRow
+              key={lesson.id} dark={dark} radius={12}
+              hoverTint={hoverTint}
+              onClick={() => onPracticeLesson(lesson.id)}
+              role="button" tabIndex={isOpen ? 0 : -1}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPracticeLesson(lesson.id) } }}
             >
-              {lessonRows.map(({ lesson, count: lessonQCount }) => (
-                <PulseGlassRow
-                  key={lesson.id} dark={dark} radius={12}
-                  hoverTint={hoverTint}
-                  onClick={() => onPracticeLesson(lesson.id)}
-                  role="button" tabIndex={isOpen ? 0 : -1}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPracticeLesson(lesson.id) } }}
-                >
-                  <div style={{ padding: '9px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                    <span style={{ color: pt.textPrimary, fontSize: 13, fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lesson.title}</span>
-                    <span style={{ color: pt.textMuted, fontSize: 11, flexShrink: 0 }}>{countLabel(lessonQCount)}</span>
-                  </div>
-                </PulseGlassRow>
-              ))}
-            </div>
-          </div>
-        </div>
+              <div style={{ padding: '9px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                <span style={{ color: pt.textPrimary, fontSize: 13, fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lesson.title}</span>
+                <span style={{ color: pt.textMuted, fontSize: 11, flexShrink: 0 }}>{countLabel(lessonQCount)}</span>
+              </div>
+            </PulseGlassRow>
+          ))}
+        </Collapse>
       )}
     </LiquidGlassCard>
   )
@@ -327,26 +307,22 @@ export default function MCQBrowse({
     <PageShell dark={dark} backFallback="/" maxWidth={900}>
       {(loadError || modulesError) && <ErrorBanner />}
       {usingCache && (
-        <div style={{ marginBottom: 16 }}>
-          <LiquidGlassCard dark={dark} delay={0} style={{ padding: '10px 16px', textAlign: 'center' }}>
-            <span style={{ color: pt.amber, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <OfflineIcon color={pt.amber} size={14} /> You're offline — showing questions saved from your last visit. Quizzes still work and are saved on this device.
-            </span>
-          </LiquidGlassCard>
-        </div>
+        <OfflineNote
+          dark={dark}
+          alwaysShow
+          message="You're offline — showing questions saved from your last visit. Quizzes still work and are saved on this device."
+        />
       )}
 
-      <div style={{ textAlign: 'center', padding: '10px 0 16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-          <ExamIcon color={mcqText} size={40} />
-        </div>
-        <h1 style={{ fontFamily: pulseFonts.display, fontWeight: 800, fontSize: 24, color: ON_BACKGROUND.primary, marginBottom: 4 }}>MCQ Bank</h1>
-        {!loading && moduleTotal > 0 && (
-          <div style={{ color: ON_BACKGROUND.secondary, fontSize: 12, fontWeight: 600 }}>
-            {countLabel(moduleTotal)} · {moduleSubjects.length} subject{moduleSubjects.length === 1 ? '' : 's'}
-          </div>
-        )}
-      </div>
+      <PageIntro
+        dark={dark}
+        emoji={<ExamIcon color={mcqText} size={40} />}
+        title="MCQ Bank"
+        subtitle={!loading && moduleTotal > 0
+          ? `${countLabel(moduleTotal)} · ${moduleSubjects.length} subject${moduleSubjects.length === 1 ? '' : 's'}`
+          : undefined}
+        paddingBottom={16}
+      />
 
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
         <PulseGlassRow dark={dark} radius={999} hoverTint={hoverTint} onClick={() => navigate('/review')}
@@ -368,15 +344,13 @@ export default function MCQBrowse({
               <PauseIcon color={mcqText} size={13} /> Paused {quizName(resumeData.quizMode, resumeStageTitle)} — {Object.keys(resumeData.answers || {}).length}/{(resumeData.quizQuestions || []).length} answered
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={onResume} style={{
-                background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '6px 14px',
-                borderRadius: 999, cursor: 'pointer', fontWeight: 700, fontSize: 12, fontFamily: pulseFonts.body,
-                display: 'inline-flex', alignItems: 'center', gap: 5
-              }}><PlayIcon color="#0f172a" size={11} /> Continue</button>
-              <button onClick={onDiscardResume} style={{
-                background: 'transparent', border: `1px solid ${mcqText}40`, color: mcqText,
-                padding: '6px 14px', borderRadius: 999, cursor: 'pointer', fontWeight: 700, fontSize: 12, fontFamily: pulseFonts.body
-              }}>Discard</button>
+              <Button dark={dark} variant="solid" size="sm" color={MCQ_ACCENT} onClick={onResume} style={{ padding: '6px 14px', gap: 5 }}>
+                <PlayIcon color="#0f172a" size={11} /> Continue
+              </Button>
+              <Button
+                dark={dark} variant="outline" size="sm" color={mcqText} onClick={onDiscardResume}
+                style={{ padding: '6px 14px', border: `1px solid ${mcqText}40` }}
+              >Discard</Button>
             </div>
           </LiquidGlassCard>
         </div>
@@ -428,10 +402,9 @@ export default function MCQBrowse({
                     : countLabel(mockCount)}
                 </CountText>
               </div>
-              <button onClick={() => onStartQuiz('mock', null, null)} style={{
-                background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '12px 24px',
-                borderRadius: 999, fontWeight: 800, cursor: 'pointer', fontFamily: pulseFonts.body, flexShrink: 0
-              }}>Start →</button>
+              <Button dark={dark} variant="solid" size="md" color={MCQ_ACCENT} onClick={() => onStartQuiz('mock', null, null)} style={{ flexShrink: 0 }}>
+                Start →
+              </Button>
             </div>
             {tabSubjects.length > 0 && (
               <TabRow
@@ -472,10 +445,9 @@ export default function MCQBrowse({
                   <span className="sim-sub-short">{countLabel(simTotal)} · {simSubjectCount} subject{simSubjectCount === 1 ? '' : 's'}</span>
                 </CountText>
               </div>
-              <button onClick={() => onStartSimulator(activeStage)} style={{
-                background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '12px 24px',
-                borderRadius: 999, fontWeight: 800, cursor: 'pointer', fontFamily: pulseFonts.body, flexShrink: 0
-              }}>Start →</button>
+              <Button dark={dark} variant="solid" size="md" color={MCQ_ACCENT} onClick={() => onStartSimulator(activeStage)} style={{ flexShrink: 0 }}>
+                Start →
+              </Button>
             </div>
           </LiquidGlassCard>
         </div>
@@ -483,7 +455,7 @@ export default function MCQBrowse({
 
       {!loading && weakSpots.length > 0 && (
         <div style={{ marginBottom: 32 }}>
-          <h3 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16 }}>Weak Spots</h3>
+          <SectionHeader as="h3">Weak Spots</SectionHeader>
           <LiquidGlassCard dark={dark} delay={0} style={{ padding: '6px 16px' }}>
             {weakSpots.map(({ lesson, subject, stat }, i) => (
               <div key={lesson.id} style={{
@@ -500,18 +472,16 @@ export default function MCQBrowse({
                   flexShrink: 0, fontWeight: 800, fontSize: 13, color: accuracyColor(stat.accuracy, pt),
                   background: `${accuracyColor(stat.accuracy, pt)}22`, borderRadius: 999, padding: '3px 11px'
                 }}>{stat.accuracy}%</span>
-                <button onClick={() => onStartQuiz('practice', null, lesson.id)} style={{
-                  background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '8px 16px',
-                  borderRadius: 999, fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: pulseFonts.body,
-                  flexShrink: 0
-                }}>Practice</button>
+                <Button dark={dark} variant="solid" size="sm" color={MCQ_ACCENT} onClick={() => onStartQuiz('practice', null, lesson.id)} style={{ flexShrink: 0 }}>
+                  Practice
+                </Button>
               </div>
             ))}
           </LiquidGlassCard>
         </div>
       )}
 
-      <h3 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16 }}>Practice by Subject</h3>
+      <SectionHeader as="h3">Practice by Subject</SectionHeader>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {subjectRows.map(({ sub, count, lessonRows }, i) => (
           <SubjectAccordionRow

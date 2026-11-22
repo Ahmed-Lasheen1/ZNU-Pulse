@@ -3,6 +3,7 @@ import { supabase } from '@/core/supabase'
 import { getPulseTheme, pulseFonts } from '@/shared/theme/premiumTheme'
 import InlineMessage from '@/shared/ui/feedback/InlineMessage'
 import QuestionSourceBadge from '@/shared/ui/display/QuestionSourceBadge'
+import SearchInput from '@/shared/ui/controls/SearchInput'
 import AdminSplitLayout from '@/features/admin/common/AdminSplitLayout'
 import AdminFormCard from '@/features/admin/common/AdminFormCard'
 import AdminRow from '@/features/admin/common/AdminRow'
@@ -430,17 +431,14 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
   // Right side: searchable list of the module's questions.
   const list = (
     <div>
-      <div style={{ position: 'relative', marginBottom: 16 }}>
-        <input
-          placeholder="Search questions..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ ...baseStyle, marginBottom: 0, paddingLeft: 34 }}
-        />
-        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-          <SearchIcon2 color={pt.faint} size={14} />
-        </span>
-      </div>
+      <SearchInput
+        dark={dark}
+        value={search}
+        onChange={setSearch}
+        placeholder="Search questions..."
+        wrapperStyle={{ marginBottom: 16 }}
+        style={{ borderRadius: 14 }}
+      />
 
       <AdminGroupedList
         dark={dark}

@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
 import { getPulseTheme, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
@@ -6,6 +6,9 @@ import { adaptColor } from '@/shared/theme/adaptColor'
 import { ModuleIcon, NotesIcon, ExamIcon } from '@/shared/icons/medicalIcons'
 import { StudyByLessonIcon, BookIcon } from '@/shared/icons/tool-icons'
 import { FlashcardIcon } from '@/shared/icons/FlashcardIcon'
+import Button from '@/shared/ui/controls/Button'
+import Checkbox from '@/shared/ui/controls/Checkbox'
+import Collapse from '@/shared/ui/layout/Collapse'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import { glassHoverTint } from '@/shared/theme/liquidGlass'
@@ -55,16 +58,6 @@ function readDone(moduleId: string): Set<string> {
     return new Set(JSON.parse(storageGet(doneKey(moduleId)) || '[]'))
   } catch {
     return new Set()
-  }
-}
-
-// Style of the small colored action buttons on a lesson row.
-function pillBtn(color: string): CSSProperties {
-  return {
-    display: 'inline-flex', alignItems: 'center', gap: 5,
-    background: `${color}18`, border: `1px solid ${color}55`, color,
-    borderRadius: 999, padding: '6px 12px', fontSize: 11.5, fontWeight: 700,
-    cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit'
   }
 }
 
@@ -144,7 +137,7 @@ export default function StudyByLessonSection({
         .study-lesson-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .study-lesson-badge { flex-shrink: 0; font-size: 10.5px; font-weight: 800; line-height: 1; border-radius: 999px; padding: 3px 8px; font-variant-numeric: tabular-nums; }
         .study-lesson-actions { display: flex; gap: 6px; flex-shrink: 0; }
-        .study-lesson-check { flex-shrink: 0; width: 28px; height: 28px; margin: -5px 0 -5px -5px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: none; border-radius: 8px; cursor: pointer; }
+        .study-lesson-check { width: 28px; height: 28px; margin: -5px 0 -5px -5px; align-items: center; justify-content: center; }
         @media (max-width: 480px) {
           .study-lesson-main { min-width: 100%; }
           .study-lesson-actions { min-width: 100%; justify-content: center; flex-wrap: wrap; }
@@ -186,101 +179,91 @@ export default function StudyByLessonSection({
                     <ChevronDown size={16} color={pt.textMuted} />
                   </span>
                 </button>
-                <button onClick={() => practiceSubject(sub.id)} style={{
-                  background: MCQ_ACCENT, color: '#0f172a', border: 'none', padding: '8px 16px',
-                  borderRadius: 999, fontWeight: 700, fontSize: 12, cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit'
-                }}>Practice All</button>
+                <Button dark={dark} variant="solid" size="sm" color={MCQ_ACCENT} onClick={() => practiceSubject(sub.id)} style={{ flexShrink: 0 }}>
+                  Practice All
+                </Button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateRows: open ? '1fr' : '0fr', transition: 'grid-template-rows 0.25s ease' }}>
-                <div style={{ overflow: 'hidden' }}>
-                  <div
-                    id={`subject-lessons-${sub.id}`} role="region" aria-label={`${sub.name} lessons`} aria-hidden={!open}
-                    style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}
-                  >
-                    {lessonsForSub.map(lesson => {
-                      const summaries = lessonSummaries[lesson.id] || []
-                      const hasQuestions = lessonQuestionIds.has(lesson.id)
-                      const hasFlashcards = lessonFlashcardIds.has(lesson.id)
-                      const pickerOpen = openPickerLessonId === lesson.id
-                      const stat = lessonAccuracy[lesson.id]
-                      const weak = hasQuestions && !!stat && stat.accuracy < WEAK_BELOW
-                      const weakColor = stat ? accuracyColor(stat.accuracy, pt) : pt.textMuted
-                      const isDone = doneLessons.has(lesson.id)
-                      return (
-                        <div key={lesson.id}>
-                          <PulseGlassRow dark={dark} radius={12}>
-                            <div className="study-lesson-row">
-                              <div className="study-lesson-main">
-                                <button
-                                  type="button" role="checkbox" aria-checked={isDone}
-                                  aria-label={`Mark ${lesson.title} as done`}
-                                  tabIndex={open ? 0 : -1}
-                                  className="study-lesson-check glass-focus-ring"
-                                  onClick={() => toggleDone(lesson.id)}
-                                >
-                                  <span aria-hidden style={{
-                                    width: 18, height: 18, borderRadius: 6, boxSizing: 'border-box',
-                                    border: `1.5px solid ${isDone ? pt.success : pt.faint}`,
-                                    background: isDone ? pt.success : 'transparent', color: onDone,
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    fontSize: 11, fontWeight: 900, transition: 'background 0.15s ease, border-color 0.15s ease',
-                                  }}>{isDone && '✓'}</span>
-                                </button>
-                                {lesson.icon
-                                  ? <ModuleIcon value={lesson.icon} size={16} color={pt.success} />
-                                  : <NotesIcon color={pt.success} size={16} />}
-                                <span className="study-lesson-title" style={{
-                                  color: isDone ? pt.textMuted : pt.textPrimary, fontSize: 13, fontWeight: 600,
-                                  textDecoration: isDone ? 'line-through' : 'none',
-                                }}>{lesson.title}</span>
-                                {weak && (
-                                  <span
-                                    className="study-lesson-badge"
-                                    title="Your recent accuracy in this lesson"
-                                    aria-label={`Accuracy ${stat.accuracy} percent, needs practice`}
-                                    style={{ color: weakColor, background: `${weakColor}22`, border: `1px solid ${weakColor}44` }}
-                                  >{stat.accuracy}%</span>
-                                )}
-                              </div>
-                              <div className="study-lesson-actions">
-                                {summaries.length > 0 && (
-                                  <button onClick={() => handleSummary(lesson.id, summaries)} style={pillBtn(pt.success)}>
-                                    <NotesIcon color={pt.success} size={12} /> Summary
-                                  </button>
-                                )}
-                                {hasFlashcards && (
-                                  <button onClick={() => studyFlashcards(lesson.id)} style={pillBtn(flashcardText)}>
-                                    <FlashcardIcon color={flashcardText} size={12} /> Flashcards
-                                  </button>
-                                )}
-                                {hasQuestions && (
-                                  <button onClick={() => practiceLesson(lesson.id)} style={pillBtn(mcqText)}>
-                                    <ExamIcon color={mcqText} size={12} /> Practice
-                                  </button>
-                                )}
-                                {!hasQuestions && !hasFlashcards && summaries.length === 0 && (
-                                  <span style={{ color: pt.faint, fontSize: 11 }}>No content yet</span>
-                                )}
-                              </div>
-                            </div>
-                          </PulseGlassRow>
-                          {pickerOpen && summaries.length > 1 && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '4px 4px 0 34px' }}>
-                              {summaries.map(s => (
-                                <button key={s.id} onClick={() => onOpenSummary(s)} style={{
-                                  background: 'transparent', border: 'none', textAlign: 'left', cursor: 'pointer',
-                                  color: pt.sub, fontSize: 12, fontWeight: 600, padding: '4px 0', fontFamily: 'inherit'
-                                }}>• {s.title}</button>
-                              ))}
-                            </div>
-                          )}
+              <Collapse
+                open={open} id={`subject-lessons-${sub.id}`} label={`${sub.name} lessons`}
+                panelStyle={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}
+              >
+                {lessonsForSub.map(lesson => {
+                  const summaries = lessonSummaries[lesson.id] || []
+                  const hasQuestions = lessonQuestionIds.has(lesson.id)
+                  const hasFlashcards = lessonFlashcardIds.has(lesson.id)
+                  const pickerOpen = openPickerLessonId === lesson.id
+                  const stat = lessonAccuracy[lesson.id]
+                  const weak = hasQuestions && !!stat && stat.accuracy < WEAK_BELOW
+                  const weakColor = stat ? accuracyColor(stat.accuracy, pt) : pt.textMuted
+                  const isDone = doneLessons.has(lesson.id)
+                  return (
+                    <div key={lesson.id}>
+                      <PulseGlassRow dark={dark} radius={12}>
+                        <div className="study-lesson-row">
+                          <div className="study-lesson-main">
+                            <Checkbox
+                              dark={dark}
+                              checked={isDone}
+                              onChange={() => toggleDone(lesson.id)}
+                              label={`Mark ${lesson.title} as done`}
+                              color={pt.success}
+                              checkColor={onDone}
+                              tabIndex={open ? 0 : -1}
+                              className="study-lesson-check glass-focus-ring"
+                            />
+                            {lesson.icon
+                              ? <ModuleIcon value={lesson.icon} size={16} color={pt.success} />
+                              : <NotesIcon color={pt.success} size={16} />}
+                            <span className="study-lesson-title" style={{
+                              color: isDone ? pt.textMuted : pt.textPrimary, fontSize: 13, fontWeight: 600,
+                              textDecoration: isDone ? 'line-through' : 'none',
+                            }}>{lesson.title}</span>
+                            {weak && (
+                              <span
+                                className="study-lesson-badge"
+                                title="Your recent accuracy in this lesson"
+                                aria-label={`Accuracy ${stat.accuracy} percent, needs practice`}
+                                style={{ color: weakColor, background: `${weakColor}22`, border: `1px solid ${weakColor}44` }}
+                              >{stat.accuracy}%</span>
+                            )}
+                          </div>
+                          <div className="study-lesson-actions">
+                            {summaries.length > 0 && (
+                              <Button dark={dark} variant="tinted" size="xs" color={pt.success} onClick={() => handleSummary(lesson.id, summaries)} style={{ gap: 5 }}>
+                                <NotesIcon color={pt.success} size={12} /> Summary
+                              </Button>
+                            )}
+                            {hasFlashcards && (
+                              <Button dark={dark} variant="tinted" size="xs" color={flashcardText} onClick={() => studyFlashcards(lesson.id)} style={{ gap: 5 }}>
+                                <FlashcardIcon color={flashcardText} size={12} /> Flashcards
+                              </Button>
+                            )}
+                            {hasQuestions && (
+                              <Button dark={dark} variant="tinted" size="xs" color={mcqText} onClick={() => practiceLesson(lesson.id)} style={{ gap: 5 }}>
+                                <ExamIcon color={mcqText} size={12} /> Practice
+                              </Button>
+                            )}
+                            {!hasQuestions && !hasFlashcards && summaries.length === 0 && (
+                              <span style={{ color: pt.faint, fontSize: 11 }}>No content yet</span>
+                            )}
+                          </div>
                         </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
+                      </PulseGlassRow>
+                      {pickerOpen && summaries.length > 1 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '4px 4px 0 34px' }}>
+                          {summaries.map(s => (
+                            <button key={s.id} onClick={() => onOpenSummary(s)} style={{
+                              background: 'transparent', border: 'none', textAlign: 'left', cursor: 'pointer',
+                              color: pt.sub, fontSize: 12, fontWeight: 600, padding: '4px 0', fontFamily: 'inherit'
+                            }}>• {s.title}</button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </Collapse>
             </LiquidGlassCard>
           )
         })}

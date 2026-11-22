@@ -1,12 +1,14 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
 import { Award, X } from 'lucide-react'
 import { getPulseTheme, pulseFonts, pulseType } from '@/shared/theme/premiumTheme'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import { useBodyScrollLock } from '@/shared/hooks/useBodyScrollLock'
+import { useDialogKeyboard } from '@/shared/hooks/useDialogKeyboard'
 import { usePrefersReducedMotion } from '@/shared/hooks/usePrefersReducedMotion'
 import { PointsTiles, PastSemesters } from '@/features/account/PointsTiles'
+import { Z } from '@/shared/theme/tokens'
 import type { PulseTheme } from '@/shared/theme/types'
 import type { LeaderboardEntry } from '@/services/leaderboard/leaderboard'
 
@@ -69,9 +71,9 @@ export default function StudentCard({ dark, entry, rank, semester, onClose }: St
   const reduced = usePrefersReducedMotion()
   const dialogRef = useRef<HTMLDivElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
-  const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
   useBodyScrollLock(true)
+  // Escape closes, Tab stays inside, and focus returns to the tapped row on close (shared with the other dialogs).
+  useDialogKeyboard({ open: true, onClose, dialogRef, initialFocusRef: closeRef })
 
   const medal = medalColor(rank, pt)
   const accent = medal ?? pt.cobalt
@@ -79,33 +81,10 @@ export default function StudentCard({ dark, entry, rank, semester, onClose }: St
   const ctx: SectionContext = { entry, semester, dark }
   const sections = SECTIONS.filter(section => section.isVisible(entry))
 
-  // Handles Escape and keeps Tab inside the dialog; focus returns to the tapped row on close.
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null
-    closeRef.current?.focus()
-
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') { onCloseRef.current(); return }
-      if (e.key !== 'Tab' || !dialogRef.current) return
-      const focusable = dialogRef.current.querySelectorAll<HTMLElement>('button, [href], [tabindex]:not([tabindex="-1"])')
-      if (focusable.length === 0) return
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
-    }
-
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      previous?.focus?.()
-    }
-  }, [])
-
   return createPortal(
     <div className="sc-root" role="presentation">
       <style>{`
-        .sc-root { position: fixed; inset: 0; z-index: 4000; display: flex; align-items: flex-end; justify-content: center;
+        .sc-root { position: fixed; inset: 0; z-index: ${Z.dialog}; display: flex; align-items: flex-end; justify-content: center;
           padding: 0 12px calc(12px + env(safe-area-inset-bottom, 0px)); }
         .sc-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
         .sc-sheet { position: relative; width: 100%; max-width: 420px; }

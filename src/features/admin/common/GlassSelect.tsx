@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { getPulseTheme, pulseFonts } from '@/shared/theme/premiumTheme'
 import { liquidGlassShadow, glassBorderColor } from '@/shared/theme/liquidGlass'
+import { Z } from '@/shared/theme/tokens'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import { ModuleIcon } from '@/shared/icons/medicalIcons'
 import { DotIcon, CheckCircleIcon } from '@/shared/icons/tool-icons'
@@ -36,6 +37,7 @@ const PANEL_MAX_HEIGHT = 320
 const PANEL_MIN_HEIGHT = 140
 const VIEWPORT_MARGIN = 12
 
+// Glass dropdown whose option panel is portaled to the page body so cards never clip it.
 export default function GlassSelect({
   options, value, onChange, dark, placeholder = 'Select', emptyLabel, fallbackIcon
 }: GlassSelectProps) {
@@ -49,6 +51,7 @@ export default function GlassSelect({
   const activeOptions = options.filter(o => o.status === 'active')
   const completedOptions = options.filter(o => o.status && o.status !== 'active')
 
+  // Positions the panel under the trigger, within the viewport.
   function measure() {
     const el = triggerRef.current
     if (!el) return
@@ -61,6 +64,7 @@ export default function GlassSelect({
     })
   }
 
+  // While open: measures the panel, closes it on outside click or Escape, and repositions on resize or scroll.
   useEffect(() => {
     if (!open) return
     measure()
@@ -85,11 +89,13 @@ export default function GlassSelect({
     }
   }, [open])
 
+  // Selects an option and closes the panel.
   function pick(id: string) {
     onChange(id)
     setOpen(false)
   }
 
+  // Renders one selectable option row.
   function row(o: GlassSelectOption) {
     const active = o.id === value
     return (
@@ -129,7 +135,7 @@ export default function GlassSelect({
           ref={panelRef}
           role="listbox"
           style={{
-            position: 'fixed', top: rect.top, left: rect.left, width: rect.width, zIndex: 3000,
+            position: 'fixed', top: rect.top, left: rect.left, width: rect.width, zIndex: Z.panel,
             maxHeight: rect.maxHeight, overflowY: 'auto', borderRadius: 14,
             background: dark ? 'rgba(20,32,54,0.62)' : 'rgba(255,255,255,0.62)',
             backdropFilter: 'blur(22px) saturate(160%)', WebkitBackdropFilter: 'blur(22px) saturate(160%)',
@@ -161,10 +167,12 @@ export default function GlassSelect({
   )
 }
 
+// Style of the small uppercase group heading ("Active", "Completed").
 function groupLabel(pt: PulseTheme): CSSProperties {
   return { padding: '10px 16px 4px', fontSize: 10, fontWeight: 800, letterSpacing: 1, color: pt.textMuted, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }
 }
 
+// Style of one option row, highlighted when it is the current value.
 function optionRow(pt: PulseTheme, active: boolean): CSSProperties {
   return {
     display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',

@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom'
-import { getPulseTheme, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseType } from '@/shared/theme/premiumTheme'
 import { isSafeExternalUrl } from '@/shared/utils/embedUrl'
 import { StudyMaterialsIcon, FolderIcon } from '@/shared/icons/tool-icons'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
+import SectionHeader from '@/shared/ui/layout/SectionHeader'
 
 interface StudyMaterialsSectionProps {
   dark: boolean
@@ -66,9 +67,7 @@ export default function StudyMaterialsSection({ dark, moduleId, presentFileTypes
 
   return (
     <div style={{ marginBottom: 32 }}>
-      <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <StudyMaterialsIcon color={ON_BACKGROUND.muted} size={14} /> Study Materials
-      </h2>
+      <SectionHeader Icon={StudyMaterialsIcon}>Study Materials</SectionHeader>
       {cards.length === 1 ? (
         <div className="auto-grid-single">{cards[0]}</div>
       ) : (

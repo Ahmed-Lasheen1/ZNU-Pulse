@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import { Info } from 'lucide-react'
+import { Z } from '@/shared/theme/tokens'
 
 const ToastContext = createContext(() => {})
 
@@ -25,20 +26,19 @@ export function useToast() {
 
 const DURATIONS = { success: 2500, error: 2500, info: 6000 }
 
+// Provides showToast to the app and renders the active toast above every other layer, dialogs included.
 export default function ToastProvider({ children }) {
   const [toast, setToast] = useState(null)
   const timeoutRef = useRef(null)
 
+  // Shows a toast and restarts the auto-dismiss timer.
   const showToast = useCallback((message, type = 'success') => {
     clearTimeout(timeoutRef.current)
     setToast({ message, type })
     timeoutRef.current = setTimeout(() => setToast(null), DURATIONS[type] ?? DURATIONS.success)
   }, [])
 
-  // Safety net: clears any pending dismiss timer if this provider
-  // itself ever unmounts mid-toast, so it can't fire setState after
-  // unmount. In practice ToastProvider wraps the whole app for its
-  // entire lifetime, so this rarely matters — added for completeness.
+  // Clears the pending dismiss timer if the provider itself unmounts mid-toast.
   useEffect(() => {
     return () => clearTimeout(timeoutRef.current)
   }, [])
@@ -70,7 +70,7 @@ export default function ToastProvider({ children }) {
             borderRadius: isInfo ? 14 : 12,
             fontSize: isInfo ? 12.5 : 13, fontWeight: isInfo ? 600 : 700,
             lineHeight: isInfo ? 1.35 : undefined,
-            zIndex: 3000,
+            zIndex: Z.toast,
             boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
             border: `1px solid ${isError ? '#f8717140' : isInfo ? 'rgba(56,189,248,0.4)' : 'rgba(255,255,255,0.12)'}`,
             // Without an explicit width, a fixed element pinned at left:50%

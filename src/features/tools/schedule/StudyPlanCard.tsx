@@ -5,6 +5,8 @@ import { getPulseTheme, pulseType } from '@/shared/theme/premiumTheme'
 import { adaptColor } from '@/shared/theme/adaptColor'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
+import Button from '@/shared/ui/controls/Button'
+import Collapse from '@/shared/ui/layout/Collapse'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { ScheduleIcon, SearchIcon2 } from '@/shared/icons/tool-icons'
 import { ModuleIcon } from '@/shared/icons/medicalIcons'
@@ -72,18 +74,8 @@ function groupBySubject(items: PlanItem[], lookups: PlanLookups): SubjectGroup[]
   return groups
 }
 
-// Style of the small colored tool buttons, same look as the Study by Lesson buttons.
-function toolBtn(color: string) {
-  return {
-    display: 'inline-flex', alignItems: 'center', gap: 5,
-    background: `${color}18`, border: `1px solid ${color}55`, color,
-    borderRadius: 999, padding: '6px 12px', fontSize: 11.5, fontWeight: 700,
-    cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit',
-  } as const
-}
-
 // Study plan card: collapsible checklist grouped by subject, or a plain image row when the plan has no items.
-// The list expands with a height transition (grid-template-rows), like the Study by Lesson accordion.
+// The list expands with a height transition (shared Collapse), like the Study by Lesson accordion.
 // Each item is a glass row like a lesson row there: checkbox, name and date on the left, tool buttons on the right,
 // and the note on its own full-width line underneath.
 // Items open their lesson's summary, flashcards and practice, and tick themselves once the lesson is studied.
@@ -188,12 +180,14 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
                   const meta = PLAN_TOOL_META[kind]
                   const color = adaptColor(planToolColor(kind, pt), dark)
                   return (
-                    <button
-                      key={kind} type="button" onClick={() => openTool(item, kind)}
-                      aria-label={`${meta.label}: ${item.text}`} style={toolBtn(color)}
+                    <Button
+                      key={kind} dark={dark} variant="tinted" size="xs" color={color}
+                      onClick={() => openTool(item, kind)}
+                      aria-label={`${meta.label}: ${item.text}`}
+                      style={{ gap: 5 }}
                     >
                       <meta.Icon color={color} size={12} /> {meta.label}
-                    </button>
+                    </Button>
                   )
                 })}
               </div>
@@ -288,55 +282,42 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
       )}
 
       {hasItems && (
-        <div style={{
-          display: 'grid',
-          gridTemplateRows: open ? '1fr' : '0fr',
-          visibility: open ? 'visible' : 'hidden',
-          transition: 'grid-template-rows 0.25s ease, visibility 0.25s',
-        }}>
-          <div style={{ overflow: 'hidden' }}>
-            <div
-              id={panelId} role="region" aria-label={`${schedule.title} items`} aria-hidden={!open}
-              style={{ padding: '0 12px 16px' }}
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {groups.map(group => {
-                  // Subject color as text/icon color, adjusted for the current mode.
-                  const groupColor = group.color ? adaptColor(group.color, dark) : pt.textMuted
-                  return (
-                    <div key={group.key}>
-                      {showHeaders && (
-                        <div style={{
-                          ...pulseType.sectionLabel, fontSize: 11, margin: '0 4px 8px',
-                          color: groupColor, display: 'flex', alignItems: 'center', gap: 6,
-                        }}>
-                          {group.icon && <ModuleIcon value={group.icon} size={14} color={groupColor} />}
-                          <span style={{ minWidth: 0, ...wrapText }}>{group.name}</span>
-                          <span style={{ color: pt.textMuted, fontWeight: 600, letterSpacing: 0, textTransform: 'none' }}>
-                            · {group.items.filter(item => isItemDone(item.id)).length}/{group.items.length}
-                          </span>
-                        </div>
-                      )}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {group.items.map(renderItem)}
-                      </div>
+        <Collapse open={open} id={panelId} label={`${schedule.title} items`} panelStyle={{ padding: '0 12px 16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {groups.map(group => {
+              // Subject color as text/icon color, adjusted for the current mode.
+              const groupColor = group.color ? adaptColor(group.color, dark) : pt.textMuted
+              return (
+                <div key={group.key}>
+                  {showHeaders && (
+                    <div style={{
+                      ...pulseType.sectionLabel, fontSize: 11, margin: '0 4px 8px',
+                      color: groupColor, display: 'flex', alignItems: 'center', gap: 6,
+                    }}>
+                      {group.icon && <ModuleIcon value={group.icon} size={14} color={groupColor} />}
+                      <span style={{ minWidth: 0, ...wrapText }}>{group.name}</span>
+                      <span style={{ color: pt.textMuted, fontWeight: 600, letterSpacing: 0, textTransform: 'none' }}>
+                        · {group.items.filter(item => isItemDone(item.id)).length}/{group.items.length}
+                      </span>
                     </div>
-                  )
-                })}
-              </div>
-
-              {schedule.url && (
-                <button type="button" onClick={onViewImage} style={{
-                  marginTop: 16, background: 'transparent', border: `1px solid ${accentText}66`, color: accentText,
-                  borderRadius: 999, padding: '7px 14px', fontWeight: 700, fontSize: 12, cursor: 'pointer',
-                  fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6,
-                }}>
-                  <SearchIcon2 color={accentText} size={12} /> View schedule image
-                </button>
-              )}
-            </div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {group.items.map(renderItem)}
+                  </div>
+                </div>
+              )
+            })}
           </div>
-        </div>
+
+          {schedule.url && (
+            <Button
+              dark={dark} variant="outline" size="sm" color={accentText} onClick={onViewImage}
+              style={{ marginTop: 16, padding: '7px 14px', border: `1px solid ${accentText}66` }}
+            >
+              <SearchIcon2 color={accentText} size={12} /> View schedule image
+            </Button>
+          )}
+        </Collapse>
       )}
     </LiquidGlassCard>
   )

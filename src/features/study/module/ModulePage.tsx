@@ -4,6 +4,7 @@ import { getPulseTheme, pulseFonts, pulseType, ON_BACKGROUND } from '@/shared/th
 import { adaptColor } from '@/shared/theme/adaptColor'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PageShell from '@/shared/ui/layout/PageShell'
+import SectionHeader from '@/shared/ui/layout/SectionHeader'
 import ModuleNotFoundState from '@/features/study/module/ModuleNotFoundState'
 import StudyMaterialsSection from '@/features/study/module/StudyMaterialsSection'
 import StudyByLessonSection from '@/features/study/module/StudyByLessonSection'
@@ -256,9 +257,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
 
       {visibleExamStages.length > 0 && (
         <div style={{ marginBottom: 32 }}>
-          <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <ExamStageIcon color={ON_BACKGROUND.muted} size={14} /> Exam Stage
-          </h2>
+          <SectionHeader Icon={ExamStageIcon} center marginBottom={14}>Exam Stage</SectionHeader>
           <TabRow
             items={tabItems}
             active={stageActive ? activeStage : null}
@@ -317,9 +316,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
               .sim-btn { padding: 10px 16px; font-size: 13px !important; }
             }
           `}</style>
-          <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <TargetIcon color={ON_BACKGROUND.muted} size={14} /> Exam Simulator
-          </h2>
+          <SectionHeader Icon={TargetIcon}>Exam Simulator</SectionHeader>
           <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 24px' }}>
             <div className="sim-row">
               <div className="sim-icon" style={{ background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55` }}>
@@ -354,9 +351,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
           <div className="module-actions-row" style={{ marginBottom: 32 }}>
             {hasSummaries && (
               <div>
-                <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <SmartSummariesIcon color={ON_BACKGROUND.muted} size={14} /> Smart Summaries
-                </h2>
+                <SectionHeader Icon={SmartSummariesIcon}>Smart Summaries</SectionHeader>
                 <LiquidGlassCard dark={dark} delay={0} onClick={openSummaries} style={{ padding: 24, textAlign: 'center' }}>
                   <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
                     <NotesIcon color={pt.success} size={30} />
@@ -373,9 +368,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
 
             {hasFlashcards && (
               <div>
-                <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <FlashcardIcon color={ON_BACKGROUND.muted} size={14} /> Flashcards
-                </h2>
+                <SectionHeader Icon={FlashcardIcon}>Flashcards</SectionHeader>
                 <LiquidGlassCard dark={dark} delay={0} onClick={openFlashcards} style={{ padding: 24, textAlign: 'center' }}>
                   <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
                     <FlashcardIcon color={flashcardText} size={30} />
@@ -390,9 +383,7 @@ export default function ModulePage({ dark }: { dark: boolean }) {
 
             {hasQuestions && (
               <div>
-                <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <PracticeIcon color={ON_BACKGROUND.muted} size={14} /> Practice
-                </h2>
+                <SectionHeader Icon={PracticeIcon}>Practice</SectionHeader>
                 <LiquidGlassCard dark={dark} delay={0} onClick={openPractice} style={{ padding: 24, textAlign: 'center' }}>
                   <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
                     <ExamIcon color={mcqText} size={30} />

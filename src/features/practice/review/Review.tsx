@@ -2,12 +2,15 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/core/supabase'
 import { useAuth, useModules } from '@/core/contexts'
-import { getPulseTheme, pulseFonts, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import { adaptColor } from '@/shared/theme/adaptColor'
 import { glassInput } from '@/shared/ui/glass/PulseUI'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import ConfirmDialog from '@/shared/ui/feedback/ConfirmDialog'
+import InfoNotice from '@/shared/ui/feedback/InfoNotice'
+import Button from '@/shared/ui/controls/Button'
+import SearchInput from '@/shared/ui/controls/SearchInput'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import PageShell from '@/shared/ui/layout/PageShell'
@@ -322,8 +325,14 @@ export default function Review({ dark }: { dark: boolean }) {
     { id: 'flagged' as const, label: 'Flagged', Icon: FlagIcon },
   ]
 
+  // While an attempt is open, the page's Back button returns to the history list instead of leaving the page.
+  const inDetail = tab === 'history' && !!selectedHistory
+
   return (
-    <PageShell dark={dark} backFallback="/mcq" maxWidth={900} containerClassName="review-wide">
+    <PageShell
+      dark={dark} backFallback="/mcq" maxWidth={900} containerClassName="review-wide"
+      onBack={inDetail ? () => setSelectedHistory(null) : undefined}
+    >
       <style>{`
         .review-wide {
           width: 100%;
@@ -348,15 +357,11 @@ export default function Review({ dark }: { dark: boolean }) {
       {savedCopy && !loading && <OfflineNote dark={dark} message="You're offline. Showing your saved history. Exams you take now are kept on this device and sync when you reconnect." />}
 
       {!user && (
-        <div style={{ marginBottom: SECTION_GAP }}>
-          <LiquidGlassCard dark={dark} delay={0} style={{ padding: '12px 18px', textAlign: 'center' }}>
-            <span style={{ color: pt.cobalt, fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <LightbulbIcon color={pt.cobalt} size={14} /> This list is saved on this device only.{' '}
-              <span style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => navigate('/auth')}>Sign in</span>{' '}
-              to keep it across devices.
-            </span>
-          </LiquidGlassCard>
-        </div>
+        <InfoNotice dark={dark} marginBottom={SECTION_GAP}>
+          This list is saved on this device only.{' '}
+          <span style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => navigate('/auth')}>Sign in</span>{' '}
+          to keep it across devices.
+        </InfoNotice>
       )}
 
       {loading && <LoadingText />}
@@ -435,14 +440,6 @@ export default function Review({ dark }: { dark: boolean }) {
         ] : []
         return (
           <div>
-            <div style={{ marginBottom: SECTION_GAP }}>
-              <PulseGlassRow dark={dark} radius={999} hoverTint={hoverTint} onClick={() => setSelectedHistory(null)}
-                role="button" tabIndex={0} style={{ display: 'inline-block' }}
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedHistory(null) } }}>
-                <div style={{ padding: '8px 18px', ...pulseType.small, fontWeight: 700, color: pt.sub }}>← Back to history</div>
-              </PulseGlassRow>
-            </div>
-
             <div style={{ textAlign: 'center', marginBottom: SECTION_GAP }}>
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                 {mod && <ModuleIcon value={mod.icon} size={20} color={modText(mod)} />}
@@ -481,21 +478,7 @@ export default function Review({ dark }: { dark: boolean }) {
             )}
 
             {detailTabs.length > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginBottom: SECTION_GAP }}>
-                {detailTabs.map(t => {
-                  const active = detailFilter === t.id
-                  return (
-                    <PulseGlassRow
-                      key={t.id} dark={dark} radius={999} active={active}
-                      activeTint={`${pt.cobalt}26`} hoverTint={hoverTint}
-                      onClick={() => setDetailFilter(t.id)} role="button" tabIndex={0}
-                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailFilter(t.id) } }}
-                    >
-                      <div style={{ padding: '8px 18px', ...pulseType.small, fontWeight: 700, color: active ? pt.cobalt : pt.sub }}>{t.label}</div>
-                    </PulseGlassRow>
-                  )
-                })}
-              </div>
+              <PillTabs dark={dark} tabs={detailTabs} active={detailFilter} onSelect={setDetailFilter} marginBottom={SECTION_GAP} size="compact" />
             )}
 
             {!fullAttempt && incorrectItems.length > 0 && (
@@ -506,14 +489,12 @@ export default function Review({ dark }: { dark: boolean }) {
 
             {incorrectItems.length > 0 && (
               <div style={{ marginBottom: SECTION_GAP }}>
-                <button onClick={() => retryAll(incorrectItems)} style={{
-                  width: '100%', padding: '14px', background: MCQ_ACCENT, color: '#0f172a',
-                  border: 'none', borderRadius: 999, cursor: 'pointer', fontWeight: 700,
-                  fontSize: 14, fontFamily: pulseFonts.body, boxShadow: `0 8px 28px ${MCQ_ACCENT}35`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
-                }}>
+                <Button
+                  dark={dark} variant="solid" size="md" color={MCQ_ACCENT} fullWidth onClick={() => retryAll(incorrectItems)}
+                  style={{ padding: '14px', fontWeight: 700, gap: 8, boxShadow: `0 8px 28px ${MCQ_ACCENT}35` }}
+                >
                   <RefreshIcon color="#0f172a" size={15} /> Retry These {incorrectItems.length} Incorrect Question{incorrectItems.length === 1 ? '' : 's'}
-                </button>
+                </Button>
               </div>
             )}
 
@@ -604,12 +585,14 @@ export default function Review({ dark }: { dark: boolean }) {
           {flaggedItems.length > 0 && (
             <>
               <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-                <input
+                <SearchInput
+                  dark={dark}
                   value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="🔍 Search questions..."
-                  aria-label="Search flagged questions"
-                  style={{ ...inStyle, flex: 1, minWidth: 160 }}
+                  onChange={setSearchQuery}
+                  placeholder="Search questions..."
+                  ariaLabel="Search flagged questions"
+                  wrapperStyle={{ flex: 1, minWidth: 160 }}
+                  style={{ paddingTop: 13, paddingBottom: 13, paddingRight: 20 }}
                 />
                 {showModuleFilter && (
                   <select value={moduleFilter} onChange={e => setModuleFilter(e.target.value)} style={{ ...inStyle, width: 'auto' }}>
@@ -624,14 +607,12 @@ export default function Review({ dark }: { dark: boolean }) {
 
               {filteredFlagged.length > 0 && (
                 <div style={{ marginBottom: SECTION_GAP }}>
-                  <button onClick={() => retryAll(filteredFlagged)} style={{
-                    width: '100%', padding: '14px', background: MCQ_ACCENT, color: '#0f172a',
-                    border: 'none', borderRadius: 999, cursor: 'pointer', fontWeight: 700,
-                    fontSize: 14, fontFamily: pulseFonts.body, boxShadow: `0 8px 28px ${MCQ_ACCENT}35`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
-                  }}>
+                  <Button
+                    dark={dark} variant="solid" size="md" color={MCQ_ACCENT} fullWidth onClick={() => retryAll(filteredFlagged)}
+                    style={{ padding: '14px', fontWeight: 700, gap: 8, boxShadow: `0 8px 28px ${MCQ_ACCENT}35` }}
+                  >
                     <RefreshIcon color="#0f172a" size={15} /> Retry {filteredFlagged.length === flaggedItems.length ? 'All' : `These ${filteredFlagged.length}`} Flagged Questions
-                  </button>
+                  </Button>
                 </div>
               )}
             </>
@@ -701,11 +682,10 @@ export default function Review({ dark }: { dark: boolean }) {
                         <RefreshIcon color={pt.sub} size={13} /> Retry this one
                       </div>
                     </PulseGlassRow>
-                    <button onClick={() => unflag(qId)} style={{
-                      padding: '8px 12px', background: 'transparent', border: `1px solid ${badColor}40`,
-                      borderRadius: 8, color: badColor, cursor: 'pointer', fontFamily: pulseFonts.body,
-                      fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5
-                    }}><FlagIcon color={badColor} size={12} /> Remove</button>
+                    <Button
+                      dark={dark} variant="outline" size="sm" color={badColor} onClick={() => unflag(qId)}
+                      style={{ padding: '8px 12px', borderRadius: 8, gap: 5, border: `1px solid ${badColor}40` }}
+                    ><FlagIcon color={badColor} size={12} /> Remove</Button>
                   </div>
                 </LiquidGlassCard>
               </div>

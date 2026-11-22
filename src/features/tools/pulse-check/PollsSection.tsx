@@ -6,6 +6,7 @@ import { adaptColor } from '@/shared/theme/adaptColor'
 import { glassInput } from '@/shared/ui/glass/PulseUI'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PulseSwitch from '@/shared/ui/controls/pulse-switch'
+import Button from '@/shared/ui/controls/Button'
 import EmptyState from '@/shared/ui/feedback/EmptyState'
 import OfflineNote from '@/shared/ui/feedback/OfflineNote'
 import { CardRowsSkeleton } from '@/shared/ui/feedback/Skeletons'
@@ -55,11 +56,14 @@ const MIN_OPTIONS = 2
 const MAX_OPTIONS = 6
 const INPUT_FONT_SIZE = 16
 
+// Creates an empty option field for the new-poll form.
 const newOption = (): OptionDraft => ({ id: crypto.randomUUID(), value: '' })
 
+// Short readable closing time such as "Oct 22, 02:30 PM".
 const closesLabel = (iso: string) =>
   new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
+// Loads the polls with this device's votes.
 const fetchPollsRpc = () => supabase.rpc('get_polls', { p_guest_token: getGuestToken() })
 
 // Polls list: students vote anonymously, admins create, close and delete polls.
@@ -213,11 +217,8 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
 
   const inStyle = { ...glassInput(pt, dark), padding: '12px 18px', marginBottom: 0, fontSize: INPUT_FONT_SIZE }
   const arabicFont = (text: string) => (isArabicText(text) ? { fontFamily: ARABIC_FONT } : {})
-  const pillBtn = (color: string) => ({
-    background: 'transparent', border: `1px solid ${color}66`, color, borderRadius: 999,
-    padding: '6px 14px', cursor: 'pointer', fontFamily: pulseFonts.body, fontSize: 12, fontWeight: 700,
-    display: 'inline-flex', alignItems: 'center', gap: 5,
-  } as const)
+  // Padding of the small admin action buttons (a little tighter than the default small size).
+  const compactPad = { padding: '6px 14px' }
 
   return (
     <div>
@@ -227,11 +228,13 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
       {isAdmin && (
         <div style={{ marginBottom: 20 }}>
           {!formOpen ? (
-            <button onClick={() => setFormOpen(true)} style={{
-              ...pillBtn(accentText), width: '100%', justifyContent: 'center', padding: '12px', borderStyle: 'dashed',
-            }}>
+            <Button
+              dark={dark} variant="outline" size="sm" color={accentText} fullWidth
+              onClick={() => setFormOpen(true)}
+              style={{ padding: '12px', borderStyle: 'dashed' }}
+            >
               <PlusIcon color={accentText} size={12} /> New poll
-            </button>
+            </Button>
           ) : (
             <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
               <h3 style={{ ...pulseType.sectionLabel, color: accentText, marginBottom: 14 }}>New poll</h3>
@@ -247,17 +250,22 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
                     style={{ ...inStyle, ...arabicFont(o.value), flex: 1, minWidth: 0 }}
                   />
                   {options.length > MIN_OPTIONS && (
-                    <button
+                    <Button
+                      dark={dark} variant="outline" size="sm" color={pt.danger}
                       onClick={() => setOptions(prev => prev.filter(x => x.id !== o.id))}
-                      aria-label={`Remove option ${i + 1}`} style={pillBtn(pt.danger)}
-                    ><TrashIcon color={pt.danger} size={13} /></button>
+                      aria-label={`Remove option ${i + 1}`} style={compactPad}
+                    ><TrashIcon color={pt.danger} size={13} /></Button>
                   )}
                 </div>
               ))}
               {options.length < MAX_OPTIONS && (
-                <button onClick={() => setOptions(prev => [...prev, newOption()])} style={{ ...pillBtn(pt.sub), marginBottom: 14 }}>
+                <Button
+                  dark={dark} variant="ghost" size="sm"
+                  onClick={() => setOptions(prev => [...prev, newOption()])}
+                  style={{ ...compactPad, marginBottom: 14 }}
+                >
                   <PlusIcon color={pt.sub} size={11} /> Add option
-                </button>
+                </Button>
               )}
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
@@ -274,12 +282,14 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
               <label style={{ ...pulseType.small, color: pt.textMuted, display: 'block', marginBottom: 6 }}>Closes at (optional)</label>
               <input type="datetime-local" value={closesAt} onChange={e => setClosesAt(e.target.value)} style={{ ...inStyle, marginBottom: 16 }} />
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={resetForm} disabled={creating} style={{ ...pillBtn(pt.sub), flex: 1, justifyContent: 'center', padding: '11px' }}>Cancel</button>
-                <button onClick={createPoll} disabled={creating} style={{
-                  flex: 2, padding: '11px', borderRadius: 999, border: 'none', background: accent, color: '#0f172a',
-                  fontWeight: 700, fontSize: 14, fontFamily: pulseFonts.body,
-                  cursor: creating ? 'not-allowed' : 'pointer', opacity: creating ? 0.7 : 1,
-                }}>{creating ? 'Creating...' : 'Create poll'}</button>
+                <Button
+                  dark={dark} variant="ghost" size="sm" onClick={resetForm} disabled={creating}
+                  style={{ flex: 1, padding: '11px' }}
+                >Cancel</Button>
+                <Button
+                  dark={dark} variant="solid" size="md" color={accent} onClick={createPoll} disabled={creating}
+                  style={{ flex: 2, padding: '11px', fontWeight: 700 }}
+                >{creating ? 'Creating...' : 'Create poll'}</Button>
               </div>
             </LiquidGlassCard>
           )}
@@ -377,10 +387,15 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
 
               {isAdmin && (
                 <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-                  <button onClick={() => toggleClosed(poll)} style={pillBtn(pt.sub)}>{poll.closed ? 'Reopen' : 'Close poll'}</button>
-                  <button onClick={() => setConfirmDeleteId(poll.id)} style={pillBtn(pt.danger)}>
+                  <Button dark={dark} variant="ghost" size="sm" onClick={() => toggleClosed(poll)} style={compactPad}>
+                    {poll.closed ? 'Reopen' : 'Close poll'}
+                  </Button>
+                  <Button
+                    dark={dark} variant="outline" size="sm" color={pt.danger}
+                    onClick={() => setConfirmDeleteId(poll.id)} style={compactPad}
+                  >
                     <TrashIcon color={pt.danger} size={12} /> Delete
-                  </button>
+                  </Button>
                 </div>
               )}
             </LiquidGlassCard>

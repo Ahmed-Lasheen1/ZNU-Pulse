@@ -20,6 +20,7 @@ export const ON_BACKGROUND = {
 
 // Full theme token set, keyed by dark/light. The light values are tuned for the glass cards over the pale-blue page
 // (--page-bg in src/styles/index.css): accents at least ~4.5:1 on the glass, text well above that.
+// The *Tint values are the status colors at 16% opacity, for badge and row backgrounds.
 export function getPulseTheme(dark) {
   return dark
     ? {
@@ -51,6 +52,10 @@ export function getPulseTheme(dark) {
         danger: '#F87171',
         error: '#F87171',
         success: '#4ADE80',
+
+        successTint: '#4ADE8029',
+        dangerTint: '#F8717129',
+        amberTint: '#FF6B0029',
 
         ecgBase: '#3A5170',
         ecgLine: '#7FB0FF',
@@ -85,6 +90,10 @@ export function getPulseTheme(dark) {
         danger: '#991B1B',
         error: '#991B1B',
         success: '#166534',
+
+        successTint: '#16653429',
+        dangerTint: '#991B1B29',
+        amberTint: '#9A341229',
 
         ecgBase: '#C7D3E3',
         ecgLine: '#1E3F91',
