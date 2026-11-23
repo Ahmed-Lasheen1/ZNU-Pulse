@@ -8,8 +8,7 @@ interface ModuleNotFoundStateProps {
   errorMessage?: string
 }
 
-// Shared "module not found / still loading / failed to load" screen,
-// used by ModulePage and StagePage whenever the parent module can't be resolved.
+// "Module not found / still loading / failed to load" screen shown by ModulePage when its module can't be resolved.
 export default function ModuleNotFoundState({
   hasError,
   loaded,

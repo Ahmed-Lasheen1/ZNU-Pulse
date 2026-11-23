@@ -6,6 +6,7 @@ import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import PageShell from '@/shared/ui/layout/PageShell'
 import LoadingText from '@/shared/ui/feedback/LoadingText'
 import { useStudyFontScale } from '@/shared/hooks/useStudyFontScale'
+import { useGiveUpTimer } from '@/shared/hooks/useGiveUpTimer'
 import { fetchModuleStages } from '@/services/content/moduleStages'
 import { fetchAllSubjects } from '@/services/content/subjects'
 import { fetchAllLessons } from '@/services/content/lessons'
@@ -27,9 +28,6 @@ import MCQExamFlow from '@/features/practice/mcq/MCQExamFlow'
 const OFFLINE_KEYS_MESSAGE = "Answer keys for this module aren't saved on this device — open it once while online."
 const OFFLINE_SAVED_MESSAGE = "Saved on this device — it will sync when you're back online. Points are added when it syncs."
 const OFFLINE_SAVE_FAILED_MESSAGE = "This device couldn't save the attempt — your results are shown here only."
-
-// Longest the loading screen waits for a link-started quiz before showing the browse page instead.
-const AUTO_START_TIMEOUT_MS = 10000
 
 type StartType = 'mock' | 'practice' | 'simulator'
 
@@ -114,7 +112,7 @@ export default function MCQ({ dark }: { dark: boolean }) {
   // True once a link auto-start has run (it either began a quiz, opened the source dialog, or found nothing to draw).
   const [autoStartDone, setAutoStartDone] = useState(false)
   // True when a link auto-start took too long, so the browse page is shown instead of the loading screen.
-  const [autoStartGaveUp, setAutoStartGaveUp] = useState(false)
+  const autoStartGaveUp = useGiveUpTimer(!!lessonFilter || !!subjectFilter || simulatorParam)
 
   const { fontScale, cycleFontScale } = useStudyFontScale()
 
@@ -145,13 +143,6 @@ export default function MCQ({ dark }: { dark: boolean }) {
     isMountedRef.current = true
     return () => { isMountedRef.current = false }
   }, [])
-
-  // Stops waiting on a link auto-start after a while, so a problem we did not foresee can never trap the student on the loading screen.
-  useEffect(() => {
-    if (!lessonFilter && !subjectFilter && !simulatorParam) return
-    const timer = setTimeout(() => setAutoStartGaveUp(true), AUTO_START_TIMEOUT_MS)
-    return () => clearTimeout(timer)
-  }, [lessonFilter, subjectFilter, simulatorParam])
 
   // Removes one-shot auto-start parameters from the URL.
   function clearAutoStartParams() {

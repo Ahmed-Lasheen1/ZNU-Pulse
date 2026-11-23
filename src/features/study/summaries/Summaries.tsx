@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
-import { getPulseTheme, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseType } from '@/shared/theme/premiumTheme'
 import { adaptColor } from '@/shared/theme/adaptColor'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import SummaryOverlay from '@/features/study/summaries/SummaryOverlay'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PageShell from '@/shared/ui/layout/PageShell'
+import ModuleFallbackPage from '@/shared/ui/layout/ModuleFallbackPage'
 import TabRow from '@/shared/ui/controls/TabRow'
 import { SummaryListSkeleton } from '@/shared/ui/feedback/Skeletons'
 import EmptyState from '@/shared/ui/feedback/EmptyState'
@@ -224,13 +225,5 @@ export default function Summaries({ dark }: { dark: boolean }) {
     />
   )
 
-  return (
-    <PageShell dark={dark} backFallback="/" maxWidth={PAGE_MAX_WIDTH}>
-      <div style={{ textAlign: 'center', padding: 40, color: ON_BACKGROUND.secondary }}>
-        {modulesError
-          ? <ErrorBanner message="Couldn't load modules — check your connection." />
-          : !modulesLoaded ? 'Loading...' : 'No modules available yet.'}
-      </div>
-    </PageShell>
-  )
+  return <ModuleFallbackPage dark={dark} hasError={modulesError} loaded={modulesLoaded} maxWidth={PAGE_MAX_WIDTH} />
 }

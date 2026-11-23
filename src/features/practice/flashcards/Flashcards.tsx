@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuth, useModules } from '@/core/contexts'
-import { ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import PageShell from '@/shared/ui/layout/PageShell'
-import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
+import ModuleFallbackPage from '@/shared/ui/layout/ModuleFallbackPage'
 import LoadingText from '@/shared/ui/feedback/LoadingText'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { useGoBack } from '@/shared/hooks/useGoBack'
+import { useGiveUpTimer } from '@/shared/hooks/useGiveUpTimer'
 import { fetchModuleFlashcards } from '@/services/content/moduleContent'
 import { resolveModule } from '@/services/content/modules'
 import { fetchLessonsForModule } from '@/services/content/lessons'
@@ -28,9 +28,6 @@ interface FlashcardSubject { id: string; name: string; icon?: string | null; col
 interface Session { lessonId: string | null; subjectId: string | null; title: string; queue: FlashcardRow[]; run: number; practice: boolean; fromLink: boolean }
 
 const PAGE_MAX_WIDTH = 900
-
-// Longest the loading screen waits for a link-started session before showing the browse page instead.
-const AUTO_START_TIMEOUT_MS = 10000
 
 // Loads a module's flashcards, runs study sessions and shows the browse page.
 function ModuleFlashcards({ mod, dark, stage: initialStage, initialLessonId }: {
@@ -55,15 +52,8 @@ function ModuleFlashcards({ mod, dark, stage: initialStage, initialLessonId }: {
   // True once the link auto-start has run (it either began a session or found no cards).
   const [autoStartDone, setAutoStartDone] = useState(false)
   // True when the link auto-start took too long, so the browse page is shown instead of the loading screen.
-  const [autoStartGaveUp, setAutoStartGaveUp] = useState(false)
+  const autoStartGaveUp = useGiveUpTimer(!!initialLessonId)
   const autoStartedRef = useRef(false)
-
-  // Stops waiting on the link auto-start after a while, so a problem we did not foresee can never trap the student on the loading screen.
-  useEffect(() => {
-    if (!initialLessonId) return
-    const timer = setTimeout(() => setAutoStartGaveUp(true), AUTO_START_TIMEOUT_MS)
-    return () => clearTimeout(timer)
-  }, [initialLessonId])
 
   // Loads the module's cards (cached), lessons, subjects, stages and lesson stages.
   useEffect(() => {
@@ -304,13 +294,5 @@ export default function Flashcards({ dark }: { dark: boolean }) {
     />
   )
 
-  return (
-    <PageShell dark={dark} backFallback="/" maxWidth={PAGE_MAX_WIDTH}>
-      <div style={{ textAlign: 'center', padding: 40, color: ON_BACKGROUND.secondary }}>
-        {modulesError
-          ? <ErrorBanner message="Couldn't load modules — check your connection." />
-          : !modulesLoaded ? 'Loading...' : 'No modules available yet.'}
-      </div>
-    </PageShell>
-  )
+  return <ModuleFallbackPage dark={dark} hasError={modulesError} loaded={modulesLoaded} maxWidth={PAGE_MAX_WIDTH} />
 }

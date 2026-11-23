@@ -12,10 +12,8 @@ interface StudyMaterialsSectionProps {
   driveUrl: string
 }
 
-// "Study Materials" section (Files card + University Google Drive
-// card) — identical on ModulePage and StagePage, both linking to the
-// same Files page. The Drive URL is validated (http/https only)
-// before it's ever rendered as a clickable card or window.open target.
+// "Study Materials" section on the module page: a Files card and a University Google Drive card.
+// The Drive URL is validated (http/https only) before it's ever rendered as a clickable card or window.open target.
 export default function StudyMaterialsSection({ dark, moduleId, presentFileTypes, driveUrl }: StudyMaterialsSectionProps) {
   const pt = getPulseTheme(dark)
   const navigate = useNavigate()

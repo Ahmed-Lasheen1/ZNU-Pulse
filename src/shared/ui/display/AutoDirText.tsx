@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import { isArabicText } from '@/shared/utils/bidi'
+import { isArabicText, ARABIC_FONT } from '@/shared/utils/bidi'
 
 interface AutoDirTextProps {
   text: string
@@ -16,7 +16,7 @@ export default function AutoDirText({ text, style, wrapperStyle }: AutoDirTextPr
         return (
           <div key={i} dir="auto" style={{
             ...style,
-            fontFamily: arabic ? "'Cairo', 'Sora', sans-serif" : style?.fontFamily,
+            fontFamily: arabic ? ARABIC_FONT : style?.fontFamily,
             lineHeight: arabic ? 1.8 : style?.lineHeight,
             letterSpacing: arabic ? 'normal' : style?.letterSpacing,
           }}>

@@ -26,10 +26,11 @@ import { fetchModuleStages } from '@/services/content/moduleStages'
 import { quizName } from '@/features/practice/quizNames'
 import { useOnlineStatus } from '@/shared/hooks/useOnlineStatus'
 import QuestionSourceBadge from '@/shared/ui/display/QuestionSourceBadge'
+import AutoDirText from '@/shared/ui/display/AutoDirText'
 import { ModuleIcon } from '@/shared/icons/medicalIcons'
 import { wrapText } from '@/shared/utils/textStyles'
-import { BookIcon, ClockIcon, FlagIcon, LightbulbIcon, TargetIcon, EmptyBoxIcon, CelebrationIcon, RefreshIcon, SearchIcon2 } from '@/shared/icons/tool-icons'
-import { optionLabels } from '@/features/practice/mcqShared'
+import { BookIcon, ClockIcon, FlagIcon, TargetIcon, EmptyBoxIcon, CelebrationIcon, RefreshIcon, SearchIcon2 } from '@/shared/icons/tool-icons'
+import { optionLabels, ReviewOption, ExplanationNote } from '@/features/practice/mcqShared'
 import { MCQ_ACCENT } from '@/shared/theme/accents'
 import { glassHoverTint } from '@/shared/theme/liquidGlass'
 import { SECTION_GAP } from '@/shared/theme/layout'
@@ -129,11 +130,11 @@ export default function Review({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const online = useOnlineStatus()
 
-  // Status colors follow the color mode; the tints are the same colors at 16% opacity.
+  // Status colors and their 16% tints come from the theme.
   const okColor = pt.success
   const badColor = pt.danger
-  const okTint = `${pt.success}29`
-  const badTint = `${pt.danger}29`
+  const okTint = pt.successTint
+  const badTint = pt.dangerTint
   // The accent as text color (fills keep the original), and a module's color adjusted for text and icons.
   const accentText = adaptColor(MCQ_ACCENT, dark)
   const modText = (mod: ReviewModule) => adaptColor(mod.color, dark)
@@ -460,16 +461,12 @@ export default function Review({ dark }: { dark: boolean }) {
                       : "Saved on this device — waiting to sync. Points are added when it syncs."}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
-                    <PulseGlassRow dark={dark} radius={999} hoverTint={hoverTint} onClick={retrySync}
-                      role="button" tabIndex={0}
-                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); retrySync() } }}>
+                    <PulseGlassRow dark={dark} radius={999} hoverTint={hoverTint} onClick={retrySync}>
                       <div style={{ padding: '8px 18px', ...pulseType.small, fontWeight: 700, color: pt.sub, display: 'flex', alignItems: 'center', gap: 6 }}>
                         <RefreshIcon color={pt.sub} size={13} /> {syncBusy ? 'Syncing...' : 'Retry sync'}
                       </div>
                     </PulseGlassRow>
-                    <PulseGlassRow dark={dark} radius={999} hoverTint={hoverTint} onClick={() => setConfirmDiscardId(pending.id)}
-                      role="button" tabIndex={0}
-                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setConfirmDiscardId(pending.id) } }}>
+                    <PulseGlassRow dark={dark} radius={999} hoverTint={hoverTint} onClick={() => setConfirmDiscardId(pending.id)}>
                       <div style={{ padding: '8px 18px', ...pulseType.small, fontWeight: 700, color: pt.danger }}>Remove</div>
                     </PulseGlassRow>
                   </div>
@@ -526,41 +523,28 @@ export default function Review({ dark }: { dark: boolean }) {
                         {item.source && <QuestionSourceBadge source={item.source} dark={dark} />}
                       </div>
                     )}
-                    <p style={{ ...pulseType.cardTitle, color: pt.textPrimary, marginBottom: 12, ...wrapText }}>{item.question}</p>
+                    <div style={{ marginBottom: 12 }}>
+                      <AutoDirText text={item.question} style={{ ...pulseType.cardTitle, color: pt.textPrimary, ...wrapText }} />
+                    </div>
 
                     {optionsOf(item).map((opt, ai) => {
                       const label = optionLabels[ai]
                       const isCorrect = label === item.correct_answer
                       const isChosenWrong = !isCorrect && !!item.answer && item.answer === label
                       return (
-                        <div key={ai} style={{
-                          background: isCorrect ? okTint : isChosenWrong ? badTint : (dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
-                          border: `1px solid ${isCorrect ? okColor : isChosenWrong ? badColor : pt.border}`,
-                          borderRadius: 10, padding: '9px 14px', marginBottom: 6,
-                          color: isCorrect ? okColor : isChosenWrong ? badColor : pt.sub, fontSize: 13, fontWeight: 600,
-                          display: 'flex', alignItems: 'flex-start', gap: 6, ...wrapText
-                        }}>
-                          <span style={{ flexShrink: 0 }}>{label.toUpperCase()}.</span>
-                          <span style={wrapText}>{opt}</span>
-                        </div>
+                        <ReviewOption
+                          key={ai} dark={dark} label={label} text={opt}
+                          state={isCorrect ? 'correct' : isChosenWrong ? 'wrong' : 'neutral'}
+                        />
                       )
                     })}
 
                     {item.explanation && (
-                      <div style={{
-                        background: dark ? 'rgba(56,189,248,0.10)' : 'rgba(2,132,199,0.06)',
-                        borderRadius: 10, padding: '10px 14px', marginTop: 8, color: pt.sub, fontSize: 12,
-                        display: 'flex', alignItems: 'flex-start', gap: 8
-                      }}>
-                        <LightbulbIcon color={pt.sub} size={14} />
-                        <span style={wrapText}>{item.explanation}</span>
-                      </div>
+                      <ExplanationNote dark={dark} style={{ marginTop: 8 }}>{item.explanation}</ExplanationNote>
                     )}
 
                     <div style={{ marginTop: 14 }}>
-                      <PulseGlassRow dark={dark} radius={10} hoverTint={hoverTint} onClick={() => retryAll([item])}
-                        role="button" tabIndex={0}
-                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); retryAll([item]) } }}>
+                      <PulseGlassRow dark={dark} radius={10} hoverTint={hoverTint} onClick={() => retryAll([item])}>
                         <div style={{ padding: '8px', textAlign: 'center', color: pt.sub, ...pulseType.small, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                           <RefreshIcon color={pt.sub} size={13} /> Retry this one
                         </div>
@@ -639,34 +623,18 @@ export default function Review({ dark }: { dark: boolean }) {
                       {item.source && <QuestionSourceBadge source={item.source} dark={dark} />}
                     </div>
                   )}
-                  <p style={{ ...pulseType.cardTitle, color: pt.textPrimary, marginBottom: 12, ...wrapText }}>{item.question}</p>
+                  <div style={{ marginBottom: 12 }}>
+                    <AutoDirText text={item.question} style={{ ...pulseType.cardTitle, color: pt.textPrimary, ...wrapText }} />
+                  </div>
 
                   {optionsOf(item).map((opt, ai) => {
                     const label = optionLabels[ai]
                     const isCorrect = item.attempted && label === item.correct_answer
-                    return (
-                      <div key={ai} style={{
-                        background: isCorrect ? okTint : (dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'),
-                        border: `1px solid ${isCorrect ? okColor : pt.border}`,
-                        borderRadius: 10, padding: '9px 14px', marginBottom: 6,
-                        color: isCorrect ? okColor : pt.sub, fontSize: 13, fontWeight: 600,
-                        display: 'flex', alignItems: 'flex-start', gap: 6, ...wrapText
-                      }}>
-                        <span style={{ flexShrink: 0 }}>{label.toUpperCase()}.</span>
-                        <span style={wrapText}>{opt}</span>
-                      </div>
-                    )
+                    return <ReviewOption key={ai} dark={dark} label={label} text={opt} state={isCorrect ? 'correct' : 'neutral'} />
                   })}
 
                   {item.attempted && item.explanation && (
-                    <div style={{
-                      background: dark ? 'rgba(56,189,248,0.10)' : 'rgba(2,132,199,0.06)',
-                      borderRadius: 10, padding: '10px 14px', marginTop: 8, color: pt.sub, fontSize: 12,
-                      display: 'flex', alignItems: 'flex-start', gap: 8
-                    }}>
-                      <LightbulbIcon color={pt.sub} size={14} />
-                      <span style={wrapText}>{item.explanation}</span>
-                    </div>
+                    <ExplanationNote dark={dark} style={{ marginTop: 8 }}>{item.explanation}</ExplanationNote>
                   )}
                   {!item.attempted && (
                     <div style={{ color: pt.faint, fontSize: 12, fontStyle: 'italic', marginTop: 4 }}>
@@ -675,9 +643,7 @@ export default function Review({ dark }: { dark: boolean }) {
                   )}
 
                   <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-                    <PulseGlassRow dark={dark} radius={10} hoverTint={hoverTint} onClick={() => retryAll([item])}
-                      role="button" tabIndex={0} style={{ flex: 1 }}
-                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); retryAll([item]) } }}>
+                    <PulseGlassRow dark={dark} radius={10} hoverTint={hoverTint} onClick={() => retryAll([item])} style={{ flex: 1 }}>
                       <div style={{ padding: '8px', textAlign: 'center', color: pt.sub, ...pulseType.small, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                         <RefreshIcon color={pt.sub} size={13} /> Retry this one
                       </div>

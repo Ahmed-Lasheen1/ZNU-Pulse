@@ -12,9 +12,12 @@ import AutoDirText from '@/shared/ui/display/AutoDirText'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import { GradingSkeleton } from '@/shared/ui/feedback/Skeletons'
 import ConfirmDialog from '@/shared/ui/feedback/ConfirmDialog'
-import { FlagIcon, SearchIcon2, LightbulbIcon } from '@/shared/icons/tool-icons'
+import { FlagIcon, SearchIcon2 } from '@/shared/icons/tool-icons'
 import { wrapText } from '@/shared/utils/textStyles'
-import { EXAM_LOW_TEXT, EXAM_LOW_SECONDARY, EXAM_DIVIDER, optionLabels, optionTexts, formatTime, StatChip, InfoTag } from '@/features/practice/mcqShared'
+import {
+  EXAM_LOW_TEXT, EXAM_LOW_SECONDARY, EXAM_DIVIDER, optionLabels, optionTexts, formatTime,
+  StatChip, InfoTag, ReviewOption, ExplanationNote,
+} from '@/features/practice/mcqShared'
 import { MCQ_ACCENT } from '@/shared/theme/accents'
 import { accuracyTier, accuracyColor } from '@/shared/utils/accuracy'
 
@@ -87,11 +90,11 @@ export default function MCQExamFlow({
   const [confirmExitOpen, setConfirmExitOpen] = useState(false)
   const [barHeight, setBarHeight] = useState(96)
 
-  // Status colors follow the color mode; the tints are the same colors at 16% opacity.
+  // Status colors and their 16% tints come from the theme.
   const okColor = pt.success
   const badColor = pt.danger
-  const okTint = `${pt.success}29`
-  const badTint = `${pt.danger}29`
+  const okTint = pt.successTint
+  const badTint = pt.dangerTint
   // Letter color on a solid correct/incorrect badge.
   const onOk = dark ? '#08300f' : '#FFFFFF'
   const onBad = dark ? '#3a0a0a' : '#FFFFFF'
@@ -385,14 +388,7 @@ export default function MCQExamFlow({
                     </div>
                   )}
                   {revealed && result?.explanation && (
-                    <div style={{
-                      background: dark ? 'rgba(56,189,248,0.10)' : 'rgba(2,132,199,0.06)',
-                      borderRadius: 10, padding: '10px 14px', color: pt.sub, fontSize: 12,
-                      flexShrink: 0, display: 'flex', alignItems: 'flex-start', gap: 8
-                    }}>
-                      <LightbulbIcon color={pt.sub} size={14} />
-                      <span style={{ flex: 1, minWidth: 0, ...wrapText }}>{result.explanation}</span>
-                    </div>
+                    <ExplanationNote dark={dark} style={{ flexShrink: 0 }}>{result.explanation}</ExplanationNote>
                   )}
                 </>
               )
@@ -528,35 +524,14 @@ export default function MCQExamFlow({
 
                   {optionTexts(q).map((opt: string, ai: number) => {
                     const label = optionLabels[ai]
-                    let bg = dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'
-                    let border = pt.border
-                    let color = pt.sub
-                    if (result && label === result.correct_answer) { bg = okTint; border = okColor; color = okColor }
-                    if (result && userAnswer === label && label !== result.correct_answer) { bg = badTint; border = badColor; color = badColor }
-                    return (
-                      <div key={ai} style={{
-                        background: bg, border: `1px solid ${border}`,
-                        borderRadius: 10, padding: '10px 14px', marginBottom: 8,
-                        display: 'flex', alignItems: 'flex-start', gap: 6,
-                        ...wrapText
-                      }}>
-                        <span style={{ flexShrink: 0, color, fontSize: 13, fontWeight: 600 }}>{label.toUpperCase()}.</span>
-                        <span style={{ flex: 1, minWidth: 0 }}>
-                          <AutoDirText text={opt} style={{ color, fontSize: 13, fontWeight: 600, ...wrapText }} />
-                        </span>
-                      </div>
-                    )
+                    const state = result && label === result.correct_answer
+                      ? 'correct'
+                      : result && userAnswer === label ? 'wrong' : 'neutral'
+                    return <ReviewOption key={ai} dark={dark} label={label} text={opt} state={state} />
                   })}
 
                   {result?.explanation && (
-                    <div style={{
-                      background: dark ? 'rgba(56,189,248,0.10)' : 'rgba(2,132,199,0.06)',
-                      borderRadius: 10, padding: '10px 14px', marginTop: 8, color: pt.sub, fontSize: 12,
-                      display: 'flex', alignItems: 'flex-start', gap: 8
-                    }}>
-                      <LightbulbIcon color={pt.sub} size={14} />
-                      <span style={{ flex: 1, minWidth: 0, ...wrapText }}>{result.explanation}</span>
-                    </div>
+                    <ExplanationNote dark={dark} style={{ marginTop: 8 }}>{result.explanation}</ExplanationNote>
                   )}
                 </LiquidGlassCard>
               </div>

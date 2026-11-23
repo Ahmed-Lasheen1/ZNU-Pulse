@@ -4,6 +4,7 @@ import { supabase } from '@/core/supabase'
 import { getPulseTheme, pulseFonts, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import PulseBrand from '@/shared/ui/display/PulseBrand'
 import { GlassField, PrimaryButton, GhostButton, AuthMessage, inputResetStyle } from '@/features/account/AuthPrimitives'
+import { MIN_PASSWORD_LENGTH } from '@/features/account/passwordRules'
 
 // Reset-password page opened from the emailed link.
 export default function ResetPassword({ dark = true }: { dark?: boolean }) {
@@ -25,7 +26,7 @@ export default function ResetPassword({ dark = true }: { dark?: boolean }) {
 
   // Saves the new password.
   async function handleSubmit() {
-    if (!password || password.length < 8) return setMessage('❌ Password must be at least 8 characters')
+    if (!password || password.length < MIN_PASSWORD_LENGTH) return setMessage(`❌ Password must be at least ${MIN_PASSWORD_LENGTH} characters`)
     if (password !== confirm) return setMessage('❌ Passwords do not match')
     setLoading(true); setMessage('')
     const { error } = await supabase.auth.updateUser({ password })
@@ -55,7 +56,7 @@ export default function ResetPassword({ dark = true }: { dark?: boolean }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <GlassField dark={dark}>
                 <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                  placeholder="New password (min 8 characters)" style={inputResetStyle(pt)} />
+                  placeholder={`New password (min ${MIN_PASSWORD_LENGTH} characters)`} style={inputResetStyle(pt)} />
               </GlassField>
               <GlassField dark={dark}>
                 <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)}
