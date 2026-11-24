@@ -23,21 +23,34 @@ interface PillTabsProps<T extends string> {
   onSelect: (id: T) => void
   marginBottom: number
   size?: PillTabSize
+  // center (default): centered row; scroll: left-aligned, scrolls sideways on phones and wraps from 720px up (admin tab bars).
+  layout?: 'center' | 'scroll'
+  // Makes every tab share the row width equally (two-option toggles inside forms).
+  fill?: boolean
 }
 
-// Centered row of glass tabs (Review: History/Flagged, Profile: Profile/Leaderboard, Pulse Check, Schedule).
-export default function PillTabs<T extends string>({ dark, tabs, active, onSelect, marginBottom, size = 'fixed' }: PillTabsProps<T>) {
+// Row of glass tabs (Review, Profile, Pulse Check, Schedule, admin tab bars and form toggles).
+// Each tab reports its selected state to assistive technology through aria-pressed.
+export default function PillTabs<T extends string>({
+  dark, tabs, active, onSelect, marginBottom, size = 'fixed', layout = 'center', fill = false,
+}: PillTabsProps<T>) {
   const pt = getPulseTheme(dark)
   const hoverTint = glassHoverTint(dark)
   const fixed = size === 'fixed'
   const compact = size === 'compact'
+  const scroll = layout === 'scroll'
 
   return (
-    <div style={{
-      display: 'flex', justifyContent: 'center', gap: fixed ? 14 : 10,
-      flexWrap: fixed ? undefined : 'wrap', marginBottom,
-    }}>
+    <div
+      className={scroll ? 'pill-tabs-scroll' : undefined}
+      style={{
+        display: 'flex', justifyContent: scroll ? undefined : 'center', gap: fixed ? 14 : 10,
+        flexWrap: fixed || scroll ? undefined : 'wrap', marginBottom,
+      }}
+    >
       <style>{`
+        .pill-tabs-scroll { overflow-x: auto; padding-bottom: 8px; -webkit-overflow-scrolling: touch; }
+        @media (min-width: 720px) { .pill-tabs-scroll { flex-wrap: wrap; overflow-x: visible; } }
         @media (max-width: 400px) {
           .pill-tab-auto { padding: 10px 12px !important; font-size: 13px !important; gap: 6px !important; }
         }
@@ -50,17 +63,21 @@ export default function PillTabs<T extends string>({ dark, tabs, active, onSelec
         const accent = t.accent ?? pt.cobalt
         const tint = `${accent}${t.accent ? '33' : '26'}`
         const base = compact
-          ? { padding: '8px 18px', ...pulseType.small, fontWeight: 700 }
+          ? { padding: '8px 18px', whiteSpace: 'nowrap' as const, ...pulseType.small, fontWeight: 700 }
           : fixed
             ? { padding: '11px 0', ...pulseType.button, fontSize: 14 }
             : { padding: '10px 22px', whiteSpace: 'nowrap' as const, ...pulseType.button }
+        const rowStyle = fixed
+          ? { textAlign: 'center' as const, width: 150 }
+          : fill ? { flex: 1 } : scroll ? { flexShrink: 0 } : undefined
 
         return (
           <PulseGlassRow
             key={t.id} dark={dark} radius={999} active={isActive}
             activeTint={tint} hoverTint={hoverTint}
             onClick={() => onSelect(t.id)}
-            style={fixed ? { textAlign: 'center', width: 150 } : undefined}
+            aria-pressed={isActive}
+            style={rowStyle}
           >
             <div
               className={size === 'auto' ? 'pill-tab-auto' : undefined}

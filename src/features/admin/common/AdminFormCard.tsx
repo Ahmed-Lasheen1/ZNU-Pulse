@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
 import { getPulseTheme } from '@/shared/theme/premiumTheme'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
+import Button from '@/shared/ui/controls/Button'
 import { EditIcon, PlusIcon } from '@/shared/icons/tool-icons'
-import { cancelBtnStyle, submitBtnStyle } from '@/features/admin/common/adminStyles'
 import type { AdminIcon } from '@/features/admin/common/adminTypes'
 
 interface AdminFormCardProps {
@@ -23,6 +23,7 @@ interface AdminFormCardProps {
   onCancel?: () => void
 }
 
+// Admin card with a heading, optional cancel and save buttons, and the form fields as children.
 export default function AdminFormCard({
   dark, title, noun, Icon, description, headerAction, children,
   editing = false, addLabel = 'Save', savingLabel = 'Saving...', cancelLabel = 'Cancel',
@@ -45,18 +46,17 @@ export default function AdminFormCard({
         <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           {headerAction}
           {onCancel && (
-            <button
-              onClick={onCancel}
-              disabled={saving}
-              style={{ ...cancelBtnStyle(pt, dark), padding: '9px 16px', fontSize: 13 }}
-            >{cancelLabel}</button>
+            <Button dark={dark} variant="glass" size="sm" onClick={onCancel} disabled={saving} style={{ padding: '9px 16px', fontSize: 13 }}>
+              {cancelLabel}
+            </Button>
           )}
           {onSave && (
-            <button
-              onClick={onSave}
-              disabled={blocked}
-              style={submitBtnStyle(pt, dark, blocked, { flex: 'none', width: 'auto', padding: '9px 20px', fontSize: 13 })}
-            >{saving ? savingLabel : editing ? 'Save Changes' : addLabel}</button>
+            <Button
+              dark={dark} variant="primary" size="sm" onClick={onSave} disabled={blocked}
+              style={{ padding: '9px 20px', fontSize: 13, fontWeight: 800, gap: 7 }}
+            >
+              {saving ? savingLabel : editing ? 'Save Changes' : addLabel}
+            </Button>
           )}
         </div>
       </div>

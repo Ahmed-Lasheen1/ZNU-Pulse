@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/core/supabase'
 import { getPulseTheme, pulseFonts, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import PulseBrand from '@/shared/ui/display/PulseBrand'
-import { GlassField, PrimaryButton, GhostButton, AuthMessage, inputResetStyle } from '@/features/account/AuthPrimitives'
+import Button from '@/shared/ui/controls/Button'
+import { GlassField, AuthMessage, inputResetStyle } from '@/features/account/AuthPrimitives'
 import { MIN_PASSWORD_LENGTH } from '@/features/account/passwordRules'
 
 // Reset-password page opened from the emailed link.
@@ -63,12 +64,14 @@ export default function ResetPassword({ dark = true }: { dark?: boolean }) {
                   onKeyDown={e => e.key === 'Enter' && handleSubmit()}
                   placeholder="Confirm new password" style={inputResetStyle(pt)} />
               </GlassField>
-              <PrimaryButton pt={pt} disabled={loading} onClick={handleSubmit}>
+              <Button dark={dark} variant="primary" size="lg" fullWidth disabled={loading} onClick={handleSubmit}>
                 {loading ? 'Saving...' : 'Save New Password'}
-              </PrimaryButton>
+              </Button>
             </div>
           ) : (
-            <GhostButton dark={dark} onClick={() => navigate('/auth')}>← Back to Sign In</GhostButton>
+            <Button dark={dark} variant="glass" size="field" fullWidth color={pt.text} onClick={() => navigate('/auth')}>
+              ← Back to Sign In
+            </Button>
           )}
         </div>
       </div>

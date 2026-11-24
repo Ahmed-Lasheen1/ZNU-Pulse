@@ -2,13 +2,14 @@ import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '@/core/supabase'
 import { useAuth } from '@/core/contexts'
-import { getPulseTheme, pulseFonts, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import { adaptColor } from '@/shared/theme/adaptColor'
 import { glassInput } from '@/shared/ui/glass/PulseUI'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PageShell from '@/shared/ui/layout/PageShell'
 import PageIntro from '@/shared/ui/layout/PageIntro'
 import PillTabs from '@/shared/ui/controls/PillTabs'
+import Button from '@/shared/ui/controls/Button'
 import { QuestionCardsSkeleton } from '@/shared/ui/feedback/Skeletons'
 import EmptyState from '@/shared/ui/feedback/EmptyState'
 import OfflineNote from '@/shared/ui/feedback/OfflineNote'
@@ -100,14 +101,12 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
   const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
   const location = useLocation()
 
-  // Status colors follow the color mode; the suffixes are opacities (10%, 16%, 25%, 35%).
+  // Status colors follow the color mode; the suffixes are opacities (10%, 16%, 25%).
   const okColor = pt.success
   const okSoft = `${pt.success}1A`
   const okTint = `${pt.success}29`
   const okBorder = `${pt.success}40`
   const okRing = `${pt.success}59`
-  const dangerTint = `${pt.danger}24`
-  const dangerBorder = `${pt.danger}59`
   // The violet accent as text color (fills keep the original).
   const questionsText = adaptColor(QUESTIONS_ACCENT, dark)
 
@@ -364,15 +363,13 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
               {msg && (
                 <div style={{ color: isSuccess ? okColor : pt.danger, fontSize: 13, marginBottom: 8 }}>{msg}</div>
               )}
-              <button onClick={submitQuestion} disabled={submitDisabled} style={{
-                width: '100%', padding: '13px', background: QUESTIONS_ACCENT,
-                border: 'none', borderRadius: 999, cursor: submitDisabled ? 'not-allowed' : 'pointer',
-                opacity: submitDisabled ? 0.6 : 1,
-                fontWeight: 700, color: '#0f172a', fontFamily: pulseFonts.body, fontSize: 14,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
-              }}>
+              <Button
+                dark={dark} variant="solid" size="md" color={QUESTIONS_ACCENT} fullWidth
+                onClick={submitQuestion} disabled={submitDisabled}
+                style={{ padding: 13, fontWeight: 700, gap: 8 }}
+              >
                 {submitDisabled ? `Please wait ${cooldownSeconds}s...` : (<>Send Anonymously <Lock size={14} /></>)}
-              </button>
+              </Button>
             </LiquidGlassCard>
           </div>
 
@@ -454,18 +451,14 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
                         onChange={e => setReplyText(prev => ({ ...prev, [q.id]: e.target.value }))}
                         style={{ ...inStyle, ...arabicFont(draft), minHeight: 60, resize: 'vertical' }} />
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={() => submitReply(q.id)} style={{
-                          flex: 1, padding: '10px', background: dark ? '#22c55e' : pt.success,
-                          border: 'none', borderRadius: 999, cursor: 'pointer',
-                          fontWeight: 700, color: '#fff', fontFamily: pulseFonts.body,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
-                        }}><CheckCircleIcon color="#fff" size={14} /> Answer</button>
-                        <button onClick={() => setConfirmDeleteId(q.id)} aria-label="Delete question" style={{
-                          padding: '10px 16px', background: dangerTint,
-                          border: `1px solid ${dangerBorder}`, borderRadius: 999, cursor: 'pointer',
-                          color: pt.danger, fontFamily: pulseFonts.body, fontWeight: 700,
-                          display: 'flex', alignItems: 'center'
-                        }}><TrashIcon color={pt.danger} size={15} /></button>
+                        <Button
+                          dark={dark} variant="solid" size="md" color={dark ? '#22c55e' : pt.success} onColor="#fff"
+                          onClick={() => submitReply(q.id)} style={{ flex: 1, padding: 10, fontWeight: 700 }}
+                        ><CheckCircleIcon color="#fff" size={14} /> Answer</Button>
+                        <Button
+                          dark={dark} variant="tinted" size="md" color={pt.danger}
+                          onClick={() => setConfirmDeleteId(q.id)} aria-label="Delete question" style={{ padding: '10px 16px' }}
+                        ><TrashIcon color={pt.danger} size={15} /></Button>
                       </div>
                     </LiquidGlassCard>
                   </div>
@@ -506,13 +499,10 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
                       <AutoDirText text={q.answer || ''} style={{ color: pt.textPrimary, fontSize: 14 }} />
                     </div>
                     {isAdmin && (
-                      <button onClick={() => setConfirmDeleteId(q.id)} style={{
-                        marginTop: 8, padding: '6px 12px',
-                        background: dangerTint, border: `1px solid ${dangerBorder}`,
-                        borderRadius: 8, cursor: 'pointer',
-                        color: pt.danger, fontFamily: pulseFonts.body, fontSize: 12,
-                        display: 'inline-flex', alignItems: 'center', gap: 5
-                      }}><TrashIcon color={pt.danger} size={13} /> Delete</button>
+                      <Button
+                        dark={dark} variant="tinted" size="xs" color={pt.danger}
+                        onClick={() => setConfirmDeleteId(q.id)} style={{ marginTop: 8 }}
+                      ><TrashIcon color={pt.danger} size={13} /> Delete</Button>
                     )}
                   </LiquidGlassCard>
                 </div>
@@ -521,11 +511,10 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
             {loadMoreError && <div style={{ marginTop: 16 }}><ErrorBanner message="Couldn't load more questions — check your connection." /></div>}
             {!loading && hasMore && (
               <div style={{ textAlign: 'center', marginTop: 16 }}>
-                <button onClick={loadMoreQuestions} disabled={loadingMore} style={{
-                  background: 'transparent', border: `1px solid ${pt.border}`, borderRadius: 999,
-                  padding: '8px 22px', color: pt.sub, cursor: loadingMore ? 'not-allowed' : 'pointer',
-                  fontFamily: pulseFonts.body, fontSize: 12, fontWeight: 700
-                }}>{loadingMore ? 'Loading...' : 'Load more'}</button>
+                <Button
+                  dark={dark} variant="ghost" size="sm" onClick={loadMoreQuestions} disabled={loadingMore}
+                  style={{ padding: '8px 22px' }}
+                >{loadingMore ? 'Loading...' : 'Load more'}</Button>
               </div>
             )}
           </div>

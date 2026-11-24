@@ -101,9 +101,7 @@ export default function Footer({ dark, animate = false }) {
           </div>
 
           <div style={{ marginTop: 4 }}>
-            <PulseGlassRow dark={dark} radius={999} hoverTint={hoverTint} onClick={backToTop}
-              role="button" tabIndex={0}
-              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); backToTop() } }}>
+            <PulseGlassRow dark={dark} radius={999} hoverTint={hoverTint} onClick={backToTop}>
               <div style={{ padding: '6px 14px', fontSize: 12, fontWeight: 700, color: ON_BACKGROUND.secondary }}>
                 ↑ Back to top
               </div>

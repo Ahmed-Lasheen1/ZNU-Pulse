@@ -3,6 +3,7 @@ import { ChevronDown } from 'lucide-react'
 import { getPulseTheme } from '@/shared/theme/premiumTheme'
 import { glassHoverTint } from '@/shared/theme/liquidGlass'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
+import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import Collapse from '@/shared/ui/layout/Collapse'
 
 interface SubjectAccordionProps {
@@ -17,9 +18,10 @@ interface SubjectAccordionProps {
   subtitle?: ReactNode
   // Button shown at the right of the header (for example "Practice All").
   action: ReactNode
-  // True when the header toggles the panel; false renders a plain, non-interactive header.
-  expandable: boolean
-  open: boolean
+  // True when the user expanded this subject.
+  expanded: boolean
+  // Keeps the panel open and the header non-interactive (a page with a single subject).
+  forceOpen?: boolean
   onToggle: () => void
   // False when there is nothing to expand, so no panel is rendered at all.
   hasPanel?: boolean
@@ -29,10 +31,12 @@ interface SubjectAccordionProps {
 
 // Subject card whose header expands in place to a list of lesson rows (shared by MCQ, Flashcards and Study by Lesson).
 export default function SubjectAccordion({
-  dark, id, label, delay = 0, icon, title, subtitle, action, expandable, open, onToggle, hasPanel = true, children,
+  dark, id, label, delay = 0, icon, title, subtitle, action, expanded, forceOpen = false, onToggle, hasPanel = true, children,
 }: SubjectAccordionProps) {
   const pt = getPulseTheme(dark)
   const hoverTint = glassHoverTint(dark)
+  const expandable = hasPanel && !forceOpen
+  const open = hasPanel && (forceOpen || expanded)
 
   return (
     <LiquidGlassCard dark={dark} delay={delay} style={{ padding: 0 }}>
@@ -80,5 +84,16 @@ export default function SubjectAccordion({
         </Collapse>
       )}
     </LiquidGlassCard>
+  )
+}
+
+// Tappable lesson row inside an accordion panel: a title block on the left and a count or badge on the right.
+export function AccordionRow({ dark, onClick, children }: { dark: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <PulseGlassRow dark={dark} radius={12} hoverTint={glassHoverTint(dark)} onClick={onClick}>
+      <div style={{ padding: '9px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+        {children}
+      </div>
+    </PulseGlassRow>
   )
 }

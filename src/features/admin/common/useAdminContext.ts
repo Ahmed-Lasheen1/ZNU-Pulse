@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { storageGet, storageSet } from '@/core/safeStorage'
+import { storageGetJson, storageSetJson } from '@/core/safeStorage'
 import type { AdminModule, AdminSubject, AdminLesson, AdminContext, ContextSelection } from '@/features/admin/common/adminTypes'
 
 const STORAGE_KEY = 'znu_admin_context'
@@ -7,24 +7,22 @@ const STORAGE_KEY = 'znu_admin_context'
 export const PICK_MODULE_MESSAGE = '❌ Pick a module above first'
 export const REQUIRED_FIELDS_MESSAGE = '❌ Please fill in all required fields'
 
+// Reads the last admin module/subject/lesson selection saved on this device.
 function readStoredSelection(): ContextSelection {
-  try {
-    const parsed = JSON.parse(storageGet(STORAGE_KEY) || '{}')
-    return {
-      moduleId: String(parsed.moduleId || ''),
-      subjectId: String(parsed.subjectId || ''),
-      lessonId: String(parsed.lessonId || ''),
-    }
-  } catch {
-    return { moduleId: '', subjectId: '', lessonId: '' }
+  const parsed = storageGetJson(STORAGE_KEY, {})
+  return {
+    moduleId: String(parsed.moduleId || ''),
+    subjectId: String(parsed.subjectId || ''),
+    lessonId: String(parsed.lessonId || ''),
   }
 }
 
+// Keeps the admin context selection saved and drops ids that no longer exist.
 export function useAdminContext(modules: AdminModule[], subjects: AdminSubject[], lessons: AdminLesson[]): AdminContext {
   const [selection, setSelection] = useState<ContextSelection>(readStoredSelection)
 
   useEffect(() => {
-    storageSet(STORAGE_KEY, JSON.stringify(selection))
+    storageSetJson(STORAGE_KEY, selection)
   }, [selection])
 
   return useMemo(() => {

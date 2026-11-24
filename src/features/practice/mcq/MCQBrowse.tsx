@@ -9,15 +9,16 @@ import Button from '@/shared/ui/controls/Button'
 import TabRow from '@/shared/ui/controls/TabRow'
 import ActionCard from '@/shared/ui/layout/ActionCard'
 import SectionHeader from '@/shared/ui/layout/SectionHeader'
-import SubjectAccordion from '@/shared/ui/layout/SubjectAccordion'
+import SubjectAccordion, { AccordionRow } from '@/shared/ui/layout/SubjectAccordion'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PageShell from '@/shared/ui/layout/PageShell'
 import PageIntro from '@/shared/ui/layout/PageIntro'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import { CardRowsSkeleton } from '@/shared/ui/feedback/Skeletons'
 import { ModuleIcon, ExamIcon } from '@/shared/icons/medicalIcons'
-import { BookIcon, PauseIcon, PlayIcon, EmptyBoxIcon, GraduationCapIcon, TargetIcon } from '@/shared/icons/tool-icons'
+import { BookIcon, PauseIcon, PlayIcon, EmptyBoxIcon, GraduationCapIcon } from '@/shared/icons/tool-icons'
 import { useWeakSpots } from '@/features/practice/mcq/useWeakSpots'
+import SimulatorCard from '@/features/practice/SimulatorCard'
 import { MCQ_ACCENT } from '@/shared/theme/accents'
 import { stagesOf, inStage } from '@/services/content/lessonStages'
 import { simulatorPool, simulatorTotal, QUIZ_MAX_QUESTIONS } from '@/services/exam/stageSimulator'
@@ -127,73 +128,6 @@ function SourceChoiceDialog({
         </div>
       </LiquidGlassCard>
     </DialogShell>
-  )
-}
-
-interface SubjectAccordionRowProps {
-  dark: boolean
-  sub: any
-  count: number
-  tabAccentColor: string
-  delay: number
-  lessonRows: { lesson: any; count: number }[]
-  expanded: boolean
-  forceOpen: boolean
-  onToggle: () => void
-  onPracticeSubject: () => void
-  onPracticeLesson: (lessonId: string) => void
-}
-
-// Subject row that expands in place to its lessons, with a "Practice All" button.
-function SubjectAccordionRow({
-  dark, sub, count, tabAccentColor, delay, lessonRows, expanded, forceOpen, onToggle, onPracticeSubject, onPracticeLesson
-}: SubjectAccordionRowProps) {
-  const pt = getPulseTheme(dark)
-  const hasLessons = lessonRows.length > 0
-  const canExpand = hasLessons && !forceOpen
-  const isOpen = hasLessons && (forceOpen || expanded)
-  const hoverTint = glassHoverTint(dark)
-
-  return (
-    <SubjectAccordion
-      dark={dark}
-      id={`subject-lessons-${sub.id}`}
-      label={`${sub.name} lessons`}
-      delay={delay}
-      icon={<ModuleIcon value={sub.icon} size={18} color={adaptColor(sub.color || tabAccentColor, dark)} />}
-      title={sub.name}
-      subtitle={
-        <>
-          {countLabel(count)}
-          {count > QUIZ_MAX_QUESTIONS && (
-            <span style={{ color: pt.faint }}> · quiz uses {QUIZ_MAX_QUESTIONS}</span>
-          )}
-        </>
-      }
-      action={
-        <Button dark={dark} variant="solid" size="sm" color={MCQ_ACCENT} onClick={onPracticeSubject} style={{ flexShrink: 0 }}>
-          Practice All
-        </Button>
-      }
-      expandable={canExpand}
-      open={isOpen}
-      hasPanel={hasLessons}
-      onToggle={onToggle}
-    >
-      {lessonRows.map(({ lesson, count: lessonQCount }) => (
-        <PulseGlassRow
-          key={lesson.id} dark={dark} radius={12}
-          hoverTint={hoverTint}
-          onClick={() => onPracticeLesson(lesson.id)}
-          tabIndex={isOpen ? 0 : -1}
-        >
-          <div style={{ padding: '9px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-            <span style={{ color: pt.textPrimary, fontSize: 13, fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lesson.title}</span>
-            <span style={{ color: pt.textMuted, fontSize: 11, flexShrink: 0 }}>{countLabel(lessonQCount)}</span>
-          </div>
-        </PulseGlassRow>
-      ))}
-    </SubjectAccordion>
   )
 }
 
@@ -390,29 +324,12 @@ export default function MCQBrowse({
 
       {simulatorShown && (
         <div style={{ marginBottom: 32 }}>
-          <style>{`
-            .sim-sub-short { display: none; }
-            @media (max-width: 480px) {
-              .sim-sub-full { display: none; }
-              .sim-sub-short { display: inline; }
-            }
-          `}</style>
-          <ActionCard
+          <SimulatorCard
             dark={dark}
-            accent={MCQ_ACCENT}
-            icon={<TargetIcon color={mcqText} size={28} />}
-            title={`${stageTitle} Simulator`}
-            subtitle={
-              <CountText dark={dark}>
-                <span className="sim-sub-full">{countLabel(simTotal)} · {simSubjectCount} subject{simSubjectCount === 1 ? '' : 's'} · new mix each time</span>
-                <span className="sim-sub-short">{countLabel(simTotal)} · {simSubjectCount} subject{simSubjectCount === 1 ? '' : 's'}</span>
-              </CountText>
-            }
-            action={
-              <Button dark={dark} variant="solid" size="md" color={MCQ_ACCENT} onClick={() => onStartSimulator(activeStage)} style={{ flexShrink: 0 }}>
-                Start →
-              </Button>
-            }
+            title={stageTitle}
+            total={simTotal}
+            subjectCount={simSubjectCount}
+            onStart={() => onStartSimulator(activeStage)}
           />
         </div>
       )}
@@ -448,20 +365,39 @@ export default function MCQBrowse({
       <SectionHeader as="h3">Practice by Subject</SectionHeader>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {subjectRows.map(({ sub, count, lessonRows }, i) => (
-          <SubjectAccordionRow
+          <SubjectAccordion
             key={sub.id}
             dark={dark}
-            sub={sub}
-            count={count}
-            tabAccentColor={tabAccentColor}
+            id={`subject-lessons-${sub.id}`}
+            label={`${sub.name} lessons`}
             delay={i * 70}
-            lessonRows={lessonRows}
+            icon={<ModuleIcon value={sub.icon} size={18} color={adaptColor(sub.color || tabAccentColor, dark)} />}
+            title={sub.name}
+            subtitle={
+              <>
+                {countLabel(count)}
+                {count > QUIZ_MAX_QUESTIONS && (
+                  <span style={{ color: pt.faint }}> · quiz uses {QUIZ_MAX_QUESTIONS}</span>
+                )}
+              </>
+            }
+            action={
+              <Button dark={dark} variant="solid" size="sm" color={MCQ_ACCENT} onClick={() => onStartQuiz('practice', sub.id, null)} style={{ flexShrink: 0 }}>
+                Practice All
+              </Button>
+            }
             expanded={expandedSubjectId === sub.id}
             forceOpen={singleSubject}
+            hasPanel={lessonRows.length > 0}
             onToggle={() => setExpandedSubjectId(prev => prev === sub.id ? null : sub.id)}
-            onPracticeSubject={() => onStartQuiz('practice', sub.id, null)}
-            onPracticeLesson={lessonId => onStartQuiz('practice', null, lessonId)}
-          />
+          >
+            {lessonRows.map(({ lesson, count: lessonQCount }) => (
+              <AccordionRow key={lesson.id} dark={dark} onClick={() => onStartQuiz('practice', null, lesson.id)}>
+                <span style={{ color: pt.textPrimary, fontSize: 13, fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lesson.title}</span>
+                <span style={{ color: pt.textMuted, fontSize: 11, flexShrink: 0 }}>{countLabel(lessonQCount)}</span>
+              </AccordionRow>
+            ))}
+          </SubjectAccordion>
         ))}
         {loading && subjectRows.length === 0 && <CardRowsSkeleton count={3} label="Loading subjects" />}
         {subjectRows.length === 0 && !loading && (

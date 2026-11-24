@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react'
-import { getPulseTheme, pulseFonts, pulseType } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseFonts, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import { adaptColor } from '@/shared/theme/adaptColor'
 import StudyShell from '@/shared/ui/study/StudyShell'
 import StudyHeader from '@/shared/ui/study/StudyHeader'
@@ -9,14 +9,16 @@ import ProgressRail from '@/shared/ui/study/ProgressRail'
 import StudyActionBar, { BAR_BUTTON_BASE, BAR_TEXT, BAR_TEXT_MUTED } from '@/shared/ui/study/StudyActionBar'
 import QuestionSourceBadge from '@/shared/ui/display/QuestionSourceBadge'
 import AutoDirText from '@/shared/ui/display/AutoDirText'
+import Badge from '@/shared/ui/display/Badge'
+import Button from '@/shared/ui/controls/Button'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import { GradingSkeleton } from '@/shared/ui/feedback/Skeletons'
 import ConfirmDialog from '@/shared/ui/feedback/ConfirmDialog'
 import { FlagIcon, SearchIcon2 } from '@/shared/icons/tool-icons'
 import { wrapText } from '@/shared/utils/textStyles'
 import {
-  EXAM_LOW_TEXT, EXAM_LOW_SECONDARY, EXAM_DIVIDER, optionLabels, optionTexts, formatTime,
-  StatChip, InfoTag, ReviewOption, ExplanationNote,
+  optionLabels, optionTexts, formatTime,
+  StatChip, ReviewOption, ExplanationNote,
 } from '@/features/practice/mcqShared'
 import { MCQ_ACCENT } from '@/shared/theme/accents'
 import { accuracyTier, accuracyColor } from '@/shared/utils/accuracy'
@@ -52,25 +54,6 @@ interface MCQExamFlowProps {
   toggleFlagFor: (q: any) => void
   goPrev: () => void
   goNext: () => void
-}
-
-// Translucent pill button style for the results screen.
-function glassPillBtn(dark: boolean, overrides: React.CSSProperties = {}): React.CSSProperties {
-  return {
-    background: dark ? 'rgba(110,140,195,0.16)' : 'rgba(255,255,255,0.35)',
-    border: `1px solid ${dark ? 'rgba(255,255,255,0.28)' : 'rgba(6,43,80,0.3)'}`, borderRadius: 999,
-    color: EXAM_LOW_TEXT,
-    cursor: 'pointer', fontWeight: 700, fontSize: 13, letterSpacing: 0.5, fontFamily: pulseFonts.body,
-    ...overrides
-  }
-}
-
-// Solid "Done" pill button style for the results screen.
-function solidPillBtn(pt: ReturnType<typeof getPulseTheme>): React.CSSProperties {
-  return {
-    flex: 1, background: pt.cobalt, border: 'none', borderRadius: 999, padding: '13px',
-    color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 13, letterSpacing: 0.5, fontFamily: pulseFonts.body
-  }
 }
 
 // Exam screen: question flow, results summary and answer review for every MCQ mode.
@@ -234,7 +217,7 @@ export default function MCQExamFlow({
 
       {!submitted && !grading && currentQuestion && (
         <>
-          <div style={{ height: 1, background: EXAM_DIVIDER, marginBottom: 16 }} />
+          <div style={{ height: 1, background: ON_BACKGROUND.divider, marginBottom: 16 }} />
 
           <ProgressRail
             total={total}
@@ -259,8 +242,10 @@ export default function MCQExamFlow({
                   background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`,
                   color: accentText, fontWeight: 800, fontSize: 12, whiteSpace: 'nowrap'
                 }}>Q{safeIndex + 1}</span>
-                {showCurrentSubjectTag && <InfoTag label={currentSubject.name} color={currentSubject.color || '#34d399'} dark={dark} />}
-                {showCurrentLessonTag && <InfoTag label={currentLesson.title} color="#818cf8" dark={dark} />}
+                {showCurrentSubjectTag && (
+                  <Badge variant="neutral" dark={dark} color={currentSubject.color || '#34d399'} dot={currentSubject.color || '#34d399'}>{currentSubject.name}</Badge>
+                )}
+                {showCurrentLessonTag && <Badge variant="neutral" dark={dark} color="#818cf8" dot="#818cf8">{currentLesson.title}</Badge>}
                 {currentQuestion.source && <QuestionSourceBadge source={currentQuestion.source} dark={dark} />}
               </>
             }
@@ -399,10 +384,10 @@ export default function MCQExamFlow({
 
       {submitted && !grading && !showReview && (
         <div style={{ paddingBottom: 20 }}>
-          <div style={{ height: 1, background: EXAM_DIVIDER, marginBottom: 18 }} />
+          <div style={{ height: 1, background: ON_BACKGROUND.divider, marginBottom: 18 }} />
 
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: EXAM_LOW_SECONDARY, marginBottom: 2 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: ON_BACKGROUND.secondary, marginBottom: 2 }}>
               {completeLabel}
             </div>
             <div style={{
@@ -416,18 +401,18 @@ export default function MCQExamFlow({
             <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginTop: 16, flexWrap: 'wrap' }}>
               <StatChip label="CORRECT" value={score} color={pt.success} />
               <StatChip label="INCORRECT" value={total - score} color={pt.danger} />
-              <StatChip label="TIME" value={formatTime(finishTimeSec)} color={EXAM_LOW_TEXT} />
+              <StatChip label="TIME" value={formatTime(finishTimeSec)} color={ON_BACKGROUND.primary} />
             </div>
           </div>
 
           {subjectStats.length > 1 && (
             <div style={{ marginTop: 20 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: EXAM_LOW_SECONDARY, marginBottom: 10 }}>YOUR PERFORMANCE</div>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: ON_BACKGROUND.secondary, marginBottom: 10 }}>YOUR PERFORMANCE</div>
               {subjectStats.map(s => (
                 <div key={s.id} style={{ marginBottom: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ color: EXAM_LOW_TEXT, fontSize: 12, fontWeight: 600 }}>{s.name}</span>
-                    <span style={{ color: EXAM_LOW_SECONDARY, fontSize: 12, fontWeight: 700 }}>{s.accuracy}</span>
+                    <span style={{ color: ON_BACKGROUND.primary, fontSize: 12, fontWeight: 600 }}>{s.name}</span>
+                    <span style={{ color: ON_BACKGROUND.secondary, fontSize: 12, fontWeight: 700 }}>{s.accuracy}</span>
                   </div>
                   <div style={{
                     height: 4, borderRadius: 999, overflow: 'hidden',
@@ -446,7 +431,7 @@ export default function MCQExamFlow({
 
           {weakestSubject && (
             <div style={{ marginTop: 20 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: EXAM_LOW_SECONDARY, marginBottom: 8 }}>FOCUS NEXT</div>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: ON_BACKGROUND.secondary, marginBottom: 8 }}>FOCUS NEXT</div>
               <LiquidGlassCard dark={dark} delay={0} style={{ padding: '16px 20px' }}>
                 <div style={{ color: accentText, fontWeight: 800, fontSize: 15, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                   {weakestSubject.name}
@@ -454,35 +439,36 @@ export default function MCQExamFlow({
                 <div style={{ color: pt.sub, fontSize: 12, marginBottom: 12 }}>
                   You missed {weakestSubject.incorrect} question{weakestSubject.incorrect === 1 ? '' : 's'} from this topic.
                 </div>
-                <button onClick={() => startTargetedPractice(weakestSubject.id)} className="study-btn" style={{
-                  width: '100%', background: MCQ_ACCENT, color: '#0f172a', border: 'none', borderRadius: 999,
-                  padding: '11px', fontWeight: 800, fontSize: 12, letterSpacing: 0.5, cursor: 'pointer', fontFamily: pulseFonts.body
-                }}>START TARGETED PRACTICE</button>
+                <Button
+                  dark={dark} variant="solid" size="md" color={MCQ_ACCENT} fullWidth
+                  onClick={() => startTargetedPractice(weakestSubject.id)}
+                  style={{ padding: 11, fontSize: 12, letterSpacing: 0.5 }}
+                >START TARGETED PRACTICE</Button>
               </LiquidGlassCard>
             </div>
           )}
 
           <div style={{ marginTop: 20 }}>
-            <button onClick={() => setShowReview(true)} className="study-btn" style={glassPillBtn(dark, {
-              width: '100%', padding: '12px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
-            })}><SearchIcon2 color={EXAM_LOW_TEXT} size={14} /> REVIEW ANSWERS</button>
+            <Button
+              dark={dark} variant="glass" size="field" fullWidth color={ON_BACKGROUND.primary}
+              onClick={() => setShowReview(true)} style={{ padding: 12, letterSpacing: 0.5, gap: 8 }}
+            ><SearchIcon2 color={ON_BACKGROUND.primary} size={14} /> REVIEW ANSWERS</Button>
           </div>
 
           <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-            <button onClick={tryAgain} className="study-btn" style={glassPillBtn(dark, { flex: 1, padding: '13px' })}>TRY AGAIN</button>
-            <button onClick={stopQuiz} className="study-btn" style={solidPillBtn(pt)}>DONE</button>
+            <Button dark={dark} variant="glass" size="field" color={ON_BACKGROUND.primary} onClick={tryAgain} style={{ flex: 1, padding: 13, letterSpacing: 0.5 }}>TRY AGAIN</Button>
+            <Button dark={dark} variant="solid" size="field" color={pt.cobalt} onColor="#fff" onClick={stopQuiz} style={{ flex: 1, padding: 13, letterSpacing: 0.5 }}>DONE</Button>
           </div>
         </div>
       )}
 
       {submitted && !grading && showReview && (
         <div style={{ paddingBottom: 20 }}>
-          <div style={{ height: 1, background: EXAM_DIVIDER, marginBottom: 16 }} />
+          <div style={{ height: 1, background: ON_BACKGROUND.divider, marginBottom: 16 }} />
 
           <button onClick={() => setShowReview(false)} className="study-btn" style={{
             background: 'transparent', border: 'none', cursor: 'pointer',
-            color: EXAM_LOW_TEXT,
+            color: ON_BACKGROUND.primary,
             fontSize: 12, fontWeight: 700, letterSpacing: 1, marginBottom: 16, display: 'block'
           }}>← BACK TO RESULTS</button>
 
@@ -513,8 +499,8 @@ export default function MCQExamFlow({
                       background: isCorrect ? okTint : badTint,
                       color: isCorrect ? okColor : badColor
                     }}>{isCorrect ? '✓ CORRECT' : userAnswer ? '✕ INCORRECT' : '— UNANSWERED'}</span>
-                    {showSubjectTag && <InfoTag label={subj.name} color={subj.color || '#34d399'} dark={dark} />}
-                    {showLessonTag && <InfoTag label={lesson.title} color="#818cf8" dark={dark} />}
+                    {showSubjectTag && <Badge variant="neutral" dark={dark} color={subj.color || '#34d399'} dot={subj.color || '#34d399'}>{subj.name}</Badge>}
+                    {showLessonTag && <Badge variant="neutral" dark={dark} color="#818cf8" dot="#818cf8">{lesson.title}</Badge>}
                     {q.source && <QuestionSourceBadge source={q.source} dark={dark} />}
                   </div>
 
@@ -539,8 +525,8 @@ export default function MCQExamFlow({
           })}
 
           <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-            <button onClick={() => setShowReview(false)} className="study-btn" style={glassPillBtn(dark, { flex: 1, padding: '13px' })}>← BACK</button>
-            <button onClick={stopQuiz} className="study-btn" style={solidPillBtn(pt)}>DONE</button>
+            <Button dark={dark} variant="glass" size="field" color={ON_BACKGROUND.primary} onClick={() => setShowReview(false)} style={{ flex: 1, padding: 13, letterSpacing: 0.5 }}>← BACK</Button>
+            <Button dark={dark} variant="solid" size="field" color={pt.cobalt} onColor="#fff" onClick={stopQuiz} style={{ flex: 1, padding: 13, letterSpacing: 0.5 }}>DONE</Button>
           </div>
         </div>
       )}

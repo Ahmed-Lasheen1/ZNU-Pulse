@@ -1,8 +1,10 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { getPulseTheme, pulseFonts } from '@/shared/theme/premiumTheme'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
+import Button from '@/shared/ui/controls/Button'
 import { CompassIcon } from '@/shared/icons/tool-icons'
 
+// "Page not found" screen with a way back to Home.
 export default function NotFound({ dark }) {
   const pt = getPulseTheme(dark)
   const navigate = useNavigate()
@@ -28,11 +30,9 @@ export default function NotFound({ dark }) {
             <p style={{ color: pt.textMuted, marginBottom: 24, fontSize: 13, fontFamily: pulseFonts.body }}>
               It may have been moved, or the link might be outdated.
             </p>
-            <button onClick={() => navigate('/')} style={{
-              background: pt.cobalt, color: '#fff', border: 'none',
-              padding: '12px 24px', borderRadius: 999, cursor: 'pointer',
-              fontWeight: 700, fontFamily: pulseFonts.body, fontSize: 14
-            }}>← Back to Home</button>
+            <Button dark={dark} variant="solid" size="md" color={pt.cobalt} onColor="#fff" onClick={() => navigate('/')}>
+              ← Back to Home
+            </Button>
           </LiquidGlassCard>
         </div>
       </div>

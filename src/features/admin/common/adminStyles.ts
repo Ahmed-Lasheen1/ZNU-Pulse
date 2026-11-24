@@ -1,28 +1,16 @@
 import type { CSSProperties } from 'react'
 import { pulseFonts } from '@/shared/theme/premiumTheme'
-import { glassInput, glassPrimaryBtn, glassGhostBtn } from '@/shared/ui/glass/PulseUI'
+import { glassInput } from '@/shared/ui/glass/PulseUI'
 import type { PulseTheme } from '@/shared/theme/types'
 
 export const LIST_LIMIT = 200
 
+// Glass input style used by every admin form field.
 export function inStyle(pt: PulseTheme, dark: boolean): CSSProperties {
   return { ...glassInput(pt, dark), borderRadius: 14 }
 }
 
-export function submitBtnStyle(pt: PulseTheme, dark: boolean, busy: boolean, layout: CSSProperties = { flex: 1 }): CSSProperties {
-  return {
-    ...glassPrimaryBtn(pt, dark, false),
-    marginBottom: 0,
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-    ...layout,
-    opacity: busy ? 0.7 : 1,
-    cursor: busy ? 'not-allowed' : 'pointer',
-  }
-}
-
+// Small outlined action button used in admin rows and forms.
 export function miniBtn(color: string): CSSProperties {
   return {
     background: 'transparent',
@@ -40,14 +28,12 @@ export function miniBtn(color: string): CSSProperties {
   }
 }
 
-export function cancelBtnStyle(pt: PulseTheme, dark: boolean): CSSProperties {
-  return { ...glassGhostBtn(pt, dark), width: 'auto', padding: '0 20px' }
-}
-
+// Label above an admin form field.
 export function fieldLabel(pt: PulseTheme): CSSProperties {
   return { color: pt.textMuted, fontSize: 12, display: 'block', marginBottom: 4, fontWeight: 600 }
 }
 
+// Heading above a group of admin rows.
 export function groupHeading(color: string): CSSProperties {
   return { color, marginBottom: 8, fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }
 }

@@ -1,3 +1,4 @@
+import Badge from '@/shared/ui/display/Badge'
 import { RobotIcon, BookIcon, GraduationCapIcon } from '@/shared/icons/tool-icons'
 
 const SOURCE_META = {
@@ -6,21 +7,15 @@ const SOURCE_META = {
   university: { label: 'University Doctors', Icon: GraduationCapIcon, color: '#22c55e' },
 }
 
+// Badge telling where a question comes from (AI, courses or University Doctors); renders nothing for unknown sources.
 export default function QuestionSourceBadge({ source, dark = true }) {
   const meta = SOURCE_META[source]
   if (!meta) return null
   const { Icon } = meta
 
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 6,
-      background: dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.05)',
-      border: `1px solid ${dark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.10)'}`,
-      color: dark ? '#f1f5f9' : '#10243A',
-      borderRadius: 20, padding: '3px 10px',
-      fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap'
-    }}>
-      <Icon color={meta.color} size={12} /> {meta.label}
-    </span>
+    <Badge variant="neutral" dark={dark} color={meta.color} icon={<Icon color={meta.color} size={12} />}>
+      {meta.label}
+    </Badge>
   )
 }

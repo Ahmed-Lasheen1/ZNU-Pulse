@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { getPulseTheme } from '@/shared/theme/premiumTheme'
 import InlineMessage from '@/shared/ui/feedback/InlineMessage'
+import PillTabs from '@/shared/ui/controls/PillTabs'
 import AdminContextBar from '@/features/admin/common/AdminContextBar'
 import AdminSplitLayout from '@/features/admin/common/AdminSplitLayout'
 import AdminFormCard from '@/features/admin/common/AdminFormCard'
@@ -241,28 +242,7 @@ export default function SchedulesTab({ dark, modules, subjects, lessons, context
       onCancel={editingId ? resetForm : undefined}
     >
       <label style={fieldLabel(pt)}>Type</label>
-      <div role="group" aria-label="Schedule type" style={{ display: 'flex', gap: 8, marginBottom: typeChangeWarning ? 8 : 16 }}>
-        {TYPE_OPTIONS.map(option => {
-          const active = type === option.id
-          return (
-            <button
-              key={option.id}
-              type="button"
-              aria-pressed={active}
-              onClick={() => setType(option.id)}
-              style={{
-                flex: 1, padding: '9px', borderRadius: 10, cursor: 'pointer',
-                border: `1.5px solid ${active ? pt.cobalt : pt.border}`,
-                background: active ? `${pt.cobalt}18` : 'transparent',
-                color: active ? pt.cobalt : pt.sub, fontWeight: 700, fontSize: 12,
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6
-              }}
-            >
-              <option.Icon color={active ? pt.cobalt : pt.sub} size={13} /> {option.label}
-            </button>
-          )
-        })}
-      </div>
+      <PillTabs dark={dark} tabs={TYPE_OPTIONS} active={type} onSelect={setType} marginBottom={typeChangeWarning ? 8 : 16} size="compact" fill />
       {typeChangeWarning && <p style={{ color: pt.amber, fontSize: 12, fontWeight: 600, marginBottom: 14 }}>{typeChangeWarning}</p>}
 
       <input placeholder={type === 'study' ? 'Title (e.g. Week 1 plan)' : 'Title (e.g. Midterm)'} value={title} onChange={e => setTitle(e.target.value)} style={inStyle} />

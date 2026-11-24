@@ -10,7 +10,7 @@ import Collapse from '@/shared/ui/layout/Collapse'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { ScheduleIcon, SearchIcon2 } from '@/shared/icons/tool-icons'
 import { ModuleIcon } from '@/shared/icons/medicalIcons'
-import { storageGet, storageSet } from '@/core/safeStorage'
+import { storageGetSet, storageSetJson } from '@/core/safeStorage'
 import { wrapText } from '@/shared/utils/textStyles'
 import { daysFromToday, formatDayHeading } from '@/features/tools/schedule/scheduleDates'
 import { usePlanProgress } from '@/features/tools/schedule/usePlanProgress'
@@ -39,15 +39,6 @@ const NO_SUBJECT = 'none'
 
 // Storage key of the plan items a student has ticked on this device.
 const doneKey = (scheduleId: string) => `schedule_plan_done_${scheduleId}`
-
-// Reads the ticked item ids of a plan from this device.
-function readDone(scheduleId: string): Set<string> {
-  try {
-    return new Set(JSON.parse(storageGet(doneKey(scheduleId)) || '[]'))
-  } catch {
-    return new Set()
-  }
-}
 
 // Orders items by date (oldest first); items without a date go last.
 function sortByDate(items: PlanItem[]) {
@@ -88,7 +79,7 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
   const items = schedule.items || []
   const hasItems = items.length > 0
   const [open, setOpen] = useState(defaultOpen)
-  const [done, setDone] = useState(() => readDone(schedule.id))
+  const [done, setDone] = useState(() => storageGetSet(doneKey(schedule.id)))
   const [pickerItemId, setPickerItemId] = useState<string | null>(null)
   const autoDone = usePlanProgress(schedule, hasItems)
   const lookups = usePlanLookups(schedule.module_id, hasItems)
@@ -109,7 +100,7 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
     if (next.has(itemId)) next.delete(itemId)
     else next.add(itemId)
     setDone(next)
-    storageSet(doneKey(schedule.id), JSON.stringify([...next]))
+    storageSetJson(doneKey(schedule.id), [...next])
   }
 
   // Expands the plan, or opens the image when there are no plan items.

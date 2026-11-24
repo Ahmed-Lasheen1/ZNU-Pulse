@@ -9,14 +9,22 @@ import { isSuccessMessage } from '@/shared/utils/messageStyle'
 import { useMediaQuery } from '@/shared/hooks/useMediaQuery'
 import { getPulseTheme, pulseFonts, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import PulseBrand from '@/shared/ui/display/PulseBrand'
+import Button from '@/shared/ui/controls/Button'
+import PillTabs from '@/shared/ui/controls/PillTabs'
 import {
-  GlassField, PrimaryButton, GhostButton, TextLink, AccountToggle, AuthMessage, inputResetStyle
+  GlassField, TextLink, AuthMessage, inputResetStyle
 } from '@/features/account/AuthPrimitives'
 import { MIN_PASSWORD_LENGTH } from '@/features/account/passwordRules'
 
 type AccountType = 'university' | 'personal'
 type AuthMode = 'signin' | 'signup'
 type AuthStep = 'form' | 'verify'
+
+// Toggle that picks which kind of email the new account uses.
+const ACCOUNT_TABS = [
+  { id: 'university', label: 'University', Icon: GraduationCap },
+  { id: 'personal', label: 'Personal Gmail', Icon: Mail },
+] as const
 
 // Anchored so an address like "student@med.znu.edu.eg.attacker.com"
 // isn't accepted just because it contains the university domain.
@@ -255,8 +263,10 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
                     placeholder="123456" name="otp" autoComplete="one-time-code"
                     style={inputResetStyle(pt, { textAlign: 'center', fontSize: 22, fontWeight: 800, letterSpacing: 8 })} />
                 </GlassField>
-                <PrimaryButton pt={pt} disabled={loading} onClick={handleVerify}>{loading ? 'Verifying...' : 'Verify & Continue'}</PrimaryButton>
-                <GhostButton dark={dark} onClick={handleResend} disabled={loading}>Resend code</GhostButton>
+                <Button dark={dark} variant="primary" size="lg" fullWidth disabled={loading} onClick={handleVerify}>
+                  {loading ? 'Verifying...' : 'Verify & Continue'}
+                </Button>
+                <Button dark={dark} variant="glass" size="field" fullWidth color={pt.text} onClick={handleResend} disabled={loading}>Resend code</Button>
                 <div style={{ textAlign: 'center' }}>
                   <TextLink pt={pt} muted onClick={() => setStep('form')}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><ArrowLeft size={13} /> Go back</span>
@@ -293,9 +303,13 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
                   <TextLink pt={pt} onClick={handleForgotPassword} disabled={loading}>Forgot password?</TextLink>
                 </div>
 
-                <PrimaryButton pt={pt} disabled={loading} onClick={handleSubmit}>{loading ? 'Signing in...' : 'Sign In'}</PrimaryButton>
+                <Button dark={dark} variant="primary" size="lg" fullWidth disabled={loading} onClick={handleSubmit}>
+                  {loading ? 'Signing in...' : 'Sign In'}
+                </Button>
 
-                <GhostButton dark={dark} onClick={() => { setMode('signup'); resetAll() }}>Don't have an account? Sign Up</GhostButton>
+                <Button dark={dark} variant="glass" size="field" fullWidth color={pt.text} onClick={() => { setMode('signup'); resetAll() }}>
+                  Don't have an account? Sign Up
+                </Button>
                 <div style={{ textAlign: 'center' }}>
                   <TextLink pt={pt} muted onClick={() => navigate('/')}>Continue without account →</TextLink>
                 </div>
@@ -307,14 +321,11 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
                 {googleButton}
                 <OrDivider pt={pt} />
 
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <AccountToggle dark={dark} pt={pt} active={accountType === 'university'} onClick={() => { setAccountType('university'); setEmail('') }}>
-                    <GraduationCap size={14} /> University
-                  </AccountToggle>
-                  <AccountToggle dark={dark} pt={pt} active={accountType === 'personal'} onClick={() => { setAccountType('personal'); setEmail('') }}>
-                    <Mail size={14} /> Personal Gmail
-                  </AccountToggle>
-                </div>
+                <PillTabs
+                  dark={dark} tabs={ACCOUNT_TABS} active={accountType}
+                  onSelect={id => { setAccountType(id); setEmail('') }}
+                  marginBottom={0} size="compact" fill
+                />
 
                 <GlassField dark={dark}>
                   <input value={name} onChange={e => setName(e.target.value)} placeholder="Your name" name="name" autoComplete="name" style={inputResetStyle(pt)} />
@@ -349,9 +360,13 @@ export default function Auth({ dark = true }: { dark?: boolean }) {
                   </button>
                 </GlassField>
 
-                <PrimaryButton pt={pt} disabled={loading} onClick={handleSubmit}>{loading ? 'Creating account...' : 'Create Account'}</PrimaryButton>
+                <Button dark={dark} variant="primary" size="lg" fullWidth disabled={loading} onClick={handleSubmit}>
+                  {loading ? 'Creating account...' : 'Create Account'}
+                </Button>
 
-                <GhostButton dark={dark} onClick={() => { setMode('signin'); resetAll() }}>Already have an account? Sign In</GhostButton>
+                <Button dark={dark} variant="glass" size="field" fullWidth color={pt.text} onClick={() => { setMode('signin'); resetAll() }}>
+                  Already have an account? Sign In
+                </Button>
                 <div style={{ textAlign: 'center' }}>
                   <TextLink pt={pt} muted onClick={() => navigate('/')}>Continue without account →</TextLink>
                 </div>

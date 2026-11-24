@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/core/supabase'
 import { useAuth } from '@/core/contexts'
 import { getPulseTheme, pulseFonts, pulseType } from '@/shared/theme/premiumTheme'
-import { glassInput, glassPrimaryBtn, glassGhostBtn } from '@/shared/ui/glass/PulseUI'
+import { glassInput } from '@/shared/ui/glass/PulseUI'
 import { containsProfanity } from '@/shared/utils/moderation'
 import { isSuccessMessage } from '@/shared/utils/messageStyle'
 import { cachedSnapshot, saveCached } from '@/core/dataCache'
@@ -12,6 +12,7 @@ import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import BackButton from '@/shared/ui/layout/BackButton'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
+import Button from '@/shared/ui/controls/Button'
 import { NotificationToggle } from '@/features/notifications'
 import OfflineNote from '@/shared/ui/feedback/OfflineNote'
 import { ProfileSkeleton, LeaderboardSkeleton } from '@/shared/ui/feedback/Skeletons'
@@ -204,11 +205,10 @@ function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
         <label style={{ ...pulseType.small, color: pt.textMuted, display: 'block', marginBottom: 6 }}>Full Name</label>
         <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
           <input value={name} maxLength={MAX_NAME_LENGTH} onChange={e => setName(e.target.value)} style={{ ...inStyle, flex: 1, marginBottom: 0 }} />
-          <button onClick={saveName} disabled={saving} style={{
-            background: pt.cobalt, color: '#fff', border: 'none',
-            padding: '0 20px', borderRadius: 999, cursor: saving ? 'not-allowed' : 'pointer',
-            fontWeight: 700, fontFamily: pulseFonts.body, fontSize: 13, whiteSpace: 'nowrap'
-          }}>Save</button>
+          <Button
+            dark={dark} variant="solid" size="sm" color={pt.cobalt} onColor="#fff"
+            onClick={saveName} disabled={saving} style={{ padding: '0 20px', fontSize: 13 }}
+          >Save</Button>
         </div>
 
         <label style={{ ...pulseType.small, color: pt.textMuted, display: 'block', marginBottom: 6 }}>Set / Change Password</label>
@@ -218,9 +218,9 @@ function EditProfileForm({ profile, dark, onUpdated, onProfileRefresh }: {
           value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && savePassword()}
           style={inStyle} />
-        <button onClick={savePassword} disabled={saving} style={glassGhostBtn(pt, dark)}>
+        <Button dark={dark} variant="glass" size="field" fullWidth onClick={savePassword} disabled={saving}>
           {saving ? 'Saving...' : 'Update Password'}
-        </button>
+        </Button>
       </LiquidGlassCard>
     </div>
   )
@@ -354,9 +354,9 @@ export default function Profile({ dark }: { dark: boolean }) {
                 </div>
                 <h3 style={{ ...pulseType.sectionTitle, color: pt.cobalt, marginBottom: 8 }}>Sign in to view your profile</h3>
                 <p style={{ color: pt.sub, marginBottom: 20, fontSize: 14 }}>Track your points and save your progress</p>
-                <button onClick={() => navigate('/auth')} style={{ ...glassPrimaryBtn(pt, dark, false), width: 'auto', padding: '12px 28px', margin: '0 auto' }}>
+                <Button dark={dark} variant="primary" size="md" onClick={() => navigate('/auth')} style={{ padding: '12px 28px' }}>
                   Sign In
-                </button>
+                </Button>
               </LiquidGlassCard>
             ) : loading ? (
               <ProfileSkeleton />
@@ -387,9 +387,7 @@ export default function Profile({ dark }: { dark: boolean }) {
                 </div>
 
                 <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                  <PulseGlassRow dark={dark} radius={999} hoverTint={hoverTint} onClick={() => navigate('/review')}
-                    role="button" tabIndex={0} style={{ display: 'inline-block' }}
-                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/review') } }}>
+                  <PulseGlassRow dark={dark} radius={999} hoverTint={hoverTint} onClick={() => navigate('/review')} style={{ display: 'inline-block' }}>
                     <div style={{ padding: '8px 18px', ...pulseType.small, fontWeight: 700, color: pt.sub, display: 'flex', alignItems: 'center', gap: 6 }}>
                       <ClockIcon color={pt.sub} size={13} /> View exam history & mistakes
                     </div>
@@ -437,21 +435,19 @@ export default function Profile({ dark }: { dark: boolean }) {
                   />
                 )}
 
-                <button onClick={() => setShowSignOutConfirm(true)} style={{
-                  width: '100%', padding: '14px',
-                  background: pt.dangerTint, border: `1px solid ${pt.danger}59`,
-                  borderRadius: 999, cursor: 'pointer',
-                  color: pt.danger, fontFamily: pulseFonts.body, fontSize: 14, fontWeight: 700
-                }}>
+                <Button
+                  dark={dark} variant="tinted" size="sm" color={pt.danger} fullWidth
+                  onClick={() => setShowSignOutConfirm(true)} style={{ padding: 14, fontSize: 14 }}
+                >
                   Sign Out
-                </button>
+                </Button>
               </div>
             ) : (
               <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
                 <p style={{ color: pt.sub, marginBottom: 20, fontSize: 14 }}>We couldn't load your profile.</p>
-                <button onClick={() => fetchData()} style={{ ...glassPrimaryBtn(pt, dark, false), width: 'auto', padding: '12px 28px', margin: '0 auto' }}>
+                <Button dark={dark} variant="primary" size="md" onClick={() => fetchData()} style={{ padding: '12px 28px' }}>
                   Try again
-                </button>
+                </Button>
               </LiquidGlassCard>
             )}
           </>

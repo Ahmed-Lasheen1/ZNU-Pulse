@@ -14,6 +14,7 @@ interface PulseGlassRowProps {
   tabIndex?: number
   onKeyDown?: (e: KeyboardEvent<HTMLDivElement>) => void
   'aria-label'?: string
+  'aria-pressed'?: boolean
 }
 
 // Same three-layer glass recipe already used by NavMenu.jsx's local

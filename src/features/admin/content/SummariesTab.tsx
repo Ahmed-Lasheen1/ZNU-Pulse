@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { getPulseTheme } from '@/shared/theme/premiumTheme'
 import InlineMessage from '@/shared/ui/feedback/InlineMessage'
+import PillTabs from '@/shared/ui/controls/PillTabs'
 import AdminSplitLayout from '@/features/admin/common/AdminSplitLayout'
 import AdminFormCard from '@/features/admin/common/AdminFormCard'
 import AdminRow from '@/features/admin/common/AdminRow'
@@ -148,26 +149,7 @@ export default function SummariesTab({ dark, modules, subjects, context }: Summa
       onCancel={editingId ? resetForm : undefined}
     >
       {!editingId && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          {PUBLISH_MODES.map(mode => {
-            const active = publishMode === mode.id
-            return (
-              <button
-                key={mode.id}
-                onClick={() => setPublishMode(mode.id)}
-                style={{
-                  flex: 1, padding: '9px', borderRadius: 10, cursor: 'pointer',
-                  border: `1.5px solid ${active ? pt.cobalt : pt.border}`,
-                  background: active ? `${pt.cobalt}18` : 'transparent',
-                  color: active ? pt.cobalt : pt.sub, fontWeight: 700, fontSize: 12,
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6
-                }}
-              >
-                <mode.Icon color={active ? pt.cobalt : pt.sub} size={13} /> {mode.label}
-              </button>
-            )
-          })}
-        </div>
+        <PillTabs dark={dark} tabs={PUBLISH_MODES} active={publishMode} onSelect={setPublishMode} marginBottom={16} size="compact" fill />
       )}
 
       <input placeholder="Title (e.g. End Module Exam)" value={title} onChange={e => setTitle(e.target.value)} style={inStyle} />

@@ -6,7 +6,7 @@ import { getPulseTheme } from '@/shared/theme/premiumTheme'
 import { watchOnlineCount } from '@/services/presence/onlinePresence'
 import { CardGridSkeleton } from '@/shared/ui/feedback/Skeletons'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
-import AdminPill from '@/features/admin/common/AdminPill'
+import PillTabs from '@/shared/ui/controls/PillTabs'
 import { StatCard } from '@/features/admin/analytics/AnalyticsWidgets'
 import { accuracyColor } from '@/shared/utils/accuracy'
 import OverviewSection from '@/features/admin/analytics/OverviewSection'
@@ -26,6 +26,12 @@ interface AnalyticsTabProps {
 }
 
 const PERIODS = [7, 30, 90] as const
+
+// Period pills plus the Refresh action; the pill id of a period is its number of days.
+const TOOLBAR_TABS = [
+  ...PERIODS.map(period => ({ id: `${period}`, label: `${period} days`, Icon: CalendarDotIcon })),
+  { id: 'refresh', label: 'Refresh', Icon: RefreshIcon },
+]
 
 // How long a saved analytics copy is reused before it is refreshed in the background.
 const ANALYTICS_TTL = 5 * MINUTE
@@ -111,6 +117,12 @@ export default function AnalyticsTab({ dark, modules }: AnalyticsTabProps) {
     setReloadTick(t => t + 1)
   }
 
+  // Handles a tap on a toolbar pill: Refresh reloads, a period pill switches the period.
+  function selectToolbar(id: string) {
+    if (id === 'refresh') refreshAnalytics()
+    else setDays(Number(id))
+  }
+
   const users = data?.users
   const performance = data?.performance
   const pending = loading && !data
@@ -120,12 +132,7 @@ export default function AnalyticsTab({ dark, modules }: AnalyticsTabProps) {
 
   return (
     <div>
-      <div className="admin-tabs" style={{ marginBottom: 8 }}>
-        {PERIODS.map(period => (
-          <AdminPill key={period} dark={dark} active={days === period} label={`${period} days`} Icon={CalendarDotIcon} onSelect={() => setDays(period)} />
-        ))}
-        <AdminPill dark={dark} active={false} label="Refresh" Icon={RefreshIcon} onSelect={refreshAnalytics} />
-      </div>
+      <PillTabs dark={dark} tabs={TOOLBAR_TABS} active={`${days}`} onSelect={selectToolbar} marginBottom={8} size="compact" layout="scroll" />
 
       {errorMessage && <div style={{ marginBottom: 16 }}><ErrorBanner message={errorMessage} /></div>}
 
@@ -152,11 +159,7 @@ export default function AnalyticsTab({ dark, modules }: AnalyticsTabProps) {
         />
       </div>
 
-      <div className="admin-tabs" style={{ marginBottom: 16 }}>
-        {SECTIONS.map(s => (
-          <AdminPill key={s.id} dark={dark} active={section === s.id} label={s.label} Icon={s.Icon} onSelect={() => setSection(s.id)} />
-        ))}
-      </div>
+      <PillTabs dark={dark} tabs={SECTIONS} active={section} onSelect={setSection} marginBottom={16} size="compact" layout="scroll" />
 
       {pending && <CardGridSkeleton />}
 

@@ -4,6 +4,7 @@ import { useAuth, useModules } from '@/core/contexts'
 import { getPulseTheme, pulseFonts, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import BackButton from '@/shared/ui/layout/BackButton'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
+import PillTabs from '@/shared/ui/controls/PillTabs'
 import { fetchAllSubjects, invalidateSubjectsCache } from '@/services/content/subjects'
 import { fetchAllLessons, invalidateLessonsCache } from '@/services/content/lessons'
 import { fetchAllRows } from '@/core/fetchAllRows'
@@ -21,7 +22,6 @@ import StructureTab from '@/features/admin/structure/StructureTab'
 import AnalyticsTab from '@/features/admin/analytics/AnalyticsTab'
 import SettingsTab from '@/features/admin/settings/SettingsTab'
 import AdminContextBar from '@/features/admin/common/AdminContextBar'
-import AdminPill from '@/features/admin/common/AdminPill'
 import { useAdminContext } from '@/features/admin/common/useAdminContext'
 import type { AdminModule, AdminSubject, AdminLesson } from '@/features/admin/common/adminTypes'
 
@@ -132,13 +132,6 @@ export default function Admin({ dark }: { dark: boolean }) {
         fontFamily: pulseFonts.body, maxWidth: 1500, margin: '0 auto'
       }}>
         <style>{`
-          .admin-tabs {
-            display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px;
-            margin-bottom: 16px; -webkit-overflow-scrolling: touch;
-          }
-          @media (min-width: 720px) {
-            .admin-tabs { flex-wrap: wrap; overflow-x: visible; }
-          }
           .admin-form-row-2 {
             display: grid; grid-template-columns: 1fr; gap: 0; margin-bottom: 12px;
           }
@@ -176,18 +169,7 @@ export default function Admin({ dark }: { dark: boolean }) {
           </div>
         )}
 
-        <div className="admin-tabs">
-          {TABS.map(tab => (
-            <AdminPill
-              key={tab.id}
-              dark={dark}
-              active={activeTab === tab.id}
-              label={tab.label}
-              Icon={tab.Icon}
-              onSelect={() => setActiveTab(tab.id)}
-            />
-          ))}
-        </div>
+        <PillTabs dark={dark} tabs={TABS} active={activeTab} onSelect={setActiveTab} marginBottom={16} size="compact" layout="scroll" />
 
         {contextDepth && (
           <AdminContextBar

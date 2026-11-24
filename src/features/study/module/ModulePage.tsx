@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { getPulseTheme, pulseFonts, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
+import { getPulseTheme, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import { adaptColor } from '@/shared/theme/adaptColor'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PageShell from '@/shared/ui/layout/PageShell'
@@ -13,6 +13,7 @@ import TabRow from '@/shared/ui/controls/TabRow'
 import { PageSectionsSkeleton } from '@/shared/ui/feedback/Skeletons'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import { SummaryOverlay } from '@/features/study/summaries'
+import { SimulatorCard } from '@/features/practice'
 import { useModules } from '@/core/contexts'
 import { fetchModuleStages, stageMetaFrom } from '@/services/content/moduleStages'
 import { fetchSubjectsForModule } from '@/services/content/subjects'
@@ -27,7 +28,6 @@ import { ModuleIcon, ExamIcon, NotesIcon } from '@/shared/icons/medicalIcons'
 import { ExamStageIcon, SmartSummariesIcon, PracticeIcon, TargetIcon } from '@/shared/icons/tool-icons'
 import { FlashcardIcon } from '@/shared/icons/FlashcardIcon'
 import { MCQ_ACCENT, FLASHCARD_ACCENT } from '@/shared/theme/accents'
-import { countLabel } from '@/shared/utils/format'
 
 interface PageModule {
   id: string; name: string; icon?: string | null; color: string; status: 'active' | 'completed'
@@ -231,7 +231,6 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   }
 
   const simulatorVisible = stageActive && simStats.total > 0 && hasQuestions
-  const subjectText = `${simStats.subjects} subject${simStats.subjects === 1 ? '' : 's'}`
 
   return (
     <PageShell dark={dark} backFallback="/" maxWidth={900}>
@@ -302,41 +301,14 @@ export default function ModulePage({ dark }: { dark: boolean }) {
 
       {simulatorVisible && meta && (
         <div style={{ marginBottom: 32 }}>
-          <style>{`
-            .sim-sub-short { display: none; }
-            .sim-row { display: flex; align-items: center; gap: 18px; }
-            .sim-icon { width: 60px; height: 60px; border-radius: 18px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-            .sim-text { flex: 1; min-width: 0; }
-            .sim-btn { flex-shrink: 0; white-space: nowrap; padding: 12px 24px; }
-            @media (max-width: 480px) {
-              .sim-sub-full { display: none; }
-              .sim-sub-short { display: inline; }
-              .sim-row { gap: 12px; }
-              .sim-icon { width: 48px; height: 48px; border-radius: 14px; }
-              .sim-btn { padding: 10px 16px; font-size: 13px !important; }
-            }
-          `}</style>
           <SectionHeader Icon={TargetIcon}>Exam Simulator</SectionHeader>
-          <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 24px' }}>
-            <div className="sim-row">
-              <div className="sim-icon" style={{ background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55` }}>
-                <TargetIcon color={mcqText} size={28} />
-              </div>
-              <div className="sim-text">
-                <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>{meta.title} Simulator</div>
-                <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 4 }}>
-                  <span className="sim-sub-full">{countLabel(simStats.total)} · {subjectText} · new mix each time</span>
-                  <span className="sim-sub-short">{countLabel(simStats.total)} · {subjectText}</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={openSimulator}
-                className="sim-btn glass-focus-ring"
-                style={{ background: MCQ_ACCENT, color: '#0f172a', border: 'none', borderRadius: 999, fontWeight: 800, fontSize: 14, fontFamily: pulseFonts.body, cursor: 'pointer' }}
-              >Start →</button>
-            </div>
-          </LiquidGlassCard>
+          <SimulatorCard
+            dark={dark}
+            title={meta.title}
+            total={simStats.total}
+            subjectCount={simStats.subjects}
+            onStart={openSimulator}
+          />
         </div>
       )}
 

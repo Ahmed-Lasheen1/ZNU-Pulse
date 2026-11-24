@@ -9,12 +9,13 @@ import FlipCard from '@/shared/ui/study/FlipCard'
 import ProgressRail from '@/shared/ui/study/ProgressRail'
 import StudyActionBar, { BAR_BUTTON_BASE } from '@/shared/ui/study/StudyActionBar'
 import AutoDirText from '@/shared/ui/display/AutoDirText'
+import Button from '@/shared/ui/controls/Button'
 import { useStudyFontScale } from '@/shared/hooks/useStudyFontScale'
 import { usePrefersReducedMotion } from '@/shared/hooks/usePrefersReducedMotion'
 import { wrapText } from '@/shared/utils/textStyles'
 import { accuracyColor } from '@/shared/utils/accuracy'
 import { CheckCircleIcon, XCircleIcon } from '@/shared/icons/tool-icons'
-import { EXAM_DIVIDER, formatTime, StatChip } from '@/features/practice/mcqShared'
+import { formatTime, StatChip } from '@/features/practice/mcqShared'
 import type { Answer } from '@/services/flashcards/scheduler'
 
 export interface StudyCardItem {
@@ -180,12 +181,6 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
   const doneIndexes = new Set(Array.from({ length: answered }, (_, i) => i))
   const percent = total > 0 ? Math.round((right / total) * 100) : 0
 
-  // Style of a full-width button on the end screen.
-  const endButton = (background: string, color: string, border = 'none') => ({
-    flex: 1, padding: '14px', borderRadius: 999, background, color, border,
-    fontWeight: 800, fontSize: 14, fontFamily: pulseFonts.body, cursor: 'pointer',
-  } as const)
-
   const verdictMeta = verdict ? VERDICT[verdict] : null
   const statusPrefix = round > 0 ? 'MISSED · ' : ''
 
@@ -199,7 +194,7 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
         onCycleFontScale={finished ? undefined : cycleFontScale}
         onExit={onExit}
       />
-      <div style={{ height: 1, background: EXAM_DIVIDER, marginBottom: 16 }} />
+      <div style={{ height: 1, background: ON_BACKGROUND.divider, marginBottom: 16 }} />
 
       {!finished && current && (
         <>
@@ -323,17 +318,16 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
             {missed.length > 0 && (
-              <button className="study-btn" onClick={reviewMissed} style={{ ...endButton(accent, '#0f172a'), flex: 'none' }}>
+              <Button dark={dark} variant="solid" size="md" color={accent} fullWidth onClick={reviewMissed} style={{ padding: 14 }}>
                 Review {missed.length} missed card{missed.length === 1 ? '' : 's'}
-              </button>
+              </Button>
             )}
             <div style={{ display: 'flex', gap: 10 }}>
-              <button className="study-btn" onClick={onExit} style={endButton('transparent', pt.sub, `1px solid ${pt.border}`)}>Done</button>
-              <button
-                className="study-btn"
-                onClick={onMore}
-                style={missed.length > 0 ? endButton('transparent', pt.sub, `1px solid ${pt.border}`) : endButton(accent, '#0f172a')}
-              >{practice ? 'Review again' : 'Study more'}</button>
+              <Button dark={dark} variant="ghost" size="md" onClick={onExit} style={{ flex: 1, padding: 14 }}>Done</Button>
+              <Button
+                dark={dark} variant={missed.length > 0 ? 'ghost' : 'solid'} size="md" color={accent}
+                onClick={onMore} style={{ flex: 1, padding: 14 }}
+              >{practice ? 'Review again' : 'Study more'}</Button>
             </div>
           </div>
         </StudyCard>

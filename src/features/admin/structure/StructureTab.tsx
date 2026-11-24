@@ -4,11 +4,12 @@ import ConfirmDialog from '@/shared/ui/feedback/ConfirmDialog'
 import EmptyState from '@/shared/ui/feedback/EmptyState'
 import { CardRowsSkeleton } from '@/shared/ui/feedback/Skeletons'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
+import PillTabs from '@/shared/ui/controls/PillTabs'
+import Badge from '@/shared/ui/display/Badge'
 import { fetchLessonStageMap } from '@/services/content/lessonStages'
 import { ModuleIcon, NotesIcon } from '@/shared/icons/medicalIcons'
 import { PackageIcon, BookIcon, TargetIcon, ConstructionIcon } from '@/shared/icons/tool-icons'
 import AdminContextBar from '@/features/admin/common/AdminContextBar'
-import AdminPill from '@/features/admin/common/AdminPill'
 import AdminSplitLayout from '@/features/admin/common/AdminSplitLayout'
 import AdminRow from '@/features/admin/common/AdminRow'
 import ModuleForm from '@/features/admin/structure/ModuleForm'
@@ -271,12 +272,10 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
                 )}
                 {(stageMap[l.id] || []).map(value => {
                   const option = stageOptions.find(o => o.value === value)
-                  const color = option?.color ?? FALLBACK_STAGE_COLOR
                   return (
-                    <span key={value} style={{
-                      background: `${color}22`, border: `1px solid ${color}55`, color,
-                      borderRadius: 999, padding: '1px 8px', fontSize: 10.5, fontWeight: 700
-                    }}>{option?.label ?? value}</span>
+                    <Badge key={value} color={option?.color ?? FALLBACK_STAGE_COLOR} variant="outline" size="sm">
+                      {option?.label ?? value}
+                    </Badge>
                   )
                 })}
               </AdminRow>
@@ -309,18 +308,7 @@ export default function StructureTab({ dark, modules, subjects, lessons, context
 
   return (
     <div>
-      <div className="admin-tabs" style={{ marginBottom: 16 }}>
-        {SEGMENTS.map(s => (
-          <AdminPill
-            key={s.id}
-            dark={dark}
-            active={segment === s.id}
-            label={s.label}
-            Icon={s.Icon}
-            onSelect={() => changeSegment(s.id)}
-          />
-        ))}
-      </div>
+      <PillTabs dark={dark} tabs={SEGMENTS} active={segment} onSelect={changeSegment} marginBottom={16} size="compact" layout="scroll" />
 
       {loading ? (
         <CardRowsSkeleton count={4} variant="admin" label="Loading structure" />

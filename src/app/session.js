@@ -1,17 +1,15 @@
 import { supabase, AUTH_STORAGE_KEY } from '@/core/supabase'
-import { storageGet } from '@/core/safeStorage'
+import { storageGetJson } from '@/core/safeStorage'
 import { containsProfanity } from '@/shared/utils/moderation'
 
+// Reads the signed-in user from the saved session (used when offline).
 export function readStoredUser() {
-  try {
-    return JSON.parse(storageGet(AUTH_STORAGE_KEY) || 'null')?.user ?? null
-  } catch {
-    return null
-  }
+  return storageGetJson(AUTH_STORAGE_KEY, null)?.user ?? null
 }
 
 const ensureProfileInFlight = new Set()
 
+// Creates the user's profile row on first sign-in.
 export async function ensureProfile(user) {
   if (ensureProfileInFlight.has(user.id)) return
   ensureProfileInFlight.add(user.id)

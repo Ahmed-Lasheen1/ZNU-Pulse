@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getPulseTheme, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
+import { getPulseTheme } from '@/shared/theme/premiumTheme'
 import { adaptColor } from '@/shared/theme/adaptColor'
 import { ModuleIcon, NotesIcon, ExamIcon } from '@/shared/icons/medicalIcons'
 import { StudyByLessonIcon, BookIcon } from '@/shared/icons/tool-icons'
 import { FlashcardIcon } from '@/shared/icons/FlashcardIcon'
 import Button from '@/shared/ui/controls/Button'
 import Checkbox from '@/shared/ui/controls/Checkbox'
+import SectionHeader from '@/shared/ui/layout/SectionHeader'
 import SubjectAccordion from '@/shared/ui/layout/SubjectAccordion'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import { MCQ_ACCENT, FLASHCARD_ACCENT } from '@/shared/theme/accents'
 import { accuracyColor } from '@/shared/utils/accuracy'
-import { storageGet, storageSet } from '@/core/safeStorage'
+import { storageGetSet, storageSetJson } from '@/core/safeStorage'
 import { useWeakSpots } from '@/features/practice'
 import { fetchModuleQuestions } from '@/services/content/moduleContent'
 import { WEAK_BELOW } from '@/services/history/weakSpots'
@@ -49,15 +50,6 @@ interface StudyByLessonSectionProps {
 // Storage key of the lessons a student has ticked in a module on this device.
 const doneKey = (moduleId: string) => `module_lessons_done_${moduleId}`
 
-// Reads the ticked lesson ids of a module from this device.
-function readDone(moduleId: string): Set<string> {
-  try {
-    return new Set(JSON.parse(storageGet(doneKey(moduleId)) || '[]'))
-  } catch {
-    return new Set()
-  }
-}
-
 // Subject accordion — expands in place to lesson rows with a done checkbox and inline
 // Summary/Flashcards/Practice actions. Lessons the student is struggling with carry an accuracy badge.
 export default function StudyByLessonSection({
@@ -68,7 +60,7 @@ export default function StudyByLessonSection({
   const [openSubjectId, setOpenSubjectId] = useState<string | null>(null)
   const [openPickerLessonId, setOpenPickerLessonId] = useState<string | null>(null)
   const [moduleQuestions, setModuleQuestions] = useState<any[]>([])
-  const [doneLessons, setDoneLessons] = useState<Set<string>>(() => readDone(moduleId))
+  const [doneLessons, setDoneLessons] = useState<Set<string>>(() => storageGetSet(doneKey(moduleId)))
   const lessonAccuracy = useWeakSpots(moduleQuestions)
   // Accents as text/icon colors, adjusted to stay readable in the current mode (fills keep the original).
   const mcqText = adaptColor(MCQ_ACCENT, dark)
@@ -84,7 +76,7 @@ export default function StudyByLessonSection({
   }, [moduleId])
 
   // Reloads the ticks when the module changes.
-  useEffect(() => { setDoneLessons(readDone(moduleId)) }, [moduleId])
+  useEffect(() => { setDoneLessons(storageGetSet(doneKey(moduleId))) }, [moduleId])
 
   // Carries the selected exam stage into the MCQ page, like the simulator link does.
   const stageQuery = stage ? `&stage=${encodeURIComponent(stage)}` : ''
@@ -101,7 +93,7 @@ export default function StudyByLessonSection({
     if (next.has(lessonId)) next.delete(lessonId)
     else next.add(lessonId)
     setDoneLessons(next)
-    storageSet(doneKey(moduleId), JSON.stringify([...next]))
+    storageSetJson(doneKey(moduleId), [...next])
   }
 
   // Opens practice questions of one lesson.
@@ -137,9 +129,7 @@ export default function StudyByLessonSection({
         }
       `}</style>
 
-      <h2 style={{ ...pulseType.sectionLabel, color: ON_BACKGROUND.muted, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <StudyByLessonIcon color={ON_BACKGROUND.muted} size={14} /> Study by Lesson
-      </h2>
+      <SectionHeader Icon={StudyByLessonIcon}>Study by Lesson</SectionHeader>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {bySubject.map(({ sub, lessonsForSub }) => {
@@ -161,8 +151,7 @@ export default function StudyByLessonSection({
                   Practice All
                 </Button>
               }
-              expandable
-              open={open}
+              expanded={open}
               onToggle={() => setOpenSubjectId(open ? null : sub.id)}
             >
               {lessonsForSub.map(lesson => {

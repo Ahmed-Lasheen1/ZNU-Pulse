@@ -12,6 +12,15 @@ interface StudyMaterialsSectionProps {
   driveUrl: string
 }
 
+// One card of the section: an icon tile, a title with a hint, and what happens on tap.
+interface MaterialCard {
+  key: string
+  Icon: (p: { color: string; size?: number }) => JSX.Element
+  title: string
+  hint: string
+  onOpen: () => void
+}
+
 // "Study Materials" section on the module page: a Files card and a University Google Drive card.
 // The Drive URL is validated (http/https only) before it's ever rendered as a clickable card or window.open target.
 export default function StudyMaterialsSection({ dark, moduleId, presentFileTypes, driveUrl }: StudyMaterialsSectionProps) {
@@ -19,57 +28,48 @@ export default function StudyMaterialsSection({ dark, moduleId, presentFileTypes
   const navigate = useNavigate()
   const driveUrlIsSafe = !!driveUrl && isSafeExternalUrl(driveUrl)
 
-  const cards: JSX.Element[] = []
+  const cards: MaterialCard[] = []
 
   if (presentFileTypes.size > 0) {
-    cards.push(
-      <LiquidGlassCard key="files" dark={dark} delay={0}
-        onClick={() => navigate(`/files?module=${moduleId}`)}
-        style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
-        <div style={{
-          background: `${pt.cobalt}20`, border: `1px solid ${pt.cobaltBorder}`,
-          borderRadius: 12, width: 44, height: 44,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-        }}>
-          <FolderIcon color={pt.cobalt} size={20} />
-        </div>
-        <div>
-          <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>Files</div>
-          <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2 }}>Explanations, questions, lectures & more</div>
-        </div>
-      </LiquidGlassCard>
-    )
+    cards.push({
+      key: 'files', Icon: FolderIcon, title: 'Files', hint: 'Explanations, questions, lectures & more',
+      onOpen: () => navigate(`/files?module=${moduleId}`),
+    })
   }
 
   if (driveUrlIsSafe) {
-    cards.push(
-      <LiquidGlassCard key="drive" dark={dark} delay={0}
-        onClick={() => window.open(driveUrl, '_blank', 'noopener,noreferrer')}
-        style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
-        <div style={{
-          background: `${pt.cobalt}20`, border: `1px solid ${pt.cobaltBorder}`,
-          borderRadius: 12, width: 44, height: 44,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-        }}>
-          <StudyMaterialsIcon color={pt.cobalt} size={20} />
-        </div>
-        <div>
-          <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>University Google Drive</div>
-          <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2 }}>Lectures, recordings & more</div>
-        </div>
-      </LiquidGlassCard>
-    )
+    cards.push({
+      key: 'drive', Icon: StudyMaterialsIcon, title: 'University Google Drive', hint: 'Lectures, recordings & more',
+      onOpen: () => window.open(driveUrl, '_blank', 'noopener,noreferrer'),
+    })
   }
 
   if (cards.length === 0) return null
 
+  const rendered = cards.map(({ key, Icon, title, hint, onOpen }) => (
+    <LiquidGlassCard key={key} dark={dark} delay={0} onClick={onOpen}
+      style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div style={{
+        background: `${pt.cobalt}20`, border: `1px solid ${pt.cobaltBorder}`,
+        borderRadius: 12, width: 44, height: 44,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+      }}>
+        <Icon color={pt.cobalt} size={20} />
+      </div>
+      <div>
+        <div style={{ ...pulseType.cardTitle, color: pt.textPrimary }}>{title}</div>
+        <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2 }}>{hint}</div>
+      </div>
+    </LiquidGlassCard>
+  ))
+
   return (
     <div style={{ marginBottom: 32 }}>
       <SectionHeader Icon={StudyMaterialsIcon}>Study Materials</SectionHeader>
-      {cards.length === 1 ? (
-        <div className="auto-grid-single">{cards[0]}</div>
+      {rendered.length === 1 ? (
+        <div className="auto-grid-single">{rendered[0]}</div>
       ) : (
-        <div className="summary-practice-row">{cards}</div>
+        <div className="summary-practice-row">{rendered}</div>
       )}
     </div>
   )

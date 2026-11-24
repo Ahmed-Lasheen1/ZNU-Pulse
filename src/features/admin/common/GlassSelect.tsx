@@ -112,8 +112,7 @@ export default function GlassSelect({
     <div ref={triggerRef} style={{ position: 'relative', marginBottom: 12 }}>
       <PulseGlassRow
         dark={dark} radius={14} onClick={() => setOpen(o => !o)}
-        role="button" tabIndex={0} aria-haspopup="listbox" aria-expanded={open}
-        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o) } }}
+        aria-haspopup="listbox" aria-expanded={open}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px' }}>
           {selected ? (

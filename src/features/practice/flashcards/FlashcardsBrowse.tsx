@@ -8,8 +8,7 @@ import Button from '@/shared/ui/controls/Button'
 import TabRow from '@/shared/ui/controls/TabRow'
 import ActionCard from '@/shared/ui/layout/ActionCard'
 import SectionHeader from '@/shared/ui/layout/SectionHeader'
-import SubjectAccordion from '@/shared/ui/layout/SubjectAccordion'
-import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
+import SubjectAccordion, { AccordionRow } from '@/shared/ui/layout/SubjectAccordion'
 import PageShell from '@/shared/ui/layout/PageShell'
 import PageIntro from '@/shared/ui/layout/PageIntro'
 import { CardRowsSkeleton } from '@/shared/ui/feedback/Skeletons'
@@ -17,7 +16,6 @@ import { ModuleIcon } from '@/shared/icons/medicalIcons'
 import { FlashcardIcon } from '@/shared/icons/FlashcardIcon'
 import { EmptyBoxIcon } from '@/shared/icons/tool-icons'
 import { FLASHCARD_ACCENT } from '@/shared/theme/accents'
-import { glassHoverTint } from '@/shared/theme/liquidGlass'
 import { plural } from '@/shared/utils/format'
 
 interface BrowseModule { id: string; name: string; icon?: string | null; color: string }
@@ -53,73 +51,6 @@ interface FlashcardsBrowseProps {
 }
 
 const PAGE_MAX_WIDTH = 900
-
-// Subject row that expands in place to its lessons, with a "Study All" button.
-function SubjectRow({ dark, group, delay, expanded, forceOpen, onToggle, onStudySubject, onStudyLesson }: {
-  dark: boolean
-  group: SubjectGroup
-  delay: number
-  expanded: boolean
-  forceOpen: boolean
-  onToggle: () => void
-  onStudySubject: () => void
-  onStudyLesson: (lessonId: string) => void
-}) {
-  const pt = getPulseTheme(dark)
-  const { subject, rows, total, due } = group
-  const hasPanel = rows.length > 1
-  const canExpand = hasPanel && !forceOpen
-  const isOpen = hasPanel && (forceOpen || expanded)
-  const hoverTint = glassHoverTint(dark)
-  const accentText = adaptColor(FLASHCARD_ACCENT, dark)
-
-  return (
-    <SubjectAccordion
-      dark={dark}
-      id={`flashcard-subject-${subject.id}`}
-      label={`${subject.name} lessons`}
-      delay={delay}
-      icon={<ModuleIcon value={subject.icon} size={18} color={adaptColor(subject.color || FLASHCARD_ACCENT, dark)} />}
-      title={subject.name}
-      subtitle={
-        <>
-          {plural(total, 'card')}
-          {due > 0 && <span style={{ color: accentText }}> · {due} due</span>}
-        </>
-      }
-      action={
-        <Button dark={dark} variant="solid" size="sm" color={FLASHCARD_ACCENT} onClick={onStudySubject} style={{ flexShrink: 0 }}>
-          Study All
-        </Button>
-      }
-      expandable={canExpand}
-      open={isOpen}
-      hasPanel={hasPanel}
-      onToggle={onToggle}
-    >
-      {rows.map(({ lesson, total: lessonTotal, toStudy }) => (
-        <PulseGlassRow
-          key={lesson.id} dark={dark} radius={12} hoverTint={hoverTint}
-          onClick={() => onStudyLesson(lesson.id)}
-          tabIndex={isOpen ? 0 : -1}
-        >
-          <div style={{ padding: '9px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-            <span style={{ minWidth: 0 }}>
-              <div style={{ color: pt.textPrimary, fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lesson.title}</div>
-              <div style={{ color: pt.textMuted, fontSize: 11, marginTop: 1 }}>{plural(lessonTotal, 'card')}</div>
-            </span>
-            <span style={{
-              flexShrink: 0, fontSize: 11, fontWeight: 700, borderRadius: 999, padding: '3px 10px', whiteSpace: 'nowrap',
-              background: toStudy > 0 ? `${FLASHCARD_ACCENT}26` : 'transparent',
-              color: toStudy > 0 ? accentText : pt.textMuted,
-              border: toStudy > 0 ? 'none' : `1px solid ${pt.border}`,
-            }}>{toStudy > 0 ? `${toStudy} to study` : 'Review anyway'}</span>
-          </div>
-        </PulseGlassRow>
-      ))}
-    </SubjectAccordion>
-  )
-}
 
 // Flashcards browse page: stage tabs, due-today card and subjects with their lessons.
 export default function FlashcardsBrowse({
@@ -194,18 +125,46 @@ export default function FlashcardsBrowse({
 
       <SectionHeader as="h3">Study by Subject</SectionHeader>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {!loading && groups.map((group, i) => (
-          <SubjectRow
-            key={group.subject.id}
+        {!loading && groups.map(({ subject, rows, total, due }, i) => (
+          <SubjectAccordion
+            key={subject.id}
             dark={dark}
-            group={group}
+            id={`flashcard-subject-${subject.id}`}
+            label={`${subject.name} lessons`}
             delay={i * 70}
-            expanded={expandedSubjectId === group.subject.id}
+            icon={<ModuleIcon value={subject.icon} size={18} color={adaptColor(subject.color || FLASHCARD_ACCENT, dark)} />}
+            title={subject.name}
+            subtitle={
+              <>
+                {plural(total, 'card')}
+                {due > 0 && <span style={{ color: accentText }}> · {due} due</span>}
+              </>
+            }
+            action={
+              <Button dark={dark} variant="solid" size="sm" color={FLASHCARD_ACCENT} onClick={() => onStartSubject(subject.id)} style={{ flexShrink: 0 }}>
+                Study All
+              </Button>
+            }
+            expanded={expandedSubjectId === subject.id}
             forceOpen={singleSubject}
-            onToggle={() => setExpandedSubjectId(prev => prev === group.subject.id ? null : group.subject.id)}
-            onStudySubject={() => onStartSubject(group.subject.id)}
-            onStudyLesson={onStartLesson}
-          />
+            hasPanel={rows.length > 1}
+            onToggle={() => setExpandedSubjectId(prev => prev === subject.id ? null : subject.id)}
+          >
+            {rows.map(({ lesson, total: lessonTotal, toStudy }) => (
+              <AccordionRow key={lesson.id} dark={dark} onClick={() => onStartLesson(lesson.id)}>
+                <span style={{ minWidth: 0 }}>
+                  <div style={{ color: pt.textPrimary, fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lesson.title}</div>
+                  <div style={{ color: pt.textMuted, fontSize: 11, marginTop: 1 }}>{plural(lessonTotal, 'card')}</div>
+                </span>
+                <span style={{
+                  flexShrink: 0, fontSize: 11, fontWeight: 700, borderRadius: 999, padding: '3px 10px', whiteSpace: 'nowrap',
+                  background: toStudy > 0 ? `${FLASHCARD_ACCENT}26` : 'transparent',
+                  color: toStudy > 0 ? accentText : pt.textMuted,
+                  border: toStudy > 0 ? 'none' : `1px solid ${pt.border}`,
+                }}>{toStudy > 0 ? `${toStudy} to study` : 'Review anyway'}</span>
+              </AccordionRow>
+            ))}
+          </SubjectAccordion>
         ))}
         {loading && <CardRowsSkeleton count={3} label="Loading flashcards" />}
         {!loading && groups.length === 0 && !loadError && (

@@ -5,46 +5,15 @@ import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import type { PulseTheme } from '@/shared/theme/types'
 
 // Shared shell for every full-screen auth-style page (Auth, Reset
-// Password): a pill-shaped glass field, a solid gradient primary
-// button, a glass ghost button, and a plain text link.
+// Password): a pill-shaped glass field, a plain text link and the
+// status banner. Buttons come from shared/ui/controls/Button and
+// toggles from shared/ui/controls/PillTabs.
 
 // Pill-shaped glass field that wraps an input.
 export function GlassField({ dark, children }: { dark: boolean; children: ReactNode }) {
   return (
     <PulseGlassRow dark={dark} radius={999}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '14px 20px' }}>
-        {children}
-      </div>
-    </PulseGlassRow>
-  )
-}
-
-// Full-width gradient button for the main action.
-export function PrimaryButton({ pt, disabled, onClick, children }: {
-  pt: PulseTheme; disabled?: boolean; onClick?: () => void; children: ReactNode
-}) {
-  return (
-    <button onClick={onClick} disabled={disabled} className="glass-focus-ring" style={{
-      width: '100%', padding: '15px', borderRadius: 999, border: 'none',
-      background: disabled ? 'rgba(255,255,255,0.15)' : `linear-gradient(135deg, ${pt.cobalt}cc, ${pt.indigo}cc)`,
-      color: disabled ? pt.sub : '#fff', fontWeight: 800, fontSize: 14, fontFamily: pulseFonts.body,
-      cursor: disabled ? 'not-allowed' : 'pointer',
-      boxShadow: disabled ? 'none' : `0 8px 28px ${pt.cobalt}35`
-    }}>{children}</button>
-  )
-}
-
-// Full-width glass button for secondary actions.
-export function GhostButton({ dark, onClick, disabled, children }: {
-  dark: boolean; onClick?: () => void; disabled?: boolean; children: ReactNode
-}) {
-  const pt = getPulseTheme(dark)
-  return (
-    <PulseGlassRow
-      dark={dark} radius={999} onClick={disabled ? undefined : onClick}
-      style={disabled ? { opacity: 0.6, pointerEvents: 'none' } : undefined}
-    >
-      <div style={{ padding: '11px', textAlign: 'center', fontSize: 13, fontWeight: 700, color: pt.text, fontFamily: pulseFonts.body }}>
         {children}
       </div>
     </PulseGlassRow>
@@ -61,25 +30,6 @@ export function TextLink({ pt, onClick, muted, disabled, children }: {
       fontFamily: pulseFonts.body, fontSize: 12, fontWeight: 600,
       color: muted ? pt.textMuted : pt.cobalt, opacity: disabled ? 0.6 : 1
     }}>{children}</button>
-  )
-}
-
-// Glass toggle used to pick between two account types.
-export function AccountToggle({ dark, pt, active, onClick, children }: {
-  dark: boolean; pt: PulseTheme; active: boolean; onClick: () => void; children: ReactNode
-}) {
-  return (
-    <PulseGlassRow
-      dark={dark} radius={999} active={active} activeTint={`${pt.cobalt}26`}
-      onClick={onClick}
-      style={{ flex: 1 }}
-    >
-      <div style={{
-        padding: '9px', display: 'flex', alignItems: 'center',
-        justifyContent: 'center', gap: 6, fontSize: 12, fontWeight: 700,
-        color: active ? pt.cobalt : pt.sub, fontFamily: pulseFonts.body
-      }}>{children}</div>
-    </PulseGlassRow>
   )
 }
 

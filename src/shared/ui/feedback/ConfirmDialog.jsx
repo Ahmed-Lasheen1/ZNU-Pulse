@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { getPulseTheme, pulseFonts, pulseType } from '@/shared/theme/premiumTheme'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import DialogShell from '@/shared/ui/feedback/DialogShell'
+import Button from '@/shared/ui/controls/Button'
 import { WarningIcon } from '@/shared/icons/tool-icons'
 
 // Generic glass confirmation modal. Clicking the backdrop or pressing
@@ -36,16 +37,12 @@ export default function ConfirmDialog({
           </p>
         )}
         <div style={{ display: 'flex', gap: 10 }}>
-          <button ref={cancelRef} onClick={onCancel} style={{
-            flex: 1, padding: '12px', borderRadius: 999,
-            background: 'transparent', border: `1px solid ${pt.border}`,
-            color: pt.sub, cursor: 'pointer', fontWeight: 700, fontSize: 13, fontFamily: pulseFonts.body
-          }}>{cancelLabel}</button>
-          <button onClick={onConfirm} style={{
-            flex: 1, padding: '12px', borderRadius: 999,
-            background: accent, border: 'none',
-            color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 13, fontFamily: pulseFonts.body
-          }}>{confirmLabel}</button>
+          <Button ref={cancelRef} dark={dark} variant="ghost" size="field" onClick={onCancel} style={{ flex: 1, padding: 12 }}>
+            {cancelLabel}
+          </Button>
+          <Button dark={dark} variant="solid" size="field" color={accent} onColor="#fff" onClick={onConfirm} style={{ flex: 1, padding: 12 }}>
+            {confirmLabel}
+          </Button>
         </div>
       </LiquidGlassCard>
     </DialogShell>
