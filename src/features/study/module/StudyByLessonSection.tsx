@@ -12,8 +12,9 @@ import SubjectAccordion from '@/shared/ui/layout/SubjectAccordion'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import { MCQ_ACCENT, FLASHCARD_ACCENT } from '@/shared/theme/accents'
 import { accuracyColor } from '@/shared/utils/accuracy'
-import { storageGetSet, storageSetJson } from '@/core/safeStorage'
+import { useDoneState } from '@/shared/hooks/useDoneState'
 import { useWeakSpots } from '@/features/practice'
+import { useLessonCompletion } from '@/features/study/module/useLessonCompletion'
 import { fetchModuleQuestions } from '@/services/content/moduleContent'
 import { WEAK_BELOW } from '@/services/history/weakSpots'
 
@@ -50,8 +51,8 @@ interface StudyByLessonSectionProps {
 // Storage key of the lessons a student has ticked in a module on this device.
 const doneKey = (moduleId: string) => `module_lessons_done_${moduleId}`
 
-// Subject accordion — expands in place to lesson rows with a done checkbox and inline
-// Summary/Flashcards/Practice actions. Lessons the student is struggling with carry an accuracy badge.
+// Subject accordion that expands to lesson rows with a done checkbox and Summary/Flashcards/Practice actions.
+// Lessons tick themselves once studied (and can be unticked); struggling lessons carry an accuracy badge.
 export default function StudyByLessonSection({
   dark, moduleId, stage, subjects, lessons, lessonQuestionIds, lessonFlashcardIds, lessonSummaries, onOpenSummary
 }: StudyByLessonSectionProps) {
@@ -60,8 +61,9 @@ export default function StudyByLessonSection({
   const [openSubjectId, setOpenSubjectId] = useState<string | null>(null)
   const [openPickerLessonId, setOpenPickerLessonId] = useState<string | null>(null)
   const [moduleQuestions, setModuleQuestions] = useState<any[]>([])
-  const [doneLessons, setDoneLessons] = useState<Set<string>>(() => storageGetSet(doneKey(moduleId)))
   const lessonAccuracy = useWeakSpots(moduleQuestions)
+  const completedLessons = useLessonCompletion(moduleId, lessons.map(l => l.id))
+  const { isDone: isLessonDone, toggle: toggleDone } = useDoneState(doneKey(moduleId), completedLessons)
   // Accents as text/icon colors, adjusted to stay readable in the current mode (fills keep the original).
   const mcqText = adaptColor(MCQ_ACCENT, dark)
   const flashcardText = adaptColor(FLASHCARD_ACCENT, dark)
@@ -75,9 +77,6 @@ export default function StudyByLessonSection({
     return () => { ignore = true }
   }, [moduleId])
 
-  // Reloads the ticks when the module changes.
-  useEffect(() => { setDoneLessons(storageGetSet(doneKey(moduleId))) }, [moduleId])
-
   // Carries the selected exam stage into the MCQ page, like the simulator link does.
   const stageQuery = stage ? `&stage=${encodeURIComponent(stage)}` : ''
 
@@ -86,15 +85,6 @@ export default function StudyByLessonSection({
     .filter(g => g.lessonsForSub.length > 0)
 
   if (bySubject.length === 0) return null
-
-  // Ticks or unticks a lesson and saves the result on this device.
-  function toggleDone(lessonId: string) {
-    const next = new Set(doneLessons)
-    if (next.has(lessonId)) next.delete(lessonId)
-    else next.add(lessonId)
-    setDoneLessons(next)
-    storageSetJson(doneKey(moduleId), [...next])
-  }
 
   // Opens practice questions of one lesson.
   function practiceLesson(lessonId: string) {
@@ -162,7 +152,7 @@ export default function StudyByLessonSection({
                 const stat = lessonAccuracy[lesson.id]
                 const weak = hasQuestions && !!stat && stat.accuracy < WEAK_BELOW
                 const weakColor = stat ? accuracyColor(stat.accuracy, pt) : pt.textMuted
-                const isDone = doneLessons.has(lesson.id)
+                const isDone = isLessonDone(lesson.id)
                 return (
                   <div key={lesson.id}>
                     <PulseGlassRow dark={dark} radius={12}>

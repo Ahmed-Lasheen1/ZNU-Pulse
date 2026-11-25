@@ -10,7 +10,7 @@ import Collapse from '@/shared/ui/layout/Collapse'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { ScheduleIcon, SearchIcon2 } from '@/shared/icons/tool-icons'
 import { ModuleIcon } from '@/shared/icons/medicalIcons'
-import { storageGetSet, storageSetJson } from '@/core/safeStorage'
+import { useDoneState } from '@/shared/hooks/useDoneState'
 import { wrapText } from '@/shared/utils/textStyles'
 import { daysFromToday, formatDayHeading } from '@/features/tools/schedule/scheduleDates'
 import { usePlanProgress } from '@/features/tools/schedule/usePlanProgress'
@@ -65,11 +65,8 @@ function groupBySubject(items: PlanItem[], lookups: PlanLookups): SubjectGroup[]
   return groups
 }
 
-// Study plan card: collapsible checklist grouped by subject, or a plain image row when the plan has no items.
-// The list expands with a height transition (shared Collapse), like the Study by Lesson accordion.
-// Each item is a glass row like a lesson row there: checkbox, name and date on the left, tool buttons on the right,
-// and the note on its own full-width line underneath.
-// Items open their lesson's summary, flashcards and practice, and tick themselves once the lesson is studied.
+// Collapsible study plan grouped by subject (or a plain image row when it has no items).
+// Items tick themselves once the lesson is studied, and can be unticked.
 export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOpen, onViewImage }: StudyPlanCardProps) {
   const pt = getPulseTheme(dark)
   // The accent as text/icon color, adjusted to stay readable in the current mode (fills keep the original).
@@ -79,29 +76,16 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
   const items = schedule.items || []
   const hasItems = items.length > 0
   const [open, setOpen] = useState(defaultOpen)
-  const [done, setDone] = useState(() => storageGetSet(doneKey(schedule.id)))
   const [pickerItemId, setPickerItemId] = useState<string | null>(null)
   const autoDone = usePlanProgress(schedule, hasItems)
+  const { isDone: isItemDone, toggle: toggleItem } = useDoneState(doneKey(schedule.id), autoDone)
   const lookups = usePlanLookups(schedule.module_id, hasItems)
   const panelId = `plan-items-${schedule.id}`
-
-  // An item counts as done when ticked by hand or completed through study activity.
-  const isItemDone = (itemId: string) => done.has(itemId) || autoDone.has(itemId)
 
   const doneCount = items.filter(item => isItemDone(item.id)).length
   const percent = hasItems ? Math.round((doneCount / items.length) * 100) : 0
   const groups = groupBySubject(items, lookups)
   const showHeaders = groups.some(g => g.key !== NO_SUBJECT)
-
-  // Ticks or unticks one plan item and saves the result on this device; study-completed items stay ticked.
-  function toggleItem(itemId: string) {
-    if (autoDone.has(itemId)) return
-    const next = new Set(done)
-    if (next.has(itemId)) next.delete(itemId)
-    else next.add(itemId)
-    setDone(next)
-    storageSetJson(doneKey(schedule.id), [...next])
-  }
 
   // Expands the plan, or opens the image when there are no plan items.
   function handleHeader() {

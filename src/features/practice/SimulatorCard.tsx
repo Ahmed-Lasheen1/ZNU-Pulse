@@ -15,7 +15,7 @@ interface SimulatorCardProps {
   onStart: () => void
 }
 
-// Stage simulator card shown on the module page and in the MCQ bank; a thin wrapper over ActionCard.
+// Stage simulator card shown on the module page and in the MCQ bank (a thin wrapper over ActionCard).
 // On phones the subtitle drops the "new mix each time" note.
 export default function SimulatorCard({ dark, title, total, subjectCount, onStart }: SimulatorCardProps) {
   const pt = getPulseTheme(dark)
@@ -36,7 +36,7 @@ export default function SimulatorCard({ dark, title, total, subjectCount, onStar
         icon={<TargetIcon color={adaptColor(MCQ_ACCENT, dark)} size={28} />}
         title={`${title} Simulator`}
         subtitle={
-          <span style={{ ...pulseType.small, color: pt.textSecondary, fontWeight: 600, whiteSpace: 'nowrap' }}>
+          <span style={{ ...pulseType.small, color: pt.textSecondary, fontWeight: 600 }}>
             <span className="sim-sub-full">{base} · new mix each time</span>
             <span className="sim-sub-short">{base}</span>
           </span>
