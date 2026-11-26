@@ -9,6 +9,7 @@ import ModuleNotFoundState from '@/features/study/module/ModuleNotFoundState'
 import StudyMaterialsSection from '@/features/study/module/StudyMaterialsSection'
 import StudyByLessonSection from '@/features/study/module/StudyByLessonSection'
 import StageSubjectSummaries from '@/features/study/module/StageSubjectSummaries'
+import { useModuleOfflineStatus } from '@/features/study/module/useModuleOfflineStatus'
 import TabRow from '@/shared/ui/controls/TabRow'
 import { PageSectionsSkeleton } from '@/shared/ui/feedback/Skeletons'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
@@ -70,6 +71,9 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   const [contentLoaded, setContentLoaded] = useState(false)
 
   useHistoryOverlay(!!selectedSummary, () => setSelectedSummary(null))
+
+  // Whether this module's content is saved on the device for offline use.
+  const offlineStatus = useModuleOfflineStatus(moduleId as string)
 
   // Memoized so the stage tabs keep a stable identity between renders.
   const visibleExamStages = useMemo(() => {
@@ -248,6 +252,11 @@ export default function ModulePage({ dark }: { dark: boolean }) {
         }}>
           {module.status === 'active' ? '● Active' : '✓ Completed'}
         </div>
+        {offlineStatus !== 'missing' && (
+          <div style={{ ...pulseType.small, color: ON_BACKGROUND.muted, marginTop: 10 }}>
+            {offlineStatus === 'ready' ? '✓ Available offline' : 'Saving for offline…'}
+          </div>
+        )}
       </div>
 
       {loadError && <div style={{ marginBottom: 24 }}><ErrorBanner message="Some content couldn't load — check your connection." /></div>}

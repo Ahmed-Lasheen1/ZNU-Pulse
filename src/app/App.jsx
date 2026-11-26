@@ -7,6 +7,7 @@ import { fetchModulesSorted } from '@/services/content/modules'
 import { subscribeOnlinePresence } from '@/services/presence/onlinePresence'
 import { migrateGuestDataIfNeeded } from '@/services/history/migrateGuestData'
 import { syncContentVersions } from '@/services/content/contentVersions'
+import { scheduleOfflinePrefetch } from '@/services/content/offlineReadiness'
 import { clearAnswerKeyCaches } from '@/services/content/moduleContent'
 import { clearHomeHistory } from '@/services/content/homeData'
 import { networkFirst, clearUserCaches } from '@/core/dataCache'
@@ -42,6 +43,9 @@ export default function App() {
   const isAdmin = profile?.role === 'admin'
 
   const lastHandledUserIdRef = useRef(null)
+  // Active modules to keep available offline, and whether the first content version check has finished.
+  const offlineTargetsRef = useRef({ enabled: false, moduleIds: [] })
+  const contentSyncedRef = useRef(false)
 
   // Loads the modules list (optionally bypassing the cache) and keeps it fresh in the background.
   async function loadModules(force = false) {
@@ -54,6 +58,24 @@ export default function App() {
 
   // Forces a fresh load of the modules list after an admin change.
   const refreshModules = useCallback(() => loadModules(true), [])
+
+  // Starts the background download of active modules for offline use, once the content versions are checked.
+  const runOfflinePrefetch = useCallback(() => {
+    const { enabled, moduleIds } = offlineTargetsRef.current
+    if (enabled && contentSyncedRef.current) scheduleOfflinePrefetch(moduleIds)
+  }, [])
+
+  const signedIn = !!user
+  const activeModuleIdsKey = modules.filter(m => m.status === 'active').map(m => m.id).join('|')
+
+  // Keeps the offline download targets current and triggers a download when they change.
+  useEffect(() => {
+    offlineTargetsRef.current = {
+      enabled: signedIn && modulesLoaded,
+      moduleIds: activeModuleIdsKey ? activeModuleIdsKey.split('|') : [],
+    }
+    runOfflinePrefetch()
+  }, [signedIn, modulesLoaded, activeModuleIdsKey, runOfflinePrefetch])
 
   // Loads modules on mount and revalidates when the tab becomes visible or the connection returns.
   useEffect(() => {
@@ -73,9 +95,13 @@ export default function App() {
     else setTimeout(prefetchPages, 3000)
   }, [])
 
-  // Keeps cached content in step with server content versions.
+  // Keeps cached content in step with server content versions, then re-saves anything that check removed.
   useEffect(() => {
-    const sync = force => syncContentVersions({ force }).then(refChanged => { if (refChanged) loadModules(true) })
+    const sync = force => syncContentVersions({ force }).then(refChanged => {
+      if (refChanged) loadModules(true)
+      contentSyncedRef.current = true
+      runOfflinePrefetch()
+    })
     const onVisible = () => { if (document.visibilityState === 'visible') sync(false) }
     sync(true)
     const timer = setInterval(onVisible, 10 * 60 * 1000)

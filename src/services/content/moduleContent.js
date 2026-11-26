@@ -100,6 +100,18 @@ export function fetchModuleFiles(moduleId, onUpdate) {
   )
 }
 
+// Cache keys of everything a module needs to work offline: quizzes, flashcards, summaries and its module page.
+export function offlineCacheKeys(moduleId) {
+  return {
+    questions: `${QUESTIONS}${moduleId}`,
+    answerKeys: `${ANSWER_KEYS}${moduleId}`,
+    flashcards: `${FLASHCARDS}${moduleId}`,
+    summaries: `${SUMMARIES}${moduleId}`,
+    facets: `${FACETS}${moduleId}`,
+    simulator: `${SIMULATOR_KEY}${moduleId}`,
+  }
+}
+
 // Deletes question caches that older versions left in localStorage.
 function removeLegacyQuestionCaches() {
   try {
