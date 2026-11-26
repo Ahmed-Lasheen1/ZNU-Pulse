@@ -40,8 +40,7 @@ interface ExamStage { value: string; title: string; emoji?: string; Icon?: (p: {
 interface ContentFacet { kind: 'file' | 'question' | 'summary' | 'flashcard'; item_type: string | null; exam_stage: string | null; lesson_id: string | null }
 interface SimulatorRow { stage: string; subject_id: string; question_count: number }
 
-// Module page: stage tabs, then study by lesson, materials, simulator, and the summaries, flashcards and practice cards
-// (each card is shown only when it has content). A stage that only has summaries shows just a per-subject summaries list.
+// Module page: stage tabs, study by lesson, materials, simulator, and the summaries, flashcards and practice cards (each only when it has content).
 export default function ModulePage({ dark }: { dark: boolean }) {
   const pt = getPulseTheme(dark)
   const { moduleId } = useParams()
@@ -50,12 +49,10 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   const { modules, modulesLoaded, modulesError } = useModules() as { modules: PageModule[]; modulesLoaded: boolean; modulesError: boolean }
   const module = modules.find(m => m.id === moduleId) || null
 
-  // Colors used as text or icons, adjusted to stay readable in the current mode (fills keep the original).
+  // Text and icon colors adjusted for the current mode (fills keep the original).
   const modColor = module ? adaptColor(module.color, dark) : pt.cobalt
   const mcqText = adaptColor(MCQ_ACCENT, dark)
   const flashcardText = adaptColor(FLASHCARD_ACCENT, dark)
-  // The "Active" pill sits directly on the page, so its green is darker in light mode.
-  const activeColor = dark ? pt.success : '#14532D'
 
   const [loadError, setLoadError] = useState(false)
   const [driveUrl, setDriveUrl] = useState('')
@@ -72,7 +69,6 @@ export default function ModulePage({ dark }: { dark: boolean }) {
 
   useHistoryOverlay(!!selectedSummary, () => setSelectedSummary(null))
 
-  // Whether this module's content is saved on the device for offline use.
   const offlineStatus = useModuleOfflineStatus(moduleId as string)
 
   // Memoized so the stage tabs keep a stable identity between renders.
@@ -197,10 +193,9 @@ export default function ModulePage({ dark }: { dark: boolean }) {
   stageFacets.forEach(r => { if (r.lesson_id) stageLessonIds.add(r.lesson_id) })
   const visibleLessons = stageActive ? lessons.filter(l => stageLessonIds.has(l.id)) : lessons
 
-  // A stage with summaries but no questions, flashcards or files shows only its summaries, grouped by subject.
+  // A stage with only summaries shows just its summaries, grouped by subject.
   const summariesOnly = stageActive && contentLoaded && hasSummaries
     && !hasQuestions && !hasFlashcards && presentFileTypes.size === 0
-  // The summaries, flashcards and practice cards appear only when they have content; with none, the whole row is skipped.
   const showActions = contentLoaded && !summariesOnly && (hasSummaries || hasFlashcards || hasQuestions)
 
   const meta = stageActive ? stageMetaFrom(examStages, activeStage) : null
@@ -243,15 +238,17 @@ export default function ModulePage({ dark }: { dark: boolean }) {
           <ModuleIcon value={module.icon} size={52} color={modColor} />
         </div>
         <h1 style={{ ...pulseType.pageTitle, fontSize: 26, color: modColor, marginBottom: 6, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{module.name}</h1>
-        <div style={{
-          display: 'inline-block',
-          background: module.status === 'active' ? `${pt.success}24` : (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
-          color: module.status === 'active' ? activeColor : ON_BACKGROUND.muted,
-          border: `1px solid ${module.status === 'active' ? `${pt.success}59` : pt.border}`,
-          borderRadius: 999, padding: '4px 14px', fontSize: 12, fontWeight: 700
-        }}>
-          {module.status === 'active' ? '● Active' : '✓ Completed'}
-        </div>
+        {module.status === 'completed' && (
+          <div style={{
+            display: 'inline-block',
+            background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+            color: ON_BACKGROUND.muted,
+            border: `1px solid ${pt.border}`,
+            borderRadius: 999, padding: '4px 14px', fontSize: 12, fontWeight: 700
+          }}>
+            ✓ Completed
+          </div>
+        )}
         {offlineStatus !== 'missing' && (
           <div style={{ ...pulseType.small, color: ON_BACKGROUND.muted, marginTop: 10 }}>
             {offlineStatus === 'ready' ? '✓ Available offline' : 'Saving for offline…'}
