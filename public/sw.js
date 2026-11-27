@@ -2,7 +2,7 @@
 
 // The shell cache is versioned. Hashed build assets live in their own cache that is never wiped on activate,
 // so a shell version bump cannot delete the chunks an already-open tab still needs.
-const CACHE_NAME = 'znu-shell-v11'
+const CACHE_NAME = 'znu-shell-v12'
 const ASSET_CACHE = 'znu-assets-v1'
 const KEEP_CACHES = [CACHE_NAME, ASSET_CACHE]
 const SHELL_URLS = ['/', '/favicon.svg', '/logo.svg', '/icon-192.png', '/icon-512.png']
@@ -13,11 +13,18 @@ const MAX_ASSET_ENTRIES = 250
 // How long a page load waits for the network before falling back to the saved shell.
 const NAV_TIMEOUT_MS = 2500
 
+// Saves each shell file on its own. "/" is required (a failure fails the install so it retries);
+// the icons are best effort. "reload" skips the HTTP cache so a stale index.html is never saved.
+function precacheShell(cache) {
+  return Promise.all(SHELL_URLS.map((url) => {
+    const saved = cache.add(new Request(url, { cache: 'reload' }))
+    return url === '/' ? saved : saved.catch(() => {})
+  }))
+}
+
 self.addEventListener('install', (event) => {
   self.skipWaiting()
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_URLS).catch(() => {}))
-  )
+  event.waitUntil(caches.open(CACHE_NAME).then(precacheShell))
 })
 
 // Removes caches from older shell versions; the asset cache is kept on purpose.

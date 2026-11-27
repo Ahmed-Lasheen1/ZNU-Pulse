@@ -3,16 +3,19 @@ import { fetchAllSubjects } from '@/services/content/subjects'
 import { fetchAllLessons } from '@/services/content/lessons'
 import { fetchLessonStageMap } from '@/services/content/lessonStages'
 import { fetchModuleStages } from '@/services/content/moduleStages'
+import { fetchDriveUrl } from '@/services/content/siteSettings'
 import {
   fetchModuleQuestions, fetchModuleAnswerKeys, fetchModuleFlashcards,
   fetchModuleSummaries, fetchModuleFacets, offlineCacheKeys,
 } from '@/services/content/moduleContent'
 import { fetchSimulatorConfig } from '@/services/exam/stageSimulator'
 
-// Modules being downloaded right now, the status listeners, and the download run in progress.
+// Modules being downloaded right now, the status listeners, the run in progress and the module list queued behind it.
 const downloading = new Set()
 const listeners = new Set()
 let running = null
+let runningKey = ''
+let queuedIds = null
 
 // Tells subscribers that a module's offline status may have changed.
 function notify() {
@@ -72,6 +75,7 @@ async function prefetch(moduleIds) {
   if (reference.some(result => result.error)) return
 
   await fetchModuleStages(moduleIds[0])
+  await fetchDriveUrl()
   const present = new Set(await idbKeys())
 
   for (const moduleId of moduleIds) {
@@ -81,13 +85,23 @@ async function prefetch(moduleIds) {
   }
 }
 
-// Downloads the given modules for offline use; overlapping calls share the run already in progress.
+// Downloads the given modules for offline use. Calls with the same list share the run in progress;
+// a different list is queued and runs as soon as the current run ends.
 export function prefetchOfflineContent(moduleIds) {
-  if (!running) {
-    running = prefetch(moduleIds)
-      .catch(error => console.warn('[offlineReadiness] Download stopped:', error))
-      .finally(() => { running = null })
+  const key = moduleIds.join('|')
+  if (running) {
+    if (key !== runningKey) queuedIds = moduleIds
+    return running
   }
+  runningKey = key
+  running = prefetch(moduleIds)
+    .catch(error => console.warn('[offlineReadiness] Download stopped:', error))
+    .finally(() => {
+      running = null
+      const next = queuedIds
+      queuedIds = null
+      if (next) prefetchOfflineContent(next)
+    })
   return running
 }
 
