@@ -1,6 +1,7 @@
 import { getPulseTheme, pulseType } from '@/shared/theme/premiumTheme'
 import { adaptColor } from '@/shared/theme/adaptColor'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
+import Badge from '@/shared/ui/display/Badge'
 import { ExamIcon } from '@/shared/icons/medicalIcons'
 import { daysFromToday, formatShortDate, parseLocalDate, relativeDayLabel } from '@/features/tools/schedule/scheduleDates'
 import type { ScheduleRow } from '@/features/tools/schedule/types'
@@ -64,12 +65,7 @@ export default function ExamScheduleCard({ dark, schedule, accent, delay, onView
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
-        {diff !== null && (
-          <span style={{
-            background: `${urgent ? pt.amber : accent}22`, color: countdownColor, borderRadius: 999,
-            padding: '3px 11px', fontSize: 11.5, fontWeight: 800, whiteSpace: 'nowrap',
-          }}>{relativeDayLabel(diff)}</span>
-        )}
+        {diff !== null && <Badge color={countdownColor}>{relativeDayLabel(diff)}</Badge>}
         {finished && <span style={{ ...pulseType.small, color: pt.textMuted, fontWeight: 700 }}>Finished</span>}
         {schedule.url && <span style={{ ...pulseType.small, color: pt.sub, fontWeight: 700 }}>View →</span>}
       </div>

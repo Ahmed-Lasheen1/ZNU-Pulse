@@ -18,6 +18,7 @@ import { NotifyPermissionButton } from '@/features/notifications'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import ConfirmDialog from '@/shared/ui/feedback/ConfirmDialog'
 import AutoDirText from '@/shared/ui/display/AutoDirText'
+import Badge from '@/shared/ui/display/Badge'
 import DateStamp from '@/shared/ui/display/DateStamp'
 import PollsSection from '@/features/tools/pulse-check/PollsSection'
 import { containsProfanity } from '@/shared/utils/moderation'
@@ -101,10 +102,9 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
   const showToast = useToast() as (message: string, type?: 'success' | 'error' | 'info') => void
   const location = useLocation()
 
-  // Status colors follow the color mode; the suffixes are opacities (10%, 16%, 25%).
+  // Status colors follow the color mode; the suffixes are opacities (10%, 25%, 35%).
   const okColor = pt.success
   const okSoft = `${pt.success}1A`
-  const okTint = `${pt.success}29`
   const okBorder = `${pt.success}40`
   const okRing = `${pt.success}59`
   // The violet accent as text color (fills keep the original).
@@ -387,15 +387,12 @@ export default function PulseCheck({ dark }: { dark: boolean }) {
                       <div dir={textDir(q.question)}>
                         <AutoDirText text={q.question} style={{ color: pt.textPrimary, fontSize: 13, marginBottom: 8 }} />
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                          <span style={{
-                            fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
-                            background: q.answered ? okTint : `${pt.amber}20`,
-                            color: q.answered ? okColor : pt.amber,
-                            display: 'inline-flex', alignItems: 'center', gap: 5
-                          }}>
-                            {q.answered ? <CheckCircleIcon color={okColor} size={12} /> : <ClockIcon color={pt.amber} size={12} />}
+                          <Badge
+                            color={q.answered ? okColor : pt.amber}
+                            icon={q.answered ? <CheckCircleIcon color={okColor} size={12} /> : <ClockIcon color={pt.amber} size={12} />}
+                          >
                             {q.answered ? 'Answered' : 'Waiting for an answer'}
-                          </span>
+                          </Badge>
                           <DateStamp value={q.created_at} color={pt.textMuted} />
                         </div>
                       </div>

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/core/supabase'
 import { useAuth, useModules } from '@/core/contexts'
-import { getPulseTheme, pulseFonts, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
-import BackButton from '@/shared/ui/layout/BackButton'
+import { getPulseTheme, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
+import PageShell from '@/shared/ui/layout/PageShell'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import PillTabs from '@/shared/ui/controls/PillTabs'
 import { fetchAllSubjects, invalidateSubjectsCache } from '@/services/content/subjects'
@@ -125,73 +125,42 @@ export default function Admin({ dark }: { dark: boolean }) {
   const contextDepth = CONTEXT_DEPTH[activeTab]
 
   return (
-    <div style={{ position: 'relative' }}>
-      <div className="pulse-wide admin-shell" style={{
-        position: 'relative', zIndex: 1,
-        padding: '4px 20px 100px',
-        fontFamily: pulseFonts.body, maxWidth: 1500, margin: '0 auto'
-      }}>
-        <style>{`
-          .admin-form-row-2 {
-            display: grid; grid-template-columns: 1fr; gap: 0; margin-bottom: 12px;
-          }
-          @media (min-width: 640px) {
-            .admin-form-row-2 { grid-template-columns: 1fr 1fr; gap: 12px; }
-          }
-          .admin-form-row-3 {
-            display: grid; grid-template-columns: 1fr; gap: 0 10px; margin-bottom: 8px;
-          }
-          @media (min-width: 560px) {
-            .admin-form-row-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-          }
-          .admin-list-grid {
-            display: grid; grid-template-columns: 1fr; gap: 10px;
-          }
-          @media (min-width: 1500px) {
-            .admin-list-grid { grid-template-columns: 1fr 1fr; }
-          }
-        `}</style>
-
-        <div style={{ marginBottom: 4 }}>
-          <BackButton dark={dark} fallback="/" />
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '8px 0 16px' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', lineHeight: 0, position: 'relative', top: -10 }}>
-            <GearIcon color={pt.text} size={24} />
-          </span>
-          <h1 style={{ ...pulseType.miniPageTitle, fontSize: 20, color: pt.text, lineHeight: '24px' }}>Admin Panel</h1>
-        </div>
-
-        {refDataError && (
-          <div style={{ marginBottom: 16 }}>
-            <ErrorBanner message="Couldn't load some admin data — check your connection and try again." />
-          </div>
-        )}
-
-        <PillTabs dark={dark} tabs={TABS} active={activeTab} onSelect={setActiveTab} marginBottom={16} size="compact" layout="scroll" />
-
-        {contextDepth && (
-          <AdminContextBar
-            dark={dark} modules={modules} subjects={subjects} lessons={lessons}
-            context={context} depth={contextDepth}
-          />
-        )}
-
-        {activeTab === 'questions' && <QuestionsTab dark={dark} modules={modules} context={context} />}
-        {activeTab === 'flashcards' && <FlashcardsTab dark={dark} modules={modules} lessons={lessons} context={context} />}
-        {activeTab === 'files' && <FilesTab dark={dark} modules={modules} context={context} />}
-        {activeTab === 'summaries' && <SummariesTab dark={dark} modules={modules} subjects={subjects} context={context} />}
-        {activeTab === 'schedules' && <SchedulesTab dark={dark} modules={modules} subjects={subjects} lessons={lessons} context={context} />}
-        {activeTab === 'structure' && (
-          <StructureTab
-            dark={dark} modules={modules} subjects={subjects} lessons={lessons} context={context}
-            loading={refDataLoading || !modulesLoaded} refresh={refreshStructure}
-          />
-        )}
-        {activeTab === 'analytics' && <AnalyticsTab dark={dark} modules={modules} />}
-        {activeTab === 'settings' && <SettingsTab dark={dark} />}
+    <PageShell dark={dark} backFallback="/" maxWidth={1500} containerStyle={{ paddingTop: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '8px 0 16px' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', lineHeight: 0, position: 'relative', top: -10 }}>
+          <GearIcon color={pt.text} size={24} />
+        </span>
+        <h1 style={{ ...pulseType.miniPageTitle, fontSize: 20, color: pt.text, lineHeight: '24px' }}>Admin Panel</h1>
       </div>
-    </div>
+
+      {refDataError && (
+        <div style={{ marginBottom: 16 }}>
+          <ErrorBanner message="Couldn't load some admin data — check your connection and try again." />
+        </div>
+      )}
+
+      <PillTabs dark={dark} tabs={TABS} active={activeTab} onSelect={setActiveTab} marginBottom={16} size="compact" layout="scroll" />
+
+      {contextDepth && (
+        <AdminContextBar
+          dark={dark} modules={modules} subjects={subjects} lessons={lessons}
+          context={context} depth={contextDepth}
+        />
+      )}
+
+      {activeTab === 'questions' && <QuestionsTab dark={dark} modules={modules} context={context} />}
+      {activeTab === 'flashcards' && <FlashcardsTab dark={dark} modules={modules} lessons={lessons} context={context} />}
+      {activeTab === 'files' && <FilesTab dark={dark} modules={modules} context={context} />}
+      {activeTab === 'summaries' && <SummariesTab dark={dark} modules={modules} subjects={subjects} context={context} />}
+      {activeTab === 'schedules' && <SchedulesTab dark={dark} modules={modules} subjects={subjects} lessons={lessons} context={context} />}
+      {activeTab === 'structure' && (
+        <StructureTab
+          dark={dark} modules={modules} subjects={subjects} lessons={lessons} context={context}
+          loading={refDataLoading || !modulesLoaded} refresh={refreshStructure}
+        />
+      )}
+      {activeTab === 'analytics' && <AnalyticsTab dark={dark} modules={modules} />}
+      {activeTab === 'settings' && <SettingsTab dark={dark} />}
+    </PageShell>
   )
 }

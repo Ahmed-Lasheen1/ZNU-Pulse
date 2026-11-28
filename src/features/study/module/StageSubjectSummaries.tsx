@@ -1,5 +1,6 @@
 import { getPulseTheme, pulseType } from '@/shared/theme/premiumTheme'
 import { adaptColor } from '@/shared/theme/adaptColor'
+import { ON_ACCENT } from '@/shared/theme/tokens'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import SectionHeader from '@/shared/ui/layout/SectionHeader'
 import { ModuleIcon } from '@/shared/icons/medicalIcons'
@@ -96,7 +97,7 @@ export default function StageSubjectSummaries<T extends StageSummary>({
               </div>
 
               <div style={{
-                background: color, color: '#0f172a', borderRadius: 999,
+                background: color, color: ON_ACCENT, borderRadius: 999,
                 padding: '7px 16px', fontSize: 12, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap',
               }}>Open →</div>
             </LiquidGlassCard>

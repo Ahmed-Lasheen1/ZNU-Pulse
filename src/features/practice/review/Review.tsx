@@ -27,6 +27,7 @@ import { quizName } from '@/features/practice/quizNames'
 import { useOnlineStatus } from '@/shared/hooks/useOnlineStatus'
 import QuestionSourceBadge from '@/shared/ui/display/QuestionSourceBadge'
 import AutoDirText from '@/shared/ui/display/AutoDirText'
+import Badge from '@/shared/ui/display/Badge'
 import { ModuleIcon } from '@/shared/icons/medicalIcons'
 import { wrapText } from '@/shared/utils/textStyles'
 import { BookIcon, ClockIcon, FlagIcon, TargetIcon, EmptyBoxIcon, CelebrationIcon, RefreshIcon, SearchIcon2 } from '@/shared/icons/tool-icons'
@@ -34,6 +35,7 @@ import { optionLabels, ReviewOption, ExplanationNote } from '@/features/practice
 import { MCQ_ACCENT } from '@/shared/theme/accents'
 import { glassHoverTint } from '@/shared/theme/liquidGlass'
 import { SECTION_GAP } from '@/shared/theme/layout'
+import { ON_ACCENT } from '@/shared/theme/tokens'
 import PillTabs from '@/shared/ui/controls/PillTabs'
 
 const ITEM_GAP = 16
@@ -331,25 +333,9 @@ export default function Review({ dark }: { dark: boolean }) {
 
   return (
     <PageShell
-      dark={dark} backFallback="/mcq" maxWidth={900} containerClassName="review-wide"
+      dark={dark} backFallback="/mcq" maxWidth={900}
       onBack={inDetail ? () => setSelectedHistory(null) : undefined}
     >
-      <style>{`
-        .review-wide {
-          width: 100%;
-          max-width: 820px;
-          margin: 0 auto;
-          padding: 0 20px;
-          box-sizing: border-box;
-        }
-        @media (min-width: 900px) {
-          .review-wide { padding: 0 40px; }
-        }
-        @media (min-width: 1400px) {
-          .review-wide { padding: 0 64px; }
-        }
-      `}</style>
-
       <PageIntro dark={dark} emoji={<BookIcon color={ON_BACKGROUND.primary} size={40} />} title="Review" subtitle="Your exam history, mistakes, and flagged questions" paddingBottom={16} />
 
       <PillTabs dark={dark} tabs={reviewTabs} active={tab} onSelect={id => setTab(id)} marginBottom={SECTION_GAP} />
@@ -490,7 +476,7 @@ export default function Review({ dark }: { dark: boolean }) {
                   dark={dark} variant="solid" size="md" color={MCQ_ACCENT} fullWidth onClick={() => retryAll(incorrectItems)}
                   style={{ padding: '14px', fontWeight: 700, gap: 8, boxShadow: `0 8px 28px ${MCQ_ACCENT}35` }}
                 >
-                  <RefreshIcon color="#0f172a" size={15} /> Retry These {incorrectItems.length} Incorrect Question{incorrectItems.length === 1 ? '' : 's'}
+                  <RefreshIcon color={ON_ACCENT} size={15} /> Retry These {incorrectItems.length} Incorrect Question{incorrectItems.length === 1 ? '' : 's'}
                 </Button>
               </div>
             )}
@@ -514,11 +500,9 @@ export default function Review({ dark }: { dark: boolean }) {
                     {(item.source || item.is_correct !== undefined) && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
                         {item.is_correct !== undefined && (
-                          <span style={{
-                            fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: '2px 9px', borderRadius: 20,
-                            background: item.is_correct ? okTint : badTint,
-                            color: item.is_correct ? okColor : badColor
-                          }}>{item.is_correct ? '✓ CORRECT' : item.answer ? '✕ INCORRECT' : '— UNANSWERED'}</span>
+                          <Badge color={item.is_correct ? okColor : badColor} size="sm">
+                            {item.is_correct ? '✓ CORRECT' : item.answer ? '✕ INCORRECT' : '— UNANSWERED'}
+                          </Badge>
                         )}
                         {item.source && <QuestionSourceBadge source={item.source} dark={dark} />}
                       </div>
@@ -595,7 +579,7 @@ export default function Review({ dark }: { dark: boolean }) {
                     dark={dark} variant="solid" size="md" color={MCQ_ACCENT} fullWidth onClick={() => retryAll(filteredFlagged)}
                     style={{ padding: '14px', fontWeight: 700, gap: 8, boxShadow: `0 8px 28px ${MCQ_ACCENT}35` }}
                   >
-                    <RefreshIcon color="#0f172a" size={15} /> Retry {filteredFlagged.length === flaggedItems.length ? 'All' : `These ${filteredFlagged.length}`} Flagged Questions
+                    <RefreshIcon color={ON_ACCENT} size={15} /> Retry {filteredFlagged.length === flaggedItems.length ? 'All' : `These ${filteredFlagged.length}`} Flagged Questions
                   </Button>
                 </div>
               )}

@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
 import { getPulseTheme, pulseType } from '@/shared/theme/premiumTheme'
 import { adaptColor } from '@/shared/theme/adaptColor'
+import { ON_ACCENT } from '@/shared/theme/tokens'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import Button from '@/shared/ui/controls/Button'
+import Checkbox from '@/shared/ui/controls/Checkbox'
 import Collapse from '@/shared/ui/layout/Collapse'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { ScheduleIcon, SearchIcon2 } from '@/shared/icons/tool-icons'
@@ -125,18 +127,19 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
       <div key={item.id}>
         <PulseGlassRow dark={dark} radius={12}>
           <div className="plan-item-row" style={item.note ? { paddingBottom: 4 } : undefined}>
-            <button
-              type="button" role="checkbox" aria-checked={isDone}
-              className="plan-item-main glass-focus-ring"
-              onClick={() => toggleItem(item.id)}
-            >
-              <span aria-hidden style={{
-                width: 18, height: 18, borderRadius: 6, flexShrink: 0, marginTop: 1,
-                border: `1.5px solid ${isDone ? accent : pt.faint}`,
-                background: isDone ? accent : 'transparent', color: '#0f172a',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900,
-              }}>{isDone && '✓'}</span>
-              <span style={{ flex: 1, minWidth: 0 }}>
+            <div className="plan-item-main">
+              <Checkbox
+                dark={dark}
+                checked={isDone}
+                onChange={() => toggleItem(item.id)}
+                label={`Mark ${item.text} as done`}
+                color={accent}
+                size={18}
+                markSize={11}
+                className="glass-focus-ring"
+                style={{ marginTop: 1 }}
+              />
+              <span style={{ flex: 1, minWidth: 0 }} onClick={() => toggleItem(item.id)}>
                 <span dir="auto" style={{
                   ...pulseType.body, display: 'block', color: isDone ? pt.textMuted : pt.textPrimary,
                   textDecoration: isDone ? 'line-through' : 'none', ...wrapText,
@@ -147,7 +150,7 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
                   </span>
                 )}
               </span>
-            </button>
+            </div>
 
             {tools.length > 0 && lessonId && (
               <div className="plan-item-actions">
@@ -198,7 +201,6 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
         .plan-item-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; flex-wrap: wrap; }
         .plan-item-main {
           flex: 1; min-width: 200px; display: flex; align-items: flex-start; gap: 10px;
-          background: transparent; border: none; padding: 0; border-radius: 8px;
           cursor: pointer; text-align: start; font-family: inherit; color: inherit;
         }
         .plan-item-actions { display: flex; flex-wrap: wrap; gap: 6px; flex-shrink: 0; }
@@ -239,10 +241,10 @@ export default function StudyPlanCard({ dark, schedule, accent, delay, defaultOp
           </span>
         ) : (
           <span style={{
-            background: accent, color: '#0f172a', borderRadius: 10, padding: '7px 13px',
+            background: accent, color: ON_ACCENT, borderRadius: 10, padding: '7px 13px',
             fontWeight: 700, fontSize: 12, flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6,
           }}>
-            <SearchIcon2 color="#0f172a" size={13} /> View
+            <SearchIcon2 color={ON_ACCENT} size={13} /> View
           </span>
         )}
       </button>

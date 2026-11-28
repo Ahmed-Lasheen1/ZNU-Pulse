@@ -21,6 +21,7 @@ import {
   StatChip, ReviewOption, ExplanationNote,
 } from '@/features/practice/mcqShared'
 import { MCQ_ACCENT } from '@/shared/theme/accents'
+import { ON_ACCENT } from '@/shared/theme/tokens'
 import { accuracyTier, accuracyColor } from '@/shared/utils/accuracy'
 
 interface MCQExamFlowProps {
@@ -365,11 +366,9 @@ export default function MCQExamFlow({
                       display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, marginBottom: result.explanation ? 10 : 0,
                       flexShrink: 0
                     }}>
-                      <span style={{
-                        fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: '3px 10px', borderRadius: 20,
-                        background: result.is_correct ? okTint : badTint,
-                        color: result.is_correct ? okColor : badColor
-                      }}>{result.is_correct ? '✓ CORRECT' : '✕ INCORRECT'}</span>
+                      <Badge color={result.is_correct ? okColor : badColor}>
+                        {result.is_correct ? '✓ CORRECT' : '✕ INCORRECT'}
+                      </Badge>
                     </div>
                   )}
                   {revealed && result?.explanation && (
@@ -494,11 +493,9 @@ export default function MCQExamFlow({
                       background: `${MCQ_ACCENT}22`, border: `1px solid ${MCQ_ACCENT}55`,
                       color: accentText, fontWeight: 800, fontSize: 11
                     }}>Q{qi + 1}</span>
-                    <span style={{
-                      fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: '2px 9px', borderRadius: 20,
-                      background: isCorrect ? okTint : badTint,
-                      color: isCorrect ? okColor : badColor
-                    }}>{isCorrect ? '✓ CORRECT' : userAnswer ? '✕ INCORRECT' : '— UNANSWERED'}</span>
+                    <Badge color={isCorrect ? okColor : badColor} size="sm">
+                      {isCorrect ? '✓ CORRECT' : userAnswer ? '✕ INCORRECT' : '— UNANSWERED'}
+                    </Badge>
                     {showSubjectTag && <Badge variant="neutral" dark={dark} color={subj.color || '#34d399'} dot={subj.color || '#34d399'}>{subj.name}</Badge>}
                     {showLessonTag && <Badge variant="neutral" dark={dark} color="#818cf8" dot="#818cf8">{lesson.title}</Badge>}
                     {q.source && <QuestionSourceBadge source={q.source} dark={dark} />}
@@ -597,7 +594,7 @@ export default function MCQExamFlow({
                   title="Next (→)"
                   style={{
                     ...BAR_BUTTON_BASE,
-                    background: MCQ_ACCENT, border: `1px solid ${MCQ_ACCENT}`, color: '#0f172a',
+                    background: MCQ_ACCENT, border: `1px solid ${MCQ_ACCENT}`, color: ON_ACCENT,
                     boxShadow: `0 6px 20px ${MCQ_ACCENT}40`,
                   }}
                 >
@@ -611,7 +608,7 @@ export default function MCQExamFlow({
                   aria-label="Submit exam"
                   style={{
                     ...BAR_BUTTON_BASE,
-                    background: MCQ_ACCENT, border: `1px solid ${MCQ_ACCENT}`, color: '#0f172a',
+                    background: MCQ_ACCENT, border: `1px solid ${MCQ_ACCENT}`, color: ON_ACCENT,
                     boxShadow: `0 6px 20px ${MCQ_ACCENT}40`,
                   }}
                 >

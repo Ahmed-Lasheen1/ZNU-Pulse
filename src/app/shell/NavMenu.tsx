@@ -4,7 +4,7 @@ import { Search as SearchIcon } from 'lucide-react'
 import { useAuth } from '@/core/contexts'
 import { MenuToggleIcon } from '@/shared/ui/controls/menu-toggle-icon'
 import ThemeSwitch from '@/shared/ui/controls/theme-switch'
-import { HomeIcon, ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, BookIcon, SignOutIcon, UserIcon, StarIcon } from '@/shared/icons/tool-icons'
+import { HomeIcon, ScheduleIcon, ChecklistIcon, AnonQAIcon, LeaderboardIcon, BookIcon, SignOutIcon, UserIcon, StarFilledIcon } from '@/shared/icons/tool-icons'
 import { getPulseTheme, pulseFonts, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import { liquidGlassShadow, liquidGlassBackdrop, liquidGlassTint, glassHoverTint } from '@/shared/theme/liquidGlass'
 import ConfirmDialog from '@/shared/ui/feedback/ConfirmDialog'
@@ -252,7 +252,7 @@ export default function NavMenu({ dark, toggleTheme, align = 'left' }: NavMenuPr
           </span>
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: pt.amber, fontSize: 12, fontWeight: 700 }}>
-          <StarIcon color={pt.amber} size={12} />
+          <StarFilledIcon color={pt.amber} size={12} />
           {menuPoints.toLocaleString()} points
         </span>
       </button>

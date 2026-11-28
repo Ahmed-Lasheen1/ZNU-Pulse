@@ -13,6 +13,7 @@ import { CardRowsSkeleton } from '@/shared/ui/feedback/Skeletons'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import ConfirmDialog from '@/shared/ui/feedback/ConfirmDialog'
 import AutoDirText from '@/shared/ui/display/AutoDirText'
+import Badge from '@/shared/ui/display/Badge'
 import DateStamp from '@/shared/ui/display/DateStamp'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import { networkFirst, cachedSnapshot } from '@/core/dataCache'
@@ -319,20 +320,17 @@ export default function PollsSection({ dark, accent, isAdmin }: PollsSectionProp
             <LiquidGlassCard dark={dark} delay={i * 60} style={{ padding: '20px 22px' }}>
               <div dir={textDir(poll.title)}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-                  <span style={{
-                    fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
-                    background: poll.closed ? (dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)') : `${accent}22`,
-                    color: poll.closed ? pt.textMuted : accentText,
-                    display: 'inline-flex', alignItems: 'center', gap: 5,
-                  }}>
-                    {poll.closed ? <CheckCircleIcon color={pt.textMuted} size={12} /> : <ClockIcon color={accentText} size={12} />}
-                    {poll.closed ? 'Closed' : poll.closes_at ? `Closes ${closesLabel(poll.closes_at)}` : 'Open'}
-                  </span>
+                  {poll.closed ? (
+                    <Badge variant="neutral" dark={dark} color={pt.textMuted} icon={<CheckCircleIcon color={pt.textMuted} size={12} />}>
+                      Closed
+                    </Badge>
+                  ) : (
+                    <Badge color={accentText} icon={<ClockIcon color={accentText} size={12} />}>
+                      {poll.closes_at ? `Closes ${closesLabel(poll.closes_at)}` : 'Open'}
+                    </Badge>
+                  )}
                   {poll.allow_multiple && (
-                    <span style={{
-                      fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
-                      background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', color: pt.textSecondary,
-                    }}>Multiple choice</span>
+                    <Badge variant="neutral" dark={dark} color={pt.textSecondary}>Multiple choice</Badge>
                   )}
                   <DateStamp value={poll.created_at} color={pt.textMuted} />
                 </div>

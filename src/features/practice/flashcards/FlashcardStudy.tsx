@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useAnimate, motion } from 'framer-motion'
 import { getPulseTheme, pulseFonts, pulseType, ON_BACKGROUND } from '@/shared/theme/premiumTheme'
 import { adaptColor } from '@/shared/theme/adaptColor'
+import { ON_ACCENT } from '@/shared/theme/tokens'
 import StudyShell from '@/shared/ui/study/StudyShell'
 import StudyHeader from '@/shared/ui/study/StudyHeader'
 import StudyCard, { STUDY_CARD_HEIGHT } from '@/shared/ui/study/StudyCard'
@@ -268,7 +269,7 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
                 className="study-btn glass-focus-ring"
                 style={{
                   ...BAR_BUTTON_BASE, width: '100%',
-                  background: accent, border: `1px solid ${accent}`, color: '#0f172a',
+                  background: accent, border: `1px solid ${accent}`, color: ON_ACCENT,
                   boxShadow: `0 6px 20px ${accent}40`,
                 }}
               >Show answer</button>
@@ -289,7 +290,7 @@ export default function FlashcardStudy({ dark, accent, title, queue: initialQueu
                   className="study-btn glass-focus-ring"
                   style={{
                     ...BAR_BUTTON_BASE, flex: 1,
-                    background: accent, border: `1px solid ${accent}`, color: '#0f172a',
+                    background: accent, border: `1px solid ${accent}`, color: ON_ACCENT,
                     boxShadow: `0 6px 20px ${accent}40`,
                   }}
                 >Got it</button>

@@ -3,6 +3,7 @@ import { supabase } from '@/core/supabase'
 import { getPulseTheme, pulseFonts } from '@/shared/theme/premiumTheme'
 import InlineMessage from '@/shared/ui/feedback/InlineMessage'
 import QuestionSourceBadge from '@/shared/ui/display/QuestionSourceBadge'
+import Badge from '@/shared/ui/display/Badge'
 import SearchInput from '@/shared/ui/controls/SearchInput'
 import AdminSplitLayout from '@/features/admin/common/AdminSplitLayout'
 import AdminFormCard from '@/features/admin/common/AdminFormCard'
@@ -469,16 +470,10 @@ export default function QuestionsTab({ dark, modules, context }: QuestionsTabPro
                 display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden'
               }}>{q.question}</p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                <span style={{
-                  fontSize: 10.5, fontWeight: 700, padding: '2px 9px', borderRadius: 20,
-                  background: `${pt.cobalt}18`, border: `1px solid ${pt.cobalt}40`, color: pt.cobalt
-                }}>{EXAM_TYPES.find(t => t.value === q.exam_type)?.label ?? q.exam_type}</span>
-                {q.exam_stage && (
-                  <span style={{
-                    fontSize: 10.5, fontWeight: 700, padding: '2px 9px', borderRadius: 20,
-                    background: `${pt.indigo}18`, border: `1px solid ${pt.indigo}40`, color: pt.indigo
-                  }}>{stageLabel(q.exam_stage)}</span>
-                )}
+                <Badge color={pt.cobalt} variant="outline" size="sm">
+                  {EXAM_TYPES.find(t => t.value === q.exam_type)?.label ?? q.exam_type}
+                </Badge>
+                {q.exam_stage && <Badge color={pt.indigo} variant="outline" size="sm">{stageLabel(q.exam_stage)}</Badge>}
                 {q.source && <QuestionSourceBadge source={q.source} dark={dark} />}
               </div>
             </div>

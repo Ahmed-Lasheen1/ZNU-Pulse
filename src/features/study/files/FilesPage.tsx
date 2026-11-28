@@ -19,7 +19,7 @@ import { fetchSubjectsForModule } from '@/services/content/subjects'
 import { fetchModuleFiles } from '@/services/content/moduleContent'
 import { selectableModules } from '@/services/content/modules'
 import { getDriveOrRawUrl, getVideoEmbedUrl, isSafeExternalUrl } from '@/shared/utils/embedUrl'
-import { Z } from '@/shared/theme/tokens'
+import { Z, ON_ACCENT } from '@/shared/theme/tokens'
 import { BookIcon, QuestionMarkIcon, VideoIcon, GraduationCapIcon, DocumentIcon, AudioIcon, FolderIcon } from '@/shared/icons/tool-icons'
 
 interface FilesModule {
@@ -272,7 +272,7 @@ export default function FilesPage({ dark }: { dark: boolean }) {
                 onClick={() => setViewer(file)}
                 style={{ fontSize: 13, flexShrink: 0 }}
               >
-                <FileActionIcon type={file.file_type} color="#0f172a" size={13} /> {fileActionLabel(file.file_type)}
+                <FileActionIcon type={file.file_type} color={ON_ACCENT} size={13} /> {fileActionLabel(file.file_type)}
               </Button>
             </LiquidGlassCard>
           </div>

@@ -104,6 +104,40 @@ h1, h2, h3 {
   }
 }
 
+/* Admin form and list grids (used by every admin tab and form) */
+
+.admin-form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  margin-bottom: 12px;
+}
+
+@media (min-width: 640px) {
+  .admin-form-row-2 { grid-template-columns: 1fr 1fr; gap: 12px; }
+}
+
+.admin-form-row-3 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0 10px;
+  margin-bottom: 8px;
+}
+
+@media (min-width: 560px) {
+  .admin-form-row-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.admin-list-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+@media (min-width: 1500px) {
+  .admin-list-grid { grid-template-columns: 1fr 1fr; }
+}
+
 .glass-focus-ring:focus-visible {
   outline: none;
   box-shadow:

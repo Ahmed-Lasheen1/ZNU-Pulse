@@ -4,6 +4,7 @@ import { getPulseTheme, pulseFonts, pulseType } from '@/shared/theme/premiumThem
 import { adaptColor } from '@/shared/theme/adaptColor'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import OfflineNote from '@/shared/ui/feedback/OfflineNote'
+import EmptyState from '@/shared/ui/feedback/EmptyState'
 import DialogShell from '@/shared/ui/feedback/DialogShell'
 import Button from '@/shared/ui/controls/Button'
 import TabRow from '@/shared/ui/controls/TabRow'
@@ -20,6 +21,7 @@ import { BookIcon, PauseIcon, PlayIcon, EmptyBoxIcon, GraduationCapIcon } from '
 import { useWeakSpots } from '@/features/practice/mcq/useWeakSpots'
 import SimulatorCard from '@/features/practice/SimulatorCard'
 import { MCQ_ACCENT } from '@/shared/theme/accents'
+import { ON_ACCENT } from '@/shared/theme/tokens'
 import { stagesOf, inStage } from '@/services/content/lessonStages'
 import { simulatorPool, simulatorTotal, QUIZ_MAX_QUESTIONS } from '@/services/exam/stageSimulator'
 import { WEAK_BELOW } from '@/services/history/weakSpots'
@@ -249,7 +251,7 @@ export default function MCQBrowse({
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <Button dark={dark} variant="solid" size="sm" color={MCQ_ACCENT} onClick={onResume} style={{ padding: '6px 14px', gap: 5 }}>
-                <PlayIcon color="#0f172a" size={11} /> Continue
+                <PlayIcon color={ON_ACCENT} size={11} /> Continue
               </Button>
               <Button
                 dark={dark} variant="outline" size="sm" color={mcqText} onClick={onDiscardResume}
@@ -401,11 +403,12 @@ export default function MCQBrowse({
         ))}
         {loading && subjectRows.length === 0 && <CardRowsSkeleton count={3} label="Loading subjects" />}
         {subjectRows.length === 0 && !loading && (
-          <LiquidGlassCard dark={dark} delay={0} style={{ padding: 24, textAlign: 'center' }}>
-            <p style={{ color: pt.sub, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              <EmptyBoxIcon color={pt.sub} size={16} /> {stageActive ? 'No questions in this stage yet' : 'No subjects for this module yet'}
-            </p>
-          </LiquidGlassCard>
+          <EmptyState
+            dark={dark}
+            icon={<EmptyBoxIcon color={pt.sub} size={16} />}
+            message={stageActive ? 'No questions in this stage yet' : 'No subjects for this module yet'}
+            style={{ padding: 24 }}
+          />
         )}
       </div>
 
@@ -420,4 +423,3 @@ export default function MCQBrowse({
       />
     </PageShell>
   )
-}

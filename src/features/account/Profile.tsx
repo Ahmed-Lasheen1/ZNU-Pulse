@@ -10,11 +10,12 @@ import { isSuccessMessage } from '@/shared/utils/messageStyle'
 import { cachedSnapshot, saveCached } from '@/core/dataCache'
 import { useToast } from '@/shared/ui/feedback/ToastProvider'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
-import BackButton from '@/shared/ui/layout/BackButton'
+import PageShell from '@/shared/ui/layout/PageShell'
 import PulseGlassRow from '@/shared/ui/glass/PulseGlassRow'
 import Button from '@/shared/ui/controls/Button'
 import { NotificationToggle } from '@/features/notifications'
 import OfflineNote from '@/shared/ui/feedback/OfflineNote'
+import EmptyState from '@/shared/ui/feedback/EmptyState'
 import { ProfileSkeleton, LeaderboardSkeleton } from '@/shared/ui/feedback/Skeletons'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import ConfirmDialog from '@/shared/ui/feedback/ConfirmDialog'
@@ -329,169 +330,156 @@ export default function Profile({ dark }: { dark: boolean }) {
   const showRankRow = !!user && myRank !== null && !leaderboard.some(entry => entry.is_me)
 
   return (
-    <div style={{ position: 'relative' }}>
-      <div className="pulse-wide" style={{
-        position: 'relative', zIndex: 1,
-        padding: '24px 20px 100px',
-        fontFamily: pulseFonts.body, maxWidth: 820, margin: '0 auto'
-      }}>
+    <PageShell dark={dark} backFallback="/" maxWidth={820}>
+      {loadError && <div style={{ marginBottom: 16 }}><ErrorBanner message="Couldn't load some data — check your connection." /></div>}
+      {savedCopy && <OfflineNote dark={dark} message="You're offline — showing your last saved profile and leaderboard." />}
 
-        <div style={{ marginBottom: 8 }}>
-          <BackButton dark={dark} fallback="/" />
-        </div>
+      <PillTabs dark={dark} tabs={PROFILE_TABS} active={tab} onSelect={id => setTab(id)} marginBottom={24} />
 
-        {loadError && <div style={{ marginBottom: 16 }}><ErrorBanner message="Couldn't load some data — check your connection." /></div>}
-        {savedCopy && <OfflineNote dark={dark} message="You're offline — showing your last saved profile and leaderboard." />}
-
-        <PillTabs dark={dark} tabs={PROFILE_TABS} active={tab} onSelect={id => setTab(id)} marginBottom={24} />
-
-        {tab === 'profile' && (
-          <>
-            {!user ? (
-              <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-                  <Lock size={48} color={pt.cobalt} />
-                </div>
-                <h3 style={{ ...pulseType.sectionTitle, color: pt.cobalt, marginBottom: 8 }}>Sign in to view your profile</h3>
-                <p style={{ color: pt.sub, marginBottom: 20, fontSize: 14 }}>Track your points and save your progress</p>
-                <Button dark={dark} variant="primary" size="md" onClick={() => navigate('/auth')} style={{ padding: '12px 28px' }}>
-                  Sign In
-                </Button>
-              </LiquidGlassCard>
-            ) : loading ? (
-              <ProfileSkeleton />
-            ) : profile ? (
-              <div>
-                <div style={{ marginBottom: 16 }}>
-                  <LiquidGlassCard dark={dark} delay={0} style={{ padding: '28px 24px', textAlign: 'center' }}>
-                    <h2 style={{ ...pulseType.sectionTitle, color: pt.cobalt, fontSize: 30, marginBottom: 8 }}>
-                      Dr. {profile.name}
-                    </h2>
-                    <p style={{ color: pt.textMuted, fontSize: 17, marginBottom: 20 }}>ZNU Medical Student</p>
-                    <PointsTiles
-                      dark={dark}
-                      semesterLabel={semester ? `${semester} points` : 'This semester'}
-                      semesterPoints={semesterPoints}
-                      lifetimePoints={profile.points}
-                    />
-                    {myHistory.length > 0 && (
-                      <div style={{ marginTop: 22, textAlign: 'left' }}>
-                        <PastSemesters dark={dark} items={myHistory} delay={0.3} />
-                      </div>
-                    )}
-                  </LiquidGlassCard>
-                </div>
-
-                <div style={{ marginBottom: 16 }}>
-                  <NotificationToggle dark={dark} switchSize={1.5} />
-                </div>
-
-                <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                  <PulseGlassRow dark={dark} radius={999} hoverTint={hoverTint} onClick={() => navigate('/review')} style={{ display: 'inline-block' }}>
-                    <div style={{ padding: '8px 18px', ...pulseType.small, fontWeight: 700, color: pt.sub, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <ClockIcon color={pt.sub} size={13} /> View exam history & mistakes
-                    </div>
-                  </PulseGlassRow>
-                </div>
-
-                <div style={{ marginBottom: 16 }}>
-                  <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                      <h3 style={{ ...pulseType.sectionLabel, fontSize: 14, color: pt.cobalt, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <ClipboardList size={14} /> Account Info
-                      </h3>
-                      <button onClick={() => setEditing(!editing)} style={{
-                        background: 'transparent', border: `1px solid ${pt.border}`,
-                        borderRadius: 8, padding: '4px 12px', cursor: 'pointer',
-                        color: pt.sub, fontFamily: pulseFonts.body, fontSize: 12, fontWeight: 700,
-                        display: 'flex', alignItems: 'center', gap: 5
-                      }}>{editing ? 'Cancel' : (<><Pencil size={12} /> Edit</>)}</button>
-                    </div>
-                    {[
-                      { label: 'Full Name', value: `Dr. ${profile.name}` },
-                      { label: 'Email', value: user.email },
-                      { label: 'University', value: 'Zagazig National University' },
-                    ].map((item, i) => (
-                      <div key={i} style={{
-                        display: 'flex', justifyContent: 'space-between', padding: '10px 0',
-                        borderBottom: i < 2 ? `1px solid ${pt.border}` : 'none'
-                      }}>
-                        <span style={{ color: pt.textMuted, fontSize: 13 }}>{item.label}</span>
-                        <span style={{ color: pt.textPrimary, fontSize: 13, fontWeight: 600 }}>{item.value}</span>
-                      </div>
-                    ))}
-                  </LiquidGlassCard>
-                </div>
-
-                {editing && (
-                  <EditProfileForm
-                    profile={profile}
-                    dark={dark}
-                    onUpdated={(newName) => {
-                      setProfile(prev => prev ? { ...prev, name: newName } : prev)
-                      saveCached(`user:${user.id}:profile`, { ...profile, name: newName })
-                    }}
-                    onProfileRefresh={() => fetchProfile(user.id)}
-                  />
-                )}
-
-                <Button
-                  dark={dark} variant="tinted" size="sm" color={pt.danger} fullWidth
-                  onClick={() => setShowSignOutConfirm(true)} style={{ padding: 14, fontSize: 14 }}
-                >
-                  Sign Out
-                </Button>
+      {tab === 'profile' && (
+        <>
+          {!user ? (
+            <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+                <Lock size={48} color={pt.cobalt} />
               </div>
-            ) : (
-              <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-                <p style={{ color: pt.sub, marginBottom: 20, fontSize: 14 }}>We couldn't load your profile.</p>
-                <Button dark={dark} variant="primary" size="md" onClick={() => fetchData()} style={{ padding: '12px 28px' }}>
-                  Try again
-                </Button>
-              </LiquidGlassCard>
-            )}
-          </>
-        )}
+              <h3 style={{ ...pulseType.sectionTitle, color: pt.cobalt, marginBottom: 8 }}>Sign in to view your profile</h3>
+              <p style={{ color: pt.sub, marginBottom: 20, fontSize: 14 }}>Track your points and save your progress</p>
+              <Button dark={dark} variant="primary" size="md" onClick={() => navigate('/auth')} style={{ padding: '12px 28px' }}>
+                Sign In
+              </Button>
+            </LiquidGlassCard>
+          ) : loading ? (
+            <ProfileSkeleton />
+          ) : profile ? (
+            <div>
+              <div style={{ marginBottom: 16 }}>
+                <LiquidGlassCard dark={dark} delay={0} style={{ padding: '28px 24px', textAlign: 'center' }}>
+                  <h2 style={{ ...pulseType.sectionTitle, color: pt.cobalt, fontSize: 30, marginBottom: 8 }}>
+                    Dr. {profile.name}
+                  </h2>
+                  <p style={{ color: pt.textMuted, fontSize: 17, marginBottom: 20 }}>ZNU Medical Student</p>
+                  <PointsTiles
+                    dark={dark}
+                    semesterLabel={semester ? `${semester} points` : 'This semester'}
+                    semesterPoints={semesterPoints}
+                    lifetimePoints={profile.points}
+                  />
+                  {myHistory.length > 0 && (
+                    <div style={{ marginTop: 22, textAlign: 'left' }}>
+                      <PastSemesters dark={dark} items={myHistory} delay={0.3} />
+                    </div>
+                  )}
+                </LiquidGlassCard>
+              </div>
 
-        {tab === 'leaderboard' && (
-          <div>
-            <h2 style={{ ...pulseType.sectionTitle, color: pt.amber, textAlign: 'center', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <LeaderboardIcon color={pt.amber} size={20} /> Top {LEADERBOARD_SIZE} Students{semester ? ` · ${semester}` : ''}
-            </h2>
-            {loading && <LeaderboardSkeleton />}
-            {!loading && leaderboard.length === 0 && (
-              <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
-                <p style={{ color: pt.sub }}>No points this semester yet — be the first to score.</p>
-              </LiquidGlassCard>
-            )}
-            {leaderboard.map((entry, i) => {
-              const rank = entry.rank_position ?? i + 1
-              return (
-                <LeaderboardRow
-                  key={i}
-                  entry={entry}
-                  rank={rank}
-                  index={i}
-                  isLast={i === leaderboard.length - 1}
+              <div style={{ marginBottom: 16 }}>
+                <NotificationToggle dark={dark} switchSize={1.5} />
+              </div>
+
+              <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                <PulseGlassRow dark={dark} radius={999} hoverTint={hoverTint} onClick={() => navigate('/review')} style={{ display: 'inline-block' }}>
+                  <div style={{ padding: '8px 18px', ...pulseType.small, fontWeight: 700, color: pt.sub, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <ClockIcon color={pt.sub} size={13} /> View exam history & mistakes
+                  </div>
+                </PulseGlassRow>
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <LiquidGlassCard dark={dark} delay={0} style={{ padding: '20px 22px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <h3 style={{ ...pulseType.sectionLabel, fontSize: 14, color: pt.cobalt, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <ClipboardList size={14} /> Account Info
+                    </h3>
+                    <button onClick={() => setEditing(!editing)} style={{
+                      background: 'transparent', border: `1px solid ${pt.border}`,
+                      borderRadius: 8, padding: '4px 12px', cursor: 'pointer',
+                      color: pt.sub, fontFamily: pulseFonts.body, fontSize: 12, fontWeight: 700,
+                      display: 'flex', alignItems: 'center', gap: 5
+                    }}>{editing ? 'Cancel' : (<><Pencil size={12} /> Edit</>)}</button>
+                  </div>
+                  {[
+                    { label: 'Full Name', value: `Dr. ${profile.name}` },
+                    { label: 'Email', value: user.email },
+                    { label: 'University', value: 'Zagazig National University' },
+                  ].map((item, i) => (
+                    <div key={i} style={{
+                      display: 'flex', justifyContent: 'space-between', padding: '10px 0',
+                      borderBottom: i < 2 ? `1px solid ${pt.border}` : 'none'
+                    }}>
+                      <span style={{ color: pt.textMuted, fontSize: 13 }}>{item.label}</span>
+                      <span style={{ color: pt.textPrimary, fontSize: 13, fontWeight: 600 }}>{item.value}</span>
+                    </div>
+                  ))}
+                </LiquidGlassCard>
+              </div>
+
+              {editing && (
+                <EditProfileForm
+                  profile={profile}
                   dark={dark}
-                  reduced={reduced}
-                  onOpen={() => setSelected({ entry, rank })}
+                  onUpdated={(newName) => {
+                    setProfile(prev => prev ? { ...prev, name: newName } : prev)
+                    saveCached(`user:${user.id}:profile`, { ...profile, name: newName })
+                  }}
+                  onProfileRefresh={() => fetchProfile(user.id)}
                 />
-              )
-            })}
-            {!loading && showRankRow && myRank !== null && (
-              <MyRankRow
-                rank={myRank}
-                name={profile?.name}
-                points={semesterPoints}
+              )}
+
+              <Button
+                dark={dark} variant="tinted" size="sm" color={pt.danger} fullWidth
+                onClick={() => setShowSignOutConfirm(true)} style={{ padding: 14, fontSize: 14 }}
+              >
+                Sign Out
+              </Button>
+            </div>
+          ) : (
+            <LiquidGlassCard dark={dark} delay={0} style={{ padding: 40, textAlign: 'center' }}>
+              <p style={{ color: pt.sub, marginBottom: 20, fontSize: 14 }}>We couldn't load your profile.</p>
+              <Button dark={dark} variant="primary" size="md" onClick={() => fetchData()} style={{ padding: '12px 28px' }}>
+                Try again
+              </Button>
+            </LiquidGlassCard>
+          )}
+        </>
+      )}
+
+      {tab === 'leaderboard' && (
+        <div>
+          <h2 style={{ ...pulseType.sectionTitle, color: pt.amber, textAlign: 'center', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <LeaderboardIcon color={pt.amber} size={20} /> Top {LEADERBOARD_SIZE} Students{semester ? ` · ${semester}` : ''}
+          </h2>
+          {loading && <LeaderboardSkeleton />}
+          {!loading && leaderboard.length === 0 && (
+            <EmptyState dark={dark} message="No points this semester yet — be the first to score." />
+          )}
+          {leaderboard.map((entry, i) => {
+            const rank = entry.rank_position ?? i + 1
+            return (
+              <LeaderboardRow
+                key={i}
+                entry={entry}
+                rank={rank}
+                index={i}
+                isLast={i === leaderboard.length - 1}
                 dark={dark}
                 reduced={reduced}
-                delay={0.1 + leaderboard.length * 0.05}
+                onOpen={() => setSelected({ entry, rank })}
               />
-            )}
-          </div>
-        )}
-      </div>
+            )
+          })}
+          {!loading && showRankRow && myRank !== null && (
+            <MyRankRow
+              rank={myRank}
+              name={profile?.name}
+              points={semesterPoints}
+              dark={dark}
+              reduced={reduced}
+              delay={0.1 + leaderboard.length * 0.05}
+            />
+          )}
+        </div>
+      )}
 
       <AnimatePresence>
         {selected && (
@@ -520,6 +508,6 @@ export default function Profile({ dark }: { dark: boolean }) {
           navigate('/')
         }}
       />
-    </div>
+    </PageShell>
   )
 }

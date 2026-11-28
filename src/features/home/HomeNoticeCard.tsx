@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { getPulseTheme, pulseType } from '@/shared/theme/premiumTheme'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
+import Badge from '@/shared/ui/display/Badge'
 
 interface HomeNoticeCardProps {
   dark: boolean
@@ -53,10 +54,9 @@ export default function HomeNoticeCard({
       </div>
 
       {badge ? (
-        <span style={{
-          background: `${accent}22`, color: accent, borderRadius: 999,
-          padding: '3px 11px', fontSize: 11.5, fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0,
-        }}>{badge}</span>
+        <span style={{ flexShrink: 0, display: 'inline-flex' }}>
+          <Badge color={accent}>{badge}</Badge>
+        </span>
       ) : onClick ? (
         <span aria-hidden style={{ color: pt.textMuted, fontSize: 16, flexShrink: 0 }}>→</span>
       ) : null}

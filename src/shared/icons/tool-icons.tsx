@@ -729,7 +729,8 @@ export function UserIcon({ color, size = 16 }: IconProps) {
   )
 }
 
-export function StarIcon({ color, size = 16 }: IconProps) {
+// Solid star; the outlined "Star / Featured" icon lives in medicalIcons.tsx as StarIcon.
+export function StarFilledIcon({ color, size = 16 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <path

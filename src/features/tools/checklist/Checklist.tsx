@@ -12,6 +12,7 @@ import { ChecklistSkeleton } from '@/shared/ui/feedback/Skeletons'
 import OfflineNote from '@/shared/ui/feedback/OfflineNote'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import InfoNotice from '@/shared/ui/feedback/InfoNotice'
+import EmptyState from '@/shared/ui/feedback/EmptyState'
 import Button from '@/shared/ui/controls/Button'
 import Checkbox from '@/shared/ui/controls/Checkbox'
 import TabRow from '@/shared/ui/controls/TabRow'
@@ -353,7 +354,7 @@ export default function Checklist({ dark }: { dark: boolean }) {
   }
 
   return (
-    <PageShell dark={dark} backFallback="/" maxWidth={900} containerClassName="pulse-wide checklist-page">
+    <PageShell dark={dark} backFallback="/" maxWidth={900}>
       <style>{`
         .checklist-add-row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
         .checklist-add-row input { flex: 1 1 180px; min-width: 0; }
@@ -455,11 +456,10 @@ export default function Checklist({ dark }: { dark: boolean }) {
       {(!modulesLoaded || tasksLoading) && <ChecklistSkeleton />}
 
       {modulesLoaded && !tasksLoading && totalTasks === 0 && !tasksError && (
-        <LiquidGlassCard dark={dark} delay={200} style={{ padding: 40, textAlign: 'center' }}>
-          <p style={{ color: pt.sub, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-            No tasks yet — add topics you need to study! <BookIcon color={pt.sub} size={15} />
-          </p>
-        </LiquidGlassCard>
+        <EmptyState
+          dark={dark}
+          message={<>No tasks yet — add topics you need to study! <BookIcon color={pt.sub} size={15} /></>}
+        />
       )}
 
       {activeTasks.map((task, i) => (
@@ -469,11 +469,12 @@ export default function Checklist({ dark }: { dark: boolean }) {
       ))}
 
       {modulesLoaded && totalTasks > 0 && activeTasks.length === 0 && (
-        <LiquidGlassCard dark={dark} delay={200} style={{ padding: 32, textAlign: 'center', marginBottom: TASK_GAP }}>
-          <p style={{ color: pt.cobalt, fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-            <CelebrationIcon color={pt.cobalt} size={16} /> Everything's checked off!
-          </p>
-        </LiquidGlassCard>
+        <EmptyState
+          dark={dark}
+          icon={<CelebrationIcon color={pt.cobalt} size={16} />}
+          message={<span style={{ color: pt.cobalt, fontWeight: 700, fontSize: 14 }}>Everything's checked off!</span>}
+          style={{ padding: 32, marginBottom: TASK_GAP }}
+        />
       )}
 
       {completedTasks.length > 0 && (

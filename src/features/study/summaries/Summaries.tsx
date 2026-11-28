@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { getPulseTheme, pulseType } from '@/shared/theme/premiumTheme'
 import { adaptColor } from '@/shared/theme/adaptColor'
+import { ON_ACCENT } from '@/shared/theme/tokens'
 import ErrorBanner from '@/shared/ui/feedback/ErrorBanner'
 import SummaryOverlay from '@/features/study/summaries/SummaryOverlay'
 import LiquidGlassCard from '@/shared/ui/glass/liquid-glass-card'
@@ -200,7 +201,7 @@ function ModuleSummaries({ mod, dark, initialStage, initialSummaryId }: {
               <div style={{ ...pulseType.small, color: pt.textMuted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mod.name}</div>
             </div>
             <div style={{
-              background: mod.color, color: '#0f172a', borderRadius: 999,
+              background: mod.color, color: ON_ACCENT, borderRadius: 999,
               padding: '6px 14px', fontSize: 12, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap',
             }}>Open →</div>
           </LiquidGlassCard>
